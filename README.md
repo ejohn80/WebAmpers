@@ -4,6 +4,6 @@ WebAmp is a web-based application that lets users process audio files or live re
 
 The goal is to create an accessible and free browser-based audio processing service that can be used for general purposes such as trimming audio recordings or more specialized uses such as music production.
 
-[Living Document]()
+[Living Document](https://docs.google.com/document/d/1iWrHvP_rDxYkGMSReI9TkP29NTkfiGw9akhMeHcdd4I/edit?tab=t.0#heading=h.zccxj59ie2v)
 
 
