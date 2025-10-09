@@ -1,0 +1,15 @@
+*, *::before, *::after {
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+html, body {
+  font-family: 'Roboto';
+}
+
+body {
+  background-color: #282c34;
+  color: white;
+  margin: 0;
+  display: flex;
+}
