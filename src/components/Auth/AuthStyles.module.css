@@ -1,0 +1,174 @@
+.wrapper {
+  min-height: 100dvh;
+  height: 100dvh;
+  width: 100%;
+  background-size: cover;
+  background-position: center;
+  overflow-y: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 20px;
+}
+
+.container {
+  max-width: 400px;
+  width: 100%;
+  font-family: sans-serif;
+  text-align: center;
+  background: white;
+  padding: 30px;
+  border-radius: 10px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.open {
+  max-height: 1000px;
+}
+
+.container h1 {
+  color: #333;
+}
+
+.options {
+  color: #667eea;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 30px;
+  gap: 15px;
+}
+
+.option {
+  flex: 1;
+  padding: 20px;
+  border: 2px solid #ccc;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: all 0.2s;
+  font-weight: 500;
+  background: white;
+}
+
+.option:hover {
+  border-color: #667eea;
+  background: #f8f9ff;
+}
+
+.option.selected {
+  border-color: #667eea;
+  background: #667eea;
+  color: white;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  text-align: left;
+}
+
+.form h2 {
+  text-align: center;
+  margin-bottom: 10px;
+  color: #333;
+}
+
+.input {
+  padding: 12px;
+  border-radius: 6px;
+  border: 1px solid #ddd;
+  font-size: 16px;
+  transition: border-color 0.2s;
+}
+
+.input:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
+}
+
+.button {
+  padding: 12px;
+  background: #667eea;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 500;
+  transition: background-color 0.2s;
+}
+
+.button:hover {
+  background: #5a6fd8;
+}
+
+.signIn {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 2px solid #dddddd;
+  text-align: center;
+  color: #666;
+  font-size: 14px;
+}
+
+.signIn span {
+  color: #667eea;
+  cursor: pointer;
+}
+
+.signIn span:hover {
+  text-decoration: underline;
+}
+
+.error {
+  color: rgb(255, 0, 0);
+  background-color: rgb(252, 189, 189);
+  border-radius: 10px;
+  padding: 5px;
+  margin-top: 10px;
+}
+
+.logo {
+  width: 90%;
+  margin-bottom: 15px;
+}
+
+.loginOptionsContainer {
+  display: flex;
+  justify-content: center;
+}
+
+.separator {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  margin: 15px 0;
+}
+
+.separator::before,
+.separator::after {
+  content: "";
+  flex: 1;
+  border-bottom: 1px solid #ccc;
+}
+
+.separator span {
+  padding: 0 10px;
+  color: #666;
+  font-size: 14px;
+}
+
+.passwordToggleIcon {
+  position: absolute;
+  right: 30px;
+  top: 52%;
+  transform: translateY(-50%);
+  cursor: pointer;
+  z-index: 999;
+}
+
+.passwordInput {
+  margin: 0;
+  padding-right: 55px;
+}
