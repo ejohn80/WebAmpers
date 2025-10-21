@@ -1,26 +1,36 @@
-import AudioImporter from '../audio/audioImporter';
+import AudioImporter from '../components/AudioImport/AudioImporter';
 import * as Tone from 'tone';
 
-jest.mock('tone', () => ({
-  context: {
-    rawContext: {
-      decodeAudioData: jest.fn()
-    }
-  },
-  ToneAudioBuffer: jest.fn()
-}));
+// Keep the original module and mock specific parts in beforeEach
+jest.mock('tone');
 
 describe('AudioImporter', () => {
   let importer;
 
   beforeEach(() => {
+    // Reset the mock before each test to ensure state isolation
+    Tone.context = {
+      state: 'suspended',
+      rawContext: {
+        decodeAudioData: jest.fn(),
+      },
+      resume: jest.fn().mockResolvedValue(undefined),
+    };
+
+    Tone.start = jest.fn().mockImplementation(() => {
+      Tone.context.state = 'running';
+      return Promise.resolve();
+    });
+
+    Tone.ToneAudioBuffer = jest.fn();
+
     importer = new AudioImporter();
     jest.clearAllMocks();
   });
 
   describe('constructor', () => {
     test('initialized supported formats', () => {
-      expect(importer.supportedFormats).toEqual(['audio/wav', 'audio/mp3']);
+      expect(importer.supportedFormats).toEqual(['audio/wav', 'audio/mp3', 'audio/mpeg']);
     });
   });
 
@@ -32,6 +42,11 @@ describe('AudioImporter', () => {
 
     test('MP3 is valid', () => {
       const file = new File([''], 'test.mp3', { type: 'audio/mp3' });
+      expect(importer.validateFile(file)).toBe(true);
+    });
+
+    test('MPEG is valid', () => {
+      const file = new File([''], 'test.mpeg', { type: 'audio/mpeg' });
       expect(importer.validateFile(file)).toBe(true);
     });
 
@@ -115,45 +130,57 @@ describe('AudioImporter', () => {
 
   describe('extractMetadata', () => {
     test('check metadata from file and buffer', () => {
+      // Freeze time to get a predictable 'uploadedAt' value
+      jest.useFakeTimers().setSystemTime(new Date('2024-01-01T00:00:00.000Z'));
+
       const mockFile = new File(['content'], 'test.wav', { type: 'audio/wav' });
-      Object.defineProperty(mockFile, 'size', { value: 1024 });
+      // 1.5 MB
+      Object.defineProperty(mockFile, 'size', { value: 1.5 * 1024 * 1024 }); 
       const mockBuffer = {
-        duration: 5.5,
-        sampleRate: 44100
+        duration: 65.5, // 1 minute 5.5 seconds
+        sampleRate: 44100,
+        numberOfChannels: 2
       };
 
       const metadata = importer.extractMetadata(mockFile, mockBuffer);
       expect(metadata).toEqual({
         name: 'test.wav',
-        size: 1024,
+        size: '1.50 MB',
         type: 'audio/wav',
-        duration: 5.5,
-        sampleRate: 44100
+        duration: '1m 5.50s',
+        sampleRate: '44100 Hz',
+        numberOfChannels: 2,
+        uploadedAt: '2024-01-01T00:00:00.000Z'
       });
+
+      // Restore real timers
+      jest.useRealTimers();
     });
 
     test('different file sizes', () => {
       const mockFile = new File([''], 'large.mp3', { type: 'audio/mp3' });
       Object.defineProperty(mockFile, 'size', { value: 5242880 }); // 5MB
       const mockBuffer = {
-        duration: 180.0,
-        sampleRate: 48000
+        duration: 180.123,
+        sampleRate: 48000,
+        numberOfChannels: 1
       };
 
       const metadata = importer.extractMetadata(mockFile, mockBuffer);
-      expect(metadata.size).toBe(5242880);
-      expect(metadata.duration).toBe(180.0);
+      expect(metadata.size).toBe('5.00 MB');
+      expect(metadata.duration).toBe('3m 0.12s');
     });
 
     test('different sample rates', () => {
       const mockFile = new File([''], 'test.wav', { type: 'audio/wav' });
       const mockBuffer = {
         duration: 10.0,
-        sampleRate: 22050
+        sampleRate: 22050,
+        numberOfChannels: 1
       };
 
       const metadata = importer.extractMetadata(mockFile, mockBuffer);
-      expect(metadata.sampleRate).toBe(22050);
+      expect(metadata.sampleRate).toBe('22050 Hz');
     });
   });
 
@@ -173,6 +200,12 @@ describe('AudioImporter', () => {
       expect(result.metadata.name).toBe('test.wav');
       expect(result.metadata.type).toBe('audio/wav');
       expect(result.originalFile).toBe(file);
+    });
+
+    test('calls Tone.start() if context is not running', async () => {
+      const file = new File([''], 'test.wav', { type: 'audio/wav' });
+      await importer.importFile(file);
+      expect(Tone.start).toHaveBeenCalled();
     });
 
     test('invalid file', async () => {
@@ -211,17 +244,18 @@ describe('AudioImporter', () => {
   describe('end-to-end scenarios', () => {
     test('should handle MP3 file correctly', async () => {
       const file = new File(['mp3 data'], 'song.mp3', { type: 'audio/mp3' });
-      Object.defineProperty(file, 'size', { value: 2048 });
+      Object.defineProperty(file, 'size', { value: 2 * 1024 * 1024 }); // 2MB
       jest.spyOn(importer, 'fileToArrayBuffer').mockResolvedValue(new ArrayBuffer(2048));
       jest.spyOn(importer, 'decodeAudioData').mockResolvedValue({
         duration: 30.5,
-        sampleRate: 44100
+        sampleRate: 44100,
+        numberOfChannels: 2
       });
 
       const result = await importer.importFile(file);
       expect(result.metadata.name).toBe('song.mp3');
       expect(result.metadata.type).toBe('audio/mp3');
-      expect(result.metadata.size).toBe(2048);
+      expect(result.metadata.size).toBe('2.00 MB');
     });
 
     test('multiple imports', async () => {

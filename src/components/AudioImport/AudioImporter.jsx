@@ -5,7 +5,7 @@ import * as Tone from 'tone';
  */
 class AudioImporter {
   constructor() {
-    this.supportedFormats = ['audio/wav', 'audio/mp3'];
+    this.supportedFormats = ['audio/wav', 'audio/mp3', 'audio/mpeg']; // Added 'audio/mpeg' for broader mp3 support
   }
 
   /**
@@ -20,7 +20,7 @@ class AudioImporter {
     }
 
     if (!this.supportedFormats.includes(file.type)) {
-      throw new Error(`Unsupported file format: ${file.type}`);
+      throw new Error(`Unsupported file format: ${file.type}. Only .wav and .mp3 are supported.`);
     }
 
     return true;
@@ -34,6 +34,11 @@ class AudioImporter {
    */
   async importFile(file) {
     this.validateFile(file);
+
+    // // Ensure Tone.js AudioContext is running, as it's required for decoding.
+    if (Tone.context.state !== 'running') {
+      await Tone.start();
+    }
 
     try {
       const arrayBuffer = await this.fileToArrayBuffer(file);
@@ -57,11 +62,11 @@ class AudioImporter {
    * @throws {Error} - if the file could not be read
    */
   async fileToArrayBuffer(file) {
-    const fileReader = new FileReader();
+    const reader = new FileReader();
     const result = await new Promise((resolve, reject) => {
-      fileReader.onload = (e) => resolve(e.target.result);
-      fileReader.onerror = () => reject(new Error('Failed to read file'));
-      fileReader.readAsArrayBuffer(file);
+      reader.onload = (e) => resolve(e.target.result);
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      reader.readAsArrayBuffer(file);
     });
     
     return result;
@@ -89,13 +94,21 @@ class AudioImporter {
    * @param {Tone.ToneAudioBuffer} buffer - decoded buffer
    * @returns {Object} - metadata object
    */
-  extractMetadata(file, buffer) {
+   extractMetadata(file, buffer) {
+    const formatDuration = (seconds) => {
+      const min = Math.floor(seconds / 60);
+      const sec = (seconds % 60).toFixed(2);
+      return `${min}m ${sec}s`;
+    };
+
     return {
       name: file.name,
-      size: file.size,
+      size: (file.size / (1024 * 1024)).toFixed(2) + ' MB',
       type: file.type,
-      duration: buffer.duration,
-      sampleRate: buffer.sampleRate
+      duration: formatDuration(buffer.duration),
+      sampleRate: buffer.sampleRate + ' Hz',
+      numberOfChannels: buffer.numberOfChannels,
+      uploadedAt: new Date().toISOString()
     };
   }
 }
