@@ -37,7 +37,7 @@ class AudioImporter {
 
     // // Ensure Tone.js AudioContext is running, as it's required for decoding.
     if (Tone.context.state !== 'running') {
-      await Tone.context.resume();
+      await Tone.start();
     }
 
     try {
