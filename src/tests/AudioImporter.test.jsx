@@ -1,11 +1,22 @@
 import AudioImporter from '../components/AudioImport/AudioImporter';
 import * as Tone from 'tone';
 
+// jest.mock('tone', () => ({
+//   context: {
+//     rawContext: {
+//       decodeAudioData: jest.fn()
+//     }
+//   },
+//   ToneAudioBuffer: jest.fn()
+// }));
+
 jest.mock('tone', () => ({
   context: {
+    state: 'suspended',
     rawContext: {
       decodeAudioData: jest.fn()
-    }
+    },
+    resume: jest.fn().mockResolvedValue(undefined), // Mock resume method
   },
   ToneAudioBuffer: jest.fn()
 }));
@@ -20,7 +31,7 @@ describe('AudioImporter', () => {
 
   describe('constructor', () => {
     test('initialized supported formats', () => {
-      expect(importer.supportedFormats).toEqual(['audio/wav', 'audio/mp3']);
+      expect(importer.supportedFormats).toEqual(['audio/wav', 'audio/mp3', 'audio/mpeg']);
     });
   });
 
