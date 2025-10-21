@@ -1,4 +1,4 @@
-import AudioImporter from '../audio/audioImporter';
+import AudioImporter from '../components/AudioImport/AudioImporter';
 import * as Tone from 'tone';
 
 jest.mock('tone', () => ({
