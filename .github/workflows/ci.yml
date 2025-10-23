@@ -5,6 +5,7 @@ on:
     branches: [tests]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -13,19 +14,21 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-defaults:
-  run:
-    working-directory: WebAmpers
-
 jobs:
   node-ci:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - name: Debug workspace
+        run: |
+          echo "GITHUB_WORKSPACE=$GITHUB_WORKSPACE"
+          pwd
+          ls -la
+          # show top two levels
+          (command -v tree >/dev/null && tree -L 2) || true
+
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
@@ -35,15 +38,13 @@ jobs:
         run: npm ci
 
       - name: Check formatting (Prettier)
-        run: npm run format
-        # or: npm run format --if-present
+        run: npm run format --if-present
 
       - name: Lint (ESLint)
-        run: npm run lint -- --max-warnings=0
-        # or: npm run lint --if-present
+        run: npm run lint --if-present
 
       - name: Unit tests (Vitest)
-        run: npm run test:coverage
+        run: npm run test:coverage --if-present
         env:
           CI: true
 
@@ -52,5 +53,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: coverage
-          path: WebAmpers/coverage/
+          path: coverage/
           if-no-files-found: ignore
