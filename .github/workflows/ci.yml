@@ -29,17 +29,18 @@ jobs:
         with:
           node-version: 20
           cache: npm
-          cache-dependency-path:  '**/package-lock.json'
+          cache-dependency-path: '**/package-lock.json'
 
       - name: Install (clean)
         run: npm ci
 
       - name: Check formatting (Prettier)
         run: npm run format
+        # or: npm run format --if-present
 
       - name: Lint (ESLint)
-        run: npm run lint
-        # To fail on warnings, add: -- --max-warnings=0
+        run: npm run lint -- --max-warnings=0
+        # or: npm run lint --if-present
 
       - name: Unit tests (Vitest)
         run: npm run test:coverage
@@ -53,4 +54,3 @@ jobs:
           name: coverage
           path: WebAmpers/coverage/
           if-no-files-found: ignore
-
