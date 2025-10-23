@@ -1,4 +1,4 @@
-import { getAuth, signOut } from 'firebase/auth';
+import {getAuth, signOut} from "firebase/auth";
 
 export function logout() {
   const auth = getAuth();
@@ -6,5 +6,5 @@ export function logout() {
 }
 
 export function isValidEmail(email) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
