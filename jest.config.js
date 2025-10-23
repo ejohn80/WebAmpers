@@ -1,12 +1,10 @@
 export default {
   testEnvironment: "jsdom",
   transform: {
-    "^.+\\.[tj]sx?$": "babel-jest"
+    "^.+\\.[tj]sx?$": "babel-jest",
   },
-  transformIgnorePatterns: [
-    '/node_modules/(?!tone/)'
-  ],
+  transformIgnorePatterns: ["/node_modules/(?!tone/)"],
   moduleNameMapper: {
-    "^tone$": "tone" // ensures tone mock resolves correctly
-  }
+    "^tone$": "tone", // ensures tone mock resolves correctly
+  },
 };

@@ -1,10 +1,13 @@
-*, *::before, *::after {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
   overflow: hidden;
 }
 
-html, body {
-  font-family: 'Roboto';
+html,
+body {
+  font-family: "Roboto";
 }
 
 body {

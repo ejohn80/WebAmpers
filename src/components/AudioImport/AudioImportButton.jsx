@@ -1,7 +1,7 @@
-import React, { useRef } from 'react';
-import * as Tone from 'tone';
-import AudioImporter from './AudioImporter';
-import './AudioImportButton.css';
+import React, { useRef } from "react";
+import * as Tone from "tone";
+import AudioImporter from "./AudioImporter";
+import "./AudioImportButton.css";
 
 /**
  * A UI component that provides a button to import audio files.
@@ -31,19 +31,19 @@ const AudioImportButton = ({ onImportSuccess, onImportError }) => {
 
     try {
       const importResult = await audioImporter.importFile(file);
-      console.log('File imported successfully:', importResult.metadata);
+      console.log("File imported successfully:", importResult.metadata);
       if (onImportSuccess) {
         onImportSuccess(importResult);
       }
     } catch (error) {
-      console.error('Error importing file:', error.message);
+      console.error("Error importing file:", error.message);
       if (onImportError) {
         onImportError(error);
       }
     }
 
     // Reset the file input to allow re-importing the same file
-    event.target.value = '';
+    event.target.value = "";
   };
 
   return (
@@ -53,7 +53,7 @@ const AudioImportButton = ({ onImportSuccess, onImportError }) => {
         ref={fileInputRef}
         onChange={handleFileChange}
         accept=".wav, .mp3"
-        style={{ display: 'none' }}
+        style={{ display: "none" }}
       />
       <button className="import-button" onClick={handleButtonClick}>
         Import Audio

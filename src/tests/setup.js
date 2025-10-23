@@ -1,4 +1,4 @@
-import '@testing-library/jest-dom';
+import "@testing-library/jest-dom";
 
 global.FileReader = class FileReader {
   readAsArrayBuffer(blob) {
