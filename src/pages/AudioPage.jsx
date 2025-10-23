@@ -1,8 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
-import DraggableDiv from '../components/Generic/DraggableDiv';
-import AudioImportButton from '../components/AudioImport/AudioImportButton';
-import Waveform from '../components/Waveform/Waveform';
 import './AudioPage.css';
+
+// Import the newly created layout components
+import Header from '../components/Layout/Header';
+import Sidebar from '../components/Layout/Sidebar';
+import MainContent from '../components/Layout/MainContent';
+import Footer from '../components/Layout/Footer';
 
 const MIN_WIDTH = 0; // Minimum allowed width for the sidebar in pixels
 const MAX_WIDTH = 300; // Maximum allowed width for the sidebar in pixels
@@ -87,34 +90,26 @@ function AudioPage() {
 
   return (
     <div className="app-container">
-      {/* 1. Header Section (Red) */}
-      <DraggableDiv color="red">
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-          <span>**Header** (Red Section)</span>
-          <AudioImportButton 
-            onImportSuccess={(result) => {
-              console.log("Audio imported, setting state:", result);
-              setAudioData(result); // Store the entire result object in state
-            }}
-            onImportError={(error) => {
-              alert(`Import failed: ${error.message}`);
-              setAudioData(null); // Clear any previous audio data on error
-              // TODO: Show a more user-friendly error message in the UI
-            }}
-          />
-        </div>
-      </DraggableDiv>
+      {/* 1. Header Section */}
+      <Header 
+        onImportSuccess={(result) => {
+          console.log("Audio imported, setting state:", result);
+          setAudioData(result); // Store the entire result object in state
+        }}
+        onImportError={(error) => {
+          alert(`Import failed: ${error.message}`);
+          setAudioData(null); // Clear any previous audio data on error
+          // TODO: Show a more user-friendly error message in the UI
+        }}
+      />
 
-      {/* 2. MIDDLE AREA (Blue/Purple Split) */}
+      {/* 2. Middle Area (Sidebar/Main Content Split) */}
       <div 
         className="main-content-area" 
         style={mainContentStyle} 
         ref={mainContentRef} // Attach ref for mouse position calculations
       >
-        {/* Blue Section (Sidebar) */}
-        <DraggableDiv color="blue" className="sidebar-container">
-          **Sidebar** (Blue Section, Current Width: {Math.round(sidebarWidth)}px)
-        </DraggableDiv>
+        <Sidebar width={sidebarWidth} />
 
         {/* Movable Divider Line */}
         <div 
@@ -122,24 +117,12 @@ function AudioPage() {
           onMouseDown={handleMouseDown}
           title="Drag to resize sidebar"
         />
-
-        {/* Purple Section (Main Content) */}
-        <DraggableDiv color="purple">
-          {audioData ? (
-            <Waveform audioBuffer={audioData.buffer} />
-          ) : (
-            <div style={{ textAlign: 'center', alignSelf: 'center' }}>
-              <h2>Main Content</h2>
-              <p>Import an audio file to see its waveform here.</p>
-            </div>
-          )}
-        </DraggableDiv>
+        
+        <MainContent audioData={audioData} />
       </div>
       
-      {/* 3. Footer Section (Lime Green) */}
-      <DraggableDiv color="lime">
-        **Footer** (Lime Green Section)
-      </DraggableDiv>
+      {/* 3. Footer Section */}
+      <Footer />
     </div>
   );
 }
