@@ -31,7 +31,7 @@ const ResetPassword = () => {
       await sendPasswordResetEmail(auth, formData.email);
       alert("Password reset email sent");
       navigate("/login");
-    } catch (err) {
+    } catch {
       setError("Error, please try later");
     } finally {
       setIsSpinnerActive(false);

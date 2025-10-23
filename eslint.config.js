@@ -33,7 +33,7 @@ export default defineConfig([
     },
     rules: {
       // keep your uppercase/ALL_CAPS unused var allowance
-      "no-unused-vars": ["error", { varsIgnorePattern: "^[A-Z_]" }],
+      "no-unused-vars": ["error", { varsIgnorePattern: "^[A-Z_]", argsIgnorePattern: "^_" }],
     },
   },
 ]);

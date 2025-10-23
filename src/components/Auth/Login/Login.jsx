@@ -8,9 +8,9 @@ import {
   getAuth,
   signInWithEmailAndPassword,
   GoogleAuthProvider,
-  signInWithPopup,
-  deleteUser,
-  sendPasswordResetEmail,
+  //signInWithPopup,
+  //deleteUser,
+  //sendPasswordResetEmail,
 } from "firebase/auth";
 // import { db } from '../../../firebase/firebase';
 // import { doc, getDoc } from 'firebase/firestore';
