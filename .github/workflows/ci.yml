@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [tests]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: WebAmpers
+
+jobs:
+  node-ci:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: WebAmpers/package-lock.json
+
+      - name: Install (clean)
+        run: npm ci
+
+      - name: Check formatting (Prettier)
+        run: npm run format
+
+      - name: Lint (ESLint)
+        run: npm run lint
+        # To fail on warnings, add: -- --max-warnings=0
+
+      - name: Unit tests (Vitest)
+        run: npm run test:coverage
+        env:
+          CI: true
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: WebAmpers/coverage/
+          if-no-files-found: ignore
+
