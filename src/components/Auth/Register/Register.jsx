@@ -1,14 +1,14 @@
-import {useState, useEffect} from "react";
-import {useNavigate, useLocation} from "react-router-dom";
-import {BeatLoader} from "react-spinners";
+import { useState, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { BeatLoader } from "react-spinners";
 import styles from "../AuthStyles.module.css";
 
-import {auth, db} from "../../../firebase/firebase";
+import { auth, db } from "../../../firebase/firebase";
 // import AuthRedirect from '../AuthRedirect';
-import {createUserWithEmailAndPassword} from "firebase/auth";
-import {isValidEmail} from "../AuthUtils";
-import {doc, setDoc} from "firebase/firestore";
-import {IoMdEye, IoMdEyeOff} from "react-icons/io";
+import { createUserWithEmailAndPassword } from "firebase/auth";
+import { isValidEmail } from "../AuthUtils";
+import { doc, setDoc } from "firebase/firestore";
+import { IoMdEye, IoMdEyeOff } from "react-icons/io";
 
 const Register = () => {
   const navigate = useNavigate();
@@ -28,8 +28,8 @@ const Register = () => {
   });
 
   const handleChange = (e) => {
-    const {name, value} = e.target;
-    setFormData((prev) => ({...prev, [name]: value}));
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
 
     if (name === "email") {
       if (value && isValidEmail(value)) {
@@ -43,13 +43,13 @@ const Register = () => {
     setIsSpinnerActive(true);
 
     try {
-      const {email, password, username} = formData;
+      const { email, password, username } = formData;
 
       // Create Firebase Auth user
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         email,
-        password
+        password,
       );
       const user = userCredential.user;
 
@@ -92,7 +92,7 @@ const Register = () => {
   return (
     <div
       className={styles.wrapper}
-      style={{backgroundImage: `url('/soundwave.jpg')`}}
+      style={{ backgroundImage: `url('/soundwave.jpg')` }}
     >
       {/* <AuthRedirect /> */}
       <div className={styles.container}>
@@ -124,10 +124,10 @@ const Register = () => {
             }}
             required
           />
-          <div style={{position: "relative"}}>
+          <div style={{ position: "relative" }}>
             <input
               className={`${styles.input} ${styles.passwordInput}`}
-              style={{width: inputWidth}}
+              style={{ width: inputWidth }}
               name="password"
               type={showPassword ? "text" : "password"}
               placeholder="Password"
@@ -156,7 +156,9 @@ const Register = () => {
         </form>
         <div className={styles.signIn}>
           Already have an account? Sign in{" "}
-          <span onClick={() => navigate("/login", {replace: true})}>here</span>
+          <span onClick={() => navigate("/login", { replace: true })}>
+            here
+          </span>
         </div>
         {error && <div className={styles.error}>{error}</div>}
       </div>

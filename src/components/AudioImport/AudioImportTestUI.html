@@ -452,21 +452,21 @@
       const appId =
         typeof __app_id !== "undefined" ? __app_id : "default-app-id";
       const firebaseConfig = JSON.parse(
-        typeof __firebase_config !== "undefined" ? __firebase_config : "{}"
+        typeof __firebase_config !== "undefined" ? __firebase_config : "{}",
       );
       const initialAuthToken =
         typeof __initial_auth_token !== "undefined"
           ? __initial_auth_token
           : null;
 
-      import {initializeApp} from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
       import {
         getAuth,
         signInAnonymously,
         signInWithCustomToken,
       } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-      import {getFirestore} from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-      import {setLogLevel} from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+      import { getFirestore } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+      import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
       // Initialize Firebase
       let app, db, auth;
@@ -489,7 +489,7 @@
             console.log("Firebase Auth initialized successfully.");
           } else {
             console.warn(
-              "Firebase configuration missing. Running without auth."
+              "Firebase configuration missing. Running without auth.",
             );
           }
         } catch (error) {
@@ -523,7 +523,7 @@
 
           if (!isValid) {
             throw new Error(
-              `Unsupported file format: ${file.type}. Only .wav and .mp3 are supported.`
+              `Unsupported file format: ${file.type}. Only .wav and .mp3 are supported.`,
             );
           }
 
@@ -541,7 +541,7 @@
           // Ensure Tone context is running
           if (Tone.context.state !== "running") {
             throw new Error(
-              "Audio Context is not running. Please press 'Start Audio Context' first."
+              "Audio Context is not running. Please press 'Start Audio Context' first.",
             );
           }
 
@@ -591,7 +591,7 @@
           } catch (error) {
             console.error("Decoding error:", error);
             throw new Error(
-              "Failed to decode audio data. File might be corrupted or incompatible."
+              "Failed to decode audio data. File might be corrupted or incompatible.",
             );
           }
         }
@@ -640,27 +640,27 @@
           "text-red-800",
           "bg-green-100",
           "border-green-400",
-          "text-green-800"
+          "text-green-800",
         );
 
         if (type === "error") {
           statusMessage.classList.add(
             "bg-red-100",
             "border-red-400",
-            "text-red-800"
+            "text-red-800",
           );
         } else if (type === "success") {
           statusMessage.classList.add(
             "bg-green-100",
             "border-green-400",
-            "text-green-800"
+            "text-green-800",
           );
         } else {
           // Info
           statusMessage.classList.add(
             "bg-blue-100",
             "border-blue-400",
-            "text-blue-800"
+            "text-blue-800",
           );
         }
       }
@@ -693,7 +693,7 @@
 
           updateStatus(
             "success",
-            `Success! Audio file "${file.name}" imported and decoded.`
+            `Success! Audio file "${file.name}" imported and decoded.`,
           );
           console.log("Import Result:", importResult);
 
@@ -728,7 +728,7 @@
                     `;
             toneContextPanel.classList.remove(
               "bg-yellow-50",
-              "border-yellow-400"
+              "border-yellow-400",
             );
             toneContextPanel.classList.add("bg-green-50", "border-green-400");
             console.log("Tone.js Context Started. State:", Tone.context.state);

@@ -1,4 +1,4 @@
-import React, {useRef} from "react";
+import React, { useRef } from "react";
 import * as Tone from "tone";
 import AudioImporter from "./AudioImporter";
 import "./AudioImportButton.css";
@@ -12,7 +12,7 @@ import "./AudioImportButton.css";
  * @param {function} props.onImportSuccess - Callback function for successful import. Receives import result.
  * @param {function} props.onImportError - Callback function for failed import. Receives error.
  */
-const AudioImportButton = ({onImportSuccess, onImportError}) => {
+const AudioImportButton = ({ onImportSuccess, onImportError }) => {
   const fileInputRef = useRef(null);
   const audioImporter = new AudioImporter();
 
@@ -53,7 +53,7 @@ const AudioImportButton = ({onImportSuccess, onImportError}) => {
         ref={fileInputRef}
         onChange={handleFileChange}
         accept=".wav, .mp3"
-        style={{display: "none"}}
+        style={{ display: "none" }}
       />
       <button className="import-button" onClick={handleButtonClick}>
         Import Audio

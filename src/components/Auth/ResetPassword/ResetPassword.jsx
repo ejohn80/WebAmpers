@@ -1,11 +1,11 @@
-import {useState} from "react";
+import { useState } from "react";
 import styles from "../AuthStyles.module.css";
 
-import {BeatLoader} from "react-spinners";
-import {useNavigate} from "react-router-dom";
-import {getAuth, sendPasswordResetEmail} from "firebase/auth";
-import {isValidEmail} from "../AuthUtils";
-import {IoArrowBack} from "react-icons/io5";
+import { BeatLoader } from "react-spinners";
+import { useNavigate } from "react-router-dom";
+import { getAuth, sendPasswordResetEmail } from "firebase/auth";
+import { isValidEmail } from "../AuthUtils";
+import { IoArrowBack } from "react-icons/io5";
 
 const ResetPassword = () => {
   const navigate = useNavigate();
@@ -18,7 +18,7 @@ const ResetPassword = () => {
   });
 
   const handleChange = (e) => {
-    setFormData((prev) => ({...prev, [e.target.name]: e.target.value}));
+    setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
   const handleSubmit = async (e) => {
@@ -41,7 +41,7 @@ const ResetPassword = () => {
   return (
     <div
       className={styles.wrapper}
-      style={{backgroundImage: `url('/soundwave.jpg')`}}
+      style={{ backgroundImage: `url('/soundwave.jpg')` }}
     >
       <div className={styles.container}>
         <button className={styles.backArrow} onClick={() => navigate(-1)}>

@@ -1,7 +1,7 @@
-import {useEffect, useState} from "react";
-import {getAuth, onAuthStateChanged} from "firebase/auth";
-import {doc, getDoc} from "firebase/firestore";
-import {db} from "../firebase/firebase";
+import { useEffect, useState } from "react";
+import { getAuth, onAuthStateChanged } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "../firebase/firebase";
 
 export function useUserData() {
   const [userData, setUserData] = useState(null);
@@ -27,5 +27,5 @@ export function useUserData() {
     return () => unsubscribe();
   }, []);
 
-  return {userData, loading};
+  return { userData, loading };
 }

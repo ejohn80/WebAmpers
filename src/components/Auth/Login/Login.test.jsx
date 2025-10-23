@@ -1,9 +1,9 @@
 // Hoisted handle for assertions
-const {mockNavigate} = vi.hoisted(() => ({mockNavigate: vi.fn()}));
+const { mockNavigate } = vi.hoisted(() => ({ mockNavigate: vi.fn() }));
 
 vi.mock("react-router-dom", async () => {
   const actual = await vi.importActual("react-router-dom");
-  return {...actual, useNavigate: () => mockNavigate};
+  return { ...actual, useNavigate: () => mockNavigate };
 });
 
 vi.mock("firebase/auth", () => ({
@@ -16,33 +16,33 @@ vi.mock("firebase/auth", () => ({
   sendPasswordResetEmail: vi.fn(),
 }));
 
-import {render, screen, waitFor} from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import {MemoryRouter} from "react-router-dom";
+import { MemoryRouter } from "react-router-dom";
 import Login from "./Login.jsx";
-import {signInWithEmailAndPassword} from "firebase/auth";
+import { signInWithEmailAndPassword } from "firebase/auth";
 
 beforeEach(() => {
   mockNavigate.mockReset();
   signInWithEmailAndPassword.mockReset();
-  signInWithEmailAndPassword.mockResolvedValue({user: {uid: "u1"}});
+  signInWithEmailAndPassword.mockResolvedValue({ user: { uid: "u1" } });
 });
 
 function setup() {
   render(
     <MemoryRouter>
       <Login />
-    </MemoryRouter>
+    </MemoryRouter>,
   );
   return {
     email: screen.getByPlaceholderText("Email"),
     password: screen.getByPlaceholderText("Password"),
-    submit: screen.getByRole("button", {name: /login/i}),
+    submit: screen.getByRole("button", { name: /login/i }),
   };
 }
 
 test("logs in and navigates home", async () => {
-  const {email, password, submit} = setup();
+  const { email, password, submit } = setup();
   await userEvent.type(email, "user@example.com");
   await userEvent.type(password, "secret123");
   await userEvent.click(submit);
@@ -50,17 +50,17 @@ test("logs in and navigates home", async () => {
   expect(signInWithEmailAndPassword).toHaveBeenCalledWith(
     expect.any(Object),
     "user@example.com",
-    "secret123"
+    "secret123",
   );
   await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith("/"));
 });
 
 test("invalid email blur shows message", async () => {
-  const {email} = setup();
+  const { email } = setup();
   await userEvent.type(email, "not-an-email");
   await userEvent.tab();
   expect(
-    await screen.findByText(/please enter a valid email address/i)
+    await screen.findByText(/please enter a valid email address/i),
   ).toBeInTheDocument();
 });
 
@@ -68,12 +68,12 @@ test("limit shows error", async () => {
   signInWithEmailAndPassword.mockRejectedValueOnce({
     code: "auth/too-many-requests",
   });
-  const {email, password, submit} = setup();
+  const { email, password, submit } = setup();
   await userEvent.type(email, "a@b.com");
   await userEvent.type(password, "secret123");
   await userEvent.click(submit);
   expect(
-    await screen.findByText(/too many login attempts/i)
+    await screen.findByText(/too many login attempts/i),
   ).toBeInTheDocument();
 });
 
@@ -81,26 +81,26 @@ test("shows generic invalid creds message on unknown error", async () => {
   signInWithEmailAndPassword.mockRejectedValueOnce({
     code: "auth/some-other-error",
   });
-  const {email, password, submit} = setup();
+  const { email, password, submit } = setup();
   await userEvent.type(email, "a@b.com");
   await userEvent.type(password, "secret123");
   await userEvent.click(submit);
   expect(
-    await screen.findByText(/invalid email or password/i)
+    await screen.findByText(/invalid email or password/i),
   ).toBeInTheDocument();
 });
 
 test("email blur: no error when empty, clears when valid", async () => {
-  const {email} = setup();
+  const { email } = setup();
   email.blur();
   expect(
-    screen.queryByText(/please enter a valid email/i)
+    screen.queryByText(/please enter a valid email/i),
   ).not.toBeInTheDocument();
 
   await userEvent.type(email, "bad");
   email.blur();
   expect(
-    await screen.findByText(/please enter a valid email/i)
+    await screen.findByText(/please enter a valid email/i),
   ).toBeInTheDocument();
 
   await userEvent.clear(email);
@@ -108,13 +108,13 @@ test("email blur: no error when empty, clears when valid", async () => {
   email.blur();
   await waitFor(() => {
     expect(
-      screen.queryByText(/please enter a valid email/i)
+      screen.queryByText(/please enter a valid email/i),
     ).not.toBeInTheDocument();
   });
 });
 
 test("submits on Enter in password field", async () => {
-  const {email, password} = setup();
+  const { email, password } = setup();
   await userEvent.type(email, "user@example.com");
   await userEvent.type(password, "secret123{enter}");
   await waitFor(() => expect(signInWithEmailAndPassword).toHaveBeenCalled());

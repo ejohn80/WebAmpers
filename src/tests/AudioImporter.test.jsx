@@ -40,17 +40,17 @@ describe("AudioImporter", () => {
 
   describe("validateFile", () => {
     test("WAV is valid", () => {
-      const file = new File([""], "test.wav", {type: "audio/wav"});
+      const file = new File([""], "test.wav", { type: "audio/wav" });
       expect(importer.validateFile(file)).toBe(true);
     });
 
     test("MP3 is valid", () => {
-      const file = new File([""], "test.mp3", {type: "audio/mp3"});
+      const file = new File([""], "test.mp3", { type: "audio/mp3" });
       expect(importer.validateFile(file)).toBe(true);
     });
 
     test("MPEG is valid", () => {
-      const file = new File([""], "test.mpeg", {type: "audio/mpeg"});
+      const file = new File([""], "test.mpeg", { type: "audio/mpeg" });
       expect(importer.validateFile(file)).toBe(true);
     });
 
@@ -60,21 +60,21 @@ describe("AudioImporter", () => {
 
     test("given undefined file", () => {
       expect(() => importer.validateFile(undefined)).toThrow(
-        "No file provided"
+        "No file provided",
       );
     });
 
     test("given unsupported file type", () => {
-      const file = new File([""], "test.txt", {type: "text"});
+      const file = new File([""], "test.txt", { type: "text" });
       expect(() => importer.validateFile(file)).toThrow(
-        "Unsupported file format: text"
+        "Unsupported file format: text",
       );
     });
 
     test("given unsupported audio file type", () => {
-      const file = new File([""], "test.ogg", {type: "audio/ogg"});
+      const file = new File([""], "test.ogg", { type: "audio/ogg" });
       expect(() => importer.validateFile(file)).toThrow(
-        "Unsupported file format: audio/ogg"
+        "Unsupported file format: audio/ogg",
       );
     });
   });
@@ -82,21 +82,21 @@ describe("AudioImporter", () => {
   describe("fileToArrayBuffer", () => {
     test("convertfile to ArrayBuffer", async () => {
       const content = "test audio";
-      const file = new File([content], "test.wav", {type: "audio/wav"});
+      const file = new File([content], "test.wav", { type: "audio/wav" });
       const arrayBuffer = await importer.fileToArrayBuffer(file);
       expect(arrayBuffer).toBeInstanceOf(ArrayBuffer);
       expect(arrayBuffer.byteLength).toBeGreaterThan(0);
     });
 
     test("empty file", async () => {
-      const file = new File([], "empty.wav", {type: "audio/wav"});
+      const file = new File([], "empty.wav", { type: "audio/wav" });
       const arrayBuffer = await importer.fileToArrayBuffer(file);
       expect(arrayBuffer).toBeInstanceOf(ArrayBuffer);
       expect(arrayBuffer.byteLength).toBe(0);
     });
 
     test("FileReader fails", async () => {
-      const file = new File(["test"], "test.wav", {type: "audio/wav"});
+      const file = new File(["test"], "test.wav", { type: "audio/wav" });
       const fileReader = global.FileReader;
       global.FileReader = class {
         readAsArrayBuffer() {
@@ -104,7 +104,7 @@ describe("AudioImporter", () => {
         }
       };
       await expect(importer.fileToArrayBuffer(file)).rejects.toThrow(
-        "Failed to read file"
+        "Failed to read file",
       );
       global.FileReader = fileReader;
     });
@@ -118,14 +118,14 @@ describe("AudioImporter", () => {
         sampleRate: 44100,
         numberOfChannels: 2,
       };
-      const mockToneBuffer = {duration: 5.5, sampleRate: 44100};
+      const mockToneBuffer = { duration: 5.5, sampleRate: 44100 };
       Tone.context.rawContext.decodeAudioData.mockResolvedValue(
-        mockAudioBuffer
+        mockAudioBuffer,
       );
       Tone.ToneAudioBuffer.mockImplementation(() => mockToneBuffer);
       const result = await importer.decodeAudioData(mockArrayBuffer);
       expect(Tone.context.rawContext.decodeAudioData).toHaveBeenCalledWith(
-        mockArrayBuffer
+        mockArrayBuffer,
       );
       expect(Tone.ToneAudioBuffer).toHaveBeenCalledWith(mockAudioBuffer);
       expect(result).toEqual(mockToneBuffer);
@@ -134,20 +134,20 @@ describe("AudioImporter", () => {
     test("should throw error if decoding fails", async () => {
       const mockArrayBuffer = new ArrayBuffer(100);
       Tone.context.rawContext.decodeAudioData.mockRejectedValue(
-        new Error("Invalid audio data")
+        new Error("Invalid audio data"),
       );
       await expect(importer.decodeAudioData(mockArrayBuffer)).rejects.toThrow(
-        "Failed to decode audio data"
+        "Failed to decode audio data",
       );
     });
 
     test("should throw error for corrupted audio data", async () => {
       const mockArrayBuffer = new ArrayBuffer(10);
       Tone.context.rawContext.decodeAudioData.mockRejectedValue(
-        new Error("Corrupt")
+        new Error("Corrupt"),
       );
       await expect(importer.decodeAudioData(mockArrayBuffer)).rejects.toThrow(
-        "Failed to decode audio data"
+        "Failed to decode audio data",
       );
     });
   });
@@ -157,9 +157,9 @@ describe("AudioImporter", () => {
       // Freeze time to get a predictable 'uploadedAt' value
       vi.useFakeTimers().setSystemTime(new Date("2024-01-01T00:00:00.000Z"));
 
-      const mockFile = new File(["content"], "test.wav", {type: "audio/wav"});
+      const mockFile = new File(["content"], "test.wav", { type: "audio/wav" });
       // 1.5 MB
-      Object.defineProperty(mockFile, "size", {value: 1.5 * 1024 * 1024});
+      Object.defineProperty(mockFile, "size", { value: 1.5 * 1024 * 1024 });
       const mockBuffer = {
         duration: 65.5, // 1 minute 5.5 seconds
         sampleRate: 44100,
@@ -182,8 +182,8 @@ describe("AudioImporter", () => {
     });
 
     test("different file sizes", () => {
-      const mockFile = new File([""], "large.mp3", {type: "audio/mp3"});
-      Object.defineProperty(mockFile, "size", {value: 5242880}); // 5MB
+      const mockFile = new File([""], "large.mp3", { type: "audio/mp3" });
+      Object.defineProperty(mockFile, "size", { value: 5242880 }); // 5MB
       const mockBuffer = {
         duration: 180.123,
         sampleRate: 48000,
@@ -196,7 +196,7 @@ describe("AudioImporter", () => {
     });
 
     test("different sample rates", () => {
-      const mockFile = new File([""], "test.wav", {type: "audio/wav"});
+      const mockFile = new File([""], "test.wav", { type: "audio/wav" });
       const mockBuffer = {
         duration: 10.0,
         sampleRate: 22050,
@@ -210,7 +210,9 @@ describe("AudioImporter", () => {
 
   describe("importFile", () => {
     test("importing a valid audio file", async () => {
-      const file = new File(["audio content"], "test.wav", {type: "audio/wav"});
+      const file = new File(["audio content"], "test.wav", {
+        type: "audio/wav",
+      });
       const mockArrayBuffer = new ArrayBuffer(100);
       const mockToneBuffer = {
         duration: 5.5,
@@ -218,7 +220,7 @@ describe("AudioImporter", () => {
       };
 
       vi.spyOn(importer, "fileToArrayBuffer").mockResolvedValue(
-        mockArrayBuffer
+        mockArrayBuffer,
       );
       vi.spyOn(importer, "decodeAudioData").mockResolvedValue(mockToneBuffer);
       const result = await importer.importFile(file);
@@ -229,51 +231,51 @@ describe("AudioImporter", () => {
     });
 
     test("calls Tone.start() if context is not running", async () => {
-      const file = new File([""], "test.wav", {type: "audio/wav"});
+      const file = new File([""], "test.wav", { type: "audio/wav" });
       await importer.importFile(file);
       expect(Tone.start).toHaveBeenCalled();
     });
 
     test("invalid file", async () => {
-      const file = new File([""], "test.txt", {type: "text/plain"});
+      const file = new File([""], "test.txt", { type: "text/plain" });
       await expect(importer.importFile(file)).rejects.toThrow(
-        "Unsupported file format"
+        "Unsupported file format",
       );
     });
 
     test("file reading error", async () => {
-      const file = new File([""], "test.wav", {type: "audio/wav"});
+      const file = new File([""], "test.wav", { type: "audio/wav" });
       vi.spyOn(importer, "fileToArrayBuffer").mockRejectedValue(
-        new Error("Read failed")
+        new Error("Read failed"),
       );
       await expect(importer.importFile(file)).rejects.toThrow(
-        "Failed to import audio file: Read failed"
+        "Failed to import audio file: Read failed",
       );
     });
 
     test("decoding error", async () => {
-      const file = new File([""], "test.wav", {type: "audio/wav"});
+      const file = new File([""], "test.wav", { type: "audio/wav" });
       const mockArrayBuffer = new ArrayBuffer(100);
       vi.spyOn(importer, "fileToArrayBuffer").mockResolvedValue(
-        mockArrayBuffer
+        mockArrayBuffer,
       );
       vi.spyOn(importer, "decodeAudioData").mockRejectedValue(
-        new Error("Decode failed")
+        new Error("Decode failed"),
       );
       await expect(importer.importFile(file)).rejects.toThrow(
-        "Failed to import audio file"
+        "Failed to import audio file",
       );
     });
 
     test("method calls ordering", async () => {
-      const file = new File([""], "test.wav", {type: "audio/wav"});
+      const file = new File([""], "test.wav", { type: "audio/wav" });
       const validateSpy = vi.spyOn(importer, "validateFile");
       const bufferSpy = vi
         .spyOn(importer, "fileToArrayBuffer")
         .mockResolvedValue(new ArrayBuffer(100));
       const decodeSpy = vi
         .spyOn(importer, "decodeAudioData")
-        .mockResolvedValue({duration: 5, sampleRate: 44100});
+        .mockResolvedValue({ duration: 5, sampleRate: 44100 });
       const metadataSpy = vi.spyOn(importer, "extractMetadata");
       await importer.importFile(file);
       expect(validateSpy).toHaveBeenCalled();
@@ -285,10 +287,10 @@ describe("AudioImporter", () => {
 
   describe("end-to-end scenarios", () => {
     test("should handle MP3 file correctly", async () => {
-      const file = new File(["mp3 data"], "song.mp3", {type: "audio/mp3"});
-      Object.defineProperty(file, "size", {value: 2 * 1024 * 1024}); // 2MB
+      const file = new File(["mp3 data"], "song.mp3", { type: "audio/mp3" });
+      Object.defineProperty(file, "size", { value: 2 * 1024 * 1024 }); // 2MB
       vi.spyOn(importer, "fileToArrayBuffer").mockResolvedValue(
-        new ArrayBuffer(2048)
+        new ArrayBuffer(2048),
       );
       vi.spyOn(importer, "decodeAudioData").mockResolvedValue({
         duration: 30.5,
@@ -303,10 +305,10 @@ describe("AudioImporter", () => {
     });
 
     test("multiple imports", async () => {
-      const file1 = new File([""], "test1.wav", {type: "audio/wav"});
-      const file2 = new File([""], "test2.mp3", {type: "audio/mp3"});
+      const file1 = new File([""], "test1.wav", { type: "audio/wav" });
+      const file2 = new File([""], "test2.mp3", { type: "audio/mp3" });
       vi.spyOn(importer, "fileToArrayBuffer").mockResolvedValue(
-        new ArrayBuffer(100)
+        new ArrayBuffer(100),
       );
       vi.spyOn(importer, "decodeAudioData").mockResolvedValue({
         duration: 5,

@@ -21,7 +21,7 @@ class AudioImporter {
 
     if (!this.supportedFormats.includes(file.type)) {
       throw new Error(
-        `Unsupported file format: ${file.type}. Only .wav and .mp3 are supported.`
+        `Unsupported file format: ${file.type}. Only .wav and .mp3 are supported.`,
       );
     }
 

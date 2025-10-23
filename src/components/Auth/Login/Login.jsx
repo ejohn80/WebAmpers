@@ -1,8 +1,8 @@
-import {useState, useEffect} from "react";
+import { useState, useEffect } from "react";
 import styles from "../AuthStyles.module.css";
 
-import {BeatLoader} from "react-spinners";
-import {useNavigate} from "react-router-dom";
+import { BeatLoader } from "react-spinners";
+import { useNavigate } from "react-router-dom";
 // import AuthRedirect from '../AuthRedirect';
 import {
   getAuth,
@@ -14,8 +14,8 @@ import {
 } from "firebase/auth";
 // import { db } from '../../../firebase/firebase';
 // import { doc, getDoc } from 'firebase/firestore';
-import {isValidEmail} from "../AuthUtils";
-import {IoMdEye, IoMdEyeOff} from "react-icons/io";
+import { isValidEmail } from "../AuthUtils";
+import { IoMdEye, IoMdEyeOff } from "react-icons/io";
 
 const Login = () => {
   const navigate = useNavigate();
@@ -32,7 +32,7 @@ const Login = () => {
   });
 
   const handleChange = (e) => {
-    setFormData((prev) => ({...prev, [e.target.name]: e.target.value}));
+    setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
   // Login button
@@ -71,7 +71,7 @@ const Login = () => {
   return (
     <div
       className={styles.wrapper}
-      style={{backgroundImage: `url('/soundwave.jpg')`}}
+      style={{ backgroundImage: `url('/soundwave.jpg')` }}
     >
       <div className={styles.container}>
         {/* <img className={styles.logo} src="/logo.png" alt=" Logo" /> */}
@@ -92,10 +92,10 @@ const Login = () => {
             }}
             required
           />
-          <div style={{position: "relative"}}>
+          <div style={{ position: "relative" }}>
             <input
               className={`${styles.input} ${styles.passwordInput}`}
-              style={{width: inputWidth}}
+              style={{ width: inputWidth }}
               name="password"
               type={showPassword ? "text" : "password"}
               placeholder="Password"
@@ -125,7 +125,7 @@ const Login = () => {
           Don't have an account? Sign up{" "}
           <span onClick={() => navigate("/register")}>here</span>
           <br />
-          <div style={{marginTop: "5px"}}>
+          <div style={{ marginTop: "5px" }}>
             Forgot password? Reset{" "}
             <span onClick={() => navigate("/reset-password")}>here</span>
           </div>
