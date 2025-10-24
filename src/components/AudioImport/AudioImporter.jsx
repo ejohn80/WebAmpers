@@ -35,7 +35,7 @@ class AudioImporter {
   async importFile(file) {
     this.validateFile(file);
 
-    // Ensure Tone.js AudioContext is running, as it's required for decoding.
+    // // Ensure Tone.js AudioContext is running, as it's required for decoding.
     if (Tone.context.state !== 'running') {
       await Tone.start();
     }
@@ -84,8 +84,7 @@ class AudioImporter {
       const toneBuffer = new Tone.ToneAudioBuffer(audioBuffer);
       return toneBuffer;
     } catch (error) {
-      console.error("Decoding error:", error);
-      throw new Error('Failed to decode audio data. The file might be corrupted or in an incompatible format.');
+      throw new Error('Failed to decode audio data');
     }
   }
 
@@ -95,7 +94,7 @@ class AudioImporter {
    * @param {Tone.ToneAudioBuffer} buffer - decoded buffer
    * @returns {Object} - metadata object
    */
-  extractMetadata(file, buffer) {
+   extractMetadata(file, buffer) {
     const formatDuration = (seconds) => {
       const min = Math.floor(seconds / 60);
       const sec = (seconds % 60).toFixed(2);
