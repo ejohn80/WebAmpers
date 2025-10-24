@@ -17,65 +17,14 @@ const MAX_WIDTH = 300; // Maximum allowed width for the sidebar in pixels
  */
 function AudioPage() {
   // State to manage the current width of the sidebar in pixels.
-  const [sidebarWidth, setSidebarWidth] = useState(250);
-  // Ref to the main content area (the grid container) for mouse position calculations.
-  const mainContentRef = useRef(null);
-  // State to track if the user is currently dragging the divider
-  const [isDragging, setIsDragging] = useState(false);
+  const [sidebarWidth, setSidebarWidth] = useState(MAX_WIDTH);
 
-  // --- MOUSE EVENT HANDLERS ---
-
-  // Start dragging: set isDragging to true when the mouse is pressed down on the divider
   /**
-   * Initiates the dragging process when the mouse button is pressed down on the divider.
-   * @param {MouseEvent} e - The mouse event object.
+   * Toggles the sidebar width between its minimum and maximum allowed values.
    */
-  const handleMouseDown = (e) => {
-    e.preventDefault(); // Prevent default browser drag behavior (e.g., selecting text)
-    setIsDragging(true);
+  const toggleSidebar = () => {
+    setSidebarWidth(prevWidth => (prevWidth > MIN_WIDTH ? MIN_WIDTH : MAX_WIDTH));
   };
-
-  // Stop dragging: set isDragging to false when the mouse is released anywhere
-  /**
-   * Terminates the dragging process when the mouse button is released.
-   */
-  const handleMouseUp = () => {
-    setIsDragging(false);
-  };
-
-  // Handle mouse movement: update the sidebar width if dragging is true
-  /**
-   * Updates the sidebar's width based on the mouse's horizontal position during dragging.
-   * @param {MouseEvent} e - The mouse event object.
-   */
-  const handleMouseMove = (e) => {
-    if (!isDragging || !mainContentRef.current) return;
-
-    // Get the current mouse position relative to the main content area's left edge
-    const newWidth = e.clientX - mainContentRef.current.getBoundingClientRect().left;
-
-    // Constrain the width within min/max bounds
-    const constrainedWidth = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, newWidth));
-
-    setSidebarWidth(constrainedWidth);
-  };
-
-  // --- EFFECT HOOK FOR GLOBAL LISTENERS ---
-
-  /**
-   * Attaches and detaches global mouse event listeners for resizing.
-   */
-  useEffect(() => {
-    // Attach event listeners to the window to ensure dragging stops even if the cursor moves off the container
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
-
-    // Cleanup function to remove the listeners when the component unmounts
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [isDragging]); // Re-run effect if isDragging changes
 
   // --- STATE FOR AUDIO DATA ---
   // State to hold the result from the audio import, including buffer and metadata.
@@ -107,15 +56,14 @@ function AudioPage() {
       <div 
         className="main-content-area" 
         style={mainContentStyle} 
-        ref={mainContentRef} // Attach ref for mouse position calculations
       >
         <Sidebar width={sidebarWidth} />
 
         {/* Movable Divider Line */}
         <div 
           className="divider"
-          onMouseDown={handleMouseDown}
-          title="Drag to resize sidebar"
+          onClick={toggleSidebar}
+          title="Toggle sidebar"
         />
         
         <MainContent audioData={audioData} />
