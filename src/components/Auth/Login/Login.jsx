@@ -7,10 +7,10 @@ import {useNavigate} from "react-router-dom";
 import {
   getAuth,
   signInWithEmailAndPassword,
-  GoogleAuthProvider,
-  signInWithPopup,
-  deleteUser,
-  sendPasswordResetEmail,
+  //GoogleAuthProvider,
+  //signInWithPopup,
+  //deleteUser,
+  //sendPasswordResetEmail,
 } from "firebase/auth";
 // import { db } from '../../../firebase/firebase';
 // import { doc, getDoc } from 'firebase/firestore';

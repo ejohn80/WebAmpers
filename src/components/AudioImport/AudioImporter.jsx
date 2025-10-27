@@ -86,7 +86,7 @@ class AudioImporter {
         await Tone.context.rawContext.decodeAudioData(arrayBuffer);
       const toneBuffer = new Tone.ToneAudioBuffer(audioBuffer);
       return toneBuffer;
-    } catch (error) {
+    } catch {
       throw new Error("Failed to decode audio data");
     }
   }

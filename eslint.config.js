@@ -1,9 +1,9 @@
 // eslint.config.js
-import js from "@eslint/js"
-import globals from "globals"
-import reactHooks from "eslint-plugin-react-hooks"
-import reactRefresh from "eslint-plugin-react-refresh"
-import { defineConfig, globalIgnores } from "eslint/config"
+import js from "@eslint/js";
+import globals from "globals";
+import reactHooks from "eslint-plugin-react-hooks";
+import reactRefresh from "eslint-plugin-react-refresh";
+import {defineConfig, globalIgnores} from "eslint/config";
 
 export default defineConfig([
   // Ignore these paths/patterns entirely
@@ -27,13 +27,13 @@ export default defineConfig([
       ecmaVersion: "latest",
       globals: globals.browser,
       parserOptions: {
-        ecmaFeatures: { jsx: true },
+        ecmaFeatures: {jsx: true},
         sourceType: "module",
       },
     },
     rules: {
       // keep your uppercase/ALL_CAPS unused var allowance
-      "no-unused-vars": ["error", { varsIgnorePattern: "^[A-Z_]" }],
+      "no-unused-vars": ["error", {varsIgnorePattern: "^[A-Z_]"}],
     },
   },
-])
+]);
