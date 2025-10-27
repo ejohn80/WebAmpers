@@ -45,7 +45,9 @@ vi.mock("firebase/firestore", () => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
-  h.createUserWithEmailAndPassword.mockResolvedValue({user: {uid: "abc123"}});
+  h.createUserWithEmailAndPassword.mockResolvedValue({
+    user: {uid: "abc123"},
+  });
   h.setDoc.mockResolvedValue({});
 });
 

@@ -1,34 +1,57 @@
-- name: Checkout
-  uses: actions/checkout@v4
+name: CI
 
-- name: Setup Node
-  uses: actions/setup-node@v4
-  with:
-    node-version: 20
-    cache: npm # ← remove cache-dependency-path unless you need custom paths
+on:
+  push:
+    branches: [tests]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
 
-- name: Install (clean)
-  run: npm ci
+permissions:
+  contents: read
 
-- name: Check formatting (Prettier)
-  run: npx prettier --check .
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
-- name: Lint (ESLint)
-  run: npm run lint
+jobs:
+  node-ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
 
-- name: Unit tests (Vitest)
-  run: npm test
-  env:
-    CI: true
-# - name: Unit tests (Vitest)
-#   run: npm run test:coverage -- --run
-#   env:
-#     CI: true
+      - name: Debug workspace
+        run: |
+          echo "GITHUB_WORKSPACE=$GITHUB_WORKSPACE"
+          pwd
+          ls -la
+          # show top two levels
+          (command -v tree >/dev/null && tree -L 2) || true
 
-# - name: Upload coverage
-#   if: always()
-#   uses: actions/upload-artifact@v4
-#   with:
-#     name: coverage
-#     path: coverage/
-#     if-no-files-found: ignore
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: "**/package-lock.json"
+
+      - name: Install (clean)
+        run: npm ci
+
+      - name: Check formatting (Prettier)
+        run: npm run format --if-present
+
+      - name: Lint (ESLint)
+        run: npm run lint --if-present
+
+      - name: Unit tests (Vitest)
+        run: npm run test
+        env:
+          CI: true
+
+      # - name: Upload coverage
+      #   if: always()
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: coverage
+      #     path: coverage/
+      #     if-no-files-found: ignore

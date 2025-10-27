@@ -210,7 +210,9 @@ describe("AudioImporter", () => {
 
   describe("importFile", () => {
     test("importing a valid audio file", async () => {
-      const file = new File(["audio content"], "test.wav", {type: "audio/wav"});
+      const file = new File(["audio content"], "test.wav", {
+        type: "audio/wav",
+      });
       const mockArrayBuffer = new ArrayBuffer(100);
       const mockToneBuffer = {
         duration: 5.5,
