@@ -1,89 +1,113 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import * as Tone from "tone";
 
-const dbToGain = (db) => (typeof db === "number" ? Math.pow(10, db / 20) : 1);
-const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
-const msToBeats = (ms, bpm) => (ms / 1000) * (bpm / 60);
-const msToToneTime = (ms, bpm) => `${msToBeats(ms, bpm)}i`; // immutable numeric time
+// === Utility functions ===
 
-/** ---------- PlaybackEngine---------- */
+// Convert decibels to linear gain value (used for volume control)
+const dbToGain = (db) => (typeof db === "number" ? Math.pow(10, db / 20) : 1);
+
+// Clamp a value between two bounds (for panning range)
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+// Convert milliseconds to beats given a BPM (used for time alignment)
+const msToBeats = (ms, bpm) => (ms / 1000) * (bpm / 60);
+
+// Convert milliseconds to Tone.js "transport time" string format
+const msToToneTime = (ms, bpm) => `${msToBeats(ms, bpm)}i`; // i = immutable numeric time
+
+/** ---------- PlaybackEngine----------
+ * Core class responsible for handling all playback logic using Tone.js.
+ * It manages audio transport, tracks, master bus, and segment playback.
+ */
 class PlaybackEngine {
   constructor(events = {}) {
+    // Events callbacks passed from React (e.g. onProgress, onTransport)
     this.events = events;
 
-    this.version = null;
-    this.trackBuses = new Map();
-    this.master = null;
-    this.playersBySegment = new Map();
-    this.preloaded = new Set();
-    this.rafId = null;
+    // Tone.js runtime data
+    this.version = null;           // current loaded version/project
+    this.trackBuses = new Map();   // map of track IDs to their Tone buses
+    this.master = null;            // master gain node
+    this.playersBySegment = new Map(); // store all active audio players
+    this.preloaded = new Set();    // store URLs already preloaded
+    this.rafId = null;             // requestAnimationFrame ID for updating progress
 
-    // timings
-    this.renderAheadSec = 0.2;
-    this.jogLatencySec = 0.02;
-    this.defaultFadeMs = 5;
+    // playback timing parameters
+    this.renderAheadSec = 0.2;     // small pre-buffer before playback starts
+    this.jogLatencySec = 0.02;     // latency compensation for seeking
+    this.defaultFadeMs = 5;        // default fade time in milliseconds
   }
 
+  /** Ensure Tone.js AudioContext is running (required by browsers for playback) */
   async ensureAudioUnlocked() {
     if (Tone.context.state !== "running") {
       await Tone.start();
     }
   }
 
+  /** Load a new project ("version") into the playback engine */
   async load(version) {
     await this.ensureAudioUnlocked();
 
+    // Reset Tone.Transport and clear previous state
     Tone.Transport.stop();
+    Tone.Transport.cancel(0);
     this._cancelRaf();
     this._disposeAll();
 
+    // Save the version reference
     this.version = version;
 
-    // transport
+    // Configure transport tempo and time signature
     Tone.Transport.bpm.value = version.bpm || 120;
     const ts = Array.isArray(version.timeSig) ? version.timeSig : [4, 4];
     Tone.Transport.timeSignature = ts;
 
-    // master bus
+    // Create master bus
     this.master = this._makeMaster(version.masterChain);
 
-    // track buses
+    // Create all track buses and connect them to master
     (version.tracks || []).forEach((t) => {
       const bus = this._makeTrackBus(t);
       this.trackBuses.set(t.id, bus);
       (bus.fxOut ?? bus.pan).connect(this.master.fxIn ?? this.master.gain);
     });
 
-    // segments & scheduling
+    // Prepare all audio segments (Tone.Player instances)
     await this._prepareSegments(version);
 
-    // loop
+    // Enable or clear looping if defined
     if (version.loop && version.loop.enabled) {
       this.setLoop(version.loop.startMs, version.loop.endMs);
     } else {
       this.clearLoop();
     }
 
+    // Start updating progress via requestAnimationFrame
     this._startRaf();
   }
 
+  /** Start playback of the Tone.Transport */
   async play() {
     await this.ensureAudioUnlocked();
     Tone.Transport.start("+" + this.renderAheadSec);
     this._emitTransport(true);
   }
 
+  /** Pause playback but keep position */
   pause() {
     Tone.Transport.pause();
     this._emitTransport(false);
   }
 
+  /** Stop playback and reset position to start */
   stop() {
     Tone.Transport.stop();
     this.seekMs(0);
     this._emitTransport(false);
   }
 
+  /** Seek to a specific time (in milliseconds) within the timeline */
   seekMs(ms) {
     if (!this.version) return;
     const beats = msToBeats(ms, this.version.bpm || 120);
@@ -91,10 +115,12 @@ class PlaybackEngine {
     Tone.Transport.position = beats + jog;
   }
 
+  /** Get the current playback position in milliseconds */
   getPositionMs() {
     return Tone.Transport.seconds * 1000;
   }
 
+  /** Define a loop range for the transport */
   setLoop(startMs, endMs) {
     if (!this.version) return;
     Tone.Transport.setLoopPoints(
@@ -104,10 +130,12 @@ class PlaybackEngine {
     Tone.Transport.loop = endMs > startMs;
   }
 
+  /** Disable looping entirely */
   clearLoop() {
     Tone.Transport.loop = false;
   }
 
+  /** Mute or unmute a specific track */
   setTrackMute(trackId, mute) {
     if (!this.version) return;
     const t = this.version.tracks.find((x) => x.id === trackId);
@@ -115,6 +143,7 @@ class PlaybackEngine {
     this._applyMuteSolo();
   }
 
+  /** Solo or unsolo a specific track */
   setTrackSolo(trackId, solo) {
     if (!this.version) return;
     const t = this.version.tracks.find((x) => x.id === trackId);
@@ -122,6 +151,7 @@ class PlaybackEngine {
     this._applyMuteSolo();
   }
 
+  /** Adjust the gain (volume) of a track in decibels */
   setTrackGainDb(trackId, db) {
     const bus = this.trackBuses.get(trackId);
     if (bus) bus.gain.gain.value = dbToGain(db);
@@ -131,6 +161,7 @@ class PlaybackEngine {
     }
   }
 
+  /** Adjust the stereo pan (-1 = left, +1 = right) of a track */
   setTrackPan(trackId, pan) {
     const bus = this.trackBuses.get(trackId);
     if (bus) bus.pan.pan.value = clamp(pan, -1, 1);
@@ -140,6 +171,7 @@ class PlaybackEngine {
     }
   }
 
+  /** Replace the master chain (placeholder for future FX support) */
   replaceMasterChain(chain) {
     const newMaster = this._makeMaster(chain);
     const old = this.master;
@@ -152,17 +184,21 @@ class PlaybackEngine {
     });
   }
 
+  /** Dispose all audio resources */
   dispose() {
     this._cancelRaf();
     this._disposeAll();
   }
 
-  /** ------- internals ------- */
+  // ---------- Internal methods ----------
+
+  /** Prepare all segments (audio clips) and schedule them for playback */
   async _prepareSegments(version) {
     const urls = Array.from(new Set((version.segments || []).map((s) => s.fileUrl)));
     urls.forEach((u) => this._preload(u));
 
     for (const seg of version.segments || []) {
+      // Create a Tone.Player for each segment
       const player = new Tone.Player({
         url: seg.fileUrl,
         autostart: false,
@@ -171,9 +207,11 @@ class PlaybackEngine {
         fadeOut: (seg.fades?.outMs ?? this.defaultFadeMs) / 1000,
       });
 
+      // Each segment has its own gain and pan
       const segGain = new Tone.Gain(dbToGain(seg.gainDb));
       const segPan = new Tone.Panner(0);
 
+      // Connect chain: player → gain → pan → track bus
       player.connect(segGain);
       segGain.connect(segPan);
 
@@ -181,6 +219,7 @@ class PlaybackEngine {
       if (!bus) throw new Error(`Missing track bus for ${seg.trackId}`);
       segPan.connect(bus.fxIn ?? bus.gain);
 
+      // Store player and disposers
       this.playersBySegment.set(seg.id, {
         player,
         gain: segGain,
@@ -192,119 +231,37 @@ class PlaybackEngine {
         ],
       });
 
+      // Convert timeline positions to seconds
       const offsetSec = (seg.startInFileMs || 0) / 1000;
       const durSec = (seg.durationMs || 0) / 1000;
 
-      const at = msToToneTime(seg.startOnTimelineMs || 0, version.bpm || 120);
-      Tone.Transport.schedule((time) => {
-        try {
-          player.start(time, offsetSec, durSec);
-        } catch (e) {
-          this.events.onError && this.events.onError(e);
-        }
-      }, at);
+      // Sync player to Transport so pause/stop works correctly
+      player.sync();
 
-      const stopAt = msToToneTime(
-        (seg.startOnTimelineMs || 0) + (seg.durationMs || 0) + 1,
-        version.bpm || 120
-      );
-      Tone.Transport.schedule((time) => {
-        try {
-          player.stop(time);
-        } catch {}
-      }, stopAt);
+      // Schedule start time in the Transport
+      const startTT = msToToneTime(seg.startOnTimelineMs || 0, version.bpm || 120);
+      player.start(startTT, offsetSec, durSec);
     }
 
     this._applyMuteSolo();
   }
 
+  /** Create a simple Gain → Pan chain for one track */
   _makeTrackBus(t) {
     const gain = new Tone.Gain(dbToGain(t.gainDb));
     const pan = new Tone.Panner(clamp(t.pan ?? 0, -1, 1));
     gain.connect(pan);
-
-    const { chain, fxIn, fxOut } = this._buildFxChain(t.effectsChain);
-
-    if (chain.length > 0) {
-      gain.disconnect();
-      gain.connect(chain[0]);
-      chain[chain.length - 1].connect(pan);
-    }
-
-    return { id: t.id, gain, pan, fxIn, fxOut, chain };
+    return { id: t.id, gain, pan, fxIn: null, fxOut: null, chain: [] };
   }
 
-  _makeMaster(chainDef) {
+  /** Create a master bus and connect it to the audio output */
+  _makeMaster() {
     const gain = new Tone.Gain(1);
-    const { chain, fxIn, fxOut } = this._buildFxChain(chainDef);
-
-    if (chain.length > 0) {
-      gain.connect(chain[0]);
-      chain[chain.length - 1].connect(Tone.Destination);
-    } else {
-      gain.connect(Tone.Destination);
-    }
-
-    return { gain, chain, fxIn, fxOut };
+    gain.connect(Tone.Destination);
+    return { gain, chain: [], fxIn: null, fxOut: null };
   }
 
-  _buildFxChain(defs) {
-    const chain = [];
-    if (Array.isArray(defs)) {
-      for (const d of defs) {
-        const node = this._instantiateFx(d);
-        if (chain.length > 0) chain[chain.length - 1].connect(node);
-        chain.push(node);
-      }
-    }
-    return { chain, fxIn: chain[0], fxOut: chain[chain.length - 1] };
-  }
-
-  _instantiateFx(def) {
-    // def = { type: "reverb", options: {...} }
-    const type = def?.type || "none";
-    const opt = def?.options || {};
-    switch (type) {
-      case "reverb":
-        return new Tone.Reverb({
-          decay: isFinite(opt.decay) ? opt.decay : 2.5,
-          preDelay: isFinite(opt.preDelay) ? opt.preDelay : 0,
-          wet: isFinite(opt.wet) ? opt.wet : 0.3,
-        });
-      case "delay":
-        return new Tone.FeedbackDelay({
-          delayTime: isFinite(opt.delayTime) ? opt.delayTime : 0.25,
-          feedback: isFinite(opt.feedback) ? opt.feedback : 0.3,
-          wet: isFinite(opt.wet) ? opt.wet : 0.3,
-        });
-      case "distortion":
-        return new Tone.Distortion(isFinite(opt.amount) ? opt.amount : 0.2);
-      case "filter":
-        return new Tone.Filter(
-          isFinite(opt.frequency) ? opt.frequency : 1000,
-          opt.type || "lowpass"
-        );
-      case "compressor":
-        return new Tone.Compressor({
-          threshold: isFinite(opt.threshold) ? opt.threshold : -24,
-          ratio: isFinite(opt.ratio) ? opt.ratio : 12,
-          attack: isFinite(opt.attack) ? opt.attack : 0.003,
-          release: isFinite(opt.release) ? opt.release : 0.25,
-        });
-      case "limiter":
-        return new Tone.Limiter(isFinite(opt.threshold) ? opt.threshold : -1);
-      case "chorus":
-        return new Tone.Chorus({
-          frequency: isFinite(opt.frequency) ? opt.frequency : 1.5,
-          delayTime: isFinite(opt.delayTime) ? opt.delayTime : 3.5,
-          depth: isFinite(opt.depth) ? opt.depth : 0.7,
-          wet: isFinite(opt.wet) ? opt.wet : 0.3,
-        });
-      default:
-        return new Tone.Gain(1); // safe passthrough
-    }
-  }
-
+  /** Handle mute/solo logic and smoothly apply gain changes */
   _applyMuteSolo() {
     if (!this.version) return;
     const tracks = this.version.tracks || [];
@@ -318,11 +275,11 @@ class PlaybackEngine {
       const now = Tone.now();
       bus.gain.gain.cancelAndHoldAtTime(now);
       const target = shouldMute ? 0.0001 : dbToGain(t.gainDb);
-      // short ramp to avoid zipper noise
       bus.gain.gain.exponentialRampToValueAtTime(target, now + 0.01);
     });
   }
 
+  /** Preload an audio file asynchronously */
   _preload(url) {
     if (this.preloaded.has(url)) return;
     this.preloaded.add(url);
@@ -331,6 +288,7 @@ class PlaybackEngine {
       .catch((e) => this.events.onBuffer && this.events.onBuffer({ url, ready: false, error: e }));
   }
 
+  /** Start updating progress every animation frame */
   _startRaf() {
     const tick = () => {
       const ms = this.getPositionMs();
@@ -340,11 +298,13 @@ class PlaybackEngine {
     this.rafId = requestAnimationFrame(tick);
   }
 
+  /** Stop the RAF loop */
   _cancelRaf() {
     if (this.rafId != null) cancelAnimationFrame(this.rafId);
     this.rafId = null;
   }
 
+  /** Emit transport event to React (e.g., when playing/paused) */
   _emitTransport(playing) {
     this.events.onTransport &&
       this.events.onTransport({
@@ -354,9 +314,11 @@ class PlaybackEngine {
       });
   }
 
+  /** Dispose of all audio players and buses to free memory */
   _disposeAll() {
     this.playersBySegment.forEach((h) => {
       try {
+        h.player.unsync?.();
         h.disposers.forEach((d) => d());
       } catch {}
     });
@@ -382,18 +344,15 @@ class PlaybackEngine {
   }
 }
 
-/** ---------- React wrapper component ---------- */
-/**
- * Props:
- * - version: { bpm, timeSig, tracks:[], segments:[], ... } (your project snapshot)
- * - height (optional): number for simple UI
+/** ---------- React wrapper component ----------
+ * Provides UI controls (Play/Pause/Stop) and a progress bar for the PlaybackEngine.
  */
 export default function WebAmpPlayback({ version, height = 120 }) {
   const engineRef = useRef(null);
   const [playing, setPlaying] = useState(false);
   const [ms, setMs] = useState(0);
 
-  // keep a stable engine
+  // Create and memoize the engine so it persists across re-renders
   const engine = useMemo(
     () =>
       new PlaybackEngine({
@@ -404,115 +363,79 @@ export default function WebAmpPlayback({ version, height = 120 }) {
     []
   );
 
+  // Attach and clean up engine
   useEffect(() => {
     engineRef.current = engine;
     return () => engine.dispose();
   }, [engine]);
 
-  // (re)load when version changes
+  // Load engine when version changes
   useEffect(() => {
     if (!version) return;
-    engine.load(version);
+    engine.load(version).catch((e) => console.error("[UI] engine.load() failed:", e));
   }, [engine, version]);
 
+  // Control handlers for play, pause, stop
   const onPlay = async () => {
-    await engine.play();
+    try {
+      await engine.play();
+    } catch (e) {
+      console.error("[UI] engine.play() failed:", e);
+    }
   };
   const onPause = () => engine.pause();
   const onStop = () => engine.stop();
 
+  // Seek slider handler
   const onSeek = (e) => {
     const val = Number(e.target.value) || 0;
-    engine.seekMs(val);
+    try {
+      engine.seekMs(val);
+    } catch (err) {
+      console.warn("seek failed:", err);
+    }
     setMs(val);
   };
 
-  const loopToggle = () => {
-    if (!version?.lengthMs) return;
-    if (Tone.Transport.loop) {
-      engine.clearLoop();
-    } else {
-      // demo: loop 2s window around current time
-      const start = Math.max(0, ms - 1000);
-      const end = Math.min(version.lengthMs, start + 2000);
-      engine.setLoop(start, end);
-    }
-  };
-
+  // Format time as mm:ss.mmm
   const fmt = (t) => {
     const s = Math.floor(t / 1000);
     const m = Math.floor(s / 60);
     const r = s % 60;
-    const msPart = Math.floor(t % 1000)
-      .toString()
-      .padStart(3, "0");
+    const msPart = Math.floor(t % 1000).toString().padStart(3, "0");
     return `${m}:${r.toString().padStart(2, "0")}.${msPart}`;
   };
 
+  // Render player UI
   return (
     <div style={{ fontFamily: "Inter, system-ui, sans-serif", padding: 12, border: "1px solid #333", borderRadius: 12 }}>
       <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
         <button onClick={onPlay}>▶️ Play</button>
         <button onClick={onPause}>⏸ Pause</button>
         <button onClick={onStop}>⏹ Stop</button>
-        <button onClick={loopToggle}>{Tone.Transport.loop ? "🔁 Loop: ON" : "🔁 Loop: OFF"}</button>
         <div style={{ marginLeft: "auto" }}>
           BPM: <b>{version?.bpm ?? 120}</b> &nbsp; Pos: <b>{fmt(ms)}</b>
         </div>
       </div>
 
-      <input
-        type="range"
-        min={0}
-        max={version?.lengthMs ?? 60000}
-        value={ms}
-        onChange={onSeek}
-        style={{ width: "100%" }}
-      />
+      {/* Progress bar */}
+      <div style={{ margin: "8px 0" }}>
+        <input
+          type="range"
+          min={0}
+          max={version?.lengthMs ?? 60000}
+          value={ms}
+          onChange={onSeek}
+          style={{ width: "100%" }}
+        />
+      </div>
 
-      {/* Optional: simple track list with mute/solo */}
-      <div style={{ marginTop: 10, display: "grid", gap: 6 }}>
+      {/* Track list */}
+      <div style={{ marginTop: 10 }}>
         {(version?.tracks || []).map((t) => (
-          <div key={t.id} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <div key={t.id} style={{ display: "flex", gap: 8, alignItems: "center", padding: "6px 0" }}>
             <div style={{ width: 8, height: 8, borderRadius: 999, background: t.color || "#888" }} />
-            <div style={{ minWidth: 120 }}>{t.name}</div>
-            <label>
-              <input
-                type="checkbox"
-                defaultChecked={!!t.mute}
-                onChange={(e) => engine.setTrackMute(t.id, e.target.checked)}
-              />{" "}
-              Mute
-            </label>
-            <label>
-              <input
-                type="checkbox"
-                defaultChecked={!!t.solo}
-                onChange={(e) => engine.setTrackSolo(t.id, e.target.checked)}
-              />{" "}
-              Solo
-            </label>
-            <label style={{ display: "flex", alignItems: "center", gap: 4 }}>
-              Gain
-              <input
-                type="range"
-                min={-24}
-                max={6}
-                defaultValue={t.gainDb ?? 0}
-                onChange={(e) => engine.setTrackGainDb(t.id, Number(e.target.value))}
-              />
-            </label>
-            <label style={{ display: "flex", alignItems: "center", gap: 4 }}>
-              Pan
-              <input
-                type="range"
-                min={-1}
-                max={1}
-                step={0.01}
-                defaultValue={t.pan ?? 0}
-                onChange={(e) => engine.setTrackPan(t.id, Number(e.target.value))}
-              />
-            </label>
+            <div>{t.name ?? "Imported"}</div>
           </div>
         ))}
       </div>
