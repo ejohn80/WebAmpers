@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import DraggableDiv from '../Generic/DraggableDiv';
 
 import styles from './Layout.module.css';
@@ -8,6 +8,10 @@ import { RxCross2 } from "react-icons/rx";
 import { useNavigate } from 'react-router-dom';
 
 import { MoonLoader } from "react-spinners";
+
+import AssetsTab from './Sidebar/AssetsTab';
+
+
 
 import { db } from '../../firebase/firebase';
 import {
@@ -25,8 +29,10 @@ import {
  * Sidebar component for the application layout.
  * @param {object} props - The component props.
  * @param {number} props.width - The current width of the sidebar.
+ * @param {function} props.onImportSuccess - Callback for successful audio import.
+ * @param {function} props.onImportError - Callback for failed audio import.
  */
-function Sidebar({ width }) {
+function Sidebar({ width, onImportSuccess, onImportError }) {
   const navigate = useNavigate();
   const { userData, loading: userLoading } = useUserData();
   const [currentTab, setCurrentTab] = useState("projects");
@@ -92,7 +98,6 @@ function Sidebar({ width }) {
 
     return unsubscribe;
   }, [userData]);
-
 
   const ProjectsTab = () => {
     return (
@@ -173,7 +178,7 @@ function Sidebar({ width }) {
     },
     assets: {
       label: 'Assets',
-      component: '',
+      component: <AssetsTab onImportSuccess onImportError />,
     },
   };
 

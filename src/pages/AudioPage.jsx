@@ -40,8 +40,14 @@ function AudioPage() {
   return (
     <div className="app-container">
       {/* 1. Header Section */}
-      <Header 
-        onImportSuccess={(result) => {
+      <Header />
+
+      {/* 2. Middle Area (Sidebar/Main Content Split) */}
+      <div 
+        className="main-content-area" 
+        style={mainContentStyle} 
+      >
+        <Sidebar width={sidebarWidth} onImportSuccess={(result) => {
           console.log("Audio imported, setting state:", result);
           setAudioData(result); // Store the entire result object in state
         }}
@@ -49,15 +55,7 @@ function AudioPage() {
           alert(`Import failed: ${error.message}`);
           setAudioData(null); // Clear any previous audio data on error
           // TODO: Show a more user-friendly error message in the UI
-        }}
-      />
-
-      {/* 2. Middle Area (Sidebar/Main Content Split) */}
-      <div 
-        className="main-content-area" 
-        style={mainContentStyle} 
-      >
-        <Sidebar width={sidebarWidth} />
+        }} />
 
         {/* Movable Divider Line */}
         <div 

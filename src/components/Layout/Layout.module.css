@@ -3,3 +3,114 @@
   justify-content: center;
   color: white;
 }
+
+.container {
+  background-color: #1a1a1a;
+  padding: 12px;
+  color: #ffffff;
+  height: 78vh;
+  display: flex;
+  flex-direction: column;
+  border-radius: 10px;
+}
+
+.wrapper {
+  max-width: 600px;
+  margin: 0 auto;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.searchBar {
+  background-color: #2a2a2a;
+  border-radius: 6px;
+  padding: 6px 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.searchInput {
+  background-color: transparent;
+  border: none;
+  color: #ffffff;
+  font-size: 13px;
+  outline: none;
+  width: 100%;
+}
+
+.searchInput::placeholder {
+  color: #888;
+}
+
+.tableHeader {
+  display: grid;
+  grid-template-columns: 1fr 60px 70px;
+  padding: 6px 10px;
+  border-bottom: 1px solid #333;
+  font-size: 11px;
+  color: #888;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.tableHeader div:first-child {
+  text-align: left;
+}
+
+.tableHeader div:nth-child(2),
+.tableHeader div:nth-child(3) {
+  text-align: right;
+}
+
+.songRow {
+  display: grid;
+  grid-template-columns: 1fr 60px 70px;
+  padding: 6px 10px;
+  background-color: #2a2a2a;
+  margin-bottom: 1px;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  align-items: center;
+}
+
+.songRow:hover {
+  background-color: #333;
+}
+
+.songName {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  min-width: 0;
+}
+
+.songName span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.songDuration {
+  font-size: 12px;
+  color: #aaa;
+  text-align: right;
+}
+
+.songBitrate {
+  font-size: 12px;
+  color: #aaa;
+  text-align: right;
+}
+
+.importButtonWrapper {
+  display: flex;
+  justify-content: center;
+  margin-top: 12px;
+  padding-top: 12px;
+}

@@ -2,6 +2,8 @@ import React, { useRef } from 'react';
 import * as Tone from 'tone';
 import AudioImporter from './AudioImporter';
 import './AudioImportButton.css';
+import { LuImport } from "react-icons/lu";
+
 
 /**
  * A UI component that provides a button to import audio files.
@@ -56,7 +58,7 @@ const AudioImportButton = ({ onImportSuccess, onImportError }) => {
         style={{ display: 'none' }}
       />
       <button className="import-button" onClick={handleButtonClick}>
-        Import Audio
+        <LuImport size={20} /> Import
       </button>
     </>
   );
