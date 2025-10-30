@@ -1,16 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useContext } from 'react';
 import DraggableDiv from '../Generic/DraggableDiv';
 
 import styles from './Layout.module.css';
 
-import { useUserData } from '../../hooks/useUserData';
 import { RxCross2 } from "react-icons/rx";
 import { useNavigate } from 'react-router-dom';
 
 import { MoonLoader } from "react-spinners";
 
 import AssetsTab from './Sidebar/AssetsTab';
-
+import { AppContext } from '../../context/AppContext';
 
 
 import { db } from '../../firebase/firebase';
@@ -33,8 +32,10 @@ import {
  * @param {function} props.onImportError - Callback for failed audio import.
  */
 function Sidebar({ width, onImportSuccess, onImportError }) {
+
+  const { userData, loading: userLoading, activeProject, setActiveProject } = useContext(AppContext);
+  
   const navigate = useNavigate();
-  const { userData, loading: userLoading } = useUserData();
   const [currentTab, setCurrentTab] = useState("projects");
   const [isLoading, setIsLoading] = useState(false);
   const [projects, setProjects] = useState([]);
@@ -124,7 +125,7 @@ function Sidebar({ width, onImportSuccess, onImportError }) {
             ) : (
               <ul style={{ listStyle: 'none', padding: 0 }}>
                 {projects.map(p => (
-                  <li key={p.id} style={{ marginBottom: '8px', border: '1px solid black', padding: '4px' }}>
+                  <li key={p.name} onClick={() => setActiveProject(p.name)} style={{ marginBottom: '8px', border: '1px solid black', padding: '4px', border: p.name === activeProject ? "2px solid #4CAF50" : "1px solid black",}}>
                     {p.name}
                   </li>
                 ))}

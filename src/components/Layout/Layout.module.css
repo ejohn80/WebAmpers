@@ -102,6 +102,11 @@
   text-align: right;
 }
 
+.songList {
+  flex: 1;
+  overflow-y: auto;
+}
+
 .songBitrate {
   font-size: 12px;
   color: #aaa;
