@@ -469,26 +469,36 @@ export default function WebAmpPlayback({ version, height = 120 }) {
             <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 240 }}>
               <span style={{ fontSize: 12, opacity: 0.85 }}>Volume</span>
               <input
-                  type="range"
-                  min={0}
-                  max={100}
-                  step={1}
-                  value={trackGains[t.id] ?? 50}   // stays centered at 50 visually
-                  onChange={(e) => {
-                    const linearValue = Number(e.target.value); // 0–100
-                    const db = (linearValue - 50) * 0.24;       // map to ±12 dB range
+                type="range"
+                min={0}
+                max={100}
+                step={1}
+                value={trackGains[t.id] ?? 50}
+                onChange={(e) => {
+                  const v = Number(e.target.value); // 0–100
 
-                    setTrackGains(prev => ({ ...prev, [t.id]: linearValue }));
-                    try { engine.setTrackGainDb(t.id, db); } catch (err) {
-                      console.warn("setTrackGainDb failed:", err);
-                    }
-                  }}
-                  style={{ width: 160 }}
-                  aria-label={`Volume for ${t.name ?? "Imported"}`}
-                />
-                <code style={{ fontSize: 12, opacity: 0.85 }}>
-                  {(trackGains[t.id] ?? 50)}%
-                </code>
+                  // Piecewise dB mapping:
+                  // 0%   -> -120 dB (silent)
+                  // 1–100% -> -35 dB to +15 dB
+                  let db;
+                  if (v === 0) {
+                    db = -120; // fully mute
+                  } else {
+                    // Linear map: 1–100 → -35dB to +15dB
+                    db = -35 + (v / 100) * 50; // -35 → +15 range
+                  }
+
+                  setTrackGains((prev) => ({ ...prev, [t.id]: v }));
+                  try { engine.setTrackGainDb(t.id, db); } catch (err) {
+                    console.warn("setTrackGainDb failed:", err);
+                  }
+                }}
+                style={{ width: 160 }}
+                aria-label={`Volume for ${t.name ?? "Imported"}`}
+              />
+              <code style={{ fontSize: 12, opacity: 0.85 }}>
+                {(trackGains[t.id] ?? 50)}%
+              </code>
             </div>
           </div>
         ))}
