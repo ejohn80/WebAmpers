@@ -15,7 +15,7 @@ You do **not** need to install desktop DAW software. WebAmp was made to be for a
 ## 2. Installation / prerequisites
 
 ### Option A: Use WebAmp in the browser (recommended)
-Visit [INSERT LINK HERE]. You visit the URL and start editing.
+Visit [WebAmp](https://webampers.com/). You visit the URL and start editing.
 
 Recommended Browsers:
 - Chrome (desktop)

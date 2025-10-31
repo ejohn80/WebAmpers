@@ -9,7 +9,7 @@ All WebAmp code is hosted in a single public GitHub repository:
 Clone the repo:
 ```bash
 git clone https://github.com/ejohn80/WebAmpers.git
-cd WebAmpers/WebAmpers
+cd WebAmpers
 ```
 ---
 ## 2. Repository layout
@@ -91,6 +91,7 @@ When preparing for a release:
 3. All code is formatted with `npm run format`.
 4. Run the production build `npm run build`
 5. Test expected functionality
+
 
 
 

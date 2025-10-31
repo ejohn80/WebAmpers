@@ -351,6 +351,18 @@ export default function WebAmpPlayback({ version, height = 120 }) {
   const engineRef = useRef(null);
   const [playing, setPlaying] = useState(false);
   const [ms, setMs] = useState(0);
+  const [trackGains, setTrackGains] = useState({});
+
+  // Seed sliders whenever a new version loads
+  useEffect(() => {
+    const map = {};
+    (version?.tracks || []).forEach(t => {
+      map[t.id] = 50; // visual 50% default
+      // also set engine default to 0 dB (neutral)
+      try { engine.setTrackGainDb(t.id, 0); } catch {}
+    });
+    setTrackGains(map);
+  }, [version]);
 
   // Create and memoize the engine so it persists across re-renders
   const engine = useMemo(
@@ -413,9 +425,6 @@ export default function WebAmpPlayback({ version, height = 120 }) {
         <button onClick={onPlay}>▶️ Play</button>
         <button onClick={onPause}>⏸ Pause</button>
         <button onClick={onStop}>⏹ Stop</button>
-        <div style={{ marginLeft: "auto" }}>
-          BPM: <b>{version?.bpm ?? 120}</b> &nbsp; Pos: <b>{fmt(ms)}</b>
-        </div>
       </div>
 
       {/* Progress bar */}
@@ -433,9 +442,54 @@ export default function WebAmpPlayback({ version, height = 120 }) {
       {/* Track list */}
       <div style={{ marginTop: 10 }}>
         {(version?.tracks || []).map((t) => (
-          <div key={t.id} style={{ display: "flex", gap: 8, alignItems: "center", padding: "6px 0" }}>
-            <div style={{ width: 8, height: 8, borderRadius: 999, background: t.color || "#888" }} />
-            <div>{t.name ?? "Imported"}</div>
+          <div
+            key={t.id}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "6px 0",
+              justifyContent: "space-between",
+            }}
+          >
+            {/* left side: dot + name */}
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: 999,
+                  background: t.color || "#888",
+                }}
+              />
+              <div>{t.name ?? "Imported"}</div>
+            </div>
+
+            {/* right side: Volume slider and readout */}
+            <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 240 }}>
+              <span style={{ fontSize: 12, opacity: 0.85 }}>Volume</span>
+              <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  step={1}
+                  value={trackGains[t.id] ?? 50}   // stays centered at 50 visually
+                  onChange={(e) => {
+                    const linearValue = Number(e.target.value); // 0–100
+                    const db = (linearValue - 50) * 0.24;       // map to ±12 dB range
+
+                    setTrackGains(prev => ({ ...prev, [t.id]: linearValue }));
+                    try { engine.setTrackGainDb(t.id, db); } catch (err) {
+                      console.warn("setTrackGainDb failed:", err);
+                    }
+                  }}
+                  style={{ width: 160 }}
+                  aria-label={`Volume for ${t.name ?? "Imported"}`}
+                />
+                <code style={{ fontSize: 12, opacity: 0.85 }}>
+                  {(trackGains[t.id] ?? 50)}%
+                </code>
+            </div>
           </div>
         ))}
       </div>
