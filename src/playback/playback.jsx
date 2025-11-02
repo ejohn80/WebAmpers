@@ -25,17 +25,17 @@ class PlaybackEngine {
     this.events = events;
 
     // Tone.js runtime data
-    this.version = null;           // current loaded version/project
-    this.trackBuses = new Map();   // map of track IDs to their Tone buses
-    this.master = null;            // master gain node
+    this.version = null; // current loaded version/project
+    this.trackBuses = new Map(); // map of track IDs to their Tone buses
+    this.master = null; // master gain node
     this.playersBySegment = new Map(); // store all active audio players
-    this.preloaded = new Set();    // store URLs already preloaded
-    this.rafId = null;             // requestAnimationFrame ID for updating progress
+    this.preloaded = new Set(); // store URLs already preloaded
+    this.rafId = null; // requestAnimationFrame ID for updating progress
 
     // playback timing parameters
-    this.renderAheadSec = 0.2;     // small pre-buffer before playback starts
-    this.jogLatencySec = 0.02;     // latency compensation for seeking
-    this.defaultFadeMs = 5;        // default fade time in milliseconds
+    this.renderAheadSec = 0.2; // small pre-buffer before playback starts
+    this.jogLatencySec = 0.02; // latency compensation for seeking
+    this.defaultFadeMs = 5; // default fade time in milliseconds
   }
 
   /** Ensure Tone.js AudioContext is running (required by browsers for playback) */
@@ -125,7 +125,7 @@ class PlaybackEngine {
     if (!this.version) return;
     Tone.Transport.setLoopPoints(
       msToToneTime(startMs, this.version.bpm || 120),
-      msToToneTime(endMs, this.version.bpm || 120)
+      msToToneTime(endMs, this.version.bpm || 120),
     );
     Tone.Transport.loop = endMs > startMs;
   }
@@ -194,7 +194,9 @@ class PlaybackEngine {
 
   /** Prepare all segments (audio clips) and schedule them for playback */
   async _prepareSegments(version) {
-    const urls = Array.from(new Set((version.segments || []).map((s) => s.fileUrl)));
+    const urls = Array.from(
+      new Set((version.segments || []).map((s) => s.fileUrl)),
+    );
     urls.forEach((u) => this._preload(u));
 
     for (const seg of version.segments || []) {
@@ -239,7 +241,10 @@ class PlaybackEngine {
       player.sync();
 
       // Schedule start time in the Transport
-      const startTT = msToToneTime(seg.startOnTimelineMs || 0, version.bpm || 120);
+      const startTT = msToToneTime(
+        seg.startOnTimelineMs || 0,
+        version.bpm || 120,
+      );
       player.start(startTT, offsetSec, durSec);
     }
 
@@ -284,8 +289,15 @@ class PlaybackEngine {
     if (this.preloaded.has(url)) return;
     this.preloaded.add(url);
     Tone.ToneAudioBuffer.load(url)
-      .then(() => this.events.onBuffer && this.events.onBuffer({ url, ready: true }))
-      .catch((e) => this.events.onBuffer && this.events.onBuffer({ url, ready: false, error: e }));
+      .then(
+        () =>
+          this.events.onBuffer && this.events.onBuffer({ url, ready: true }),
+      )
+      .catch(
+        (e) =>
+          this.events.onBuffer &&
+          this.events.onBuffer({ url, ready: false, error: e }),
+      );
   }
 
   /** Start updating progress every animation frame */
@@ -320,7 +332,9 @@ class PlaybackEngine {
       try {
         h.player.unsync?.();
         h.disposers.forEach((d) => d());
-      } catch {}
+      } catch {
+        /* suppress ESLINT error */
+      }
     });
     this.playersBySegment.clear();
 
@@ -330,7 +344,9 @@ class PlaybackEngine {
         (b.chain || []).forEach((n) => n.dispose?.());
         b.pan.dispose();
         b.gain.dispose();
-      } catch {}
+      } catch {
+        /* suppress ESLINT error */
+      }
     });
     this.trackBuses.clear();
 
@@ -339,7 +355,9 @@ class PlaybackEngine {
         (this.master.fxOut ?? this.master.gain).disconnect();
         (this.master.chain || []).forEach((n) => n.dispose?.());
         this.master.gain.dispose();
-      } catch {}
+      } catch {
+        /* suppress ESLINT error */
+      }
     }
   }
 }
@@ -347,7 +365,8 @@ class PlaybackEngine {
 /** ---------- React wrapper component ----------
  * Provides UI controls (Play/Pause/Stop) and a progress bar for the PlaybackEngine.
  */
-export default function WebAmpPlayback({ version, height = 120 }) {
+export default function WebAmpPlayback({ version }) {
+  // removed ", height = 120" since it is unused
   const engineRef = useRef(null);
   const [playing, setPlaying] = useState(false);
   const [ms, setMs] = useState(0);
@@ -356,13 +375,17 @@ export default function WebAmpPlayback({ version, height = 120 }) {
   // Seed sliders whenever a new version loads
   useEffect(() => {
     const map = {};
-    (version?.tracks || []).forEach(t => {
+    (version?.tracks || []).forEach((t) => {
       map[t.id] = 50; // visual 50% default
       // also set engine default to 0 dB (neutral)
-      try { engine.setTrackGainDb(t.id, 0); } catch {}
+      try {
+        engine.setTrackGainDb(t.id, 0);
+      } catch {
+        /* suppress ESLINT error */
+      }
     });
     setTrackGains(map);
-  }, [version]);
+  }, [version, engine]);
 
   // Create and memoize the engine so it persists across re-renders
   const engine = useMemo(
@@ -372,7 +395,7 @@ export default function WebAmpPlayback({ version, height = 120 }) {
         onTransport: ({ playing }) => setPlaying(playing),
         onError: (e) => console.error(e),
       }),
-    []
+    [],
   );
 
   // Attach and clean up engine
@@ -384,7 +407,9 @@ export default function WebAmpPlayback({ version, height = 120 }) {
   // Load engine when version changes
   useEffect(() => {
     if (!version) return;
-    engine.load(version).catch((e) => console.error("[UI] engine.load() failed:", e));
+    engine
+      .load(version)
+      .catch((e) => console.error("[UI] engine.load() failed:", e));
   }, [engine, version]);
 
   // Control handlers for play, pause, stop
@@ -410,20 +435,37 @@ export default function WebAmpPlayback({ version, height = 120 }) {
   };
 
   // Format time as mm:ss.mmm
-  const fmt = (t) => {
-    const s = Math.floor(t / 1000);
-    const m = Math.floor(s / 60);
-    const r = s % 60;
-    const msPart = Math.floor(t % 1000).toString().padStart(3, "0");
-    return `${m}:${r.toString().padStart(2, "0")}.${msPart}`;
-  };
+  // const fmt = (t) => {
+  //   const s = Math.floor(t / 1000);
+  //   const m = Math.floor(s / 60);
+  //   const r = s % 60;
+  //   const msPart = Math.floor(t % 1000)
+  //     .toString()
+  //     .padStart(3, "0");
+  //   return `${m}:${r.toString().padStart(2, "0")}.${msPart}`;
+  // };
 
   // Render player UI
   return (
-    <div style={{ fontFamily: "Inter, system-ui, sans-serif", padding: 12, border: "1px solid #333", borderRadius: 12 }}>
-      <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
-        <button onClick={onPlay}>▶️ Play</button>
-        <button onClick={onPause}>⏸ Pause</button>
+    <div
+      style={{
+        fontFamily: "Inter, system-ui, sans-serif",
+        padding: 12,
+        border: "1px solid #333",
+        borderRadius: 12,
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          gap: 8,
+          alignItems: "center",
+          marginBottom: 8,
+        }}
+      >
+        <button onClick={playing ? onPause : onPlay}>
+          {playing ? "⏸ Pause" : "▶️ Play"}
+        </button>
         <button onClick={onStop}>⏹ Stop</button>
       </div>
 
@@ -466,7 +508,14 @@ export default function WebAmpPlayback({ version, height = 120 }) {
             </div>
 
             {/* right side: Volume slider and readout */}
-            <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 240 }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                minWidth: 240,
+              }}
+            >
               <span style={{ fontSize: 12, opacity: 0.85 }}>Volume</span>
               <input
                 type="range"
@@ -489,7 +538,9 @@ export default function WebAmpPlayback({ version, height = 120 }) {
                   }
 
                   setTrackGains((prev) => ({ ...prev, [t.id]: v }));
-                  try { engine.setTrackGainDb(t.id, db); } catch (err) {
+                  try {
+                    engine.setTrackGainDb(t.id, db);
+                  } catch (err) {
                     console.warn("setTrackGainDb failed:", err);
                   }
                 }}
@@ -497,7 +548,7 @@ export default function WebAmpPlayback({ version, height = 120 }) {
                 aria-label={`Volume for ${t.name ?? "Imported"}`}
               />
               <code style={{ fontSize: 12, opacity: 0.85 }}>
-                {(trackGains[t.id] ?? 50)}%
+                {trackGains[t.id] ?? 50}%
               </code>
             </div>
           </div>
