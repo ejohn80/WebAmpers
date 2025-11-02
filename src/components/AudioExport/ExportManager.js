@@ -154,7 +154,7 @@ class ExportManager {
       case "mp3":
         return await this.exportMp3(buffer, filename, bitrate);
 
-      case "ogg":
+      case "ogg": {
         const wavFile = this.bufferToWavFile(buffer, "temp.wav");
         const oggBlob = await this.pythonApi.exportAudio(wavFile, {
           format: "ogg",
@@ -162,6 +162,7 @@ class ExportManager {
         });
         this.pythonApi.downloadBlob(oggBlob, filename);
         return { success: true, format: "ogg" };
+      } 
 
       default:
         throw new Error(`Unsupported format: ${format}`);
