@@ -1,0 +1,141 @@
+.container {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  width: 100%;
+  height: 40px;
+}
+
+/* Container for Webamp and FETS */
+.leftContainer {
+  display: flex;
+  align-items: flex-start;
+  gap: 13px;
+}
+
+.webampText {
+  color: #17E1FF;
+  font-family: "Roboto", sans-serif;
+  font-size: 20px;
+  font-weight: 500;
+  transform: translateY(7px);
+  padding-left: 10px;;
+}
+
+/* File/Edit/Tools/Settings container */
+.FETS-container {
+  display: flex;
+  position: relative;
+}
+
+/* File and Edit buttons styling */
+.dropdown-btn {
+  background: #262529;
+  color: #E5E5E5;
+  padding: 5px 16px 6px 16px;
+  border: none;
+  cursor: pointer;
+  width: 60px;
+  height: 38px;
+  font-size: 16px;
+}
+
+.dropdown-btn:hover {
+  background-color: #333239;
+}
+
+/* Tools button styling */
+.dropdown-btn-tools {
+  background: #262529;
+  color: #E5E5E5;
+  padding: 5px 16px 6px 16px;
+  border: none;
+  cursor: pointer;
+  width: 70px;
+  height: 38px;
+  font-size: 16px;
+}
+
+.dropdown-btn-tools:hover {
+  background-color: #333239;
+}
+
+/* Settings button styling */
+.dropdown-btn-settings {
+  background: #262529;
+  color: #E5E5E5;
+  padding: 5px 16px 6px 16px;
+  border: none;
+  cursor: pointer;
+  width: 90px;
+  height: 38px;
+  font-size: 16px;
+}
+
+.dropdown-btn-settings:hover {
+  background-color: #333239;
+}
+
+.dropdown {
+  position: relative;
+  display: inline-block;
+  z-index: 9999;
+}
+
+/* Base dropdown content styling */
+.dropdown-content {
+  position: absolute;
+  background: #262529;
+  z-index: 10000;
+  border: 2px solid #333239;
+  border-radius: 4px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+  overflow: visible;
+}
+
+/* FILE Dropdown - Specific Styling */
+.dropdown-content-file {
+  width: 200px;
+  height: 175px;
+}
+
+/* EDIT Dropdown - Specific Styling */
+.dropdown-content-edit {
+  width: 180px;
+  height: 262px;
+}
+
+/* TOOLS Dropdown - Specific Styling */
+.dropdown-content-tools {
+  width: 160px;
+  height: 129px;
+}
+
+/* SETTINGS Dropdown - Specific Styling */
+.dropdown-content-settings {
+  width: 220px;
+  height: 171px;
+}
+
+/* Dropdown menu text */
+.dropdown-content a {
+  color: #E5E5E5;
+  padding:  12px 16px;
+  text-decoration: none;
+  font-family: "Roboto", sans-serif;
+  font-weight: 400;
+  display: block;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.dropdown-content a:hover {
+  background-color: #333239;
+}
+
+/* Active state for buttons when dropdown is open */
+.dropdown-btn.active,
+.dropdown-btn-tools.active,
+.dropdown-btn-settings.active {
+  background-color: #333239;
+}
