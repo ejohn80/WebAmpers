@@ -2,7 +2,7 @@
  * Client for communicating with Python backend API
  */
 class PythonApiClient {
-  constructor(baseUrl = 'http://localhost:5000') {
+  constructor(baseUrl = "http://localhost:5000") {
     this.baseUrl = baseUrl;
   }
 
@@ -15,17 +15,17 @@ class PythonApiClient {
   async convertFormat(file, targetFormat) {
     try {
       const formData = new FormData();
-      formData.append('file', file);
-      formData.append('target_format', targetFormat);
+      formData.append("file", file);
+      formData.append("target_format", targetFormat);
 
       const response = await fetch(`${this.baseUrl}/convert`, {
-        method: 'POST',
-        body: formData
+        method: "POST",
+        body: formData,
       });
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || 'Conversion failed');
+        throw new Error(error.error || "Conversion failed");
       }
 
       return await response.blob();
@@ -40,26 +40,26 @@ class PythonApiClient {
    * @param {string} outputFormat - Output format (wav, mp3)
    * @returns {Promise<Blob>} - Merged audio file
    */
-  async mergeFiles(files, outputFormat = 'mp3') {
+  async mergeFiles(files, outputFormat = "mp3") {
     try {
       if (files.length < 2) {
-        throw new Error('At least 2 files required for merging');
+        throw new Error("At least 2 files required for merging");
       }
 
       const formData = new FormData();
-      files.forEach(file => {
-        formData.append('files[]', file);
+      files.forEach((file) => {
+        formData.append("files[]", file);
       });
-      formData.append('output_format', outputFormat);
+      formData.append("output_format", outputFormat);
 
       const response = await fetch(`${this.baseUrl}/merge`, {
-        method: 'POST',
-        body: formData
+        method: "POST",
+        body: formData,
       });
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || 'Merge failed');
+        throw new Error(error.error || "Merge failed");
       }
 
       return await response.blob();
@@ -80,24 +80,24 @@ class PythonApiClient {
   async exportAudio(file, settings = {}) {
     try {
       const formData = new FormData();
-      formData.append('file', file);
-      formData.append('format', settings.format || 'mp3');
-      
+      formData.append("file", file);
+      formData.append("format", settings.format || "mp3");
+
       if (settings.bitrate) {
-        formData.append('bitrate', settings.bitrate);
+        formData.append("bitrate", settings.bitrate);
       }
       if (settings.sampleRate) {
-        formData.append('sample_rate', settings.sampleRate.toString());
+        formData.append("sample_rate", settings.sampleRate.toString());
       }
 
       const response = await fetch(`${this.baseUrl}/export`, {
-        method: 'POST',
-        body: formData
+        method: "POST",
+        body: formData,
       });
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || 'Export failed');
+        throw new Error(error.error || "Export failed");
       }
 
       return await response.blob();
@@ -114,16 +114,16 @@ class PythonApiClient {
   async getMetadata(file) {
     try {
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append("file", file);
 
       const response = await fetch(`${this.baseUrl}/metadata`, {
-        method: 'POST',
-        body: formData
+        method: "POST",
+        body: formData,
       });
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || 'Failed to get metadata');
+        throw new Error(error.error || "Failed to get metadata");
       }
 
       return await response.json();
@@ -152,7 +152,7 @@ class PythonApiClient {
    */
   downloadBlob(blob, filename) {
     const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const a = document.createElement("a");
     a.href = url;
     a.download = filename;
     document.body.appendChild(a);
