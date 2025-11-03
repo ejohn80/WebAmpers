@@ -120,15 +120,15 @@ class PlaybackEngine {
     return Tone.Transport.seconds * 1000;
   }
 
-  /** Define a loop range for the transport */
-  setLoop(startMs, endMs) {
-    if (!this.version) return;
-    Tone.Transport.setLoopPoints(
-      msToToneTime(startMs, this.version.bpm || 120),
-      msToToneTime(endMs, this.version.bpm || 120)
-    );
-    Tone.Transport.loop = endMs > startMs;
-  }
+  // /** Define a loop range for the transport */
+  // setLoop(startMs, endMs) {
+  //   if (!this.version) return;
+  //   Tone.Transport.setLoopPoints(
+  //     msToToneTime(startMs, this.version.bpm || 120),
+  //     msToToneTime(endMs, this.version.bpm || 120)
+  //   );
+  //   Tone.Transport.loop = endMs > startMs;
+  // }
 
   // /** Disable looping entirely */
   // clearLoop() {
@@ -385,7 +385,7 @@ export default function WebAmpPlayback({ version }) {
       }
     });
     setTrackGains(map);
-  }, [version, engine]);
+  }, [version]);
 
   // Create and memoize the engine so it persists across re-renders
   const engine = useMemo(
@@ -434,14 +434,18 @@ export default function WebAmpPlayback({ version }) {
     setMs(val);
   };
 
+  // // Format time as mm:ss.mmm
   // Format time as mm:ss.mmm
-  const fmt = (t) => {
-    const s = Math.floor(t / 1000);
-    const m = Math.floor(s / 60);
-    const r = s % 60;
-    const msPart = Math.floor(t % 1000).toString().padStart(3, "0");
-    return `${m}:${r.toString().padStart(2, "0")}.${msPart}`;
-  };
+  // const fmt = (t) => {
+  //   const s = Math.floor(t / 1000);
+  //   const m = Math.floor(s / 60);
+  //   const r = s % 60;
+  //   const msPart = Math.floor(t % 1000).toString().padStart(3, "0");
+  //   const msPart = Math.floor(t % 1000)
+  //     .toString()
+  //     .padStart(3, "0");
+  //   return `${m}:${r.toString().padStart(2, "0")}.${msPart}`;
+  // };
 
   // Render player UI
   return (
@@ -514,7 +518,6 @@ export default function WebAmpPlayback({ version }) {
                 minWidth: 240,
               }}
             >
-              <span style={{ fontSize: 12, opacity: 0.85 }}>Volume</span>
               <input
                 type="range"
                 min={0}
