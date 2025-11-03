@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import * as Tone from "tone";
 import { progressStore } from './progressStore';
+import PlayIcon from "../assets/footer/PlayButton.svg";
+import PauseIcon from "../assets/footer/PauseButton.svg";
 
 // === Utility functions ===
 
@@ -570,9 +572,27 @@ export default function WebAmpPlayback({ version }) {
           {typeof (version?.lengthMs) === 'number' && version.lengthMs > 0 ? ` / ${fmtTime(version.lengthMs)}` : ''}
         </code>
         <button onClick={skipBack10} title="Back 10s">⏪ 10s</button>
-        <button onClick={onTogglePlay} title={playing ? "Pause" : "Play"}>
-          {playing ? "⏸" : "▶️"}
-        </button>
+        {playing ? (
+          <button
+            type="button"
+            onClick={onPause}
+            title="Pause"
+            style={{ background: 'transparent', border: 'none', padding: 0, margin: 0, cursor: 'pointer' }}
+            aria-label="Pause"
+          >
+            <img src={PauseIcon} alt="Pause" style={{ height: 18, display: 'block' }} />
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={onPlay}
+            title="Play"
+            style={{ background: 'transparent', border: 'none', padding: 0, margin: 0, cursor: 'pointer' }}
+            aria-label="Play"
+          >
+            <img src={PlayIcon} alt="Play" style={{ height: 18, display: 'block' }} />
+          </button>
+        )}
         <button onClick={skipFwd10} title="Forward 10s">10s ⏩</button>
       </div>
 
