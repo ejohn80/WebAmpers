@@ -333,7 +333,7 @@ class PlaybackEngine {
         h.player.unsync?.();
         h.disposers.forEach((d) => d());
       } catch {
-        /* suppress ESLINT error */
+        /* To suppress linter warning */
       }
     });
     this.playersBySegment.clear();
@@ -345,7 +345,7 @@ class PlaybackEngine {
         b.pan.dispose();
         b.gain.dispose();
       } catch {
-        /* suppress ESLINT error */
+        /* To suppress linter warning */
       }
     });
     this.trackBuses.clear();
@@ -356,7 +356,7 @@ class PlaybackEngine {
         (this.master.chain || []).forEach((n) => n.dispose?.());
         this.master.gain.dispose();
       } catch {
-        /* suppress ESLINT error */
+        /* To suppress linter warning */
       }
     }
   }
@@ -366,9 +366,9 @@ class PlaybackEngine {
  * Provides UI controls (Play/Pause/Stop) and a progress bar for the PlaybackEngine.
  */
 export default function WebAmpPlayback({ version }) {
-  // removed ", height = 120" since it is unused
+  // , height = 120
   const engineRef = useRef(null);
-  const [playing, setPlaying] = useState(false);
+  const [setPlaying] = useState(false); // playing,
   const [ms, setMs] = useState(0);
   const [trackGains, setTrackGains] = useState({});
 
@@ -381,7 +381,7 @@ export default function WebAmpPlayback({ version }) {
       try {
         engine.setTrackGainDb(t.id, 0);
       } catch {
-        /* suppress ESLINT error */
+        /* To suppress linter warning */
       }
     });
     setTrackGains(map);
@@ -465,9 +465,8 @@ export default function WebAmpPlayback({ version }) {
           marginBottom: 8,
         }}
       >
-        <button onClick={playing ? onPause : onPlay}>
-          {playing ? "⏸ Pause" : "▶️ Play"}
-        </button>
+        <button onClick={onPlay}>▶️ Play</button>
+        <button onClick={onPause}>⏸ Pause</button>
         <button onClick={onStop}>⏹ Stop</button>
       </div>
 
