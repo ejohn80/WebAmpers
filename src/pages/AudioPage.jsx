@@ -5,7 +5,7 @@ import Sidebar from '../components/Layout/Sidebar';
 import MainContent from '../components/Layout/MainContent';
 import Footer from '../components/Layout/Footer';
 import { audioManager } from '../managers/AudioManager';
-import WebAmpPlayback from '../playback/playback.jsx';
+// import WebAmpPlayback from '../playback/playback.jsx';
 
 const MIN_WIDTH = 0;
 const MAX_WIDTH = 300;
@@ -55,7 +55,6 @@ function AudioPage() {
 
   const activeTrack = tracks.length > 0 ? tracks[0] : null;
   
-  // FIX: Get buffer from the track - check different possible property names
   const audioBuffer = activeTrack && activeTrack.segments.length > 0
   ? activeTrack.segments[0].buffer
   : null;
