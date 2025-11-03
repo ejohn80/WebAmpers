@@ -11,6 +11,8 @@ export default {
   transformIgnorePatterns: [
     'node_modules/(?!(tone)/)'
   ],
-  extensionsToTreatAsEsm: ['.jsx'],
-  moduleFileExtensions: ['js', 'jsx'],
+  moduleNameMapper: {
+    "^tone$": "tone" // ensures tone mock resolves correctly
+  },
+  setupFilesAfterEnv: ["./src/tests/setup.js"]
 };
