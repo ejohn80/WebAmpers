@@ -93,25 +93,25 @@
   overflow: visible;
 }
 
-/* FILE Dropdown - Specific Styling */
+/* File dropdown */
 .dropdown-content-file {
   width: 200px;
   height: 175px;
 }
 
-/* EDIT Dropdown - Specific Styling */
+/* Edit dropdown */
 .dropdown-content-edit {
   width: 180px;
   height: 262px;
 }
 
-/* TOOLS Dropdown - Specific Styling */
+/* Tools dropdown */
 .dropdown-content-tools {
   width: 160px;
   height: 129px;
 }
 
-/* SETTINGS Dropdown - Specific Styling */
+/* Settings dropdown */
 .dropdown-content-settings {
   width: 220px;
   height: 171px;
