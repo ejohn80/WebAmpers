@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import * as Tone from "tone";
+import { progressStore } from './progressStore';
 
 // === Utility functions ===
 
@@ -31,6 +32,7 @@ class PlaybackEngine {
     this.playersBySegment = new Map(); // store all active audio players
     this.preloaded = new Set(); // store URLs already preloaded
     this.rafId = null; // requestAnimationFrame ID for updating progress
+    this.ended = false; // whether we've reached the end of the timeline
 
     // playback timing parameters
     this.renderAheadSec = 0.2; // small pre-buffer before playback starts
@@ -57,6 +59,7 @@ class PlaybackEngine {
 
     // Save the version reference
     this.version = version;
+    this.ended = false;
 
     // Configure transport tempo and time signature
     Tone.Transport.bpm.value = version.bpm || 120;
@@ -92,6 +95,7 @@ class PlaybackEngine {
     await this.ensureAudioUnlocked();
     Tone.Transport.start("+" + this.renderAheadSec);
     this._emitTransport(true);
+    this.ended = false;
   }
 
   /** Pause playback but keep position */
@@ -110,9 +114,13 @@ class PlaybackEngine {
   /** Seek to a specific time (in milliseconds) within the timeline */
   seekMs(ms) {
     if (!this.version) return;
-    const beats = msToBeats(ms, this.version.bpm || 120);
-    const jog = this.jogLatencySec * ((this.version.bpm || 120) / 60);
-    Tone.Transport.position = beats + jog;
+    // Use seconds for absolute seeking; avoid mixing units with beats.
+    const clampedMs = Math.max(0, Number(ms) || 0);
+    if (this.version?.lengthMs && clampedMs < this.version.lengthMs) {
+      this.ended = false;
+    }
+    const seconds = clampedMs / 1000 + (this.jogLatencySec || 0);
+    Tone.Transport.seconds = seconds;
   }
 
   /** Get the current playback position in milliseconds */
@@ -303,7 +311,22 @@ class PlaybackEngine {
   /** Start updating progress every animation frame */
   _startRaf() {
     const tick = () => {
-      const ms = this.getPositionMs();
+      let ms = this.getPositionMs();
+      const len = this.version?.lengthMs;
+      if (typeof len === "number" && len > 0) {
+        if (ms >= len) {
+          // Clamp and auto-pause exactly at the end once
+          ms = len;
+          if (!this.ended) {
+            try {
+              Tone.Transport.pause();
+            } catch {}
+            this.seekMs(len);
+            this._emitTransport(false);
+            this.ended = true;
+          }
+        }
+      }
       this.events.onProgress && this.events.onProgress(ms);
       this.rafId = requestAnimationFrame(tick);
     };
@@ -367,25 +390,15 @@ class PlaybackEngine {
  */
 export default function WebAmpPlayback({ version }) {
   // , height = 120
-  const engineRef = useRef(null);
-  const [setPlaying] = useState(false); // playing,
+  const engineRef = useRef(null); // no external usage currently
+  const [playing, setPlaying] = useState(false);
   const [ms, setMs] = useState(0);
-  const [trackGains, setTrackGains] = useState({});
+  const [masterVol, setMasterVol] = useState(50); // 0-100 visual percent, default 50%
+  const wasPlayingRef = useRef(false);
+  const prevMasterGainRef = useRef(0.5);
+  const mutingDuringScrubRef = useRef(false);
 
-  // Seed sliders whenever a new version loads
-  useEffect(() => {
-    const map = {};
-    (version?.tracks || []).forEach((t) => {
-      map[t.id] = 50; // visual 50% default
-      // also set engine default to 0 dB (neutral)
-      try {
-        engine.setTrackGainDb(t.id, 0);
-      } catch {
-        /* To suppress linter warning */
-      }
-    });
-    setTrackGains(map);
-  }, [version]);
+  // No per-track sliders in footer; keep track gains from version
 
   // Create and memoize the engine so it persists across re-renders
   const engine = useMemo(
@@ -404,13 +417,63 @@ export default function WebAmpPlayback({ version }) {
     return () => engine.dispose();
   }, [engine]);
 
-  // Load engine when version changes
+  // Load engine when version changes (do not reload on play/pause)
   useEffect(() => {
     if (!version) return;
+    // update known length for waveform progress
+    progressStore.setLengthMs(version.lengthMs ?? 0);
+    // allow waveform to request seeking
+    progressStore.setSeeker((absMs) => {
+      try { engine.seekMs(absMs); } catch (e) { console.warn('seek request failed:', e); }
+    });
     engine
       .load(version)
+      .then(() => {
+        try {
+          // Initialize master volume to 50%
+          if (engine.master) {
+            engine.master.gain.gain.value = 0.5;
+            prevMasterGainRef.current = 0.5;
+            setMasterVol(50);
+          }
+        } catch {}
+      })
       .catch((e) => console.error("[UI] engine.load() failed:", e));
+    return () => {
+      // cleanup seeker on version change/unmount
+      progressStore.setSeeker(null);
+    };
   }, [engine, version]);
+
+  // Keep scrub handlers updated with current playing state without reloading engine
+  useEffect(() => {
+    progressStore.setScrubStart(() => {
+      wasPlayingRef.current = playing;
+      if (playing && engine.master) {
+        try {
+          prevMasterGainRef.current = engine.master.gain.gain.value;
+          engine.master.gain.gain.value = 0.0001; // virtually silent
+          mutingDuringScrubRef.current = true;
+        } catch {}
+      }
+    });
+    progressStore.setScrubEnd(() => {
+      if (mutingDuringScrubRef.current && engine.master) {
+        try {
+          engine.master.gain.gain.value = prevMasterGainRef.current ?? 1;
+        } catch {}
+      }
+      mutingDuringScrubRef.current = false;
+      // if it was playing before scrub, resume playback
+      if (wasPlayingRef.current) {
+        engine.play().catch(() => {});
+      }
+    });
+    return () => {
+      progressStore.setScrubStart(null);
+      progressStore.setScrubEnd(null);
+    };
+  }, [playing, engine]);
 
   // Control handlers for play, pause, stop
   const onPlay = async () => {
@@ -421,17 +484,56 @@ export default function WebAmpPlayback({ version }) {
     }
   };
   const onPause = () => engine.pause();
-  const onStop = () => engine.stop();
+
+  // Combined play/pause toggle
+  const onTogglePlay = async () => {
+    if (playing) {
+      onPause();
+    } else {
+      await onPlay();
+    }
+  };
 
   // Seek slider handler
-  const onSeek = (e) => {
-    const val = Number(e.target.value) || 0;
+  // no direct seek slider in footer
+
+  // Skip helpers (±10s)
+  const skipMs = (delta) => {
+    const len = version?.lengthMs ?? Number.POSITIVE_INFINITY;
+    const next = Math.max(0, Math.min((ms || 0) + delta, len));
     try {
-      engine.seekMs(val);
+      engine.seekMs(next);
     } catch (err) {
-      console.warn("seek failed:", err);
+      console.warn("skip failed:", err);
     }
-    setMs(val);
+    setMs(next);
+  };
+
+  const skipBack10 = () => skipMs(-10000);
+  const skipFwd10 = () => skipMs(10000);
+
+  // Jump to start (0:00)
+  const goToStart = () => {
+    try {
+      engine.seekMs(0);
+    } catch (err) {
+      console.warn("goToStart failed:", err);
+    }
+    setMs(0);
+    try { progressStore.setMs(0); } catch {}
+  };
+
+  // Publish progress to store whenever local ms updates
+  useEffect(() => {
+    progressStore.setMs(ms);
+  }, [ms]);
+
+  // Format milliseconds as M:SS
+  const fmtTime = (tMs) => {
+    const t = Math.max(0, Math.floor((tMs || 0) / 1000));
+    const m = Math.floor(t / 60);
+    const s = t % 60;
+    return `${m}:${s.toString().padStart(2, "0")}`;
   };
 
   // Format time as mm:ss.mmm
@@ -449,109 +551,53 @@ export default function WebAmpPlayback({ version }) {
   return (
     <div
       style={{
-        fontFamily: "Inter, system-ui, sans-serif",
-        padding: 12,
-        border: "1px solid #333",
-        borderRadius: 12,
+        display: "flex",
+        alignItems: "center",
+        height: "100%",
+        width: "100%",
+        gap: 12,
+        boxSizing: "border-box",
       }}
     >
-      <div
-        style={{
-          display: "flex",
-          gap: 8,
-          alignItems: "center",
-          marginBottom: 8,
-        }}
-      >
-        <button onClick={onPlay}>▶️ Play</button>
-        <button onClick={onPause}>⏸ Pause</button>
-        <button onClick={onStop}>⏹ Stop</button>
+      {/* left spacer to center the transport group */}
+      <div style={{ flex: 1 }} />
+
+      {/* centered transport: time | start | back 10s | play/pause | fwd 10s */}
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <button onClick={goToStart} title="Go to start">⏮ Start</button>
+        <code style={{ fontSize: 12, opacity: 0.85, minWidth: 80, textAlign: "right" }}>
+          {fmtTime(ms)}
+          {typeof (version?.lengthMs) === 'number' && version.lengthMs > 0 ? ` / ${fmtTime(version.lengthMs)}` : ''}
+        </code>
+        <button onClick={skipBack10} title="Back 10s">⏪ 10s</button>
+        <button onClick={onTogglePlay} title={playing ? "Pause" : "Play"}>
+          {playing ? "⏸" : "▶️"}
+        </button>
+        <button onClick={skipFwd10} title="Forward 10s">10s ⏩</button>
       </div>
 
-      {/* Progress bar */}
-      <div style={{ margin: "8px 0" }}>
+      {/* right side: master volume */}
+      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8 }}>
+        <span style={{ fontSize: 12, opacity: 0.85 }}>🔊</span>
         <input
           type="range"
           min={0}
-          max={version?.lengthMs ?? 60000}
-          value={ms}
-          onChange={onSeek}
-          style={{ width: "100%" }}
+          max={100}
+          step={1}
+          value={masterVol}
+          onChange={(e) => {
+            const v = Number(e.target.value) || 0;
+            setMasterVol(v);
+            try {
+              // master volume: linear 0.0 - 1.0
+              engine.master && (engine.master.gain.gain.value = Math.max(0, Math.min(1, v / 100)));
+            } catch (err) {
+              console.warn("master volume set failed:", err);
+            }
+          }}
+          style={{ width: 160 }}
+          aria-label="Master volume"
         />
-      </div>
-
-      {/* Track list */}
-      <div style={{ marginTop: 10 }}>
-        {(version?.tracks || []).map((t) => (
-          <div
-            key={t.id}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              padding: "6px 0",
-              justifyContent: "space-between",
-            }}
-          >
-            {/* left side: dot + name */}
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <div
-                style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: 999,
-                  background: t.color || "#888",
-                }}
-              />
-              <div>{t.name ?? "Imported"}</div>
-            </div>
-
-            {/* right side: Volume slider and readout */}
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                minWidth: 240,
-              }}
-            >
-              <span style={{ fontSize: 12, opacity: 0.85 }}>Volume</span>
-              <input
-                type="range"
-                min={0}
-                max={100}
-                step={1}
-                value={trackGains[t.id] ?? 50}
-                onChange={(e) => {
-                  const v = Number(e.target.value); // 0–100
-
-                  // Piecewise dB mapping:
-                  // 0%   -> -120 dB (silent)
-                  // 1–100% -> -35 dB to +15 dB
-                  let db;
-                  if (v === 0) {
-                    db = -120; // fully mute
-                  } else {
-                    // Linear map: 1–100 → -35dB to +15dB
-                    db = -35 + (v / 100) * 50; // -35 → +15 range
-                  }
-
-                  setTrackGains((prev) => ({ ...prev, [t.id]: v }));
-                  try {
-                    engine.setTrackGainDb(t.id, db);
-                  } catch (err) {
-                    console.warn("setTrackGainDb failed:", err);
-                  }
-                }}
-                style={{ width: 160 }}
-                aria-label={`Volume for ${t.name ?? "Imported"}`}
-              />
-              <code style={{ fontSize: 12, opacity: 0.85 }}>
-                {trackGains[t.id] ?? 50}%
-              </code>
-            </div>
-          </div>
-        ))}
       </div>
     </div>
   );

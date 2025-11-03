@@ -27,10 +27,11 @@ class AudioManager {
    * @param {File} audioData.file - The original file object.
    * @returns {AudioTrack} The newly created audio track.
    */
-  addTrackFromBuffer({ buffer, originalFile: file }) {
+  addTrackFromBuffer({ buffer, originalFile: file, name }) {
     // 1. Create a new AudioTrack.
+    const baseName = (file && file.name) ? file.name.replace(/\.[^/.]+$/, "") : (name || 'Recording');
     const newTrack = new AudioTrack({
-      name: file.name.replace(/\.[^/.]+$/, ""), // Use the filename without extension
+      name: baseName, // Use the filename without extension or provided name
       color: this.getNewTrackColor(),
     });
 

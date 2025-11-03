@@ -7,7 +7,6 @@ import Sidebar from '../components/Layout/Sidebar';
 import MainContent from '../components/Layout/MainContent';
 import Footer from '../components/Layout/Footer';
 import { audioManager } from '../managers/AudioManager';
-import WebAmpPlayback from '../playback/playback.jsx';
 
 const MIN_WIDTH = 0; // Minimum allowed width for the sidebar in pixels
 const MAX_WIDTH = 300; // Maximum allowed width for the sidebar in pixels
@@ -129,7 +128,10 @@ function AudioPage() {
   const mainContentStyle = {
     '--sidebar-width': `${sidebarWidth}px`,
   };
-  const activeTrack = tracks.length > 0 ? tracks[0] : null;
+  // Show the most recently added/recorded track in the main content
+  const activeTrack = tracks.length > 0 ? tracks[tracks.length - 1] : null;
+  // Live recording state for preview
+  const [recording, setRecording] = useState({ stream: null, startTs: 0 });
 
   return (
     <div className="app-container">
@@ -149,12 +151,16 @@ function AudioPage() {
           title="Toggle sidebar"
         />
         
-        <MainContent track={activeTrack} />
+        <MainContent track={activeTrack} recording={recording} />
       </div>
       
       {/* 3. Footer Section */}
-      <Footer />
-      <WebAmpPlayback version={version} />
+      <Footer
+        version={version}
+        onRecordComplete={handleImportSuccess}
+        onRecordStart={({ stream, startTs }) => setRecording({ stream, startTs })}
+        onRecordStop={() => setRecording({ stream: null, startTs: 0 })}
+      />
     </div>
   );
 }
