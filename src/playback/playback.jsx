@@ -3,6 +3,12 @@ import * as Tone from "tone";
 import { progressStore } from './progressStore';
 import PlayIcon from "../assets/footer/PlayButton.svg";
 import PauseIcon from "../assets/footer/PauseButton.svg";
+import RewindIcon from "../assets/footer/RewindButton.svg";
+import ForwardIcon from "../assets/footer/FastForwardButton.svg";
+import GoToStartIcon from "../assets/footer/GoToStartButton.svg";
+import SoundOnIcon from "../assets/footer/SoundOnButton.svg";
+import SoundOffIcon from "../assets/footer/SoundOffButton.svg";
+import VolumeKnob from "../assets/footer/VolumeKnob.svg";
 
 // === Utility functions ===
 
@@ -396,8 +402,11 @@ export default function WebAmpPlayback({ version }) {
   const [playing, setPlaying] = useState(false);
   const [ms, setMs] = useState(0);
   const [masterVol, setMasterVol] = useState(50); // 0-100 visual percent, default 50%
+  const [muted, setMuted] = useState(false);
+  const [draggingVol, setDraggingVol] = useState(false);
   const wasPlayingRef = useRef(false);
   const prevMasterGainRef = useRef(0.5);
+  const savedVolumeRef = useRef(0.5); // remembers last non-muted linear volume
   const mutingDuringScrubRef = useRef(false);
 
   // No per-track sliders in footer; keep track gains from version
@@ -436,7 +445,9 @@ export default function WebAmpPlayback({ version }) {
           if (engine.master) {
             engine.master.gain.gain.value = 0.5;
             prevMasterGainRef.current = 0.5;
+            savedVolumeRef.current = 0.5;
             setMasterVol(50);
+            setMuted(false);
           }
         } catch {}
       })
@@ -530,6 +541,25 @@ export default function WebAmpPlayback({ version }) {
     progressStore.setMs(ms);
   }, [ms]);
 
+  // Toggle mute while preserving slider value
+  const onToggleMute = () => {
+    try {
+      if (!engine.master) return;
+      if (muted) {
+        // unmute to last saved volume
+        engine.master.gain.gain.value = Math.max(0, Math.min(1, savedVolumeRef.current ?? masterVol / 100));
+        setMuted(false);
+      } else {
+        // save current volume and mute
+        savedVolumeRef.current = Math.max(0, Math.min(1, masterVol / 100));
+        engine.master.gain.gain.value = 0;
+        setMuted(true);
+      }
+    } catch (err) {
+      console.warn("toggle mute failed:", err);
+    }
+  };
+
   // Format milliseconds as M:SS
   const fmtTime = (tMs) => {
     const t = Math.max(0, Math.floor((tMs || 0) / 1000));
@@ -566,12 +596,24 @@ export default function WebAmpPlayback({ version }) {
 
       {/* centered transport: time | start | back 10s | play/pause | fwd 10s */}
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        <button onClick={goToStart} title="Go to start">⏮ Start</button>
+        <button
+          onClick={goToStart}
+          title="Go to start"
+          style={{ background: 'transparent', border: 'none', padding: 0, margin: 0, cursor: 'pointer' }}
+        >
+          <img src={GoToStartIcon} alt="Go to start" style={{ height: 18, display: 'block' }} />
+        </button>
         <code style={{ fontSize: 12, opacity: 0.85, minWidth: 80, textAlign: "right" }}>
           {fmtTime(ms)}
           {typeof (version?.lengthMs) === 'number' && version.lengthMs > 0 ? ` / ${fmtTime(version.lengthMs)}` : ''}
         </code>
-        <button onClick={skipBack10} title="Back 10s">⏪ 10s</button>
+        <button
+          onClick={skipBack10}
+          title="Back 10s"
+          style={{ background: 'transparent', border: 'none', padding: 0, margin: 0, cursor: 'pointer' }}
+        >
+          <img src={RewindIcon} alt="Rewind 10 seconds" style={{ height: 18, display: 'block' }} />
+        </button>
         {playing ? (
           <button
             type="button"
@@ -593,31 +635,122 @@ export default function WebAmpPlayback({ version }) {
             <img src={PlayIcon} alt="Play" style={{ height: 18, display: 'block' }} />
           </button>
         )}
-        <button onClick={skipFwd10} title="Forward 10s">10s ⏩</button>
+        <button
+          onClick={skipFwd10}
+          title="Forward 10s"
+          style={{ background: 'transparent', border: 'none', padding: 0, margin: 0, cursor: 'pointer' }}
+        >
+          <img src={ForwardIcon} alt="Forward 10 seconds" style={{ height: 18, display: 'block' }} />
+        </button>
       </div>
 
       {/* right side: master volume */}
       <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8 }}>
-        <span style={{ fontSize: 12, opacity: 0.85 }}>🔊</span>
-        <input
-          type="range"
-          min={0}
-          max={100}
-          step={1}
-          value={masterVol}
-          onChange={(e) => {
-            const v = Number(e.target.value) || 0;
-            setMasterVol(v);
-            try {
-              // master volume: linear 0.0 - 1.0
-              engine.master && (engine.master.gain.gain.value = Math.max(0, Math.min(1, v / 100)));
-            } catch (err) {
-              console.warn("master volume set failed:", err);
-            }
+        <button
+          type="button"
+          onClick={onToggleMute}
+          title={muted ? "Unmute" : "Mute"}
+          style={{ background: 'transparent', border: 'none', padding: 0, margin: 0, cursor: 'pointer' }}
+          aria-label={muted ? "Unmute" : "Mute"}
+        >
+          <img
+            src={muted ? SoundOffIcon : SoundOnIcon}
+            alt={muted ? "Muted" : "Sound on"}
+            style={{ height: 18, display: 'block' }}
+          />
+        </button>
+        {/* Custom-styled slider wrapper */}
+        <div
+          style={{
+            position: 'relative',
+            width: 160, // match previous fixed width
+            height: 28,
+            display: 'flex',
+            alignItems: 'center',
           }}
-          style={{ width: 160 }}
           aria-label="Master volume"
-        />
+        >
+          {/* Track background */}
+          <div
+            style={{
+              position: 'absolute',
+              left: 0,
+              right: 0,
+              top: '50%',
+              height: 10,
+              background: '#CDF8FF',
+              borderRadius: 100,
+              transform: 'translateY(-50%)',
+            }}
+          />
+          {/* Filled portion */}
+          <div
+            style={{
+              position: 'absolute',
+              left: 0,
+              width: `${masterVol}%`,
+              top: '50%',
+              height: 10,
+              background: '#17E1FF',
+              borderRadius: 100,
+              transform: 'translateY(-50%)',
+            }}
+          />
+          {/* Knob */}
+          <img
+            src={VolumeKnob}
+            alt="Volume knob"
+            style={{
+              position: 'absolute',
+              left: `${masterVol}%`,
+              top: '50%',
+              // Nudge downward slightly for visual centering
+              transform: `translate(-50%, -40%) ${draggingVol ? 'scale(1.05)' : 'scale(1)'}`,
+              height: 20,
+              width: 20,
+              filter: draggingVol ? 'drop-shadow(0 0 6px rgba(61,133,225,0.4))' : 'drop-shadow(0 1px 2px rgba(0,0,0,0.15))',
+              transition: 'transform 120ms ease, filter 120ms ease',
+              pointerEvents: 'none',
+            }}
+          />
+          {/* Native input for interactions (invisible) */}
+          <input
+            type="range"
+            min={0}
+            max={100}
+            step={1}
+            value={masterVol}
+            onChange={(e) => {
+              const v = Number(e.target.value) || 0;
+              setMasterVol(v);
+              try {
+                // master volume: linear 0.0 - 1.0
+                if (engine.master) {
+                  const linear = Math.max(0, Math.min(1, v / 100));
+                  savedVolumeRef.current = linear; // always remember intended volume
+                  if (!muted) {
+                    engine.master.gain.gain.value = linear;
+                  }
+                }
+              } catch (err) {
+                console.warn("master volume set failed:", err);
+              }
+            }}
+            onMouseDown={() => setDraggingVol(true)}
+            onMouseUp={() => setDraggingVol(false)}
+            onMouseLeave={() => setDraggingVol(false)}
+            onTouchStart={() => setDraggingVol(true)}
+            onTouchEnd={() => setDraggingVol(false)}
+            style={{
+              position: 'absolute',
+              inset: 0,
+              width: '100%',
+              height: 28,
+              opacity: 0,
+              cursor: 'pointer',
+            }}
+          />
+        </div>
       </div>
     </div>
   );
