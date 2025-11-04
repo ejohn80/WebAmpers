@@ -1,5 +1,6 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import './Waveform.css';
+import { progressStore } from '../../playback/progressStore';
 
 /**
  * A component that renders an audio buffer as a waveform on a canvas.
@@ -8,6 +9,7 @@ import './Waveform.css';
  */
 const Waveform = ({ audioBuffer, color = '#ffffff' }) => {
   const canvasRef = useRef(null);
+  const draggingRef = useRef(false);
 
   useEffect(() => {
   if (!audioBuffer || !canvasRef.current) return;
@@ -19,12 +21,17 @@ const Waveform = ({ audioBuffer, color = '#ffffff' }) => {
   canvas.width  = canvas.clientWidth;
   canvas.height = canvas.clientHeight;
 
-  // 🔧 Unwrap Tone.ToneAudioBuffer -> native AudioBuffer
-  const native = (audioBuffer instanceof AudioBuffer)
-    ? audioBuffer
-    : (typeof audioBuffer.get === 'function'
-        ? audioBuffer.get()        // ToneAudioBuffer.get() -> AudioBuffer
-        : audioBuffer._buffer);    // fallback if Tone version exposes _buffer
+  // 🔧 Unwrap Tone.ToneAudioBuffer -> native AudioBuffer robustly
+  let native = null;
+  if (audioBuffer instanceof AudioBuffer) {
+    native = audioBuffer;
+  } else if (audioBuffer && audioBuffer._buffer instanceof AudioBuffer) {
+    native = audioBuffer._buffer; // ToneAudioBuffer internal
+  } else if (audioBuffer && typeof audioBuffer.get === 'function') {
+    // Some Tone versions expose .get(channel?) returning Float32Array; not usable here
+    // Prefer _buffer path above; if not available, abort to avoid rendering garbage
+    native = null;
+  }
 
   if (!native) return; // still nothing to draw
 
@@ -53,9 +60,98 @@ const Waveform = ({ audioBuffer, color = '#ffffff' }) => {
   ctx.stroke();
 }, [audioBuffer, color]); // Redraw when the audioBuffer or color prop changes
 
+  const [{ ms, lengthMs }, setProgress] = useState(progressStore.getState());
+
+  useEffect(() => {
+    return progressStore.subscribe(setProgress);
+  }, []);
+
+
+  const pct = lengthMs > 0 ? Math.max(0, Math.min(100, (ms / lengthMs) * 100)) : 0;
+
+  // Scrub helpers
+  const msAtClientX = (clientX) => {
+    const el = canvasRef.current?.parentElement; // container div
+    if (!el || !lengthMs) return;
+    const rect = el.getBoundingClientRect();
+    const rel = Math.max(0, Math.min(rect.width, clientX - rect.left));
+    const p = rect.width > 0 ? rel / rect.width : 0;
+    return p * lengthMs;
+  };
+
+  const onMouseDown = (e) => {
+    draggingRef.current = true;
+    progressStore.beginScrub();
+    const target = msAtClientX(e.clientX);
+    if (typeof target === 'number') {
+      // preview only: move the playhead visually without seeking audio
+      progressStore.setMs(target);
+    }
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+  };
+  const onMouseMove = (e) => {
+    if (!draggingRef.current) return;
+    const target = msAtClientX(e.clientX);
+    if (typeof target === 'number') {
+      progressStore.setMs(target);
+    }
+  };
+  const onMouseUp = (e) => {
+    if (!draggingRef.current) return;
+    draggingRef.current = false;
+    const target = msAtClientX(e.clientX);
+    if (typeof target === 'number') {
+      // finalize seek in the engine and progress store
+      progressStore.requestSeek(target);
+    }
+    progressStore.endScrub();
+    window.removeEventListener('mousemove', onMouseMove);
+    window.removeEventListener('mouseup', onMouseUp);
+  };
+
+  useEffect(() => () => {
+    window.removeEventListener('mousemove', onMouseMove);
+    window.removeEventListener('mouseup', onMouseUp);
+  }, []);
+
+  // Touch support
+  const onTouchStart = (e) => {
+    if (!e.touches || e.touches.length === 0) return;
+    draggingRef.current = true;
+    progressStore.beginScrub();
+    const target = msAtClientX(e.touches[0].clientX);
+    if (typeof target === 'number') {
+      progressStore.setMs(target);
+    }
+  };
+  const onTouchMove = (e) => {
+    if (!draggingRef.current || !e.touches || e.touches.length === 0) return;
+    const target = msAtClientX(e.touches[0].clientX);
+    if (typeof target === 'number') {
+      progressStore.setMs(target);
+    }
+  };
+  const onTouchEnd = () => {
+    if (!draggingRef.current) return;
+    draggingRef.current = false;
+    // finalize at current playhead; engine will have been paused
+    const { ms: current } = progressStore.getState();
+    progressStore.requestSeek(current);
+    progressStore.endScrub();
+  };
+
+
   return (
-    <div className="waveform-container">
+    <div
+      className="waveform-container"
+      onMouseDown={onMouseDown}
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+    >
       <canvas ref={canvasRef} className="waveform-canvas" />
+      <div className="waveform-progress" style={{ left: `${pct}%` }} />
     </div>
   );
 };
