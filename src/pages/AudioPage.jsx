@@ -182,7 +182,10 @@ function AudioPage() {
   const mainContentStyle = {
     '--sidebar-width': `${sidebarWidth}px`,
   };
-  const activeTrack = tracks.length > 0 ? tracks[0] : null;
+  // Show the most recently added/recorded track in the main content
+  const activeTrack = tracks.length > 0 ? tracks[tracks.length - 1] : null;
+  // Live recording state for preview
+  const [recording, setRecording] = useState({ stream: null, startTs: 0 });
 
   return (
     <div className="app-container">
@@ -202,12 +205,16 @@ function AudioPage() {
           title="Toggle sidebar"
         />
         
-        <MainContent track={activeTrack} />
+        <MainContent track={activeTrack} recording={recording} />
       </div>
       
       {/* 3. Footer Section */}
-      <Footer />
-      <WebAmpPlayback version={version} />
+      <Footer
+        version={version}
+        onRecordComplete={handleImportSuccess}
+        onRecordStart={({ stream, startTs }) => setRecording({ stream, startTs })}
+        onRecordStop={() => setRecording({ stream: null, startTs: 0 })}
+      />
     </div>
   );
 }
