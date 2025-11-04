@@ -9,257 +9,243 @@ import { audioManager } from '../managers/AudioManager';
 import WebAmpPlayback from '../playback/playback.jsx';
 import { dbManager } from '../managers/DBManager';
 
-const MIN_WIDTH = 0;
-const MAX_WIDTH = 300;
+const MIN_WIDTH = 0; 
+const MAX_WIDTH = 300; 
 
-const bufferToWave = (buffer, len) => {
-    const numOfChan = buffer.numberOfChannels;
-    const channels = [];
-    let l = len * numOfChan * 2 + 44;
-    let offset = 0;
-    let bufferArray = new ArrayBuffer(l);
-    let view = new DataView(bufferArray);
-    let sampleRate = buffer.sampleRate;
-    
-    function writeString(view, offset, string) {
-        for (let i = 0; i < string.length; i++) {
-            view.setUint8(offset + i, string.charCodeAt(i));
-        }
-    }
-
-    for (let i = 0; i < numOfChan; i++) {
-        channels.push(buffer.getChannelData(i));
-    }
-
-    // Write WAV file headers
-    writeString(view, offset, 'RIFF'); offset += 4;
-    view.setUint32(offset, l - 8, true); offset += 4;
-    writeString(view, offset, 'WAVE'); offset += 4;
-    writeString(view, offset, 'fmt '); offset += 4;
-    view.setUint32(offset, 16, true); offset += 4; // Sub-chunk size
-    view.setUint16(offset, 1, true); offset += 2; // Audio Format (1 = PCM)
-    view.setUint16(offset, numOfChan, true); offset += 2; // Number of Channels
-    view.setUint32(offset, sampleRate, true); offset += 4; // Sample Rate
-    view.setUint32(offset, sampleRate * numOfChan * 2, true); offset += 4; // Byte Rate
-    view.setUint16(offset, numOfChan * 2, true); offset += 2; // Block Align
-    view.setUint16(offset, 16, true); offset += 2; // Bits Per Sample (16-bit)
-    writeString(view, offset, 'data'); offset += 4;
-    view.setUint32(offset, l - offset - 4, true); offset += 4; // Data size
-
-    // Write audio data (interleaved 16-bit PCM)
-    let index = 0;
-    const maxVal = 32767; // Max value for 16-bit
-    while (index < len) {
-        for (let i = 0; i < numOfChan; i++) {
-            // Convert Float32 data (-1.0 to 1.0) to 16-bit integer
-            let s = Math.max(-1, Math.min(1, channels[i][index]));
-            view.setInt16(offset, s * maxVal, true); 
-            offset += 2;
-        }
-        index++;
-    }
-
-    return new Blob([bufferArray], { type: 'audio/wav' });
-};
-
-
+/**
+ * AudioPage component provides a resizable layout with a sidebar and main content area.
+ */
 function AudioPage() {
-  const [sidebarWidth, setSidebarWidth] = useState(MAX_WIDTH);
-  const [tracks, setTracks] = useState(audioManager.tracks);
-  const [activeTrackId, setActiveTrackId] = useState(null);
+    const [sidebarWidth, setSidebarWidth] = useState(MAX_WIDTH);
+    const [tracks, setTracks] = useState(audioManager.tracks);
+    const [audioData, setAudioData] = useState(null); 
+    const [recording, setRecording] = useState({ stream: null, startTs: 0 }); 
+    const engineRef = React.useRef(null);
 
-  const [audioData, setAudioData] = useState(null);
+    useEffect(() => {
+        const loadTracksFromDB = async () => {
+            try {
+                const savedTracks = await dbManager.getAllTracks();
+                if (savedTracks && savedTracks.length > 0) {
+                    console.log('Loading tracks from IndexedDB:', savedTracks);
+                    let needsStateUpdate = false;
 
-  // Effect to load tracks from IndexedDB on initial component mount
-  useEffect(() => {
-    const loadTracksFromDB = async () => {
-      try {
-        const savedTracks = await dbManager.getAllTracks();
-        if (savedTracks && savedTracks.length > 0) {
-          console.log('Loading tracks from IndexedDB:', savedTracks);
-          let needsStateUpdate = false;
+                    for (const savedTrack of savedTracks) {
+                        const maybeBufferData = savedTrack.buffer?.channels ? savedTrack.buffer : (savedTrack.segments && savedTrack.segments[0] && savedTrack.segments[0].buffer && savedTrack.segments[0].buffer.channels ? savedTrack.segments[0].buffer : null);
 
-          for (const savedTrack of savedTracks) {
-            // Reconstruct the Tone.ToneAudioBuffer from the stored raw data
-            if (savedTrack.buffer && savedTrack.buffer.channels) {
-              const bufferData = savedTrack.buffer;
-              const audioBuffer = Tone.context.createBuffer(
-                bufferData.numberOfChannels,
-                bufferData.length,
-                bufferData.sampleRate
-              );
+                        if (maybeBufferData) {
+                            const bufferData = maybeBufferData;
+                            const audioBuffer = Tone.context.createBuffer(
+                                bufferData.numberOfChannels,
+                                bufferData.length,
+                                bufferData.sampleRate
+                            );
 
-              for (let i = 0; i < bufferData.numberOfChannels; i++) {
-                audioBuffer.copyToChannel(bufferData.channels[i], i);
-              }
+                            for (let i = 0; i < bufferData.numberOfChannels; i++) {
+                                audioBuffer.copyToChannel(bufferData.channels[i], i);
+                            }
 
-              savedTrack.buffer = new Tone.ToneAudioBuffer(audioBuffer);
-              audioManager.addTrackFromBuffer(savedTrack);
-              needsStateUpdate = true;
+                            savedTrack.buffer = new Tone.ToneAudioBuffer(audioBuffer);
+                            audioManager.addTrackFromBuffer(savedTrack);
+                            needsStateUpdate = true;
 
-              // Set the audioData for the first loaded track to initialize the player
-              // This is the missing piece to make playback work on refresh.
-              if (!audioData) setAudioData(savedTrack);
+                            if (!audioData) setAudioData(savedTrack);
+                        }
+                    }
+                    if (needsStateUpdate) {
+                        setTracks([...audioManager.tracks]);
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to load tracks from IndexedDB:', error);
             }
-          }
-          if (needsStateUpdate) {
-            setTracks([...audioManager.tracks]);
-          }
-        }
-      } catch (error) {
-        console.error('Failed to load tracks from IndexedDB:', error);
-      }
+        };
+
+        loadTracksFromDB();
+    }, []); 
+
+    const toggleSidebar = () => {
+        setSidebarWidth(prevWidth => (prevWidth > MIN_WIDTH ? MIN_WIDTH : MAX_WIDTH));
     };
 
-    loadTracksFromDB();
-  }, []); // The empty dependency array ensures this runs only once on mount
-  
-  const toggleSidebar = () => {
-    setSidebarWidth(prevWidth => (prevWidth > MIN_WIDTH ? MIN_WIDTH : MAX_WIDTH));
-  };
+    const handleImportSuccess = async (importedAudioData) => {
+        console.log('Audio imported successfully, creating track:', importedAudioData);
+        setAudioData(importedAudioData); 
+        
+        const createdTrack = audioManager.addTrackFromBuffer(importedAudioData);
+        
+        setTracks([...audioManager.tracks]);
 
-  const handleImportSuccess = async (importedAudioData) => {
-    console.log('Audio imported successfully, creating track:', importedAudioData);
-    setAudioData(importedAudioData);
-    // Use the AudioManager to create a new track from the imported data
-    audioManager.addTrackFromBuffer(importedAudioData);
-    // Update the component's state to re-render with the new track list.
-    // We create a new array to ensure React detects the state change.
-    setTracks([...audioManager.tracks]);
+        try {
+            if (createdTrack) {
+                await dbManager.addTrack(createdTrack);
+            } else {
+                await dbManager.addTrack(importedAudioData); 
+            }
+            console.log('Track saved to IndexedDB');
+        } catch (error) {
+            console.error('Failed to save track to IndexedDB:', error);
+        }
+    };
 
-    try {
-      await dbManager.addTrack(importedAudioData);
-      console.log('Track saved to IndexedDB');
-    } catch (error) {
-      console.error('Failed to save track to IndexedDB:', error);
-    }
-  };
+    const handleImportError = (error) => {
+        alert(`Import failed: ${error.message}`);
+    };
+    
+    const handleExportComplete = () => {
+        console.log('Export process complete.');
+    };
 
-  const handleImportError = (error) => {
-    console.error('Import error:', error);
-    alert(`Import failed: ${error.message}`);
-  };
+    // Helper functions for version object (Keeping the original/main branch logic)
+    const active = tracks && tracks.length > 0 ? tracks[tracks.length - 1] : null;
+    const version = active
+        ? (() => {
+            const vs = {
+                bpm: 120,
+                timeSig: [4, 4],
+                lengthMs: 60000,
+                tracks: [],
+                segments: [],
+                loop: { enabled: false },
+                masterChain: [],
+            };
 
-  const handleExportComplete = () => {
-    console.log('Export process complete.');
-  };
+            vs.tracks.push({
+                id: active.id,
+                name: active.name ?? 'Imported',
+                gainDb: typeof active.volume === 'number' ? active.volume : 0,
+                pan: typeof active.pan === 'number' ? active.pan : 0,
+                mute: !!active.mute,
+                solo: !!active.solo,
+                color: active.color || '#888',
+            });
 
-  /**
-   * parseDurationMs:
-   * Accepts either:
-   * - number (seconds) 	-> converts to ms
-   * - string "mm:ss(.ms)" -> parses and converts to ms
-   * - otherwise returns 0
-   */
-  const parseDurationMs = (d) => {
-    if (typeof d === "number" && !Number.isNaN(d)) return Math.round(d * 1000); // seconds → ms
-    if (typeof d === "string") {
-      // support "mm:ss" or "mm:ss.mmm"
-      const m = d.match(/^(\d+):(\d{2})(?:\.(\d{1,3}))?$/);
-      if (m) {
-        const mm = parseInt(m[1], 10);
-        const ss = parseInt(m[2], 10);
-        const ms = m[3] ? parseInt(m[3].padEnd(3, "0"), 10) : 0;
-        return (mm * 60 + ss) * 1000 + ms;
-      }
-    }
-    return 0;
-  };
+            let maxEndMs = 0;
+            (active.segments || []).forEach((s) => {
+                const fileUrl = s.buffer ?? s.fileUrl ?? null;
+                const startOnTimelineMs = s.startOnTimelineMs ?? (s.startOnTimeline ? Math.round(s.startOnTimeline * 1000) : 0);
+                const startInFileMs = (s.offset ? Math.round(s.offset * 1000) : (s.startInFileMs ?? 0));
+                const durationMs = s.duration ? Math.round(s.duration * 1000) : (s.durationMs ?? 0);
 
-  /**
-   * srcFromImport:
-   * Chooses the best audio source field from the importer’s result.
-   * Tone.Player accepts a URL/blob URL or an AudioBuffer.
-   */
-  const srcFromImport = (ad) =>
-    ad?.fileUrl ?? ad?.objectUrl ?? ad?.url ?? ad?.blobUrl ?? ad?.buffer ?? "";
+                vs.segments.push({
+                    id: s.id ?? `seg_${Math.random().toString(36).slice(2, 8)}`,
+                    trackId: active.id,
+                    fileUrl,
+                    startOnTimelineMs,
+                    startInFileMs,
+                    durationMs,
+                    gainDb: s.gainDb ?? 0,
+                    fades: s.fades ?? { inMs: 5, outMs: 5 },
+                });
 
-  /**
-   * durationMsOf:
-   * Returns the best-known duration in ms from the importer result, trying
-   * buffer.duration (seconds) → durationSec → "mm:ss" string → durationMs.
-   */
-  const durationMsOf = (ad) =>
-    (ad?.buffer?.duration ? Math.round(ad.buffer.duration * 1000) : 0) ||
-    (typeof ad?.durationSec === "number" ? Math.round(ad.durationSec * 1000) : 0) ||
-    parseDurationMs(ad?.duration) ||
-    (typeof ad?.durationMs === "number" ? Math.round(ad.durationMs) : 0);
-  const version = audioData
-    ? {
-        bpm: 120,
-        timeSig: [4, 4],
-        lengthMs: durationMsOf(audioData) || 60000, // fallback 60s so slider works
-        tracks: [
-          {
-            id: "t1",
-            name: audioData.name ?? "Imported",
-            gainDb: 0,
-            pan: 0,
-            mute: false,
-            solo: false,
-            color: "#888",
-          },
-        ],
-        segments: [
-          {
-            id: "s1",
-            trackId: "t1",
-            fileUrl: srcFromImport(audioData), // can be URL OR AudioBuffer
-            startOnTimelineMs: 0,
-            startInFileMs: 0,
-            durationMs: durationMsOf(audioData), // non-zero so playback is audible
-            gainDb: 0,
-            fades: { inMs: 5, outMs: 5 },
-          },
-        ],
-        loop: { enabled: false },
-        masterChain: [],
-      }
-    : null;
+                const endMs = startOnTimelineMs + (durationMs || 0);
+                if (endMs > maxEndMs) maxEndMs = endMs;
+            });
 
+            vs.lengthMs = maxEndMs || 60000;
+            return vs;
+        })()
+        : null;
 
-  const mainContentStyle = {
-    '--sidebar-width': `${sidebarWidth}px`,
-  };
+    // --- RENDERING ---
 
-  const activeTrack = tracks.length > 0 ? tracks[0] : null;
+    const mainContentStyle = {
+        '--sidebar-width': `${sidebarWidth}px`,
+    };
+    const activeTrack = tracks.length > 0 ? tracks[tracks.length - 1] : null;
+    
+    // FIX: Check activeTrack.buffer first, but fall back to activeTrack.segments[0].buffer 
+    // to ensure the export button enables immediately after a fresh import or DB load.
+    const audioBuffer = activeTrack 
+        ? activeTrack.buffer || activeTrack.segments?.[0]?.buffer 
+        : null;
 
-  const audioBuffer = activeTrack && activeTrack.segments.length > 0
-    ? activeTrack.segments[0].buffer
-    : null;
+    const handleEngineReady = (engine) => {
+        engineRef.current = engine;
+    };
 
-  console.log('Active track:', activeTrack);
-  console.log('Audio buffer for export:', audioBuffer);
+    return (
+        <div className="app-container">
+            {/* 1. Header Section */}
+            <Header 
+                onImportSuccess={handleImportSuccess}
+                onImportError={handleImportError}
+                audioBuffer={audioBuffer} // Now uses the robust check
+                onExportComplete={handleExportComplete}
+            />
 
-  return (
-    <div className="app-container">
-      <Header
-        onImportSuccess={handleImportSuccess}
-        onImportError={handleImportError}
-        audioBuffer={audioBuffer}
-        onExportComplete={handleExportComplete}
-        bufferToWave={bufferToWave} 
-      />
+            {/* 2. Middle Area (Sidebar/Main Content Split) */}
+            <div 
+                className="main-content-area" 
+                style={mainContentStyle} 
+            >
+                {/* Sidebar */}
+                <Sidebar 
+                    width={sidebarWidth} 
+                    onImportSuccess={handleImportSuccess} 
+                    onImportError={handleImportError} 
+                />
 
-      <div className="main-content-area" style={mainContentStyle}>
-        <Sidebar width={sidebarWidth} />
-
-        <div
-          className="divider"
-          onClick={toggleSidebar}
-          title="Toggle sidebar"
-        />
-
-        <MainContent
-          key={activeTrackId}
-          track={activeTrack}
-        />
-      </div>
-
-      <Footer />
-      <WebAmpPlayback version={version} />
-    </div>
-  );
+                {/* Movable Divider Line */}
+                <div 
+                    className="divider"
+                    onClick={toggleSidebar}
+                    title="Toggle sidebar"
+                />
+                
+                {/* Main Content */}
+                <MainContent
+                    track={activeTrack}
+                    recording={recording}
+                    audioData={audioData}
+                    onMute={async (trackId, muted) => {
+                        try {
+                            engineRef.current?.setTrackMute(trackId, muted);
+                        } catch (e) {
+                            console.warn('Engine setTrackMute failed', e);
+                        }
+                        const t = audioManager.tracks.find((x) => x.id === trackId);
+                        if (t) {
+                            try {
+                                t.mute = muted;
+                                if (dbManager.updateTrack) await dbManager.updateTrack(t);
+                            } catch (e) {
+                                console.warn('Failed to persist mute change', e);
+                            }
+                            setTracks([...audioManager.tracks]);
+                        }
+                    }}
+                    onSolo={async (trackId, soloed) => {
+                        try {
+                            engineRef.current?.setTrackSolo(trackId, soloed);
+                        } catch (e) {
+                            console.warn('Engine setTrackSolo failed', e);
+                        }
+                        const t = audioManager.tracks.find((x) => x.id === trackId);
+                        if (t) {
+                            try {
+                                t.solo = soloed;
+                                if (dbManager.updateTrack) await dbManager.updateTrack(t);
+                            } catch (e) {
+                                console.warn('Failed to persist solo change', e);
+                            }
+                            setTracks([...audioManager.tracks]);
+                        }
+                    }}
+                />
+            </div>
+            
+            {/* 3. Footer Section */}
+            <Footer
+                version={version}
+                onRecordComplete={handleImportSuccess}
+                onRecordStart={({ stream, startTs }) => setRecording({ stream, startTs })}
+                onRecordStop={() => setRecording({ stream: null, startTs: 0 })}
+            />
+            {/* WebAmpPlayback remains at the bottom */}
+            <WebAmpPlayback version={version} onEngineReady={handleEngineReady} />
+        </div>
+    );
 }
 
 export default AudioPage;

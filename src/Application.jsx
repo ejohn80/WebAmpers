@@ -1,36 +1,18 @@
-import React from 'react';
-import DraggableDiv from '../Generic/DraggableDiv';
-import AudioImportButton from '../AudioImport/AudioImportButton';
-import AudioExportButton from '../AudioExport/AudioExportButton';
+import styles from './Application.module.css';
+import { useNavigate } from 'react-router-dom';
+import { useUserData } from './hooks/useUserData';
+import { logout } from './components/Auth/AuthUtils';
 
-/**
- * Header component for the application layout.
- * Displays the header section and includes audio import and export functionality.
- */
-function Header({ onImportSuccess, onImportError, audioBuffer, onExportComplete }) {
-  return (
-    <DraggableDiv color="red">
-      <div style={{ 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'space-between', 
-        width: '100%' 
-      }}>
-        <span>**Header** (Red Section)</span>
-        
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <AudioImportButton 
-            onImportSuccess={onImportSuccess}
-            onImportError={onImportError}
-          />
-          <AudioExportButton
-            audioBuffer={audioBuffer}
-            onExportComplete={onExportComplete}
-          />
-        </div>
-      </div>
-    </DraggableDiv>
-  );
-}
+const Application = () => {
+  const navigate = useNavigate();
+  const { userData, loading } = useUserData();
 
-export default Header;
+  if (loading) return <p>Loading...</p>;
+
+  return <div>
+    <h3>{userData?.username ? `Hello, ${userData.username}!`: 'Hello there!'}</h3>
+    {userData ? <button onClick={logout}>Log out</button> : <button onClick={() => navigate('/register')}>Login or Register</button>}<br /><br /><br />
+  </div>;
+};
+
+export default Application;
