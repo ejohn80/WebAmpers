@@ -197,15 +197,12 @@ function AudioPage() {
         className="main-content-area" 
         style={mainContentStyle} 
       >
-        <Sidebar width={sidebarWidth} onImportSuccess={(result) => {
-          console.log("Audio imported, setting state:", result);
-          setAudioData(result); // Store the entire result object in state
-        }}
-        onImportError={(error) => {
-          alert(`Import failed: ${error.message}`);
-          setAudioData(null); // Clear any previous audio data on error
-          // TODO: Show a more user-friendly error message in the UI
-        }} />
+        <Sidebar
+          width={sidebarWidth}
+          // Use the centralized handlers so imported audio is turned into a track
+          onImportSuccess={handleImportSuccess}
+          onImportError={handleImportError}
+        />
 
         {/* Movable Divider Line */}
         <div 
