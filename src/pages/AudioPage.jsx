@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import './AudioPage.css';
 import * as Tone from 'tone';
-
-// Import the newly created layout components
 import Header from '../components/Layout/Header';
 import Sidebar from '../components/Layout/Sidebar';
 import MainContent from '../components/Layout/MainContent';
@@ -14,9 +12,63 @@ import { dbManager } from '../managers/DBManager';
 const MIN_WIDTH = 0;
 const MAX_WIDTH = 300;
 
+const bufferToWave = (buffer, len) => {
+    const numOfChan = buffer.numberOfChannels;
+    const channels = [];
+    let l = len * numOfChan * 2 + 44;
+    let offset = 0;
+    let bufferArray = new ArrayBuffer(l);
+    let view = new DataView(bufferArray);
+    let sampleRate = buffer.sampleRate;
+    
+    function writeString(view, offset, string) {
+        for (let i = 0; i < string.length; i++) {
+            view.setUint8(offset + i, string.charCodeAt(i));
+        }
+    }
+
+    for (let i = 0; i < numOfChan; i++) {
+        channels.push(buffer.getChannelData(i));
+    }
+
+    // Write WAV file headers
+    writeString(view, offset, 'RIFF'); offset += 4;
+    view.setUint32(offset, l - 8, true); offset += 4;
+    writeString(view, offset, 'WAVE'); offset += 4;
+    writeString(view, offset, 'fmt '); offset += 4;
+    view.setUint32(offset, 16, true); offset += 4; // Sub-chunk size
+    view.setUint16(offset, 1, true); offset += 2; // Audio Format (1 = PCM)
+    view.setUint16(offset, numOfChan, true); offset += 2; // Number of Channels
+    view.setUint32(offset, sampleRate, true); offset += 4; // Sample Rate
+    view.setUint32(offset, sampleRate * numOfChan * 2, true); offset += 4; // Byte Rate
+    view.setUint16(offset, numOfChan * 2, true); offset += 2; // Block Align
+    view.setUint16(offset, 16, true); offset += 2; // Bits Per Sample (16-bit)
+    writeString(view, offset, 'data'); offset += 4;
+    view.setUint32(offset, l - offset - 4, true); offset += 4; // Data size
+
+    // Write audio data (interleaved 16-bit PCM)
+    let index = 0;
+    const maxVal = 32767; // Max value for 16-bit
+    while (index < len) {
+        for (let i = 0; i < numOfChan; i++) {
+            // Convert Float32 data (-1.0 to 1.0) to 16-bit integer
+            let s = Math.max(-1, Math.min(1, channels[i][index]));
+            view.setInt16(offset, s * maxVal, true); 
+            offset += 2;
+        }
+        index++;
+    }
+
+    return new Blob([bufferArray], { type: 'audio/wav' });
+};
+
+
 function AudioPage() {
   const [sidebarWidth, setSidebarWidth] = useState(MAX_WIDTH);
   const [tracks, setTracks] = useState(audioManager.tracks);
+  const [activeTrackId, setActiveTrackId] = useState(null);
+
+  const [audioData, setAudioData] = useState(null);
 
   // Effect to load tracks from IndexedDB on initial component mount
   useEffect(() => {
@@ -61,8 +113,7 @@ function AudioPage() {
 
     loadTracksFromDB();
   }, []); // The empty dependency array ensures this runs only once on mount
-  const [activeTrackId, setActiveTrackId] = useState(null);
-
+  
   const toggleSidebar = () => {
     setSidebarWidth(prevWidth => (prevWidth > MIN_WIDTH ? MIN_WIDTH : MAX_WIDTH));
   };
@@ -88,18 +139,17 @@ function AudioPage() {
     console.error('Import error:', error);
     alert(`Import failed: ${error.message}`);
   };
-  // --- STATE FOR AUDIO DATA ---
-  // Holds the object returned by the Import button (buffer/URL/metadata).
-  const [audioData, setAudioData] = useState(null);
 
-  // ---- Helpers used to build a minimal "version" object for the player ----
+  const handleExportComplete = () => {
+    console.log('Export process complete.');
+  };
 
   /**
    * parseDurationMs:
-   *  Accepts either:
-   *   - number (seconds)  -> converts to ms
-   *   - string "mm:ss(.ms)" -> parses and converts to ms
-   *   - otherwise returns 0
+   * Accepts either:
+   * - number (seconds) 	-> converts to ms
+   * - string "mm:ss(.ms)" -> parses and converts to ms
+   * - otherwise returns 0
    */
   const parseDurationMs = (d) => {
     if (typeof d === "number" && !Number.isNaN(d)) return Math.round(d * 1000); // seconds → ms
@@ -118,24 +168,22 @@ function AudioPage() {
 
   /**
    * srcFromImport:
-   *  Chooses the best audio source field from the importer’s result.
-   *  Tone.Player accepts a URL/blob URL or an AudioBuffer.
+   * Chooses the best audio source field from the importer’s result.
+   * Tone.Player accepts a URL/blob URL or an AudioBuffer.
    */
   const srcFromImport = (ad) =>
     ad?.fileUrl ?? ad?.objectUrl ?? ad?.url ?? ad?.blobUrl ?? ad?.buffer ?? "";
 
   /**
    * durationMsOf:
-   *  Returns the best-known duration in ms from the importer result, trying
-   *  buffer.duration (seconds) → durationSec → "mm:ss" string → durationMs.
+   * Returns the best-known duration in ms from the importer result, trying
+   * buffer.duration (seconds) → durationSec → "mm:ss" string → durationMs.
    */
   const durationMsOf = (ad) =>
     (ad?.buffer?.duration ? Math.round(ad.buffer.duration * 1000) : 0) ||
     (typeof ad?.durationSec === "number" ? Math.round(ad.durationSec * 1000) : 0) ||
     parseDurationMs(ad?.duration) ||
     (typeof ad?.durationMs === "number" ? Math.round(ad.durationMs) : 0);
-
-  // Build the minimal version object for the playback engine when we have audio
   const version = audioData
     ? {
         bpm: 120,
@@ -175,38 +223,39 @@ function AudioPage() {
   };
 
   const activeTrack = tracks.length > 0 ? tracks[0] : null;
-  
+
   const audioBuffer = activeTrack && activeTrack.segments.length > 0
-  ? activeTrack.segments[0].buffer
-  : null;
-  
+    ? activeTrack.segments[0].buffer
+    : null;
+
   console.log('Active track:', activeTrack);
   console.log('Audio buffer for export:', audioBuffer);
 
   return (
     <div className="app-container">
-      <Header 
-        onImportSuccess={handleImportSuccess} 
+      <Header
+        onImportSuccess={handleImportSuccess}
         onImportError={handleImportError}
         audioBuffer={audioBuffer}
         onExportComplete={handleExportComplete}
+        bufferToWave={bufferToWave} 
       />
 
       <div className="main-content-area" style={mainContentStyle}>
         <Sidebar width={sidebarWidth} />
 
-        <div 
+        <div
           className="divider"
           onClick={toggleSidebar}
           title="Toggle sidebar"
         />
-        
-        <MainContent 
-          key={activeTrackId} 
-          track={activeTrack} 
+
+        <MainContent
+          key={activeTrackId}
+          track={activeTrack}
         />
       </div>
-      
+
       <Footer />
       <WebAmpPlayback version={version} />
     </div>
