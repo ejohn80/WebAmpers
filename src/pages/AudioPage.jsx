@@ -8,7 +8,7 @@ import Sidebar from '../components/Layout/Sidebar';
 import MainContent from '../components/Layout/MainContent';
 import Footer from '../components/Layout/Footer';
 import { audioManager } from '../managers/AudioManager';
-import WebAmpPlayback from '../playback/playback.jsx'; // ⬅️ KEEP
+import WebAmpPlayback from '../playback/playback.jsx';
 import { dbManager } from '../managers/DBManager';
 
 const MIN_WIDTH = 0; // Minimum allowed width for the sidebar in pixels
@@ -26,9 +26,8 @@ function AudioPage() {
     const [recording, setRecording] = useState({ stream: null, startTs: 0 }); 
 
     // Keep a reference to the playback engine so we can call control methods
-    const engineRef = React.useRef(null); // ⬅️ KEEP from TrackLane
+    const engineRef = React.useRef(null);
 
-    // ➡️ MERGED useEffect: Use the robust track reconstruction from TrackLane
     useEffect(() => {
         const loadTracksFromDB = async () => {
             try {
@@ -80,7 +79,6 @@ function AudioPage() {
         setSidebarWidth(prevWidth => (prevWidth > MIN_WIDTH ? MIN_WIDTH : MAX_WIDTH));
     };
 
-    // ➡️ MERGED handleImportSuccess: Use the robust persistence from TrackLane
     const handleImportSuccess = async (importedAudioData) => {
         console.log('Audio imported successfully, creating track:', importedAudioData);
         setAudioData(importedAudioData); // Update raw data for immediate player setup
@@ -111,12 +109,10 @@ function AudioPage() {
     };
     
     // ---- Helpers used to build a minimal "version" object for the player ----
-    // ➡️ KEEP all helper functions (parseDurationMs, srcFromImport, durationMsOf) from main
-    const parseDurationMs = (d) => { /* ... (full function code from main) ... */ };
-    const srcFromImport = (ad) => { /* ... (full function code from main) ... */ };
-    const durationMsOf = (ad) => { /* ... (full function code from main) ... */ };
+    // const parseDurationMs = (d) => { /* ... (full function code from main) ... */ };
+    // const srcFromImport = (ad) => { /* ... (full function code from main) ... */ };
+    // const durationMsOf = (ad) => { /* ... (full function code from main) ... */ };
 
-    // ➡️ MERGED version: Use the robust version object creation from TrackLane (handles active track)
     const active = tracks && tracks.length > 0 ? tracks[tracks.length - 1] : null;
     const version = active
         ? (() => {
@@ -174,7 +170,6 @@ function AudioPage() {
     };
     const activeTrack = tracks.length > 0 ? tracks[tracks.length - 1] : null;
     
-    // ➡️ KEEP engine ready handler from TrackLane
     const handleEngineReady = (engine) => {
         engineRef.current = engine;
     };
@@ -183,8 +178,8 @@ function AudioPage() {
         <div className="app-container">
             {/* 1. Header Section - Add back import props (from main) */}
             <Header 
-                onImportSuccess={handleImportSuccess} // ⬅️ ADDED
-                onImportError={handleImportError}   // ⬅️ ADDED
+                onImportSuccess={handleImportSuccess}
+                onImportError={handleImportError}
             />
 
             {/* 2. Middle Area (Sidebar/Main Content Split) */}
@@ -192,7 +187,7 @@ function AudioPage() {
                 className="main-content-area" 
                 style={mainContentStyle} 
             >
-                {/* ➡️ Sidebar - Add back import props (from main) */}
+                {/* Sidebar - Add back import props (from main) */}
                 <Sidebar 
                     width={sidebarWidth} 
                     onImportSuccess={handleImportSuccess} 
@@ -206,11 +201,11 @@ function AudioPage() {
                     title="Toggle sidebar"
                 />
                 
-                {/* ➡️ MainContent - KEEP TrackLane props and add audioData fallback from main */}
+                {/* */}
                 <MainContent
                     track={activeTrack}
-                    recording={recording} // Added from main
-                    audioData={audioData} // Added from main
+                    recording={recording}
+                    audioData={audioData}
                     onMute={async (trackId, muted) => {
                         try {
                             engineRef.current?.setTrackMute(trackId, muted);
@@ -251,12 +246,10 @@ function AudioPage() {
             {/* 3. Footer Section - MERGED */}
             <Footer
                 version={version} // Passed from main, but using TrackLane's 'version' structure
-                onRecordComplete={handleImportSuccess} // Added from main (re-use import handler)
-                onRecordStart={({ stream, startTs }) => setRecording({ stream, startTs })} // Added from main
-                onRecordStop={() => setRecording({ stream: null, startTs: 0 })} // Added from main
+                onRecordComplete={handleImportSuccess}
+                onRecordStart={({ stream, startTs }) => setRecording({ stream, startTs })}
+                onRecordStop={() => setRecording({ stream: null, startTs: 0 })}
             />
-            {/* ➡️ WebAmpPlayback must be outside the Footer */}
-            <WebAmpPlayback version={version} onEngineReady={handleEngineReady} /> 
         </div>
     );
 }
