@@ -190,13 +190,22 @@ function AudioPage() {
   return (
     <div className="app-container">
       {/* 1. Header Section */}
-      <Header onImportSuccess={handleImportSuccess} onImportError={handleImportError} />
+      <Header 
+        onImportSuccess={handleImportSuccess}
+        onImportError={handleImportError}
+    />
+
       {/* 2. Middle Area (Sidebar/Main Content Split) */}
       <div 
         className="main-content-area" 
         style={mainContentStyle} 
       >
-        <Sidebar width={sidebarWidth} />
+        <Sidebar
+          width={sidebarWidth}
+          // Use the centralized handlers so imported audio is turned into a track
+          onImportSuccess={handleImportSuccess}
+          onImportError={handleImportError}
+        />
 
         {/* Movable Divider Line */}
         <div 
@@ -205,7 +214,13 @@ function AudioPage() {
           title="Toggle sidebar"
         />
         
-        <MainContent track={activeTrack} recording={recording} />
+        {/* <MainContent track={activeTrack} recording={recording} /> */}
+        <MainContent 
+            track={activeTrack} 
+            recording={recording}
+            // Pass the raw import data as well, in case MainContent uses it directly
+            audioData={audioData} 
+        />
       </div>
       
       {/* 3. Footer Section */}
