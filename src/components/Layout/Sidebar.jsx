@@ -28,7 +28,7 @@ function Sidebar({ width, onImportSuccess, onImportError }) {
     },
     assets: {
       label: 'Assets',
-      component: <AssetsTab onImportSuccess onImportError />,
+      component: <AssetsTab onImportSuccess={onImportSuccess} onImportError={onImportError} />,
     },
   };
 

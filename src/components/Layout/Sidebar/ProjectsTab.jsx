@@ -36,8 +36,7 @@ function ProjectsTab() {
     try {
       // check for duplicate
       const q = query(
-        collection(db, 'projects'),
-        where('ownerId', '==', userData.uid),
+        collection(db, 'users', userData.uid, 'projects'),
         where('name', '==', projectName.trim())
       );
       const existing = await getDocs(q);
@@ -47,7 +46,7 @@ function ProjectsTab() {
         return;
       }
 
-      await addDoc(collection(db, 'projects'), {
+      await addDoc(collection(db, 'users', userData.uid, 'projects'), {
         ownerId: userData.uid,
         name: projectName.trim(),
         createdAt: serverTimestamp(),
@@ -70,9 +69,8 @@ function ProjectsTab() {
 
     setIsLoading(true);
     const q = query(
-      collection(db, 'projects'),
-      where('ownerId', '==', userData.uid),
-      orderBy('createdAt', 'desc')
+        collection(db, 'users', userData.uid, 'projects'),
+        orderBy('createdAt', 'desc')
     );
 
     const unsubscribe = onSnapshot(q, snapshot => {
@@ -127,6 +125,7 @@ function ProjectsTab() {
             placeholder="Project Name"
             value={projectName}
             onChange={e => setProjectName(e.target.value)}
+            style={{ width: '150px' }}
             className={styles.input}
           />
           <button className={styles.saveButton} onClick={createProject}>
@@ -140,7 +139,7 @@ function ProjectsTab() {
               setError(null);
             }}
           >
-            <RxCross2 />
+            <RxCross2 size={13}/>
           </button>
         </div>
       )}
