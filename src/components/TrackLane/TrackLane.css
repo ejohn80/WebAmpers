@@ -1,0 +1,82 @@
+.tracklane-root {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.tracklane-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px;
+}
+
+.tracklane-title {
+  font-weight: 600;
+  color: #eee;
+}
+
+.tracklane-controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.tl-btn {
+  background: rgba(255,255,255,0.03);
+  color: #ddd;
+  border: 1px solid rgba(255,255,255,0.06);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.tl-btn--active {
+  background: rgba(255,255,255,0.12);
+  color: #fff;
+  border-color: rgba(255,255,255,0.12);
+}
+
+.tracklane-segments {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.tracklane-segment {
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(255,255,255,0.03);
+  padding: 8px;
+  border-radius: 6px;
+}
+
+.segment-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+  color: #cfcfcf;
+  font-size: 12px;
+}
+
+.segment-waveform {
+  height: 64px; /* default waveform height */
+  width: 100%;
+}
+
+.waveform-placeholder {
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  height:100%;
+  color:#8b8b8b;
+  font-size:12px;
+}
+
+.tracklane-empty {
+  color: #9b9b9b;
+  padding: 12px;
+  text-align: center;
+}

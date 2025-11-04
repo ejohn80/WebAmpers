@@ -365,7 +365,7 @@ class PlaybackEngine {
 /** ---------- React wrapper component ----------
  * Provides UI controls (Play/Pause/Stop) and a progress bar for the PlaybackEngine.
  */
-export default function WebAmpPlayback({ version }) {
+export default function WebAmpPlayback({ version, onEngineReady }) {
   // , height = 120
   const engineRef = useRef(null);
   const [setPlaying] = useState(false); // playing,
@@ -401,6 +401,13 @@ export default function WebAmpPlayback({ version }) {
   // Attach and clean up engine
   useEffect(() => {
     engineRef.current = engine;
+    // Inform parent that the engine instance is available so it can call
+    // control methods (setTrackMute, setTrackSolo, etc.).
+    try {
+      onEngineReady && onEngineReady(engine);
+    } catch (e) {
+      // swallow
+    }
     return () => engine.dispose();
   }, [engine]);
 

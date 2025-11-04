@@ -52,39 +52,100 @@ export class AudioTrack {
     this.color = options.color || '#FFFFFF';
     this.segments = options.segments || [];
 
-    // Initialize the Tone.js Channel for mixer controls
+    // Serializable primitive fields. These are kept in sync with the
+    // underlying Tone.Channel so the values can be stored/loaded easily.
+    this._volumeDb = typeof options.volume === 'number' ? options.volume : 0; // in dB
+    this._pan = typeof options.pan === 'number' ? options.pan : 0; // -1 .. 1
+    this._mute = !!options.mute;
+    this._solo = !!options.solo;
+
+    // Initialize the Tone.js Channel for mixer controls and set initial
+    // values from the primitive fields. The channel remains the runtime
+    // audio object and is not serialized directly.
     this.channel = new Tone.Channel({
-      volume: options.volume || 0,
-      pan: options.pan || 0,
-      mute: options.mute || false,
-      solo: options.solo || false,
+      volume: this._volumeDb,
+      pan: this._pan,
+      mute: this._mute,
+      solo: this._solo,
     }).toDestination(); // Connect it to the master output by default
   }
 
   // --- Mixer Parameter Getters/Setters ---
 
+  // Volume in decibels (primitive). Update Tone.Channel when changed.
   get volume() {
-    return this.channel.volume;
+    return this._volumeDb;
   }
 
+  set volume(v) {
+    this._volumeDb = typeof v === 'number' ? v : 0;
+    if (this.channel) {
+      // Tone.Param sometimes exposes a .value property; set defensively.
+      try {
+        if (this.channel.volume && typeof this.channel.volume.value === 'number') {
+          this.channel.volume.value = this._volumeDb;
+        } else {
+          this.channel.volume = this._volumeDb;
+        }
+      } catch (e) {
+        // ignore - keep the in-memory primitive as the source of truth
+      }
+    }
+  }
+
+  // Pan (-1 left .. +1 right)
   get pan() {
-    return this.channel.pan;
+    return this._pan;
   }
 
+  set pan(v) {
+    this._pan = typeof v === 'number' ? v : 0;
+    if (this.channel) {
+      try {
+        if (this.channel.pan && typeof this.channel.pan.value === 'number') {
+          this.channel.pan.value = this._pan;
+        } else {
+          this.channel.pan = this._pan;
+        }
+      } catch (e) {
+        // swallow
+      }
+    }
+  }
+
+  // Mute / Solo primitive flags
   get mute() {
-    return this.channel.mute;
+    return this._mute;
   }
 
   set mute(isMuted) {
-    this.channel.mute = isMuted;
+    this._mute = !!isMuted;
+    if (this.channel) this.channel.mute = this._mute;
   }
 
   get solo() {
-    return this.channel.solo;
+    return this._solo;
   }
 
   set solo(isSoloed) {
-    this.channel.solo = isSoloed;
+    this._solo = !!isSoloed;
+    if (this.channel) this.channel.solo = this._solo;
+  }
+
+  /**
+   * Return a serializable representation suitable for DB storage.
+   */
+  toJSON() {
+    return {
+      id: this.id,
+      name: this.name,
+      color: this.color,
+      volume: this._volumeDb,
+      pan: this._pan,
+      mute: this._mute,
+      solo: this._solo,
+      segments: this.segments,
+    };
   }
 
   /**

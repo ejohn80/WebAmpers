@@ -33,9 +33,13 @@ function AudioPage() {
           let needsStateUpdate = false;
 
           for (const savedTrack of savedTracks) {
-            // Reconstruct the Tone.ToneAudioBuffer from the stored raw data
-            if (savedTrack.buffer && savedTrack.buffer.channels) {
-              const bufferData = savedTrack.buffer;
+            // Reconstruct the Tone.ToneAudioBuffer from the stored raw data.
+            // Support both the older shape (track.buffer) and the newer
+            // shape where buffers are stored per-segment (track.segments[0].buffer).
+            const maybeBufferData = savedTrack.buffer?.channels ? savedTrack.buffer : (savedTrack.segments && savedTrack.segments[0] && savedTrack.segments[0].buffer && savedTrack.segments[0].buffer.channels ? savedTrack.segments[0].buffer : null);
+
+            if (maybeBufferData) {
+              const bufferData = maybeBufferData;
               const audioBuffer = Tone.context.createBuffer(
                 bufferData.numberOfChannels,
                 bufferData.length,
@@ -46,6 +50,8 @@ function AudioPage() {
                 audioBuffer.copyToChannel(bufferData.channels[i], i);
               }
 
+              // Attach a Tone.ToneAudioBuffer at the track-level so existing
+              // restore path (addTrackFromBuffer) can find it.
               savedTrack.buffer = new Tone.ToneAudioBuffer(audioBuffer);
               audioManager.addTrackFromBuffer(savedTrack);
               needsStateUpdate = true;
@@ -78,13 +84,18 @@ function AudioPage() {
     console.log('Audio imported successfully, creating track:', importedAudioData);
     setAudioData(importedAudioData);
     // Use the AudioManager to create a new track from the imported data
-    audioManager.addTrackFromBuffer(importedAudioData);
+    const createdTrack = audioManager.addTrackFromBuffer(importedAudioData);
     // Update the component's state to re-render with the new track list.
     // We create a new array to ensure React detects the state change.
     setTracks([...audioManager.tracks]);
 
     try {
-      await dbManager.addTrack(importedAudioData);
+      // Persist the created AudioTrack (so it includes the generated id)
+      if (createdTrack) {
+        await dbManager.addTrack(createdTrack);
+      } else {
+        await dbManager.addTrack(importedAudioData);
+      }
       console.log('Track saved to IndexedDB');
     } catch (error) {
       console.error('Failed to save track to IndexedDB:', error);
@@ -142,38 +153,56 @@ function AudioPage() {
     parseDurationMs(ad?.duration) ||
     (typeof ad?.durationMs === "number" ? Math.round(ad.durationMs) : 0);
 
-  // Build the minimal version object for the playback engine when we have audio
-  const version = audioData
-    ? {
-        bpm: 120,
-        timeSig: [4, 4],
-        lengthMs: durationMsOf(audioData) || 60000, // fallback 60s so slider works
-        tracks: [
-          {
-            id: "t1",
-            name: audioData.name ?? "Imported",
-            gainDb: 0,
-            pan: 0,
-            mute: false,
-            solo: false,
-            color: "#888",
-          },
-        ],
-        segments: [
-          {
-            id: "s1",
-            trackId: "t1",
-            fileUrl: srcFromImport(audioData), // can be URL OR AudioBuffer
-            startOnTimelineMs: 0,
-            startInFileMs: 0,
-            durationMs: durationMsOf(audioData), // non-zero so playback is audible
-            gainDb: 0,
-            fades: { inMs: 5, outMs: 5 },
-          },
-        ],
-        loop: { enabled: false },
-        masterChain: [],
-      }
+  // Build the minimal version object for the playback engine from the
+  // currently active track (only play/display the last imported track).
+  const active = tracks && tracks.length > 0 ? tracks[tracks.length - 1] : null;
+  const version = active
+    ? (() => {
+        const vs = {
+          bpm: 120,
+          timeSig: [4, 4],
+          lengthMs: 60000,
+          tracks: [],
+          segments: [],
+          loop: { enabled: false },
+          masterChain: [],
+        };
+
+        vs.tracks.push({
+          id: active.id,
+          name: active.name ?? 'Imported',
+          gainDb: typeof active.volume === 'number' ? active.volume : 0,
+          pan: typeof active.pan === 'number' ? active.pan : 0,
+          mute: !!active.mute,
+          solo: !!active.solo,
+          color: active.color || '#888',
+        });
+
+        let maxEndMs = 0;
+        (active.segments || []).forEach((s) => {
+          const fileUrl = s.buffer ?? s.fileUrl ?? null;
+          const startOnTimelineMs = s.startOnTimelineMs ?? (s.startOnTimeline ? Math.round(s.startOnTimeline * 1000) : 0);
+          const startInFileMs = (s.offset ? Math.round(s.offset * 1000) : (s.startInFileMs ?? 0));
+          const durationMs = s.duration ? Math.round(s.duration * 1000) : (s.durationMs ?? 0);
+
+          vs.segments.push({
+            id: s.id ?? `seg_${Math.random().toString(36).slice(2,8)}`,
+            trackId: active.id,
+            fileUrl,
+            startOnTimelineMs,
+            startInFileMs,
+            durationMs,
+            gainDb: s.gainDb ?? 0,
+            fades: s.fades ?? { inMs: 5, outMs: 5 },
+          });
+
+          const endMs = startOnTimelineMs + (durationMs || 0);
+          if (endMs > maxEndMs) maxEndMs = endMs;
+        });
+
+        vs.lengthMs = maxEndMs || 60000;
+        return vs;
+      })()
     : null;
 
   // --- RENDERING ---
@@ -182,7 +211,15 @@ function AudioPage() {
   const mainContentStyle = {
     '--sidebar-width': `${sidebarWidth}px`,
   };
-  const activeTrack = tracks.length > 0 ? tracks[0] : null;
+  const activeTrack = tracks.length > 0 ? tracks[tracks.length - 1] : null;
+
+  // Keep a reference to the playback engine so we can call control methods
+  // (setTrackMute, setTrackSolo) from this component when UI toggles occur.
+  const engineRef = React.useRef(null);
+
+  const handleEngineReady = (engine) => {
+    engineRef.current = engine;
+  };
 
   return (
     <div className="app-container">
@@ -202,12 +239,53 @@ function AudioPage() {
           title="Toggle sidebar"
         />
         
-        <MainContent track={activeTrack} />
+        <MainContent
+          track={activeTrack}
+          onMute={async (trackId, muted) => {
+            try {
+              engineRef.current?.setTrackMute(trackId, muted);
+            } catch (e) {
+              console.warn('Engine setTrackMute failed', e);
+            }
+
+            // Update model and persist
+            const t = audioManager.tracks.find((x) => x.id === trackId);
+            if (t) {
+              try {
+                t.mute = muted;
+                // Persist the updated track; prefer updateTrack if available
+                if (dbManager.updateTrack) await dbManager.updateTrack(t);
+              } catch (e) {
+                console.warn('Failed to persist mute change', e);
+              }
+              // Refresh local state
+              setTracks([...audioManager.tracks]);
+            }
+          }}
+          onSolo={async (trackId, soloed) => {
+            try {
+              engineRef.current?.setTrackSolo(trackId, soloed);
+            } catch (e) {
+              console.warn('Engine setTrackSolo failed', e);
+            }
+
+            const t = audioManager.tracks.find((x) => x.id === trackId);
+            if (t) {
+              try {
+                t.solo = soloed;
+                if (dbManager.updateTrack) await dbManager.updateTrack(t);
+              } catch (e) {
+                console.warn('Failed to persist solo change', e);
+              }
+              setTracks([...audioManager.tracks]);
+            }
+          }}
+        />
       </div>
       
       {/* 3. Footer Section */}
       <Footer />
-      <WebAmpPlayback version={version} />
+  <WebAmpPlayback version={version} onEngineReady={handleEngineReady} />
     </div>
   );
 }
