@@ -1,32 +1,10 @@
 import { useState, useEffect, useContext } from 'react';
 import DraggableDiv from '../Generic/DraggableDiv';
 import { AppContext } from '../../context/AppContext';
-
-import styles from './Layout.module.css';
-
 import AssetsTab from './Sidebar/AssetsTab';
 import EffectsTab from './Sidebar/EffectsTab';
 import ProjectsTab from './Sidebar/ProjectsTab';
-
-import styles from './Layout.module.css';
-
-import { useUserData } from '../../hooks/useUserData';
-import { RxCross2 } from "react-icons/rx";
-import { useNavigate } from 'react-router-dom';
-
-import { MoonLoader } from "react-spinners";
-
-import { db } from '../../firebase/firebase';
-import {
-  collection,
-  query,
-  where,
-  getDocs,
-  addDoc,
-  serverTimestamp,
-  orderBy,
-  onSnapshot
-} from 'firebase/firestore';
+// import styles from './Layout.module.css';
 
 /**
  * Sidebar component for the application layout.

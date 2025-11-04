@@ -214,7 +214,13 @@ function AudioPage() {
           title="Toggle sidebar"
         />
         
-        <MainContent track={activeTrack} recording={recording} />
+        {/* <MainContent track={activeTrack} recording={recording} /> */}
+        <MainContent 
+            track={activeTrack} 
+            recording={recording}
+            // Pass the raw import data as well, in case MainContent uses it directly
+            audioData={audioData} 
+        />
       </div>
       
       {/* 3. Footer Section */}

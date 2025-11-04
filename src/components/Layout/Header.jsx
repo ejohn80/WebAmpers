@@ -1,31 +1,28 @@
-import { useContext } from 'react';
-
-import DraggableDiv from '../Generic/DraggableDiv';
 import { logout } from '../Auth/AuthUtils';
+import { useUserData } from '../../hooks/useUserData';
 import { useNavigate } from 'react-router-dom';
+import DropdownPortal from './DropdownPortal';
+import './Header.css';
 
-import { AppContext } from '../../context/AppContext';
-
-/**
- * Header component for the application layout.
- * Displays the header section and includes the audio import functionality.
- * @param {object} props - The component props.
- */
-function Header({ onImportSuccess, onImportError }) {
+function Header({}) { 
   const navigate = useNavigate();
-
-  const { userData, activeProject } = useContext(AppContext);
-
-
+  const { userData, loading } = useUserData();
 
   return (
-    <DraggableDiv color="red">
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', margin: '0' }}>
-        <span>**Header** (Red Section)</span>
-        <span>{activeProject}</span>
-        {userData ? <button onClick={logout}>Log out</button> : <button onClick={() => navigate('/register')}>Login or Register</button>}
+    <div className="header">
+      <div className="container">
+        {/* container for logo + dropdown */}
+        <div className="leftContainer">
+          <span className="webampText">Webamp</span>
+          <DropdownPortal showMenuButtons={true} showGuestButton={false} />
+        </div>
+      
+        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+
+          {userData ? <button onClick={logout}>Log out</button> : <button onClick={() => navigate('/register')}>Login or Register</button>}
+        </div>
       </div>
-    </DraggableDiv>
+    </div>
   );
 }
 
