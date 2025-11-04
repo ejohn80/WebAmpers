@@ -190,7 +190,10 @@ function AudioPage() {
   return (
     <div className="app-container">
       {/* 1. Header Section */}
-      <Header />
+      <Header 
+        onImportSuccess={handleImportSuccess}
+        onImportError={handleImportError}
+    />
 
       {/* 2. Middle Area (Sidebar/Main Content Split) */}
       <div 

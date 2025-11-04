@@ -12,7 +12,7 @@ import {
   orderBy,
   onSnapshot,
 } from 'firebase/firestore';
-import AudioImportButton from "../../AudioImport/AudioImportButton";
+import AudioImportButton from "../../AudioImport/AudioImportButton2";
 import styles from "../Layout.module.css";
 
 const AssetsTab = ({ onImportSuccess, onImportError }) => {

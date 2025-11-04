@@ -1,10 +1,12 @@
+import React from 'react';
+import AudioImportButton from '../AudioImport/AudioImportButton';
 import { logout } from '../Auth/AuthUtils';
 import { useUserData } from '../../hooks/useUserData';
 import { useNavigate } from 'react-router-dom';
 import DropdownPortal from './DropdownPortal';
 import './Header.css';
 
-function Header({}) { 
+function Header({ onImportSuccess, onImportError }) {
   const navigate = useNavigate();
   const { userData, loading } = useUserData();
 
@@ -18,8 +20,16 @@ function Header({}) {
         </div>
       
         <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-
-          {userData ? <button onClick={logout}>Log out</button> : <button onClick={() => navigate('/register')}>Login or Register</button>}
+          <AudioImportButton 
+            onImportSuccess={onImportSuccess}
+            onImportError={onImportError}
+          />
+          
+          {userData ? (
+            <button onClick={logout}>Log out</button>
+          ) : (
+            <DropdownPortal showMenuButtons={false} showGuestButton={true} />
+          )}
         </div>
       </div>
     </div>
