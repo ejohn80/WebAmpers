@@ -1,35 +1,38 @@
 import React from 'react';
-import DraggableDiv from '../Generic/DraggableDiv';
 import AudioImportButton from '../AudioImport/AudioImportButton';
-import AudioExportButton from '../AudioExport/AudioExportButton';
+import { logout } from '../Auth/AuthUtils';
+import { useUserData } from '../../hooks/useUserData';
+import { useNavigate } from 'react-router-dom';
+import DropdownPortal from './DropdownPortal';
+import './Header.css';
 
-/**
- * Header component for the application layout.
- * Displays the header section and includes audio import and export functionality.
- */
-function Header({ onImportSuccess, onImportError, audioBuffer, onExportComplete }) {
+function Header({ onImportSuccess, onImportError }) {
+  const navigate = useNavigate();
+  const { userData, loading } = useUserData();
+
   return (
-    <DraggableDiv color="red">
-      <div style={{ 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'space-between', 
-        width: '100%' 
-      }}>
-        <span>**Header** (Red Section)</span>
-        
-        <div style={{ display: 'flex', gap: '10px' }}>
+    <div className="header">
+      <div className="container">
+        {/* container for logo + dropdown */}
+        <div className="leftContainer">
+          <span className="webampText">Webamp</span>
+          <DropdownPortal showMenuButtons={true} showGuestButton={false} />
+        </div>
+      
+        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
           <AudioImportButton 
             onImportSuccess={onImportSuccess}
             onImportError={onImportError}
           />
-          <AudioExportButton
-            audioBuffer={audioBuffer}
-            onExportComplete={onExportComplete}
-          />
+          
+          {userData ? (
+            <button onClick={logout}>Log out</button>
+          ) : (
+            <DropdownPortal showMenuButtons={false} showGuestButton={true} />
+          )}
         </div>
       </div>
-    </DraggableDiv>
+    </div>
   );
 }
 

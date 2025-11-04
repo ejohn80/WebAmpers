@@ -1,0 +1,136 @@
+.tracklane-side {
+  width: 100px; /* reduced width so box sits further left */
+  min-width: 80px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  /* Allow the side column to stretch to match the height of the main area */
+  align-self: stretch;
+  padding-right: 6px;
+}
+
+.tracklane-root {
+  display: flex;
+  flex-direction: row;
+  gap: 12px;
+  width: 100%;
+  align-items: stretch;
+}
+
+
+.tracklane-main {
+  flex: 1 1 auto;
+}
+
+.tracklane-root {
+  background: #2f2f2f; /* lighter grey */
+  color: #eaeaea;
+  padding: 8px;
+  border-radius: 6px;
+}
+
+.tracklane-title {
+  font-weight: 600;
+  color: #eee;
+}
+
+.tracklane-controls-box {
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(255,255,255,0.03);
+  padding: 8px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Fill remaining vertical space so height matches the waveform area */
+  flex: 1 1 auto;
+}
+
+/* Ensure the controls area centers its buttons vertically */
+.tracklane-controls-box .tracklane-controls {
+  width: 100%;
+  display: flex;
+  flex-direction: column; /* stack buttons vertically */
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.tracklane-controls-box .tl-btn {
+  width: 100%;
+  padding: 6px 6px;
+  font-size: 12px;
+}
+
+.tracklane-controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.tl-btn {
+  background: rgba(255,255,255,0.03);
+  color: #ddd;
+  border: 1px solid rgba(255,255,255,0.06);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.tl-btn--active {
+  background: rgba(255,255,255,0.12);
+  color: #fff;
+  border-color: rgba(255,255,255,0.12);
+}
+
+.tracklane-segments {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.tracklane-segment {
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(255,255,255,0.03);
+  padding: 8px;
+  border-radius: 6px;
+}
+
+.segment-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.segment-name {
+  font-size: 11px; /* smaller name text */
+  color: #9a9a9a;
+  font-weight: 500;
+}
+
+.segment-duration {
+  font-size: 11px;
+  color: #a9a9a9;
+}
+
+.segment-waveform {
+  height: 64px; /* default waveform height */
+  width: 100%;
+}
+
+.waveform-placeholder {
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  height:100%;
+  color:#8b8b8b;
+  font-size:12px;
+}
+
+.tracklane-empty {
+  color: #9b9b9b;
+  padding: 12px;
+  text-align: center;
+}

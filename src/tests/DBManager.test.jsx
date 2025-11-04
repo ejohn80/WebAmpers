@@ -4,18 +4,26 @@ import { dbManager } from '../managers/DBManager';
  * Helper function to create mock track data.
  * Using a function makes it easy to create unique tracks for each test.
  */
+// Place the buffer inside a `segments` array to match current DBManager
+// serialization expectations (segment-level buffers are serialized).
 const createMockTrack = (id, name) => ({
   id,
   name,
-  buffer: {
-    get: () => ({
-      numberOfChannels: 2,
-      sampleRate: 44100,
-      length: 88200,
-      duration: 2,
-      getChannelData: () => new Float32Array([0.1, 0.2, 0.3]),
-    }),
-  },
+  segments: [
+    {
+      id: `${id}-seg`,
+      buffer: {
+        get: () => ({
+          numberOfChannels: 2,
+          sampleRate: 44100,
+          length: 88200,
+          duration: 2,
+          getChannelData: () => new Float32Array([0.1, 0.2, 0.3]),
+        }),
+      },
+      durationMs: 2000,
+    },
+  ],
 });
 
 describe('DBManager Behavioral Tests', () => {
@@ -47,8 +55,9 @@ describe('DBManager Behavioral Tests', () => {
     const tracks = await dbManager.getAllTracks();
     expect(tracks).toHaveLength(1);
     expect(tracks[0].name).toBe('My First Track');
-    // Check if buffer data was serialized correctly
-    expect(tracks[0].buffer.sampleRate).toBe(44100);
+  // Check if segment buffer data was serialized correctly
+  expect(tracks[0].segments).toBeDefined();
+  expect(tracks[0].segments[0].buffer.sampleRate).toBe(44100);
   });
 
   it('should add multiple tracks and retrieve them all', async () => {
@@ -60,9 +69,9 @@ describe('DBManager Behavioral Tests', () => {
 
     const tracks = await dbManager.getAllTracks();
     expect(tracks).toHaveLength(2);
-    // Note: IndexedDB does not guarantee insertion order for getAll()
-    const names = tracks.map(t => t.name).sort();
-    expect(names).toEqual(['First', 'Second']);
+  // Note: IndexedDB does not guarantee insertion order for getAll()
+  const names = tracks.map(t => t.name).sort();
+  expect(names).toEqual(['First', 'Second']);
   });
 
   it('should delete a specific track', async () => {
@@ -112,7 +121,8 @@ describe('DBManager Behavioral Tests', () => {
 
     const tracks = await dbManager.getAllTracks();
     expect(tracks).toHaveLength(1);
-    expect(tracks[0].name).toBe('Metadata Only');
-    expect(tracks[0].buffer).toBeUndefined();
+  expect(tracks[0].name).toBe('Metadata Only');
+  // No segments or buffer present for metadata-only track
+  expect(tracks[0].segments).toBeUndefined();
   });
 });

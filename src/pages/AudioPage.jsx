@@ -18,8 +18,12 @@ const MAX_WIDTH = 300;
 function AudioPage() {
     const [sidebarWidth, setSidebarWidth] = useState(MAX_WIDTH);
     const [tracks, setTracks] = useState(audioManager.tracks);
+    // --- STATE FOR AUDIO DATA --- (Kept from main/old approach for backward compatibility)
     const [audioData, setAudioData] = useState(null); 
+    // Live recording state for preview (Kept from main/old approach)
     const [recording, setRecording] = useState({ stream: null, startTs: 0 }); 
+
+    // Keep a reference to the playback engine so we can call control methods
     const engineRef = React.useRef(null);
 
     useEffect(() => {
@@ -31,6 +35,8 @@ function AudioPage() {
                     let needsStateUpdate = false;
 
                     for (const savedTrack of savedTracks) {
+                        // Reconstruct the Tone.ToneAudioBuffer from the stored raw data.
+                        // Support both older (track.buffer) and newer (track.segments[0].buffer) shapes.
                         const maybeBufferData = savedTrack.buffer?.channels ? savedTrack.buffer : (savedTrack.segments && savedTrack.segments[0] && savedTrack.segments[0].buffer && savedTrack.segments[0].buffer.channels ? savedTrack.segments[0].buffer : null);
 
                         if (maybeBufferData) {
@@ -45,10 +51,13 @@ function AudioPage() {
                                 audioBuffer.copyToChannel(bufferData.channels[i], i);
                             }
 
+                            // Attach a Tone.ToneAudioBuffer at the track-level so existing
+                            // restore path (addTrackFromBuffer) can find it.
                             savedTrack.buffer = new Tone.ToneAudioBuffer(audioBuffer);
                             audioManager.addTrackFromBuffer(savedTrack);
                             needsStateUpdate = true;
 
+                            // Set the audioData for the first loaded track to initialize the player
                             if (!audioData) setAudioData(savedTrack);
                         }
                     }
@@ -70,16 +79,20 @@ function AudioPage() {
 
     const handleImportSuccess = async (importedAudioData) => {
         console.log('Audio imported successfully, creating track:', importedAudioData);
-        setAudioData(importedAudioData); 
+        setAudioData(importedAudioData); // Update raw data for immediate player setup
         
+        // Use the AudioManager to create a new track and capture the created track object
         const createdTrack = audioManager.addTrackFromBuffer(importedAudioData);
         
+        // Update the component's state to re-render with the new track list.
         setTracks([...audioManager.tracks]);
 
         try {
+            // Persist the created AudioTrack (so it includes the generated id)
             if (createdTrack) {
                 await dbManager.addTrack(createdTrack);
             } else {
+                // Fallback for older data shape (from main)
                 await dbManager.addTrack(importedAudioData); 
             }
             console.log('Track saved to IndexedDB');
@@ -90,13 +103,14 @@ function AudioPage() {
 
     const handleImportError = (error) => {
         alert(`Import failed: ${error.message}`);
+        // TODO: Show a more user-friendly error message in the UI
     };
     
-    const handleExportComplete = () => {
-        console.log('Export process complete.');
-    };
+    // ---- Helpers used to build a minimal "version" object for the player ----
+    // const parseDurationMs = (d) => { /* ... (full function code from main) ... */ };
+    // const srcFromImport = (ad) => { /* ... (full function code from main) ... */ };
+    // const durationMsOf = (ad) => { /* ... (full function code from main) ... */ };
 
-    // Helper functions for version object (Keeping the original/main branch logic)
     const active = tracks && tracks.length > 0 ? tracks[tracks.length - 1] : null;
     const version = active
         ? (() => {
@@ -154,24 +168,16 @@ function AudioPage() {
     };
     const activeTrack = tracks.length > 0 ? tracks[tracks.length - 1] : null;
     
-    // FIX: Check activeTrack.buffer first, but fall back to activeTrack.segments[0].buffer 
-    // to ensure the export button enables immediately after a fresh import or DB load.
-    const audioBuffer = activeTrack 
-        ? activeTrack.buffer || activeTrack.segments?.[0]?.buffer 
-        : null;
-
     const handleEngineReady = (engine) => {
         engineRef.current = engine;
     };
 
     return (
         <div className="app-container">
-            {/* 1. Header Section */}
+            {/* 1. Header Section - Add back import props (from main) */}
             <Header 
                 onImportSuccess={handleImportSuccess}
                 onImportError={handleImportError}
-                audioBuffer={audioBuffer} // Now uses the robust check
-                onExportComplete={handleExportComplete}
             />
 
             {/* 2. Middle Area (Sidebar/Main Content Split) */}
@@ -179,7 +185,7 @@ function AudioPage() {
                 className="main-content-area" 
                 style={mainContentStyle} 
             >
-                {/* Sidebar */}
+                {/* Sidebar - Add back import props (from main) */}
                 <Sidebar 
                     width={sidebarWidth} 
                     onImportSuccess={handleImportSuccess} 
@@ -193,7 +199,7 @@ function AudioPage() {
                     title="Toggle sidebar"
                 />
                 
-                {/* Main Content */}
+                {/* */}
                 <MainContent
                     track={activeTrack}
                     recording={recording}
@@ -235,15 +241,13 @@ function AudioPage() {
                 />
             </div>
             
-            {/* 3. Footer Section */}
+            {/* 3. Footer Section - MERGED */}
             <Footer
-                version={version}
+                version={version} // Passed from main, but using TrackLane's 'version' structure
                 onRecordComplete={handleImportSuccess}
                 onRecordStart={({ stream, startTs }) => setRecording({ stream, startTs })}
                 onRecordStop={() => setRecording({ stream: null, startTs: 0 })}
             />
-            {/* WebAmpPlayback remains at the bottom */}
-            <WebAmpPlayback version={version} onEngineReady={handleEngineReady} />
         </div>
     );
 }
