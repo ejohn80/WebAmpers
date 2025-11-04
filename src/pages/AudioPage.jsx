@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import './AudioPage.css';
 import * as Tone from 'tone';
+
+// Import the newly created layout components
 import Header from '../components/Layout/Header';
 import Sidebar from '../components/Layout/Sidebar';
 import MainContent from '../components/Layout/MainContent';
@@ -9,8 +11,8 @@ import { audioManager } from '../managers/AudioManager';
 import WebAmpPlayback from '../playback/playback.jsx';
 import { dbManager } from '../managers/DBManager';
 
-const MIN_WIDTH = 0; 
-const MAX_WIDTH = 300; 
+const MIN_WIDTH = 0; // Minimum allowed width for the sidebar in pixels
+const MAX_WIDTH = 300; // Maximum allowed width for the sidebar in pixels
 
 /**
  * AudioPage component provides a resizable layout with a sidebar and main content area.
@@ -105,6 +107,10 @@ function AudioPage() {
         alert(`Import failed: ${error.message}`);
         // TODO: Show a more user-friendly error message in the UI
     };
+
+    const handleExportComplete = () => {
+        console.log('Export process complete.');
+    };
     
     // ---- Helpers used to build a minimal "version" object for the player ----
     // const parseDurationMs = (d) => { /* ... (full function code from main) ... */ };
@@ -167,7 +173,8 @@ function AudioPage() {
         '--sidebar-width': `${sidebarWidth}px`,
     };
     const activeTrack = tracks.length > 0 ? tracks[tracks.length - 1] : null;
-    
+    const audioBuffer = activeTrack ? activeTrack.buffer || activeTrack.segments?.[0]?.buffer : null;
+
     const handleEngineReady = (engine) => {
         engineRef.current = engine;
     };
@@ -178,6 +185,8 @@ function AudioPage() {
             <Header 
                 onImportSuccess={handleImportSuccess}
                 onImportError={handleImportError}
+                audioBuffer={audioBuffer}
+                onExportComplete={handleExportComplete}
             />
 
             {/* 2. Middle Area (Sidebar/Main Content Split) */}
