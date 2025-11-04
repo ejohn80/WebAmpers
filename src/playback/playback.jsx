@@ -368,7 +368,7 @@ class PlaybackEngine {
 export default function WebAmpPlayback({ version, onEngineReady }) {
   // , height = 120
   const engineRef = useRef(null);
-  const [setPlaying] = useState(false); // playing,
+  const [playing, setPlaying] = useState(false); 
   const [ms, setMs] = useState(0);
   const [trackGains, setTrackGains] = useState({});
 

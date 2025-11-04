@@ -1,5 +1,6 @@
 import { AudioTrack } from '../models/AudioTrack';
 import { AudioSegment } from '../models/AudioSegment';
+import * as Tone from 'tone';
 
 /**
  * @class AudioManager
