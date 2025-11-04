@@ -139,3 +139,30 @@
 .dropdown-btn-settings.active {
   background-color: #333239;
 }
+
+/* Guest Button Styling */
+.dropdown-btn-guest {
+  background: #262529;
+  color: #E5E5E5;
+  padding: 8px 16px;
+  border: none;
+  cursor: pointer;
+  height: 40px;
+  font-size: 16px;
+  display: flex;
+  gap: 8px;
+  border-radius: 4px;
+}
+
+.dropdown-btn-guest:hover {
+  background-color: #333239;
+}
+
+.dropdown-btn-guest.active {
+  background-color: #333239;
+}
+
+.dropdown-content-guest {
+  width: 111px;
+  height: 90px;
+}

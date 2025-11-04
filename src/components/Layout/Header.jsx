@@ -1,5 +1,4 @@
 import React from 'react';
-import DraggableDiv from '../Generic/DraggableDiv';
 import AudioImportButton from '../AudioImport/AudioImportButton';
 import { logout } from '../Auth/AuthUtils';
 import { useUserData } from '../../hooks/useUserData';
@@ -17,18 +16,19 @@ function Header({ onImportSuccess, onImportError }) {
         {/* container for logo + dropdown */}
         <div className="leftContainer">
           <span className="webampText">Webamp</span>
-          <DropdownPortal />
+          <DropdownPortal showMenuButtons={true} showGuestButton={false} />
         </div>
       
-        <div style={{ display: 'flex', alignItems: 'right', gap: '15px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
           <AudioImportButton 
             onImportSuccess={onImportSuccess}
             onImportError={onImportError}
           />
+          
           {userData ? (
             <button onClick={logout}>Log out</button>
           ) : (
-            <button onClick={() => navigate('/register')}>Login or Register</button>
+            <DropdownPortal showMenuButtons={false} showGuestButton={true} />
           )}
         </div>
       </div>

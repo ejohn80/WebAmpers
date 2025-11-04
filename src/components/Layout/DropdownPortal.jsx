@@ -1,9 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReactDOM from 'react-dom';
+import { useNavigate } from 'react-router-dom';
 import './Header.css';
-import { ExportIcon, NewIcon, PreviousVersionsIcon, UndoIcon, RedoIcon, CutIcon, CopyIcon, PasteIcon, DeleteIcon, SoundQualityIcon, ThemesIcon, ColorAccessibilityIcon } from './Svgs';
+import { 
+  ExportIcon, NewIcon, PreviousVersionsIcon, UndoIcon, RedoIcon, 
+  CutIcon, CopyIcon, PasteIcon, DeleteIcon, SoundQualityIcon, 
+  ThemesIcon, ColorAccessibilityIcon, GuestIcon 
+} from './Svgs';
 
-function DropdownPortal() {
+function DropdownPortal({ showMenuButtons = true, showGuestButton = false }) {
+  const navigate = useNavigate();
   const [activeDropdown, setActiveDropdown] = useState(null);
   const [position, setPosition] = useState({ top: 0, left: 0 });
   
@@ -11,11 +17,26 @@ function DropdownPortal() {
   const editButtonRef = useRef(null);
   const toolsButtonRef = useRef(null);
   const settingsButtonRef = useRef(null);
+  const guestButtonRef = useRef(null);
   
   const fileDropdownRef = useRef(null);
   const editDropdownRef = useRef(null);
   const toolsDropdownRef = useRef(null);
   const settingsDropdownRef = useRef(null);
+  const guestDropdownRef = useRef(null);
+
+ const handleMenuItemClick = (action) => {
+    console.log(`Selected: ${action}`);
+    
+    // Handle navigation for guest dropdown
+    if (action === 'Login') {
+      navigate('/login');
+    } else if (action === 'Register') {
+      navigate('/register');
+    }
+    
+    setActiveDropdown(null);
+  };
 
   const handleButtonClick = (dropdownName, buttonRef) => {
     if (buttonRef.current) {
@@ -31,11 +52,9 @@ function DropdownPortal() {
 
   // Handle mouse leave from dropdown
   const handleDropdownMouseLeave = (event) => {
-    // Check if we're actually leaving the dropdown (not just moving between child elements)
     const relatedTarget = event.relatedTarget;
     const dropdown = event.currentTarget;
     
-    // If we're leaving the dropdown and not entering a child element, close it
     if (!dropdown.contains(relatedTarget)) {
       setActiveDropdown(null);
     }
@@ -47,14 +66,16 @@ function DropdownPortal() {
         file: fileDropdownRef,
         edit: editDropdownRef,
         tools: toolsDropdownRef,
-        settings: settingsDropdownRef
+        settings: settingsDropdownRef,
+        guest: guestDropdownRef
       };
       
       const buttonRefs = {
         file: fileButtonRef,
         edit: editButtonRef,
         tools: toolsButtonRef,
-        settings: settingsButtonRef
+        settings: settingsButtonRef,
+        guest: guestButtonRef
       };
 
       const activeRef = dropdownRefs[activeDropdown];
@@ -74,11 +95,6 @@ function DropdownPortal() {
     };
   }, [activeDropdown]);
 
-  const handleMenuItemClick = (action) => {
-    console.log(`Selected: ${action}`);
-    setActiveDropdown(null);
-  };
-
   // Helper function to get button class with active state
   const getButtonClass = (buttonType, dropdownName) => {
     const baseClass = `dropdown-btn${buttonType ? `-${buttonType}` : ''}`;
@@ -97,7 +113,7 @@ function DropdownPortal() {
           left: position.left,
           zIndex: 99999
         }}
-        onMouseLeave={handleDropdownMouseLeave} // Add this
+        onMouseLeave={handleDropdownMouseLeave}
       >
         <a href="#" onClick={(e) => { e.preventDefault(); handleMenuItemClick('New'); }}>
           <span style={{ 
@@ -148,7 +164,7 @@ function DropdownPortal() {
           left: position.left,
           zIndex: 99999
         }}
-        onMouseLeave={handleDropdownMouseLeave} // Add this
+        onMouseLeave={handleDropdownMouseLeave}
       >
         <a href="#" onClick={(e) => { e.preventDefault(); handleMenuItemClick('Undo'); }}>
           <span style={{ 
@@ -229,7 +245,7 @@ function DropdownPortal() {
           left: position.left,
           zIndex: 99999
         }}
-        onMouseLeave={handleDropdownMouseLeave} // Add this
+        onMouseLeave={handleDropdownMouseLeave}
       >
         <a href="#" onClick={(e) => { e.preventDefault(); handleMenuItemClick('Tool 1'); }}>
           Tool 1
@@ -253,7 +269,7 @@ function DropdownPortal() {
           left: position.left,
           zIndex: 99999
         }}
-        onMouseLeave={handleDropdownMouseLeave} // Add this
+        onMouseLeave={handleDropdownMouseLeave}
       >
         <a href="#" onClick={(e) => { e.preventDefault(); handleMenuItemClick('Sound Quality'); }}>
           <span style={{
@@ -292,6 +308,27 @@ function DropdownPortal() {
           About
         </a>
       </div>
+    ),
+
+    guest: (
+      <div 
+        ref={guestDropdownRef}
+        className="dropdown-content dropdown-content-guest"
+        style={{
+          position: 'fixed',
+          top: position.top,
+          left: position.left,
+          zIndex: 99999
+        }}
+        onMouseLeave={handleDropdownMouseLeave}
+      >
+        <a href="#" onClick={(e) => { e.preventDefault(); handleMenuItemClick('Login'); }}>
+          Login
+        </a>
+        <a href="#" onClick={(e) => { e.preventDefault(); handleMenuItemClick('Register'); }}>
+          Register
+        </a>
+      </div>
     )
   };
 
@@ -299,49 +336,70 @@ function DropdownPortal() {
     <>
       {/* Buttons stay in normal flow */}
       <div className="FETS-container">
-        {/* File Dropdown */}
-        <div className="dropdown">
-          <button 
-            ref={fileButtonRef}
-            className={getButtonClass('', 'file')}
-            onClick={() => handleButtonClick('file', fileButtonRef)}
-          >
-            File
-          </button>
-        </div>
+        {/* Menu Buttons */}
+        {showMenuButtons && (
+          <>
+            {/* File Dropdown */}
+            <div className="dropdown">
+              <button 
+                ref={fileButtonRef}
+                className={getButtonClass('', 'file')}
+                onClick={() => handleButtonClick('file', fileButtonRef)}
+              >
+                File
+              </button>
+            </div>
 
-        {/* Edit Dropdown */}
-        <div className="dropdown">
-          <button 
-            ref={editButtonRef}
-            className={getButtonClass('', 'edit')}
-            onClick={() => handleButtonClick('edit', editButtonRef)}
-          >
-            Edit
-          </button>
-        </div>
+            {/* Edit Dropdown */}
+            <div className="dropdown">
+              <button 
+                ref={editButtonRef}
+                className={getButtonClass('', 'edit')}
+                onClick={() => handleButtonClick('edit', editButtonRef)}
+              >
+                Edit
+              </button>
+            </div>
 
-        {/* Tools Dropdown */}
-        <div className="dropdown">
-          <button 
-            ref={toolsButtonRef}
-            className={getButtonClass('tools', 'tools')}
-            onClick={() => handleButtonClick('tools', toolsButtonRef)}
-          >
-            Tools
-          </button>
-        </div>
+            {/* Tools Dropdown */}
+            <div className="dropdown">
+              <button 
+                ref={toolsButtonRef}
+                className={getButtonClass('tools', 'tools')}
+                onClick={() => handleButtonClick('tools', toolsButtonRef)}
+              >
+                Tools
+              </button>
+            </div>
 
-        {/* Settings Dropdown */}
-        <div className="dropdown">
-          <button 
-            ref={settingsButtonRef}
-            className={getButtonClass('settings', 'settings')}
-            onClick={() => handleButtonClick('settings', settingsButtonRef)}
-          >
-            Settings
-          </button>
-        </div>
+            {/* Settings Dropdown */}
+            <div className="dropdown">
+              <button 
+                ref={settingsButtonRef}
+                className={getButtonClass('settings', 'settings')}
+                onClick={() => handleButtonClick('settings', settingsButtonRef)}
+              >
+                Settings
+              </button>
+            </div>
+          </>
+        )}
+
+        {/* Guest Button */}
+        {showGuestButton && (
+          <div className="dropdown">
+            <button 
+              ref={guestButtonRef}
+              className={getButtonClass('guest', 'guest')}
+              onClick={() => handleButtonClick('guest', guestButtonRef)}
+            >
+              <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <GuestIcon />
+                <span>Guest</span>
+              </span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Dropdowns rendered via portal */}
