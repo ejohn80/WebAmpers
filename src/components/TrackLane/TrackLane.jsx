@@ -53,10 +53,10 @@ function TrackLane({ track, showTitle = true, onMute, onSolo }) {
 
   return (
     <div className="tracklane-root">
-      {(showTitle || true) && (
-        <div className="tracklane-header">
-          <div className="tracklane-title">{track.name ?? 'Untitled Track'}</div>
+      <div className="tracklane-side">
+        {showTitle && <div className="tracklane-title">{track.name ?? 'Untitled Track'}</div>}
 
+        <div className="tracklane-controls-box">
           <div className="tracklane-controls">
             <button
               className={`tl-btn tl-btn-mute ${muted ? 'tl-btn--active' : ''}`}
@@ -77,9 +77,10 @@ function TrackLane({ track, showTitle = true, onMute, onSolo }) {
             </button>
           </div>
         </div>
-      )}
+      </div>
 
-      <div className="tracklane-segments">
+      <div className="tracklane-main">
+        <div className="tracklane-segments">
         {segments.length === 0 && (
           <div className="tracklane-empty">No segments — import audio to add one.</div>
         )}
@@ -100,7 +101,7 @@ function TrackLane({ track, showTitle = true, onMute, onSolo }) {
 
               <div className="segment-waveform">
                 {audioBuffer ? (
-                  <Waveform audioBuffer={audioBuffer} />
+                  <Waveform audioBuffer={audioBuffer} color={track?.color} />
                 ) : (
                   <div className="waveform-placeholder">(No buffer available for this segment)</div>
                 )}
@@ -108,6 +109,7 @@ function TrackLane({ track, showTitle = true, onMute, onSolo }) {
             </div>
           );
         })}
+        </div>
       </div>
     </div>
   );

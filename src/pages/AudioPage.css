@@ -42,6 +42,11 @@ body, html, #root {
   background-color: #99ff4d; /* Lime Green */
 }
 
+/* Main content (center area) override — use a dark grey so TrackLane can be lighter */
+.maincontent {
+  background-color: #1f1f1f !important;
+}
+
 /* --- Main Content Area Styling (The Core Grid) --- */
 .main-content-area {
   display: grid;

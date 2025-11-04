@@ -10,7 +10,7 @@ import TrackLane from '../../components/TrackLane/TrackLane';
  */
 function MainContent({ track, onMute, onSolo }) {
   return (
-    <DraggableDiv color="purple">
+    <DraggableDiv color="purple" className="maincontent">
       {track ? (
         // Delegate rendering to the TrackLane which is responsible for
         // rendering track segments and waveform visualizations.

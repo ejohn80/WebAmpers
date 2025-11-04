@@ -6,7 +6,7 @@ import './Waveform.css';
  * @param {object} props
  * @param {Tone.ToneAudioBuffer} props.audioBuffer - The audio buffer to visualize.
  */
-const Waveform = ({ audioBuffer }) => {
+const Waveform = ({ audioBuffer, color = '#ffffff' }) => {
   const canvasRef = useRef(null);
 
   useEffect(() => {
@@ -33,7 +33,8 @@ const Waveform = ({ audioBuffer }) => {
   const amp  = canvas.height / 2;
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.strokeStyle = '#ffffff';
+  // allow caller to specify the stroke color (track color) with a sensible default
+  ctx.strokeStyle = color || '#ffffff';
   ctx.lineWidth = 1;
   ctx.beginPath();
 
@@ -50,7 +51,7 @@ const Waveform = ({ audioBuffer }) => {
     ctx.lineTo(i, (1 + max) * amp);
   }
   ctx.stroke();
-}, [audioBuffer]); // Redraw when the audioBuffer prop changes
+}, [audioBuffer, color]); // Redraw when the audioBuffer or color prop changes
 
   return (
     <div className="waveform-container">
