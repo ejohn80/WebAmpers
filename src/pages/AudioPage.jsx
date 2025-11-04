@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './AudioPage.css';
+import * as Tone from 'tone';
 
 // Import the newly created layout components
 import Header from '../components/Layout/Header';
@@ -7,6 +8,8 @@ import Sidebar from '../components/Layout/Sidebar';
 import MainContent from '../components/Layout/MainContent';
 import Footer from '../components/Layout/Footer';
 import { audioManager } from '../managers/AudioManager';
+import WebAmpPlayback from '../playback/playback.jsx';
+import { dbManager } from '../managers/DBManager';
 
 const MIN_WIDTH = 0; // Minimum allowed width for the sidebar in pixels
 const MAX_WIDTH = 300; // Maximum allowed width for the sidebar in pixels
@@ -20,6 +23,50 @@ function AudioPage() {
   // State to hold the list of tracks from the AudioManager
   const [tracks, setTracks] = useState(audioManager.tracks);
 
+  // Effect to load tracks from IndexedDB on initial component mount
+  useEffect(() => {
+    const loadTracksFromDB = async () => {
+      try {
+        const savedTracks = await dbManager.getAllTracks();
+        if (savedTracks && savedTracks.length > 0) {
+          console.log('Loading tracks from IndexedDB:', savedTracks);
+          let needsStateUpdate = false;
+
+          for (const savedTrack of savedTracks) {
+            // Reconstruct the Tone.ToneAudioBuffer from the stored raw data
+            if (savedTrack.buffer && savedTrack.buffer.channels) {
+              const bufferData = savedTrack.buffer;
+              const audioBuffer = Tone.context.createBuffer(
+                bufferData.numberOfChannels,
+                bufferData.length,
+                bufferData.sampleRate
+              );
+
+              for (let i = 0; i < bufferData.numberOfChannels; i++) {
+                audioBuffer.copyToChannel(bufferData.channels[i], i);
+              }
+
+              savedTrack.buffer = new Tone.ToneAudioBuffer(audioBuffer);
+              audioManager.addTrackFromBuffer(savedTrack);
+              needsStateUpdate = true;
+
+              // Set the audioData for the first loaded track to initialize the player
+              // This is the missing piece to make playback work on refresh.
+              if (!audioData) setAudioData(savedTrack);
+            }
+          }
+          if (needsStateUpdate) {
+            setTracks([...audioManager.tracks]);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load tracks from IndexedDB:', error);
+      }
+    };
+
+    loadTracksFromDB();
+  }, []); // The empty dependency array ensures this runs only once on mount
+
   /**
    * Toggles the sidebar width between its minimum and maximum allowed values.
    */
@@ -27,7 +74,7 @@ function AudioPage() {
     setSidebarWidth(prevWidth => (prevWidth > MIN_WIDTH ? MIN_WIDTH : MAX_WIDTH));
   };
 
-  const handleImportSuccess = (importedAudioData) => {
+  const handleImportSuccess = async (importedAudioData) => {
     console.log('Audio imported successfully, creating track:', importedAudioData);
     setAudioData(importedAudioData);
     // Use the AudioManager to create a new track from the imported data
@@ -35,6 +82,13 @@ function AudioPage() {
     // Update the component's state to re-render with the new track list.
     // We create a new array to ensure React detects the state change.
     setTracks([...audioManager.tracks]);
+
+    try {
+      await dbManager.addTrack(importedAudioData);
+      console.log('Track saved to IndexedDB');
+    } catch (error) {
+      console.error('Failed to save track to IndexedDB:', error);
+    }
   };
 
   const handleImportError = (error) => {

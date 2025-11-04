@@ -1,4 +1,6 @@
 import '@testing-library/jest-dom';
+import 'fake-indexeddb/auto';
+import structuredClone from '@ungap/structured-clone';
 
 global.FileReader = class FileReader {
   readAsArrayBuffer(blob) {
@@ -6,3 +8,4 @@ global.FileReader = class FileReader {
     setTimeout(() => this.onload({ target: { result: this.result } }), 0);
   }
 };
+global.structuredClone = structuredClone;
