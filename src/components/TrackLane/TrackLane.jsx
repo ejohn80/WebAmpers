@@ -19,7 +19,7 @@ function TrackLane({track, showTitle = true, onMute, onSolo}) {
   // We don't assume direct access to the PlaybackEngine here; callers may
   // wire `onMute`/`onSolo` to connect to the engine.
   const [muted, setMuted] = useState(!!track.mute);
-  // const [soloed, setSoloed] = useState(!!track.solo);
+  const [soloed, setSoloed] = useState(!!track.solo);
 
   // If parent updates the track prop (e.g. mute/solo changed elsewhere),
   // keep the UI in sync.
@@ -27,9 +27,9 @@ function TrackLane({track, showTitle = true, onMute, onSolo}) {
     setMuted(!!track.mute);
   }, [track?.mute, track?.id]);
 
-  // useEffect(() => {
-  //   setSoloed(!!track.solo);
-  // }, [track?.solo, track?.id]);
+  useEffect(() => {
+    setSoloed(!!track.solo);
+  }, [track?.solo, track?.id]);
 
   const toggleMute = () => {
     const next = !muted;
@@ -41,15 +41,15 @@ function TrackLane({track, showTitle = true, onMute, onSolo}) {
     }
   };
 
-  // const toggleSolo = () => {
-  //   const next = !soloed;
-  //   setSoloed(next);
-  //   try {
-  //     onSolo && onSolo(track.id, next);
-  //   } catch (e) {
-  //     // swallow to avoid breaking UI
-  //   }
-  // };
+  const toggleSolo = () => {
+    const next = !soloed;
+    setSoloed(next);
+    try {
+      onSolo && onSolo(track.id, next);
+    } catch (e) {
+      // swallow to avoid breaking UI
+    }
+  };
 
   return (
     <div className="tracklane-root">
@@ -71,14 +71,14 @@ function TrackLane({track, showTitle = true, onMute, onSolo}) {
               {muted ? "Muted" : "Mute"}
             </button>
 
-            {/* <button
-              className={`tl-btn tl-btn-solo ${soloed ? 'tl-btn--active' : ''}`}
+            <button
+              className={`tl-btn tl-btn-solo ${soloed ? "tl-btn--active" : ""}`}
               onClick={toggleSolo}
               aria-pressed={soloed}
-              title={soloed ? 'Unsolo track' : 'Solo track'}
+              title={soloed ? "Unsolo track" : "Solo track"}
             >
-              {soloed ? 'Soloed' : 'Solo'}
-            </button> */}
+              {soloed ? "Soloed" : "Solo"}
+            </button>
           </div>
         </div>
       </div>
