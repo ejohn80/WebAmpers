@@ -396,6 +396,9 @@ class PlaybackEngine {
   }
 }
 
+// Export the engine class so other modules (hooks/UI) can instantiate it
+export {PlaybackEngine};
+
 /** ---------- React wrapper component ----------
  * Provides UI controls (Play/Pause/Stop) and a progress bar for the PlaybackEngine.
  */
@@ -719,7 +722,7 @@ export default function WebAmpPlayback({version, onEngineReady}) {
           <img
             src={GoToStartIcon}
             alt="Go to start"
-            style={{height: 18, display: "block"}}
+            style={{height: 26, display: "block"}}
           />
         </button>
         <code
@@ -749,7 +752,7 @@ export default function WebAmpPlayback({version, onEngineReady}) {
           <img
             src={RewindIcon}
             alt="Rewind 10 seconds"
-            style={{height: 18, display: "block"}}
+            style={{height: 26, display: "block"}}
           />
         </button>
         {playing ? (
@@ -769,7 +772,7 @@ export default function WebAmpPlayback({version, onEngineReady}) {
             <img
               src={PauseIcon}
               alt="Pause"
-              style={{height: 18, display: "block"}}
+              style={{height: 26, display: "block"}}
             />
           </button>
         ) : (
@@ -789,7 +792,7 @@ export default function WebAmpPlayback({version, onEngineReady}) {
             <img
               src={PlayIcon}
               alt="Play"
-              style={{height: 18, display: "block"}}
+              style={{height: 26, display: "block"}}
             />
           </button>
         )}
@@ -807,7 +810,7 @@ export default function WebAmpPlayback({version, onEngineReady}) {
           <img
             src={ForwardIcon}
             alt="Forward 10 seconds"
-            style={{height: 18, display: "block"}}
+            style={{height: 26, display: "block"}}
           />
         </button>
       </div>
@@ -838,7 +841,7 @@ export default function WebAmpPlayback({version, onEngineReady}) {
           <img
             src={muted ? SoundOffIcon : SoundOnIcon}
             alt={muted ? "Muted" : "Sound on"}
-            style={{height: 18, display: "block"}}
+            style={{height: 26, display: "block"}}
           />
         </button>
         {/* Custom-styled slider wrapper */}

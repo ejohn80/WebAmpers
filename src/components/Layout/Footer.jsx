@@ -1,6 +1,6 @@
 import React from "react";
 import DraggableDiv from "../Generic/DraggableDiv";
-import WebAmpPlayback from "../../playback/playback.jsx";
+import PlaybackUI from "./PlaybackUI";
 import RecorderButton from "../Recording/RecorderButton";
 
 /**
@@ -8,7 +8,7 @@ import RecorderButton from "../Recording/RecorderButton";
  */
 function Footer({version, onRecordComplete, onRecordStart, onRecordStop}) {
   return (
-    <DraggableDiv color="lime">
+    <DraggableDiv className="footer">
       <div style={{display: "flex", alignItems: "center", width: "100%"}}>
         {/* Left: Recording control */}
         <div style={{width: 160, display: "flex", alignItems: "center"}}>
@@ -20,7 +20,7 @@ function Footer({version, onRecordComplete, onRecordStart, onRecordStop}) {
         </div>
         {/* Center/Right: Transport and volume */}
         <div style={{flex: 1}}>
-          <WebAmpPlayback version={version} />
+          <PlaybackUI version={version} />
         </div>
       </div>
     </DraggableDiv>

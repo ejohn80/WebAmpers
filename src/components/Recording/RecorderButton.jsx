@@ -124,7 +124,7 @@ export default function RecorderButton({onComplete, onStart, onStop}) {
         <img
           src={RecordIcon}
           alt="Record"
-          style={{height: 18, display: "block"}}
+          style={{height: 26, display: "block"}}
         />
       </button>
     );
@@ -151,14 +151,14 @@ export default function RecorderButton({onComplete, onStart, onStop}) {
           <img
             src={StopRecordIcon}
             alt="Stop Recording"
-            style={{height: 18, display: "block"}}
+            style={{height: 26, display: "block"}}
           />
         </span>
       ) : (
         <img
           src={RecordIcon}
           alt="Record"
-          style={{height: 18, display: "block"}}
+          style={{height: 26, display: "block"}}
         />
       )}
     </button>
