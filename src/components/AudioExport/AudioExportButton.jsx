@@ -1,16 +1,16 @@
-import React, { useState } from 'react';
-import AudioExporter from './AudioExporter'; 
-import './AudioExportButton.css';
+import React, {useState} from "react";
+import AudioExporter from "./AudioExporter";
+import "./AudioExportButton.css";
 
 /**
- * A button component that, when clicked, opens a modal 
+ * A button component that, when clicked, opens a modal
  * to display the AudioExporter component.
  *
  * @param {object} props
  * @param {Tone.ToneAudioBuffer} props.audioBuffer - The audio buffer to be exported.
  * @param {function} props.onExportComplete - Callback after a successful export.
  */
-const AudioExportButton = ({ audioBuffer, onExportComplete }) => {
+const AudioExportButton = ({audioBuffer, onExportComplete}) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const isReady = !!audioBuffer;
 
@@ -49,10 +49,12 @@ const AudioExportButton = ({ audioBuffer, onExportComplete }) => {
       {isModalOpen && (
         <div className="modal-backdrop" onClick={handleClose}>
           {/* Prevent clicks on the content from closing the modal */}
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <button className="modal-close-button" onClick={handleClose}>&times;</button>
-            <AudioExporter 
-              audioBuffer={audioBuffer} 
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <button className="modal-close-button" onClick={handleClose}>
+              &times;
+            </button>
+            <AudioExporter
+              audioBuffer={audioBuffer}
               onExportComplete={handleExportComplete}
             />
           </div>

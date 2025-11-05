@@ -134,13 +134,17 @@ class DBManager {
       // let IndexedDB assign a numeric key (via add) so stored keys remain
       // monotonic and ordering by key reflects insertion order.
       let request;
-      const hasId = typeof storableTrack.id !== 'undefined' && storableTrack.id !== null;
-      const isClientGeneratedString = hasId && (typeof storableTrack.id === 'string') && /^track_/.test(storableTrack.id);
+      const hasId =
+        typeof storableTrack.id !== "undefined" && storableTrack.id !== null;
+      const isClientGeneratedString =
+        hasId &&
+        typeof storableTrack.id === "string" &&
+        /^track_/.test(storableTrack.id);
       if (!hasId || isClientGeneratedString) {
         // Remove id if it's a client-generated string so add() assigns a numeric id
         if (isClientGeneratedString) {
           // shallow copy without id
-          const { id, ...withoutId } = storableTrack;
+          const {id, ...withoutId} = storableTrack;
           request = store.add(withoutId);
         } else {
           request = store.add(storableTrack);
