@@ -12,3 +12,49 @@ body {
   color: white;
   margin: 0;
 }
+
+/* --- Recording button pulse (footer) --- */
+.record-pulse {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+}
+/* Inner subtle white ring between the white square and the red circle */
+.record-pulse::before {
+  content: "";
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  /* transparent center with a soft white ring */
+  background: radial-gradient(circle,
+    rgba(255,255,255,0) 0%,
+    rgba(255,255,255,0) 44%,
+    rgba(255,255,255,0.35) 55%,
+    rgba(255,255,255,0) 80%
+  );
+  transform: scale(0.96);
+  animation: recordInner 1.3s ease-in-out infinite;
+  pointer-events: none;
+}
+/* Outer faint glow breathing outward */
+.record-pulse::after {
+  content: "";
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.22);
+  animation: recordOuter 1.3s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes recordInner {
+  0% { transform: scale(0.96); opacity: 0.9; }
+  70% { transform: scale(1.04); opacity: 0.3; }
+  100% { transform: scale(0.96); opacity: 0.6; }
+}
+@keyframes recordOuter {
+  0% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.22); opacity: 1; }
+  70% { box-shadow: 0 0 0 8px rgba(255, 255, 255, 0); opacity: 0.55; }
+  100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); opacity: 0.35; }
+}
