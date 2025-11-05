@@ -1,6 +1,6 @@
 import React from "react";
 import AudioExportModal from "./AudioExportModal";
-import "./AudioExportButton.css"; // Assuming this is needed for the styling
+import "./AudioExportButton.css";
 
 /**
  * Encapsulates the logic for showing the export modal.
