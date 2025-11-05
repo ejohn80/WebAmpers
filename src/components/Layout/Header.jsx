@@ -1,4 +1,3 @@
-import React from "react";
 import AudioImportButton from "../AudioImport/AudioImportButton";
 import {logout} from "../Auth/AuthUtils";
 import {useUserData} from "../../hooks/useUserData";
@@ -21,26 +20,24 @@ function Header({
         {/* container for logo + dropdown */}
         <div className="leftContainer">
           <span className="webampText">Webamp</span>
-          <DropdownPortal
-            showMenuButtons={true}
-            showGuestButton={false}
-            audioBuffer={audioBuffer}
-            onExportComplete={onExportComplete}
-          />
+          <DropdownPortal side="left" />
         </div>
 
-        <div style={{display: "flex", alignItems: "center", gap: "15px"}}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "15px",
+            height: "100%",
+          }}
+        >
           {/* Audio Import Button */}
           <AudioImportButton
             onImportSuccess={onImportSuccess}
             onImportError={onImportError}
           />
 
-          {userData ? (
-            <button onClick={logout}>Log out</button>
-          ) : (
-            <DropdownPortal showMenuButtons={false} showGuestButton={true} />
-          )}
+          <DropdownPortal side="right" />
         </div>
       </div>
     </div>
