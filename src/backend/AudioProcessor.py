@@ -1,35 +1,75 @@
+"""
+Audio processing module for format conversion, merging, and manipulation.
+"""
 import os
 import shutil
 import tempfile
 import uuid
 import time
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 try:
     from pydub import AudioSegment
     from pydub.effects import normalize
 except ImportError:
     class AudioSegment:
+        """Fallback AudioSegment when pydub is not available"""
         @staticmethod
         def from_file(file_path):
+            """Mock from_file method"""
             raise NotImplementedError("pydub is not available")
-        def export(self, out_f, format, **kwargs):
-            pass
+
+        def export(self, out_f, audio_format, **kwargs):
+            """Mock export method"""
+
         def __len__(self):
             return 0
+
         def __add__(self, other):
             return self
+
         def __radd__(self, other):
             return self
-        def append(self, segment, crossfade):
+
+        def append(self, seg, crossfade_duration):
+            """Mock append method"""
             return self
-        def set_frame_rate(self, rate):
+
+        def set_frame_rate(self, sample_rate):
+            """Mock set_frame_rate method"""
             return self
+
         def __getitem__(self, key):
             return self
 
+        @property
+        def channels(self):
+            """Mock channels property"""
+            return 2
+
+        @property
+        def frame_rate(self):
+            """Mock frame_rate property"""
+            return 44100
+
+        @property
+        def sample_width(self):
+            """Mock sample_width property"""
+            return 2
+
+        def frame_count(self):
+            """Mock frame_count method"""
+            return 0
+
+        @property
+        def dBFS(self):
+            """Mock dBFS property"""
+            return -20.0
+
     def normalize(audio):
+        """Mock normalize function"""
         return audio
+
 
 class AudioProcessor:
     """
@@ -44,10 +84,13 @@ class AudioProcessor:
     }
     CLEANUP_THRESHOLD_SECONDS = 3600
 
-    def __init__(self, upload_folder: str = None):
+    def __init__(self, upload_folder: Optional[str] = None):
         """
         Initialize the AudioProcessor.
         Creates a temporary directory for output files if none is provided.
+
+        Args:
+            upload_folder: Directory for temporary files. If None, creates temp dir.
         """
         if upload_folder is None:
             self.upload_folder = tempfile.mkdtemp()
@@ -108,6 +151,7 @@ class AudioProcessor:
             self._validate_format(target_format)
             audio = AudioSegment.from_file(input_path)
             output_path = self._generate_output_path('converted', target_format)
+
             export_params: Dict[str, Any] = {'format': target_format}
             if target_format in self.default_bitrates:
                 export_params['bitrate'] = self.default_bitrates[target_format]
@@ -118,13 +162,17 @@ class AudioProcessor:
 
             return output_path
 
-        except ValueError as ve:
-            raise ve
-        except Exception as e:
-            raise Exception(f"Conversion failed: {str(e)}")
+        except ValueError as exc:
+            raise exc
+        except Exception as exc:
+            raise Exception(f"Conversion failed: {str(exc)}") from exc
 
-    def merge_files(self, file_paths: List[str], output_format: str = 'mp3',
-                    crossfade_ms: int = 0) -> str:
+    def merge_files(
+        self,
+        file_paths: List[str],
+        output_format: str = 'mp3',
+        crossfade_ms: int = 0
+    ) -> str:
         """
         Merge multiple audio files into one
 
@@ -143,8 +191,10 @@ class AudioProcessor:
         try:
             if len(file_paths) < 2:
                 raise ValueError("Need at least 2 files to merge")
+
             self._validate_format(output_format)
             merged = AudioSegment.from_file(file_paths[0])
+
             for path in file_paths[1:]:
                 audio = AudioSegment.from_file(path)
 
@@ -152,8 +202,10 @@ class AudioProcessor:
                     merged = merged.append(audio, crossfade=crossfade_ms)
                 else:
                     merged = merged + audio
+
             output_path = self._generate_output_path('merged', output_format)
             export_params: Dict[str, Any] = {'format': output_format}
+
             if output_format in self.default_bitrates:
                 export_params['bitrate'] = self.default_bitrates[output_format]
             if output_format == 'mp3':
@@ -163,15 +215,19 @@ class AudioProcessor:
 
             return output_path
 
-        except ValueError as ve:
-            raise ve
-        except Exception as e:
-            raise Exception(f"Merge failed: {str(e)}")
+        except ValueError as exc:
+            raise exc
+        except Exception as exc:
+            raise Exception(f"Merge failed: {str(exc)}") from exc
 
-
-    def export_with_settings(self, input_path: str, target_format: str,
-                             bitrate: str = None, sample_rate: int = None,
-                             normalize_audio: bool = False) -> str:
+    def export_with_settings(
+        self,
+        input_path: str,
+        target_format: str,
+        bitrate: Optional[str] = None,
+        sample_rate: Optional[int] = None,
+        normalize_audio: bool = False
+    ) -> str:
         """
         Apply settings (bitrate, sample rate, normalization) and export.
 
@@ -184,6 +240,10 @@ class AudioProcessor:
 
         Returns:
             Path to exported file
+
+        Raises:
+            ValueError: If format is unsupported
+            Exception: If export fails
         """
         try:
             self._validate_format(target_format)
@@ -201,7 +261,7 @@ class AudioProcessor:
             if bitrate:
                 export_params['bitrate'] = bitrate
             elif target_format in self.default_bitrates:
-                 export_params['bitrate'] = self.default_bitrates[target_format]
+                export_params['bitrate'] = self.default_bitrates[target_format]
 
             if target_format == 'mp3':
                 export_params['parameters'] = ['-q:a', '2']
@@ -209,13 +269,19 @@ class AudioProcessor:
             audio.export(output_path, **export_params)
 
             return output_path
-        except ValueError as ve:
-            raise ve
-        except Exception as e:
-            raise Exception(f"Export with settings failed: {str(e)}")
 
-    def trim_audio(self, input_path: str, start_ms: int, end_ms: int,
-                   output_format: str = 'wav') -> str:
+        except ValueError as exc:
+            raise exc
+        except Exception as exc:
+            raise Exception(f"Export with settings failed: {str(exc)}") from exc
+
+    def trim_audio(
+        self,
+        input_path: str,
+        start_ms: int,
+        end_ms: int,
+        output_format: str = 'wav'
+    ) -> str:
         """
         Trim audio file to specified time range
 
@@ -230,11 +296,13 @@ class AudioProcessor:
 
         Raises:
             ValueError: If time range is invalid or format is unsupported
+            Exception: If trim fails
         """
         try:
             self._validate_format(output_format)
             audio = AudioSegment.from_file(input_path)
             duration_ms = len(audio)
+
             if start_ms < 0 or end_ms > duration_ms or start_ms >= end_ms:
                 raise ValueError(
                     f"Invalid time range: {start_ms}-{end_ms}ms "
@@ -247,26 +315,32 @@ class AudioProcessor:
 
             return output_path
 
-        except ValueError as ve:
-            raise ve
-        except Exception as e:
-            raise Exception(f"Trim failed: {str(e)}")
+        except ValueError as exc:
+            raise exc
+        except Exception as exc:
+            raise Exception(f"Trim failed: {str(exc)}") from exc
 
-    def adjust_volume(self, input_path: str, volume_change_db: float,
-                      output_format: str = 'wav') -> str:
+    def adjust_volume(
+        self,
+        input_path: str,
+        volume_change_db: float,
+        output_format: str = 'wav'
+    ) -> str:
         """
         Adjusts the volume of an audio file.
 
         Args:
             input_path: Path to input file
-            volume_change_db: Change in volume in dB. Positive value increases, negative decreases.
+            volume_change_db: Change in volume in dB.
+                            Positive increases, negative decreases.
             output_format: Output format.
 
         Returns:
             Path to the volume-adjusted file.
 
         Raises:
-            Exception: If adjustment fails.
+            ValueError: If format is unsupported
+            Exception: If adjustment fails
         """
         try:
             self._validate_format(output_format)
@@ -277,14 +351,44 @@ class AudioProcessor:
             adjusted_audio.export(output_path, format=output_format)
 
             return output_path
-        except ValueError as ve:
-            raise ve
-        except Exception as e:
-            raise Exception(f"Volume adjustment failed: {str(e)}")
 
-    def cleanup_old_files(self):
+        except ValueError as exc:
+            raise exc
+        except Exception as exc:
+            raise Exception(f"Volume adjustment failed: {str(exc)}") from exc
+
+    def get_audio_info(self, input_path: str) -> Dict[str, Any]:
+        """
+        Get audio file metadata.
+
+        Args:
+            input_path: Path to input audio file
+
+        Returns:
+            Dictionary containing audio metadata
+
+        Raises:
+            Exception: If metadata extraction fails
+        """
+        try:
+            audio = AudioSegment.from_file(input_path)
+            return {
+                'duration_seconds': len(audio) / 1000.0,
+                'channels': audio.channels,
+                'sample_rate': audio.frame_rate,
+                'sample_width': audio.sample_width,
+                'frame_count': audio.frame_count(),
+                'dBFS': audio.dBFS
+            }
+        except Exception as exc:
+            raise Exception(f"Failed to get audio info: {str(exc)}") from exc
+
+    def cleanup_old_files(self) -> int:
         """
         Removes files in the upload folder older than CLEANUP_THRESHOLD_SECONDS.
+
+        Returns:
+            Number of files cleaned up
         """
         now = time.time()
         cutoff = now - self.CLEANUP_THRESHOLD_SECONDS
@@ -300,11 +404,11 @@ class AudioProcessor:
                 if os.path.getmtime(file_path) < cutoff:
                     os.remove(file_path)
                     cleaned_count += 1
-            
+
             return cleaned_count
-            
-        except Exception as e:
-            print(f"Error during cleanup: {e}")
+
+        except Exception as exc:
+            print(f"Error during cleanup: {exc}")
             return cleaned_count
 
     def __del__(self):
@@ -314,5 +418,6 @@ class AudioProcessor:
         try:
             if os.path.exists(self.upload_folder):
                 shutil.rmtree(self.upload_folder)
-        except Exception as e:
-            print(f"Warning: Could not remove temporary directory {self.upload_folder}: {e}")
+        except Exception as exc:
+            print(f"Warning: Could not remove temporary directory "
+                  f"{self.upload_folder}: {exc}")
