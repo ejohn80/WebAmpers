@@ -32,7 +32,7 @@ const AudioExportButton = ({ audioBuffer, onExportComplete }) => {
       onExportComplete(result);
     }
     // Simple alert on success
-    alert(`Export complete: ${result.format} file saved.`);
+    // alert(`Export complete: ${result.format} file saved.`);
   };
 
   return (
