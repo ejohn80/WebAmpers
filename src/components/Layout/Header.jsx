@@ -20,10 +20,17 @@ function Header({
         {/* container for logo + dropdown */}
         <div className="leftContainer">
           <span className="webampText">Webamp</span>
-          <DropdownPortal side='left'/>
+          <DropdownPortal side="left" />
         </div>
 
-        <div style={{display: "flex", alignItems: "center", gap: "15px", height: '100%'}}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "15px",
+            height: "100%",
+          }}
+        >
           {/* Audio Import Button */}
           <AudioImportButton
             onImportSuccess={onImportSuccess}
@@ -36,7 +43,7 @@ function Header({
             onExportComplete={onExportComplete}
           />
 
-          <DropdownPortal side='right'/>
+          <DropdownPortal side="right" />
         </div>
       </div>
     </div>

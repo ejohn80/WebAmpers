@@ -1,6 +1,6 @@
 import React, {useState, useEffect, useRef, useContext} from "react";
-import { logout } from '../Auth/AuthUtils'
-import { AppContext } from "../../context/AppContext";
+import {logout} from "../Auth/AuthUtils";
+import {AppContext} from "../../context/AppContext";
 import ReactDOM from "react-dom";
 import {useNavigate} from "react-router-dom";
 
@@ -23,9 +23,9 @@ import {
   GuestIcon,
 } from "./Svgs";
 
-function DropdownPortal({ side }) {
+function DropdownPortal({side}) {
   const navigate = useNavigate();
-  const { userData, loading } = useContext(AppContext);
+  const {userData} = useContext(AppContext);
 
   const [activeDropdown, setActiveDropdown] = useState(null);
   const [position, setPosition] = useState({top: 0, left: 0});
@@ -469,8 +469,8 @@ function DropdownPortal({ side }) {
         }}
         onMouseLeave={handleDropdownMouseLeave}
       >
-      {userData ? 
-        <a
+        {userData ? (
+          <a
             href="#"
             onClick={(e) => {
               e.preventDefault();
@@ -479,29 +479,28 @@ function DropdownPortal({ side }) {
           >
             Logout
           </a>
-      
-      : 
-        <>
-          <a
-            href="#"
-            onClick={(e) => {
-              e.preventDefault();
-              handleMenuItemClick("Login");
-            }}
-          >
-            Login
-          </a>
-          <a
-            href="#"
-            onClick={(e) => {
-              e.preventDefault();
-              handleMenuItemClick("Register");
-            }}
-          >
-            Register
-          </a>
-        </>
-      }
+        ) : (
+          <>
+            <a
+              href="#"
+              onClick={(e) => {
+                e.preventDefault();
+                handleMenuItemClick("Login");
+              }}
+            >
+              Login
+            </a>
+            <a
+              href="#"
+              onClick={(e) => {
+                e.preventDefault();
+                handleMenuItemClick("Register");
+              }}
+            >
+              Register
+            </a>
+          </>
+        )}
       </div>
     ),
   };
@@ -511,7 +510,7 @@ function DropdownPortal({ side }) {
       {/* Buttons stay in normal flow */}
       <div className="FETS-container">
         {/* Menu Buttons */}
-        {side == 'left' && (
+        {side == "left" && (
           <>
             {/* File Dropdown */}
             <div className="dropdown">
@@ -560,7 +559,7 @@ function DropdownPortal({ side }) {
         )}
 
         {/* Guest Button */}
-        {side == 'right' && (
+        {side == "right" && (
           <div className="dropdown">
             <button
               ref={guestButtonRef}
@@ -569,7 +568,7 @@ function DropdownPortal({ side }) {
             >
               <span style={{display: "flex", alignItems: "center", gap: "8px"}}>
                 <GuestIcon />
-                <span>{userData ? userData.username : 'Guest'}</span>
+                <span>{userData ? userData.username : "Guest"}</span>
               </span>
             </button>
           </div>
