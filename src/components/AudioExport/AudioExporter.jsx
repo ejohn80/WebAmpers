@@ -1,8 +1,3 @@
-/**
- * AudioExporter.jsx
- * This component renders the UI for audio export settings and handles the export logic.
- * It imports ExportManager, which handles the actual file conversion and API calls.
- */
 import React, {useState, useMemo} from "react";
 import ExportManager from "./ExportManager.js";
 
@@ -10,7 +5,8 @@ const AudioExporter = ({audioBuffer, onExportComplete}) => {
   const exportManager = useMemo(() => new ExportManager(), []);
   // State for form inputs
   const [format, setFormat] = useState("mp3");
-  const [bitrate, setBitrate] = useState("320k");
+  // 🆕 Renamed and will now handle both MP3 bitrate and OGG quality value.
+  const [qualitySetting, setQualitySetting] = useState("320k"); 
   const [filename, setFilename] = useState("export.mp3");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -22,23 +18,46 @@ const AudioExporter = ({audioBuffer, onExportComplete}) => {
     {value: "ogg", label: "OGG"},
   ];
 
+  const getQualityOptions = (currentFormat) => {
+      // Using bitrate labels for OGG as well to avoid the FFmpeg crash, 
+      // assuming the backend expects a 'k' suffix if a quality option is passed.
+      const isCompressed = currentFormat !== "wav";
+      if (!isCompressed) return [];
+
+      return [
+        {value: "320k", label: currentFormat === 'mp3' ? "320 kbps (High Quality)" : "High Quality (Vorbis)"},
+        {value: "192k", label: currentFormat === 'mp3' ? "192 kbps (Standard Quality)" : "Standard Quality (Vorbis)"},
+        {value: "128k", label: currentFormat === 'mp3' ? "128 kbps (Lower Quality)" : "Lower Quality (Vorbis)"},
+      ];
+  };
+
+  const handleFormatChange = (newFormat) => {
+    setFormat(newFormat);
+    // Update default filename extension when format changes
+    setFilename((fn) =>
+      fn.replace(/\.(mp3|wav|ogg)$/i, `.${newFormat}`)
+    );
+    // Reset to a safe default
+    setQualitySetting("320k");
+  };
+
   const handleExport = async (e) => {
     e.preventDefault();
     setError(null);
 
-    // Placeholder check: In a real app, you'd check for a valid audioBuffer.
     if (!audioBuffer) {
       setError("Please load or generate an audio track before exporting.");
       return;
     }
 
     setIsLoading(true);
+    const exportBitrate = (format === "mp3" || format === "ogg") ? qualitySetting : undefined;
 
     try {
       const result = await exportManager.exportAudio(audioBuffer, {
         format,
         filename,
-        bitrate: format === "mp3" ? bitrate : undefined,
+        bitrate: exportBitrate, // Pass the selected quality/bitrate
       });
 
       if (result.success) {
@@ -49,23 +68,29 @@ const AudioExporter = ({audioBuffer, onExportComplete}) => {
       }
     } catch (err) {
       console.error("Export Error:", err);
-      setError(err.message);
+      // Ensure the message is clean if it's the FFmpeg error
+      setError(err.message.replace(/^Error:\s*/, "").split("Command:")[0].trim());
     } finally {
       setIsLoading(false);
     }
   };
 
+  const showQualitySetting = format === "mp3" || format === "ogg";
+
   return (
     <div className="p-4 max-w-sm mx-auto bg-white rounded-xl shadow-lg space-y-4">
       <h2 className="text-xl font-bold text-gray-800">Export Audio Settings</h2>
 
-      <form onSubmit={handleExport} className="space-y-4">
+      <form 
+        onSubmit={handleExport} 
+        style={{ display: "flex", flexDirection: "column", gap: "15px" }} 
+      >
         {/* Output Format Dropdown */}
-        <div>
+        <div style={{ display: "flex", alignItems: "center" }}>
           <label
             htmlFor="format"
             className="block text-sm font-medium text-gray-700"
-            style={{marginRight: "15px"}}
+            style={{ width: "120px", minWidth: "120px", marginRight: "15px" }} 
           >
             Output Format
           </label>
@@ -73,16 +98,10 @@ const AudioExporter = ({audioBuffer, onExportComplete}) => {
             id="format"
             name="format"
             value={format}
-            onChange={(e) => {
-              setFormat(e.target.value);
-              // Update default filename extension when format changes
-              setFilename((fn) =>
-                fn.replace(/\.(mp3|wav|ogg)$/i, `.${e.target.value}`)
-              );
-            }}
+            onChange={(e) => handleFormatChange(e.target.value)}
             className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md shadow-sm"
             aria-label="Output Format"
-            // style={{ marginLeft: '5px' }}
+            style={{ flexGrow: 1 }} // Input takes remaining space
           >
             {formats.map((f) => (
               <option key={f.value} value={f.value}>
@@ -92,40 +111,40 @@ const AudioExporter = ({audioBuffer, onExportComplete}) => {
           </select>
         </div>
 
-        {/* Bitrate Input (MP3 only) */}
-        <div style={{marginBottom: "10px"}}></div>
-        {format === "mp3" && (
-          <div>
+        {/* Quality/Bitrate Input (MP3 and OGG) */}
+        {showQualitySetting && (
+          <div style={{ display: "flex", alignItems: "center" }}>
             <label
-              htmlFor="bitrate"
+              htmlFor="qualitySetting"
               className="block text-sm font-medium text-gray-700"
-              style={{marginRight: "3px"}}
+              style={{ width: "120px", minWidth: "120px", marginRight: "15px" }}
             >
-              MP3 Bitrate
+              {format === "mp3" ? "MP3 Bitrate" : "OGG Quality"}
             </label>
             <select
-              id="bitrate"
-              name="bitrate"
-              value={bitrate}
-              onChange={(e) => setBitrate(e.target.value)}
+              id="qualitySetting"
+              name="qualitySetting"
+              value={qualitySetting}
+              onChange={(e) => setQualitySetting(e.target.value)}
               className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md shadow-sm"
-              aria-label="MP3 Bitrate"
-              style={{marginLeft: "10px"}}
+              aria-label={format === "mp3" ? "MP3 Bitrate" : "OGG Quality"}
+              style={{ flexGrow: 1 }} // Input takes remaining space
             >
-              <option value="320k">320 kbps (High Quality)</option>
-              <option value="192k">192 kbps (Standard Quality)</option>
-              <option value="128k">128 kbps (Lower Quality)</option>
+              {getQualityOptions(format).map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
             </select>
           </div>
         )}
 
         {/* Filename Input */}
-        <div style={{marginBottom: "10px"}}></div>
-        <div>
+        <div style={{ display: "flex", alignItems: "center" }}>
           <label
             htmlFor="filename"
             className="block text-sm font-medium text-gray-700"
-            style={{marginRight: "5px"}}
+            style={{ width: "120px", minWidth: "120px", marginRight: "15px" }}
           >
             Filename
           </label>
@@ -136,12 +155,11 @@ const AudioExporter = ({audioBuffer, onExportComplete}) => {
             value={filename}
             onChange={(e) => setFilename(e.target.value)}
             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2"
-            style={{marginLeft: "5px"}}
+            style={{ flexGrow: 1 }} // Input takes remaining space
           />
         </div>
 
         {/* Error Display */}
-        <div style={{marginBottom: "10px"}}></div>
         {error && (
           <p className="text-sm font-medium text-red-600 p-2 border border-red-200 bg-red-50 rounded-md">
             Error: {error}
@@ -149,7 +167,6 @@ const AudioExporter = ({audioBuffer, onExportComplete}) => {
         )}
 
         {/* Submit Button */}
-        <div style={{marginBottom: "10px"}}></div>
         <button
           type="submit"
           disabled={isLoading}
