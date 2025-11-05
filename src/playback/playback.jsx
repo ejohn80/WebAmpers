@@ -1,12 +1,18 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, {useEffect, useMemo, useRef, useState} from "react";
 import * as Tone from "tone";
-import { progressStore } from './progressStore';
+import {progressStore} from "./progressStore";
 import {
-  PlayIcon, PauseIcon, RewindIcon, ForwardIcon, GoToStartIcon,
-  SoundOnIcon, SoundOffIcon, VolumeKnob
+  PlayIcon,
+  PauseIcon,
+  RewindIcon,
+  ForwardIcon,
+  GoToStartIcon,
+  SoundOnIcon,
+  SoundOffIcon,
+  VolumeKnob,
 } from "../components/Layout/Svgs.jsx";
 
-import './playback.css';
+import "./playback.css";
 
 // === Utility functions ===
 
@@ -139,7 +145,7 @@ class PlaybackEngine {
     if (!this.version) return;
     Tone.Transport.setLoopPoints(
       msToToneTime(startMs, this.version.bpm || 120),
-      msToToneTime(endMs, this.version.bpm || 120),
+      msToToneTime(endMs, this.version.bpm || 120)
     );
     Tone.Transport.loop = endMs > startMs;
   }
@@ -209,7 +215,7 @@ class PlaybackEngine {
   /** Prepare all segments (audio clips) and schedule them for playback */
   async _prepareSegments(version) {
     const urls = Array.from(
-      new Set((version.segments || []).map((s) => s.fileUrl)),
+      new Set((version.segments || []).map((s) => s.fileUrl))
     );
     urls.forEach((u) => this._preload(u));
 
@@ -257,7 +263,7 @@ class PlaybackEngine {
       // Schedule start time in the Transport
       const startTT = msToToneTime(
         seg.startOnTimelineMs || 0,
-        version.bpm || 120,
+        version.bpm || 120
       );
       player.start(startTT, offsetSec, durSec);
     }
@@ -270,14 +276,14 @@ class PlaybackEngine {
     const gain = new Tone.Gain(dbToGain(t.gainDb));
     const pan = new Tone.Panner(clamp(t.pan ?? 0, -1, 1));
     gain.connect(pan);
-    return { id: t.id, gain, pan, fxIn: null, fxOut: null, chain: [] };
+    return {id: t.id, gain, pan, fxIn: null, fxOut: null, chain: []};
   }
 
   /** Create a master bus and connect it to the audio output */
   _makeMaster() {
     const gain = new Tone.Gain(1);
     gain.connect(Tone.Destination);
-    return { gain, chain: [], fxIn: null, fxOut: null };
+    return {gain, chain: [], fxIn: null, fxOut: null};
   }
 
   /** Handle mute/solo logic and smoothly apply gain changes */
@@ -308,13 +314,12 @@ class PlaybackEngine {
     this.preloaded.add(url);
     Tone.ToneAudioBuffer.load(url)
       .then(
-        () =>
-          this.events.onBuffer && this.events.onBuffer({ url, ready: true }),
+        () => this.events.onBuffer && this.events.onBuffer({url, ready: true})
       )
       .catch(
         (e) =>
           this.events.onBuffer &&
-          this.events.onBuffer({ url, ready: false, error: e }),
+          this.events.onBuffer({url, ready: false, error: e})
       );
   }
 
@@ -401,7 +406,7 @@ export {PlaybackEngine};
 /** ---------- React wrapper component ----------
  * Provides UI controls (Play/Pause/Stop) and a progress bar for the PlaybackEngine.
  */
-export default function WebAmpPlayback({ version, onEngineReady }) {
+export default function WebAmpPlayback({version, onEngineReady}) {
   const engineRef = useRef(null);
   const [playing, setPlaying] = useState(false);
   const [ms, setMs] = useState(0);
@@ -432,10 +437,10 @@ export default function WebAmpPlayback({ version, onEngineReady }) {
     () =>
       new PlaybackEngine({
         onProgress: (v) => setMs(v),
-        onTransport: ({ playing }) => setPlaying(playing),
+        onTransport: ({playing}) => setPlaying(playing),
         onError: (e) => console.error(e),
       }),
-    [],
+    []
   );
 
   useEffect(() => {
@@ -454,7 +459,11 @@ export default function WebAmpPlayback({ version, onEngineReady }) {
     if (!version) return;
     progressStore.setLengthMs(version.lengthMs ?? 0);
     progressStore.setSeeker((absMs) => {
-      try { engine.seekMs(absMs); } catch (e) { console.warn('seek request failed:', e); }
+      try {
+        engine.seekMs(absMs);
+      } catch (e) {
+        console.warn("seek request failed:", e);
+      }
     });
 
     // Build a lightweight signature for the loaded audio structure. We
@@ -601,7 +610,9 @@ export default function WebAmpPlayback({ version, onEngineReady }) {
       console.warn("goToStart failed:", err);
     }
     setMs(0);
-    try { progressStore.setMs(0); } catch {}
+    try {
+      progressStore.setMs(0);
+    } catch {}
   };
 
   useEffect(() => {
@@ -644,123 +655,121 @@ export default function WebAmpPlayback({ version, onEngineReady }) {
     return `${m}:${s.toString().padStart(2, "0")}`;
   };
 
-// Render player UI with CSS classes
-return ( 
-  
-  <div className="playback-container">
-    {/* Left: Time display */}
-    <div className="spacer"></div>
-    <div className="time-section">
-      <code className="time-display">
-        {fmtTime(ms)}
-        {typeof (version?.lengthMs) === 'number' && version.lengthMs > 0 ? ` / ${fmtTime(version.lengthMs)}` : ''}
-      </code>
-    </div>
+  // Render player UI with CSS classes
+  return (
+    <div className="playback-container">
+      {/* Left: Time display */}
+      <div className="spacer"></div>
+      <div className="time-section">
+        <code className="time-display">
+          {fmtTime(ms)}
+          {typeof version?.lengthMs === "number" && version.lengthMs > 0
+            ? ` / ${fmtTime(version.lengthMs)}`
+            : ""}
+        </code>
+      </div>
 
-    {/* Center: Transport controls */}
-    <div className="transport-section">
-      <button
-        onClick={goToStart}
-        title="Go to start"
-        className="transport-button"
-      >
-        <GoToStartIcon />
-      </button>
-      <button
-        onClick={skipBack10}
-        title="Back 10s"
-        className="transport-button"
-      >
-        <RewindIcon />
-      </button>
-      {playing ? (
+      {/* Center: Transport controls */}
+      <div className="transport-section">
+        <button
+          onClick={goToStart}
+          title="Go to start"
+          className="transport-button"
+        >
+          <GoToStartIcon />
+        </button>
+        <button
+          onClick={skipBack10}
+          title="Back 10s"
+          className="transport-button"
+        >
+          <RewindIcon />
+        </button>
+        {playing ? (
+          <button
+            type="button"
+            onClick={onPause}
+            title="Pause"
+            className="transport-button"
+            aria-label="Pause"
+          >
+            <PauseIcon />
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={onPlay}
+            title="Play"
+            className="transport-button"
+            aria-label="Play"
+          >
+            <PlayIcon />
+          </button>
+        )}
+        <button
+          onClick={skipFwd10}
+          title="Forward 10s"
+          className="transport-button"
+        >
+          <ForwardIcon />
+        </button>
+      </div>
+
+      {/* Right: Volume controls */}
+      <div className="volume-section">
         <button
           type="button"
-          onClick={onPause}
-          title="Pause"
-          className="transport-button"
-          aria-label="Pause"
+          onClick={onToggleMute}
+          title={muted ? "Unmute" : "Mute"}
+          className="volume-button"
+          aria-label={muted ? "Unmute" : "Mute"}
         >
-          <PauseIcon />
+          {muted ? <SoundOffIcon /> : <SoundOnIcon />}
         </button>
-      ) : (
-        <button
-          type="button"
-          onClick={onPlay}
-          title="Play"
-          className="transport-button"
-          aria-label="Play"
-        >
-          <PlayIcon />
-        </button>
-      )}
-      <button
-        onClick={skipFwd10}
-        title="Forward 10s"
-        className="transport-button"
-      >
-        <ForwardIcon />
-      </button>
-    </div>
-
-    {/* Right: Volume controls */}
-    <div className="volume-section">
-      <button
-        type="button"
-        onClick={onToggleMute}
-        title={muted ? "Unmute" : "Mute"}
-        className="volume-button"
-        aria-label={muted ? "Unmute" : "Mute"}
-      >
-        {muted ? <SoundOffIcon /> : <SoundOnIcon />}
-      </button>
-      {/* Custom-styled slider wrapper */}
-      <div className="volume-slider-container" aria-label="Master volume">
-        {/* Track background */}
-        <div className="volume-track" />
-        {/* Filled portion */}
-        <div 
-          className="volume-fill" 
-          style={{ width: `${masterVol}%` }}
-        />
-        {/* Knob wrapper */}
-        <div
-          className={`volume-knob-wrapper ${draggingVol ? 'dragging' : ''}`}
-          style={{ left: `${masterVol}%` }}
-        >
-          <VolumeKnob />
-        </div>
-        {/* Native input for interactions (invisible) */}
-        <input
-          type="range"
-          min={0}
-          max={100}
-          step={1}
-          value={masterVol}
-          onChange={(e) => {
-            const v = Number(e.target.value) || 0;
-            setMasterVol(v);
-            try {
-              if (engine.master) {
-                const linear = Math.max(0, Math.min(1, v / 100));
-                savedVolumeRef.current = linear;
-                if (!muted) {
-                  engine.master.gain.gain.value = linear;
+        {/* Custom-styled slider wrapper */}
+        <div className="volume-slider-container" aria-label="Master volume">
+          {/* Track background */}
+          <div className="volume-track" />
+          {/* Filled portion */}
+          <div className="volume-fill" style={{width: `${masterVol}%`}} />
+          {/* Knob wrapper */}
+          <div
+            className={`volume-knob-wrapper ${draggingVol ? "dragging" : ""}`}
+            style={{left: `${masterVol}%`}}
+          >
+            <VolumeKnob />
+          </div>
+          {/* Native input for interactions (invisible) */}
+          <input
+            type="range"
+            min={0}
+            max={100}
+            step={1}
+            value={masterVol}
+            onChange={(e) => {
+              const v = Number(e.target.value) || 0;
+              setMasterVol(v);
+              try {
+                if (engine.master) {
+                  const linear = Math.max(0, Math.min(1, v / 100));
+                  savedVolumeRef.current = linear;
+                  if (!muted) {
+                    engine.master.gain.gain.value = linear;
+                  }
                 }
+              } catch (err) {
+                console.warn("master volume set failed:", err);
               }
-            } catch (err) {
-              console.warn("master volume set failed:", err);
-            }
-          }}
-          onMouseDown={() => setDraggingVol(true)}
-          onMouseUp={() => setDraggingVol(false)}
-          onMouseLeave={() => setDraggingVol(false)}
-          onTouchStart={() => setDraggingVol(true)}
-          onTouchEnd={() => setDraggingVol(false)}
-          className="volume-input"
-        />
+            }}
+            onMouseDown={() => setDraggingVol(true)}
+            onMouseUp={() => setDraggingVol(false)}
+            onMouseLeave={() => setDraggingVol(false)}
+            onTouchStart={() => setDraggingVol(true)}
+            onTouchEnd={() => setDraggingVol(false)}
+            className="volume-input"
+          />
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
 }
