@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import Waveform from '../Waveform/Waveform';
-import './TrackLane.css';
+import React, {useState, useEffect} from "react";
+import Waveform from "../Waveform/Waveform";
+import "./TrackLane.css";
 
 /**
  * TrackLane
@@ -10,7 +10,7 @@ import './TrackLane.css';
  * props:
  *  - track: AudioTrack object (expected to have `name` and `segments` array)
  */
-function TrackLane({ track, showTitle = true, onMute, onSolo }) {
+function TrackLane({track, showTitle = true, onMute, onSolo}) {
   if (!track) return null;
 
   const segments = Array.isArray(track.segments) ? track.segments : [];
@@ -54,17 +54,21 @@ function TrackLane({ track, showTitle = true, onMute, onSolo }) {
   return (
     <div className="tracklane-root">
       <div className="tracklane-side">
-        {showTitle && <div className="tracklane-title">{track.name ?? 'Untitled Track'}</div>}
+        {showTitle && (
+          <div className="tracklane-title">
+            {track.name ?? "Untitled Track"}
+          </div>
+        )}
 
         <div className="tracklane-controls-box">
           <div className="tracklane-controls">
             <button
-              className={`tl-btn tl-btn-mute ${muted ? 'tl-btn--active' : ''}`}
+              className={`tl-btn tl-btn-mute ${muted ? "tl-btn--active" : ""}`}
               onClick={toggleMute}
               aria-pressed={muted}
-              title={muted ? 'Unmute track' : 'Mute track'}
+              title={muted ? "Unmute track" : "Mute track"}
             >
-              {muted ? 'Muted' : 'Mute'}
+              {muted ? "Muted" : "Mute"}
             </button>
 
             {/* <button
@@ -81,34 +85,45 @@ function TrackLane({ track, showTitle = true, onMute, onSolo }) {
 
       <div className="tracklane-main">
         <div className="tracklane-segments">
-        {segments.length === 0 && (
-          <div className="tracklane-empty">No segments — import audio to add one.</div>
-        )}
-
-        {segments.map((seg) => {
-          // Prefer an explicit buffer on the segment. If not present, try
-          // any buffer reference available on the segment object (many
-          // importers attach different shapes). Waveform component is
-          // tolerant of Tone/ToneAudioBuffer and native AudioBuffer.
-          const audioBuffer = seg.buffer ?? seg.fileBuffer ?? null;
-
-          return (
-            <div className="tracklane-segment" key={seg.id || seg.fileUrl || Math.random()}>
-              <div className="segment-meta">
-                <div className="segment-name">{seg.id ?? seg.fileUrl ?? 'segment'}</div>
-                <div className="segment-duration">{seg.durationMs ? `${Math.round(seg.durationMs)} ms` : ''}</div>
-              </div>
-
-              <div className="segment-waveform">
-                {audioBuffer ? (
-                  <Waveform audioBuffer={audioBuffer} color={track?.color} />
-                ) : (
-                  <div className="waveform-placeholder">(No buffer available for this segment)</div>
-                )}
-              </div>
+          {segments.length === 0 && (
+            <div className="tracklane-empty">
+              No segments — import audio to add one.
             </div>
-          );
-        })}
+          )}
+
+          {segments.map((seg) => {
+            // Prefer an explicit buffer on the segment. If not present, try
+            // any buffer reference available on the segment object (many
+            // importers attach different shapes). Waveform component is
+            // tolerant of Tone/ToneAudioBuffer and native AudioBuffer.
+            const audioBuffer = seg.buffer ?? seg.fileBuffer ?? null;
+
+            return (
+              <div
+                className="tracklane-segment"
+                key={seg.id || seg.fileUrl || Math.random()}
+              >
+                <div className="segment-meta">
+                  <div className="segment-name">
+                    {seg.id ?? seg.fileUrl ?? "segment"}
+                  </div>
+                  <div className="segment-duration">
+                    {seg.durationMs ? `${Math.round(seg.durationMs)} ms` : ""}
+                  </div>
+                </div>
+
+                <div className="segment-waveform">
+                  {audioBuffer ? (
+                    <Waveform audioBuffer={audioBuffer} color={track?.color} />
+                  ) : (
+                    <div className="waveform-placeholder">
+                      (No buffer available for this segment)
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>

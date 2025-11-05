@@ -1,4 +1,4 @@
-import * as Tone from 'tone';
+import * as Tone from "tone";
 
 /**
  * @class AudioSegment
@@ -45,15 +45,16 @@ export class AudioSegment {
    */
   constructor(options = {}) {
     if (!options.buffer || !(options.buffer instanceof Tone.ToneAudioBuffer)) {
-      throw new Error('AudioSegment requires a valid Tone.ToneAudioBuffer.');
+      throw new Error("AudioSegment requires a valid Tone.ToneAudioBuffer.");
     }
 
-    this.id = options.id || `segment_${Math.random().toString(36).substring(2, 9)}`;
+    this.id =
+      options.id || `segment_${Math.random().toString(36).substring(2, 9)}`;
     this.buffer = options.buffer;
     this.offset = options.offset || 0;
 
     // If duration is not provided, calculate it from the buffer length and offset.
-    this.duration = options.duration || (this.buffer.duration - this.offset);
+    this.duration = options.duration || this.buffer.duration - this.offset;
     this.effects = options.effects || [];
 
     // Ensure duration doesn't exceed buffer length
@@ -70,7 +71,7 @@ export class AudioSegment {
    */
   start(time, destination) {
     if (!destination) {
-      console.error('AudioSegment.start requires a destination node.');
+      console.error("AudioSegment.start requires a destination node.");
       return;
     }
 
@@ -95,5 +96,3 @@ export class AudioSegment {
     }, stopTime);
   }
 }
-
-

@@ -1,5 +1,7 @@
 /* General Reset and Base Styling */
-body, html, #root {
+body,
+html,
+#root {
   margin: 0;
   padding: 0;
   height: 100%;
@@ -21,7 +23,7 @@ body, html, #root {
 .app-container {
   height: 100vh;
   display: grid;
-  grid-template-rows: 40px 1fr 40px; 
+  grid-template-rows: 40px 1fr 40px;
 }
 
 /* Ensure other sections have lower z-index */
