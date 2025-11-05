@@ -5,7 +5,6 @@ const AudioExporter = ({audioBuffer, onExportComplete}) => {
   const exportManager = useMemo(() => new ExportManager(), []);
   // State for form inputs
   const [format, setFormat] = useState("mp3");
-  // 🆕 Renamed and will now handle both MP3 bitrate and OGG quality value.
   const [qualitySetting, setQualitySetting] = useState("320k");
   const [filename, setFilename] = useState("export.mp3");
   const [isLoading, setIsLoading] = useState(false);

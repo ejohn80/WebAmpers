@@ -71,7 +71,7 @@ function DropdownPortal({side, audioBuffer, onExportComplete}) {
     const relatedTarget = event.relatedTarget;
     const dropdown = event.currentTarget;
 
-    if (!dropdown.contains(relatedTarget)) {
+    if (relatedTarget && !dropdown.contains(relatedTarget)) {
       setActiveDropdown(null);
     }
   };
