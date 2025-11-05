@@ -289,7 +289,11 @@ class PlaybackEngine {
     tracks.forEach((t) => {
       const bus = this.trackBuses.get(t.id);
       if (!bus) return;
-      const shouldMute = anySolo ? !t.solo : !!t.mute;
+      // Mute should take precedence over solo. If a track is muted, it
+      // remains effectively silent even when soloed. If any track is
+      // soloed, non-soloed tracks are muted unless they are explicitly
+      // unmuted.
+      const shouldMute = !!t.mute || (anySolo && !t.solo);
 
       const now = Tone.now();
       bus.gain.gain.cancelAndHoldAtTime(now);
@@ -391,6 +395,9 @@ class PlaybackEngine {
   }
 }
 
+// Export the engine class so other modules (hooks/UI) can instantiate it
+export {PlaybackEngine};
+
 /** ---------- React wrapper component ----------
  * Provides UI controls (Play/Pause/Stop) and a progress bar for the PlaybackEngine.
  */
@@ -398,8 +405,23 @@ export default function WebAmpPlayback({ version, onEngineReady }) {
   const engineRef = useRef(null);
   const [playing, setPlaying] = useState(false);
   const [ms, setMs] = useState(0);
-  const [masterVol, setMasterVol] = useState(50);
-  const [muted, setMuted] = useState(false);
+  // Restore persisted master volume / mute from localStorage when possible
+  const [masterVol, setMasterVol] = useState(() => {
+    try {
+      const v = localStorage.getItem("webamp.masterVol");
+      return v !== null ? Number(v) : 50;
+    } catch (e) {
+      return 50;
+    }
+  }); // 0-100 visual percent, default 50%
+  const [muted, setMuted] = useState(() => {
+    try {
+      const m = localStorage.getItem("webamp.muted");
+      return m !== null ? m === "1" : false;
+    } catch (e) {
+      return false;
+    }
+  });
   const [draggingVol, setDraggingVol] = useState(false);
   const wasPlayingRef = useRef(false);
   const prevMasterGainRef = useRef(0.5);
@@ -426,26 +448,94 @@ export default function WebAmpPlayback({ version, onEngineReady }) {
     return () => engine.dispose();
   }, [engine, onEngineReady]);
 
+  // Load engine when version changes (do not reload on play/pause)
+  const prevLoadSigRef = React.useRef(null);
   useEffect(() => {
     if (!version) return;
     progressStore.setLengthMs(version.lengthMs ?? 0);
     progressStore.setSeeker((absMs) => {
       try { engine.seekMs(absMs); } catch (e) { console.warn('seek request failed:', e); }
     });
-    engine
-      .load(version)
-      .then(() => {
-        try {
-          if (engine.master) {
-            engine.master.gain.gain.value = 0.5;
-            prevMasterGainRef.current = 0.5;
-            savedVolumeRef.current = 0.5;
-            setMasterVol(50);
-            setMuted(false);
+
+    // Build a lightweight signature for the loaded audio structure. We
+    // intentionally exclude per-track flags like mute/solo so toggling
+    // them doesn't force a full engine.reload (which resets master volume).
+    const segSig = (version.segments || [])
+      .map(
+        (s) =>
+          `${s.fileUrl}@${s.trackId}:${s.startOnTimelineMs || 0}-${s.durationMs || 0}`
+      )
+      .join("|");
+    const sig = `${version.lengthMs || 0}::${segSig}`;
+
+    if (prevLoadSigRef.current !== sig) {
+      // Only load the engine when the actual timeline/segments change.
+      engine
+        .load(version)
+        .then(() => {
+          try {
+            if (engine.master) {
+              // Prefer persisted settings if available
+              let initVol = 0.5;
+              let initMuted = false;
+              try {
+                const v = localStorage.getItem("webamp.masterVol");
+                if (v !== null)
+                  initVol = Math.max(0, Math.min(1, Number(v) / 100));
+              } catch (e) {}
+              try {
+                const m = localStorage.getItem("webamp.muted");
+                if (m !== null) initMuted = m === "1";
+              } catch (e) {}
+
+              // remember linear values in refs
+              prevMasterGainRef.current = initVol;
+              savedVolumeRef.current = initVol;
+
+              engine.master.gain.gain.value = initMuted ? 0 : initVol;
+
+              // update UI state to reflect persisted values
+              setMasterVol(Math.round(initVol * 100));
+              setMuted(initMuted);
+            }
+          } catch {}
+        })
+        .catch((e) => console.error("[UI] engine.load() failed:", e));
+      prevLoadSigRef.current = sig;
+    } else {
+      // If only metadata (e.g., mute/solo) changed, avoid reload. However,
+      // we still need to synchronize per-track flags into the running
+      // engine instance because the engine was not reloaded and its
+      // internal `version.tracks` may be out of sync with the new
+      // `version` prop. Apply any per-track mute/solo diffs by calling
+      // the engine control methods which will update internal state and
+      // call _applyMuteSolo.
+      try {
+        const current = engine.version?.tracks || [];
+        (version.tracks || []).forEach((t) => {
+          const existing = current.find((x) => x.id === t.id);
+          if (!existing) return; // new/removed tracks would have triggered reload
+          if (Boolean(existing.mute) !== Boolean(t.mute)) {
+            try {
+              engine.setTrackMute(t.id, !!t.mute);
+            } catch (e) {
+              // swallow - best effort
+            }
           }
-        } catch {}
-      })
-      .catch((e) => console.error("[UI] engine.load() failed:", e));
+          if (Boolean(existing.solo) !== Boolean(t.solo)) {
+            try {
+              engine.setTrackSolo(t.id, !!t.solo);
+            } catch (e) {
+              // swallow - best effort
+            }
+          }
+        });
+      } catch (e) {
+        // defensive: if sync fails, fall back to a full reload next time
+        prevLoadSigRef.current = null;
+      }
+    }
+
     return () => {
       progressStore.setSeeker(null);
     };
@@ -522,11 +612,24 @@ export default function WebAmpPlayback({ version, onEngineReady }) {
     try {
       if (!engine.master) return;
       if (muted) {
-        engine.master.gain.gain.value = Math.max(0, Math.min(1, savedVolumeRef.current ?? masterVol / 100));
+        // unmute to last saved volume
+        const restore = Math.max(
+          0,
+          Math.min(1, savedVolumeRef.current ?? masterVol / 100)
+        );
+        engine.master.gain.gain.value = restore;
+        prevMasterGainRef.current = restore;
         setMuted(false);
+        try {
+          localStorage.setItem("webamp.muted", "0");
+        } catch (e) {}
       } else {
         savedVolumeRef.current = Math.max(0, Math.min(1, masterVol / 100));
+        try {
+          localStorage.setItem("webamp.muted", "1");
+        } catch (e) {}
         engine.master.gain.gain.value = 0;
+        prevMasterGainRef.current = 0;
         setMuted(true);
       }
     } catch (err) {

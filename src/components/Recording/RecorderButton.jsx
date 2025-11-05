@@ -107,8 +107,12 @@ export default function RecorderButton({ onComplete, onStart, onStop }) {
 
   if (!support) {
     return (
-      <button title="Recording not supported" disabled style={{ opacity: 0.6 }}>
-        <img src={RecordIcon} alt="Record" style={{ height: 18, display: 'block' }} />
+      <button title="Recording not supported" disabled style={{opacity: 0.6}}>
+        <img
+          src={RecordIcon}
+          alt="Record"
+          style={{height: 26, display: "block"}}
+        />
       </button>
     );
   }
@@ -121,11 +125,22 @@ export default function RecorderButton({ onComplete, onStart, onStop }) {
       style={{ background: 'transparent', border: 'none', padding: 0, margin: 0, cursor: 'pointer', transform: 'translateX(50px)' }}
     >
       {recording ? (
-        <span className="record-pulse" aria-label={`Stop Recording ${fmt(elapsedMs)}`}>
-          <img src={StopRecordIcon} alt="Stop Recording" style={{ height: 27, display: 'block' }} />
+        <span
+          className="record-pulse"
+          aria-label={`Stop Recording ${fmt(elapsedMs)}`}
+        >
+          <img
+            src={StopRecordIcon}
+            alt="Stop Recording"
+            style={{height: 26, display: "block"}}
+          />
         </span>
       ) : (
-        <img src={RecordIcon} alt="Record" style={{ height: 27, display: 'block' }} />
+        <img
+          src={RecordIcon}
+          alt="Record"
+          style={{height: 26, display: "block"}}
+        />
       )}
     </button>
   );
