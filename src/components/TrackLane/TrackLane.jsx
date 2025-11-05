@@ -72,12 +72,12 @@ function TrackLane({track, showTitle = true, onMute, onSolo}) {
             </button>
 
             <button
-              className={`tl-btn tl-btn-solo ${soloed ? 'tl-btn--active' : ''}`}
+              className={`tl-btn tl-btn-solo ${soloed ? "tl-btn--active" : ""}`}
               onClick={toggleSolo}
               aria-pressed={soloed}
-              title={soloed ? 'Unsolo track' : 'Solo track'}
+              title={soloed ? "Unsolo track" : "Solo track"}
             >
-              {soloed ? 'Soloed' : 'Solo'}
+              {soloed ? "Soloed" : "Solo"}
             </button>
           </div>
         </div>

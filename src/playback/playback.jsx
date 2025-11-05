@@ -404,8 +404,23 @@ export default function WebAmpPlayback({version, onEngineReady}) {
   const engineRef = useRef(null); // no external usage currently
   const [playing, setPlaying] = useState(false);
   const [ms, setMs] = useState(0);
-  const [masterVol, setMasterVol] = useState(50); // 0-100 visual percent, default 50%
-  const [muted, setMuted] = useState(false);
+  // Restore persisted master volume / mute from localStorage when possible
+  const [masterVol, setMasterVol] = useState(() => {
+    try {
+      const v = localStorage.getItem("webamp.masterVol");
+      return v !== null ? Number(v) : 50;
+    } catch (e) {
+      return 50;
+    }
+  }); // 0-100 visual percent, default 50%
+  const [muted, setMuted] = useState(() => {
+    try {
+      const m = localStorage.getItem("webamp.muted");
+      return m !== null ? m === "1" : false;
+    } catch (e) {
+      return false;
+    }
+  });
   const [draggingVol, setDraggingVol] = useState(false);
   const wasPlayingRef = useRef(false);
   const prevMasterGainRef = useRef(0.5);
@@ -457,7 +472,10 @@ export default function WebAmpPlayback({version, onEngineReady}) {
     // intentionally exclude per-track flags like mute/solo so toggling
     // them doesn't force a full engine.reload (which resets master volume).
     const segSig = (version.segments || [])
-      .map((s) => `${s.fileUrl}@${s.trackId}:${s.startOnTimelineMs || 0}-${s.durationMs || 0}`)
+      .map(
+        (s) =>
+          `${s.fileUrl}@${s.trackId}:${s.startOnTimelineMs || 0}-${s.durationMs || 0}`
+      )
       .join("|");
     const sig = `${version.lengthMs || 0}::${segSig}`;
 
@@ -467,13 +485,29 @@ export default function WebAmpPlayback({version, onEngineReady}) {
         .load(version)
         .then(() => {
           try {
-            // Initialize master volume to 50% on first real load
             if (engine.master) {
-              engine.master.gain.gain.value = 0.5;
-              prevMasterGainRef.current = 0.5;
-              savedVolumeRef.current = 0.5;
-              setMasterVol(50);
-              setMuted(false);
+              // Prefer persisted settings if available
+              let initVol = 0.5;
+              let initMuted = false;
+              try {
+                const v = localStorage.getItem("webamp.masterVol");
+                if (v !== null)
+                  initVol = Math.max(0, Math.min(1, Number(v) / 100));
+              } catch (e) {}
+              try {
+                const m = localStorage.getItem("webamp.muted");
+                if (m !== null) initMuted = m === "1";
+              } catch (e) {}
+
+              // remember linear values in refs
+              prevMasterGainRef.current = initVol;
+              savedVolumeRef.current = initVol;
+
+              engine.master.gain.gain.value = initMuted ? 0 : initVol;
+
+              // update UI state to reflect persisted values
+              setMasterVol(Math.round(initVol * 100));
+              setMuted(initMuted);
             }
           } catch {}
         })
@@ -610,15 +644,24 @@ export default function WebAmpPlayback({version, onEngineReady}) {
       if (!engine.master) return;
       if (muted) {
         // unmute to last saved volume
-        engine.master.gain.gain.value = Math.max(
+        const restore = Math.max(
           0,
           Math.min(1, savedVolumeRef.current ?? masterVol / 100)
         );
+        engine.master.gain.gain.value = restore;
+        prevMasterGainRef.current = restore;
         setMuted(false);
+        try {
+          localStorage.setItem("webamp.muted", "0");
+        } catch (e) {}
       } else {
         // save current volume and mute
         savedVolumeRef.current = Math.max(0, Math.min(1, masterVol / 100));
+        try {
+          localStorage.setItem("webamp.muted", "1");
+        } catch (e) {}
         engine.master.gain.gain.value = 0;
+        prevMasterGainRef.current = 0;
         setMuted(true);
       }
     } catch (err) {
@@ -866,12 +909,19 @@ export default function WebAmpPlayback({version, onEngineReady}) {
               setMasterVol(v);
               try {
                 // master volume: linear 0.0 - 1.0
-                if (engine.master) {
-                  const linear = Math.max(0, Math.min(1, v / 100));
-                  savedVolumeRef.current = linear; // always remember intended volume
-                  if (!muted) {
-                    engine.master.gain.gain.value = linear;
-                  }
+                const linear = Math.max(0, Math.min(1, v / 100));
+                // persist user's master volume preference (0-100)
+                try {
+                  localStorage.setItem("webamp.masterVol", String(v));
+                } catch (e) {}
+
+                // remember intended volume
+                savedVolumeRef.current = linear;
+                prevMasterGainRef.current = linear;
+
+                // apply to engine unless muted
+                if (engine.master && !muted) {
+                  engine.master.gain.gain.value = linear;
                 }
               } catch (err) {
                 console.warn("master volume set failed:", err);

@@ -116,12 +116,18 @@ describe("PlaybackEngine mute/solo behavior (via WebAmpPlayback)", () => {
     ]);
 
     // Render with onEngineReady to capture the engine instance
-    render(<WebAmpPlayback version={v} onEngineReady={(eng) => (engineInstance = eng)} />);
+    render(
+      <WebAmpPlayback
+        version={v}
+        onEngineReady={(eng) => (engineInstance = eng)}
+      />
+    );
 
     // Wait for engine to load and create track buses
     await waitFor(() => {
       if (!engineInstance) throw new Error("no engine yet");
-      if (!engineInstance.trackBuses || engineInstance.trackBuses.size === 0) throw new Error("no buses yet");
+      if (!engineInstance.trackBuses || engineInstance.trackBuses.size === 0)
+        throw new Error("no buses yet");
     });
 
     // Ensure initial gains match dbToGain conversion
@@ -152,11 +158,17 @@ describe("PlaybackEngine mute/solo behavior (via WebAmpPlayback)", () => {
       {id: "c", gainDb: 0, mute: false, solo: false},
     ]);
 
-    render(<WebAmpPlayback version={v} onEngineReady={(eng) => (engineInstance = eng)} />);
+    render(
+      <WebAmpPlayback
+        version={v}
+        onEngineReady={(eng) => (engineInstance = eng)}
+      />
+    );
 
     await waitFor(() => {
       if (!engineInstance) throw new Error("no engine yet");
-      if (!engineInstance.trackBuses || engineInstance.trackBuses.size < 3) throw new Error("buses not ready");
+      if (!engineInstance.trackBuses || engineInstance.trackBuses.size < 3)
+        throw new Error("buses not ready");
     });
 
     const a = engineInstance.trackBuses.get("a");
