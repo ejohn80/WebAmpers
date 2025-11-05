@@ -1,10 +1,15 @@
+// jest.config.js
 export default {
-  testEnvironment: "jsdom",
+  testEnvironment: 'jsdom',
+  setupFilesAfterEnv: ['<rootDir>/src/tests/setup.js'],
+  moduleNameMapper: {
+    '\\.(css|less|scss|sass)$': 'identity-obj-proxy',
+  },
   transform: {
-    "^.+\\.[tj]sx?$": "babel-jest"
+    '^.+\\.(js|jsx)$': 'babel-jest',
   },
   transformIgnorePatterns: [
-    '/node_modules/(?!tone/)'
+    'node_modules/(?!(tone)/)'
   ],
   moduleNameMapper: {
     "^tone$": "tone" // ensures tone mock resolves correctly
