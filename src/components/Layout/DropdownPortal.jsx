@@ -80,7 +80,11 @@ function DropdownPortal({
     const relatedTarget = event.relatedTarget;
     const dropdown = event.currentTarget;
 
-    if (relatedTarget && !dropdown.contains(relatedTarget)) {
+    if (
+      relatedTarget &&
+      relatedTarget.nodeType === 1 &&
+      !dropdown.contains(relatedTarget)
+    ) {
       setActiveDropdown(null);
     }
   };
