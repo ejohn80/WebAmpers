@@ -1,7 +1,0 @@
-dist/
-coverage/
-node_modules/
-**/*.test.js
-**/*.test.jsx
-**/*.spec.js
-**/*.spec.jsx

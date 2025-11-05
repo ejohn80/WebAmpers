@@ -3,21 +3,25 @@
 ---
 
 ## 1. How to Obtain the Source Code
+
 All WebAmp code is hosted in a single public GitHub repository:  
 [https://github.com/ejohn80/WebAmpers](https://github.com/ejohn80/WebAmpers)
 
 Clone the repo:
+
 ```bash
 git clone https://github.com/ejohn80/WebAmpers.git
-cd WebAmpers/WebAmpers
+cd WebAmpers
 ```
+
 ---
+
 ## 2. Repository layout
 
 ```bash
 WebAmpers/
-  src/                       # React source code 
-    components/             # UI components 
+  src/                       # React source code
+    components/             # UI components
   public/                    # Static assets (icons, etc.)
   backend/                   # (planned) Python for export & format conversion
     tests/                   # Pytest tests for backend
@@ -35,8 +39,11 @@ WebAmpers/
 ```
 
 ---
+
 ## 3. How to build/run
+
 Run the commands in your terminal:
+
 ```bash
 # 1. Install dependencies
 npm install
@@ -51,6 +58,7 @@ npm run dev
 ## 4. How to test
 
 We have default tests available to test expected functions
+
 ```bash
 npm run test
 ```
@@ -58,16 +66,19 @@ npm run test
 ---
 
 ## 5. How to add tests
+
 Name the file in this format:
+
 ```bash
 FILENAME.test.jsx
 ```
 
 ### Example Test
+
 ```jsx
-import { render, screen } from "@testing-library/react";
+import {render, screen} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { expect, test } from "vitest";
+import {expect, test} from "vitest";
 import Login from "./Login.jsx";
 
 test("shows error on invalid login", async () => {
@@ -77,11 +88,15 @@ test("shows error on invalid login", async () => {
   expect(screen.getByText(/Invalid email/i)).toBeInTheDocument();
 });
 ```
+
 Then run:
+
 ```bash
 npm run test
 ```
+
 ---
+
 ## 6. Release Preparation
 
 When preparing for a release:
@@ -91,14 +106,3 @@ When preparing for a release:
 3. All code is formatted with `npm run format`.
 4. Run the production build `npm run build`
 5. Test expected functionality
-
-
-
-
-
-
-
-
-
-
-

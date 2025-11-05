@@ -1,71 +1,79 @@
 /* General Reset and Base Styling */
-body, html, #root {
+body,
+html,
+#root {
   margin: 0;
   padding: 0;
-  height: 100%; /* Ensure the root elements take full viewport height */
+  height: 100%;
   font-family: sans-serif;
-  overflow: hidden; /* Prevent scrolling on the main body, as content areas will manage their own scroll */
+  overflow: hidden;
+}
+
+/* Header specific styling */
+.header {
+  background-color: #262529;
+  position: relative;
+  z-index: 9999;
+  overflow: visible;
+  border-bottom: 2px solid #343239;
+  /* border-top: 1px solid black; */
 }
 
 /* Main application container, uses CSS Grid for overall layout */
 .app-container {
-  height: 100vh; /* Occupy the full viewport height */
+  height: 100vh;
   display: grid;
-  /* Defines 3 rows for the main layout:
-   * 1. Header: Fixed height of 50px.
-   * 2. Main Area: Takes up all available remaining space (1fr).
-   * 3. Footer: Fixed height of 40px.
-   */
-  grid-template-rows: 50px 1fr 40px; 
+  grid-template-rows: 40px 1fr 40px;
 }
 
-/* Base styling applied to all major section components (e.g., Header, Sidebar, Main Content, Footer) */
+/* Ensure other sections have lower z-index */
+
+.blue {
+  background-color: #4da6ff;
+  z-index: 1; /* Lower than header */
+}
+
+.purple {
+  background-color: #a366ff;
+  overflow: auto;
+  z-index: 1; /* Lower than header */
+}
+
+.lime {
+  background-color: #99ff4d;
+  z-index: 1; /* Lower than header */
+}
+
+/* Base styling applied to all major section components */
 .section {
   padding: 10px;
   box-sizing: border-box;
-  color: white; /* Text color */
-  border: 1px solid black; /* For visual separation */
+  color: white;
+  border: 1px solid black;
 }
 
-/* Specific background colors for different sections, as per design sketch */
-.red {
-  background-color: #ff4d4d; /* Red */
-}
-.blue {
-  background-color: #4da6ff; /* Blue */
-}
-.purple {
-  background-color: #a366ff; /* Purple */
-  overflow: auto; /* Allows content within the purple section to scroll if it overflows */
-}
-.lime {
-  background-color: #99ff4d; /* Lime Green */
+/* Main content (center area) override — use a dark grey so TrackLane can be lighter */
+.maincontent {
+  background-color: #1f1f1f !important;
 }
 
 /* --- Main Content Area Styling (The Core Grid) --- */
 .main-content-area {
   display: grid;
-  /* Defines 3 columns for the middle section:
-   * 1. Sidebar: Width controlled by the `--sidebar-width` CSS variable (set dynamically in AudioPage.jsx).
-   * 2. Divider: Fixed width of 5px for the draggable separator.
-   * 3. Main Content: Takes up all remaining available space (1fr).
-   */
   grid-template-columns: var(--sidebar-width) 5px 1fr;
-  height: 100%; /* Ensure this grid takes the full height of its parent row */
+  height: 100%;
+  position: relative;
+  z-index: 1; /* Ensure main content is below header */
 }
 
 /* --- Movable Divider Styling --- */
 .divider {
-  cursor: ew-resize; /* East-West resize cursor */
-  width: 5px; /* Thin line for the grab area */
+  cursor: ew-resize;
+  width: 5px;
   background-color: black;
-  /* The CSS Grid in `.main-content-area` automatically positions this divider
-   * in the second column, between the sidebar and the main content.
-   * No need for manual positioning properties like `position`, `z-index`, or `margin-left`.
-   */
-  height: 100%; /* Ensure the divider spans the full height of the `main-content-area` */
+  height: 100%;
 }
 
 .sidebar-container {
-  overflow-y: auto; /* Allows vertical scrolling for content within the sidebar */
+  overflow-y: auto;
 }

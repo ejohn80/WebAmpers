@@ -14,7 +14,7 @@ export function useUserData() {
         const docRef = doc(db, "users", user.uid);
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
-          setUserData(docSnap.data());
+          setUserData({uid: user.uid, ...docSnap.data()});
         } else {
           setUserData(null);
         }

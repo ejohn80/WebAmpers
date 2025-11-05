@@ -2,6 +2,7 @@ import React, {useRef} from "react";
 import * as Tone from "tone";
 import AudioImporter from "./AudioImporter";
 import "./AudioImportButton.css";
+import {ImportIcon} from "../Layout/Svgs";
 
 /**
  * A UI component that provides a button to import audio files.
@@ -56,7 +57,17 @@ const AudioImportButton = ({onImportSuccess, onImportError}) => {
         style={{display: "none"}}
       />
       <button className="import-button" onClick={handleButtonClick}>
-        Import Audio
+        <span style={{display: "flex", alignItems: "center", gap: "10px"}}>
+          <ImportIcon
+            style={{
+              strokeWidth: 2,
+              stroke: "#000000",
+              width: "16px",
+              height: "16px",
+            }}
+          />
+          <span>Import File</span>
+        </span>
       </button>
     </>
   );

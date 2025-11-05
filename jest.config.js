@@ -7,4 +7,5 @@ export default {
   moduleNameMapper: {
     "^tone$": "tone", // ensures tone mock resolves correctly
   },
+  setupFilesAfterEnv: ["./src/tests/setup.js"],
 };
