@@ -128,10 +128,32 @@ class DBManager {
         });
       }
 
-      const request = store.add(storableTrack);
+      // If the provided track already has an id, use put() so we upsert
+      // instead of failing with add() on duplicate keys. However, when the
+      // id looks like a client-generated string (e.g. 'track_xxx') prefer to
+      // let IndexedDB assign a numeric key (via add) so stored keys remain
+      // monotonic and ordering by key reflects insertion order.
+      let request;
+      const hasId = typeof storableTrack.id !== 'undefined' && storableTrack.id !== null;
+      const isClientGeneratedString = hasId && (typeof storableTrack.id === 'string') && /^track_/.test(storableTrack.id);
+      if (!hasId || isClientGeneratedString) {
+        // Remove id if it's a client-generated string so add() assigns a numeric id
+        if (isClientGeneratedString) {
+          // shallow copy without id
+          const { id, ...withoutId } = storableTrack;
+          request = store.add(withoutId);
+        } else {
+          request = store.add(storableTrack);
+        }
+      } else {
+        // has a numeric or externally-managed id: upsert with put()
+        request = store.put(storableTrack);
+      }
 
       request.onsuccess = (event) => {
-        resolve(event.target.result); // Returns the new key
+        // Return the key (either provided or generated). Callers may want to
+        // update their in-memory object to match the DB-assigned key.
+        resolve(event.target.result);
       };
 
       request.onerror = (event) => {

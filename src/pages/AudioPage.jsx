@@ -101,29 +101,40 @@ function AudioPage() {
     // Update the component's state to re-render with the new track list.
     setTracks([...audioManager.tracks]);
 
-    try {
-      // Persist the created AudioTrack (so it includes the generated id)
-      if (createdTrack) {
-        await dbManager.addTrack(createdTrack);
-      } else {
-        // Fallback for older data shape (from main)
-        await dbManager.addTrack(importedAudioData);
-      }
-      console.log("Track saved to IndexedDB");
-    } catch (error) {
-      console.error("Failed to save track to IndexedDB:", error);
-    }
-  };
+        try {
+            // Persist the created AudioTrack (so it includes the generated id)
+            if (createdTrack) {
+                const savedId = await dbManager.addTrack(createdTrack);
+                // Ensure in-memory track uses the same id as stored in DB.
+                // If IndexedDB generated a numeric id, sync it back onto the
+                // AudioTrack so future updates use the same key.
+                if (savedId && createdTrack.id !== savedId) {
+                    createdTrack.id = savedId;
+                    setTracks([...audioManager.tracks]);
+                }
+            } else {
+                // Fallback for older data shape (from main)
+                await dbManager.addTrack(importedAudioData); 
+            }
+            console.log('Track saved to IndexedDB');
+        } catch (error) {
+            console.error('Failed to save track to IndexedDB:', error);
+        }
+    };
 
-  const handleImportError = (error) => {
-    alert(`Import failed: ${error.message}`);
-    // TODO: Show a more user-friendly error message in the UI
-  };
+    const handleImportError = (error) => {
+        alert(`Import failed: ${error.message}`);
+        // TODO: Show a more user-friendly error message in the UI
+    };
 
-  // ---- Helpers used to build a minimal "version" object for the player ----
-  // const parseDurationMs = (d) => { /* ... (full function code from main) ... */ };
-  // const srcFromImport = (ad) => { /* ... (full function code from main) ... */ };
-  // const durationMsOf = (ad) => { /* ... (full function code from main) ... */ };
+    const handleExportComplete = () => {
+        console.log('Export process complete.');
+    };
+    
+    // ---- Helpers used to build a minimal "version" object for the player ----
+    // const parseDurationMs = (d) => { /* ... (full function code from main) ... */ };
+    // const srcFromImport = (ad) => { /* ... (full function code from main) ... */ };
+    // const durationMsOf = (ad) => { /* ... (full function code from main) ... */ };
 
   const active = tracks && tracks.length > 0 ? tracks[tracks.length - 1] : null;
   const version = active
@@ -183,22 +194,25 @@ function AudioPage() {
 
   // --- RENDERING ---
 
-  const mainContentStyle = {
-    "--sidebar-width": `${sidebarWidth}px`,
-  };
-  const activeTrack = tracks.length > 0 ? tracks[tracks.length - 1] : null;
+    const mainContentStyle = {
+        '--sidebar-width': `${sidebarWidth}px`,
+    };
+    const activeTrack = tracks.length > 0 ? tracks[tracks.length - 1] : null;
+    const audioBuffer = activeTrack ? activeTrack.buffer || activeTrack.segments?.[0]?.buffer : null;
 
-  const handleEngineReady = (engine) => {
-    engineRef.current = engine;
-  };
+    const handleEngineReady = (engine) => {
+        engineRef.current = engine;
+    };
 
-  return (
-    <div className="app-container">
-      {/* 1. Header Section - Add back import props (from main) */}
-      <Header
-        onImportSuccess={handleImportSuccess}
-        onImportError={handleImportError}
-      />
+    return (
+        <div className="app-container">
+            {/* 1. Header Section - Add back import props (from main) */}
+            <Header 
+                onImportSuccess={handleImportSuccess}
+                onImportError={handleImportError}
+                audioBuffer={audioBuffer}
+                onExportComplete={handleExportComplete}
+            />
 
       {/* 2. Middle Area (Sidebar/Main Content Split) */}
       <div className="main-content-area" style={mainContentStyle}>
