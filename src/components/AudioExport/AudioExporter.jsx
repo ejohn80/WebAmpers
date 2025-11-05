@@ -17,9 +17,9 @@ const AudioExporter = ({ audioBuffer, onExportComplete }) => {
 
   // Supported formats for the dropdown
   const formats = [
-    { value: "mp3", label: "MP3 (Backend Conversion)" },
-    { value: "wav", label: "WAV (Browser Export)" },
-    { value: "ogg", label: "OGG (Backend Conversion)" },
+    { value: "mp3", label: "MP3" },
+    { value: "wav", label: "WAV" },
+    { value: "ogg", label: "OGG" },
   ];
 
   const handleExport = async (e) => {
