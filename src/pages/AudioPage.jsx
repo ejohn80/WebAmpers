@@ -92,7 +92,14 @@ function AudioPage() {
         try {
             // Persist the created AudioTrack (so it includes the generated id)
             if (createdTrack) {
-                await dbManager.addTrack(createdTrack);
+                const savedId = await dbManager.addTrack(createdTrack);
+                // Ensure in-memory track uses the same id as stored in DB.
+                // If IndexedDB generated a numeric id, sync it back onto the
+                // AudioTrack so future updates use the same key.
+                if (savedId && createdTrack.id !== savedId) {
+                    createdTrack.id = savedId;
+                    setTracks([...audioManager.tracks]);
+                }
             } else {
                 // Fallback for older data shape (from main)
                 await dbManager.addTrack(importedAudioData); 
