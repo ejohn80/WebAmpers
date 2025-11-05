@@ -1,7 +1,7 @@
 import React, {useRef} from "react";
 import AudioImporter from "./AudioImporter";
-import {ImportIcon} from "../Layout/Svgs"; 
-import * as Tone from "tone"; 
+import {ImportIcon} from "../Layout/Svgs";
+import * as Tone from "tone";
 
 /**
  * A UI component that provides a button to import audio files.
@@ -18,7 +18,7 @@ const AudioImportButton = ({onImportSuccess, onImportError, children}) => {
   const handleFileChange = async (event) => {
     const file = event.target.files[0];
     if (!file) {
-      return; 
+      return;
     }
 
     if (Tone.context.state !== "running") {
@@ -76,7 +76,7 @@ const AudioImportButton = ({onImportSuccess, onImportError, children}) => {
         accept=".wav, .mp3"
         style={{display: "none"}}
       />
-      
+
       {triggerElement}
     </>
   );

@@ -35,7 +35,7 @@ const AudioExportModal = ({audioBuffer, onExportComplete, isOpen, onClose}) => {
         alignItems: "center",
         zIndex: 1000,
       }}
-      onClick={handleOverlayClick} 
+      onClick={handleOverlayClick}
     >
       {/* Modal Content */}
       <div
