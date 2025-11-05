@@ -4,8 +4,6 @@ import {AppContext} from "../../context/AppContext";
 import ReactDOM from "react-dom";
 import {useNavigate} from "react-router-dom";
 
-import AudioExportButton from "../AudioExport/AudioExportButton";
-
 import "./Header.css";
 import {
   ExportIcon,
@@ -24,7 +22,7 @@ import {
 } from "./Svgs";
 import AudioExportButton from "../AudioExport/AudioExportButton";
 
-function DropdownPortal({side}) {
+function DropdownPortal({side, audioBuffer, onExportComplete}) {
   const navigate = useNavigate();
   const {userData} = useContext(AppContext);
 
