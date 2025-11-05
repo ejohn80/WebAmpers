@@ -114,6 +114,10 @@ function AudioPage() {
         alert(`Import failed: ${error.message}`);
         // TODO: Show a more user-friendly error message in the UI
     };
+
+    const handleExportComplete = () => {
+        console.log('Export process complete.');
+    };
     
     // ---- Helpers used to build a minimal "version" object for the player ----
     // const parseDurationMs = (d) => { /* ... (full function code from main) ... */ };
@@ -176,7 +180,8 @@ function AudioPage() {
         '--sidebar-width': `${sidebarWidth}px`,
     };
     const activeTrack = tracks.length > 0 ? tracks[tracks.length - 1] : null;
-    
+    const audioBuffer = activeTrack ? activeTrack.buffer || activeTrack.segments?.[0]?.buffer : null;
+
     const handleEngineReady = (engine) => {
         engineRef.current = engine;
     };
@@ -187,6 +192,8 @@ function AudioPage() {
             <Header 
                 onImportSuccess={handleImportSuccess}
                 onImportError={handleImportError}
+                audioBuffer={audioBuffer}
+                onExportComplete={handleExportComplete}
             />
 
             {/* 2. Middle Area (Sidebar/Main Content Split) */}
