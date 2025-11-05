@@ -6,11 +6,10 @@ import "../AudioExport/AudioExportButton.css";
  * A modal wrapper for the AudioExporter component.
  */
 const AudioExportModal = ({audioBuffer, onExportComplete, isOpen, onClose}) => {
-
   if (!isOpen) return null; // Only render if open
 
   const handleExportComplete = (result) => {
-    onClose(); 
+    onClose();
     if (onExportComplete) {
       onExportComplete(result);
     }

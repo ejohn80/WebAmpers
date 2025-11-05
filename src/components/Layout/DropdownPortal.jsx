@@ -180,7 +180,7 @@ function DropdownPortal({side, audioBuffer, onExportComplete}) {
         >
           <span>Save</span>
         </a>
-        
+
         <AudioExportButton
           audioBuffer={audioBuffer}
           onExportComplete={onExportComplete}
