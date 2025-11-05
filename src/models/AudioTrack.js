@@ -1,4 +1,4 @@
-import * as Tone from 'tone';
+import * as Tone from "tone";
 
 /**
  * @class AudioTrack
@@ -47,15 +47,16 @@ export class AudioTrack {
    * @param {Array<any>} [options.segments=[]] - An initial list of audio segments.
    */
   constructor(options = {}) {
-    this.id = options.id || `track_${Math.random().toString(36).substring(2, 9)}`;
-    this.name = options.name || 'Untitled Track';
-    this.color = options.color || '#FFFFFF';
+    this.id =
+      options.id || `track_${Math.random().toString(36).substring(2, 9)}`;
+    this.name = options.name || "Untitled Track";
+    this.color = options.color || "#FFFFFF";
     this.segments = options.segments || [];
 
     // Serializable primitive fields. These are kept in sync with the
     // underlying Tone.Channel so the values can be stored/loaded easily.
-    this._volumeDb = typeof options.volume === 'number' ? options.volume : 0; // in dB
-    this._pan = typeof options.pan === 'number' ? options.pan : 0; // -1 .. 1
+    this._volumeDb = typeof options.volume === "number" ? options.volume : 0; // in dB
+    this._pan = typeof options.pan === "number" ? options.pan : 0; // -1 .. 1
     this._mute = !!options.mute;
     this._solo = !!options.solo;
 
@@ -78,11 +79,14 @@ export class AudioTrack {
   }
 
   set volume(v) {
-    this._volumeDb = typeof v === 'number' ? v : 0;
+    this._volumeDb = typeof v === "number" ? v : 0;
     if (this.channel) {
       // Tone.Param sometimes exposes a .value property; set defensively.
       try {
-        if (this.channel.volume && typeof this.channel.volume.value === 'number') {
+        if (
+          this.channel.volume &&
+          typeof this.channel.volume.value === "number"
+        ) {
           this.channel.volume.value = this._volumeDb;
         } else {
           this.channel.volume = this._volumeDb;
@@ -99,10 +103,10 @@ export class AudioTrack {
   }
 
   set pan(v) {
-    this._pan = typeof v === 'number' ? v : 0;
+    this._pan = typeof v === "number" ? v : 0;
     if (this.channel) {
       try {
-        if (this.channel.pan && typeof this.channel.pan.value === 'number') {
+        if (this.channel.pan && typeof this.channel.pan.value === "number") {
           this.channel.pan.value = this._pan;
         } else {
           this.channel.pan = this._pan;

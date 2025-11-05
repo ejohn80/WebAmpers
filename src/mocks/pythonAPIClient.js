@@ -23,7 +23,7 @@ export default class PythonApiClient {
    */
   async exportAudio(wavFile, options) {
     console.log(
-      `MOCK API: Received request to convert ${wavFile.name} to ${options.format}.`,
+      `MOCK API: Received request to convert ${wavFile.name} to ${options.format}.`
     );
 
     if (!this.isHealthy) {
@@ -62,7 +62,7 @@ export default class PythonApiClient {
     // In a real browser environment, this triggers a download.
     // For testing, we just log it.
     console.log(
-      `MOCK API: Triggered browser download for: ${filename} (${blob.type})`,
+      `MOCK API: Triggered browser download for: ${filename} (${blob.type})`
     );
   }
 

@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, {useEffect, useMemo, useRef, useState} from "react";
 import * as Tone from "tone";
-import { progressStore } from './progressStore';
+import {progressStore} from "./progressStore";
 import PlayIcon from "../assets/footer/PlayButton.svg";
 import PauseIcon from "../assets/footer/PauseButton.svg";
 import RewindIcon from "../assets/footer/RewindButton.svg";
@@ -141,7 +141,7 @@ class PlaybackEngine {
     if (!this.version) return;
     Tone.Transport.setLoopPoints(
       msToToneTime(startMs, this.version.bpm || 120),
-      msToToneTime(endMs, this.version.bpm || 120),
+      msToToneTime(endMs, this.version.bpm || 120)
     );
     Tone.Transport.loop = endMs > startMs;
   }
@@ -211,7 +211,7 @@ class PlaybackEngine {
   /** Prepare all segments (audio clips) and schedule them for playback */
   async _prepareSegments(version) {
     const urls = Array.from(
-      new Set((version.segments || []).map((s) => s.fileUrl)),
+      new Set((version.segments || []).map((s) => s.fileUrl))
     );
     urls.forEach((u) => this._preload(u));
 
@@ -259,7 +259,7 @@ class PlaybackEngine {
       // Schedule start time in the Transport
       const startTT = msToToneTime(
         seg.startOnTimelineMs || 0,
-        version.bpm || 120,
+        version.bpm || 120
       );
       player.start(startTT, offsetSec, durSec);
     }
@@ -272,14 +272,14 @@ class PlaybackEngine {
     const gain = new Tone.Gain(dbToGain(t.gainDb));
     const pan = new Tone.Panner(clamp(t.pan ?? 0, -1, 1));
     gain.connect(pan);
-    return { id: t.id, gain, pan, fxIn: null, fxOut: null, chain: [] };
+    return {id: t.id, gain, pan, fxIn: null, fxOut: null, chain: []};
   }
 
   /** Create a master bus and connect it to the audio output */
   _makeMaster() {
     const gain = new Tone.Gain(1);
     gain.connect(Tone.Destination);
-    return { gain, chain: [], fxIn: null, fxOut: null };
+    return {gain, chain: [], fxIn: null, fxOut: null};
   }
 
   /** Handle mute/solo logic and smoothly apply gain changes */
@@ -306,13 +306,12 @@ class PlaybackEngine {
     this.preloaded.add(url);
     Tone.ToneAudioBuffer.load(url)
       .then(
-        () =>
-          this.events.onBuffer && this.events.onBuffer({ url, ready: true }),
+        () => this.events.onBuffer && this.events.onBuffer({url, ready: true})
       )
       .catch(
         (e) =>
           this.events.onBuffer &&
-          this.events.onBuffer({ url, ready: false, error: e }),
+          this.events.onBuffer({url, ready: false, error: e})
       );
   }
 
@@ -396,7 +395,7 @@ class PlaybackEngine {
 /** ---------- React wrapper component ----------
  * Provides UI controls (Play/Pause/Stop) and a progress bar for the PlaybackEngine.
  */
-export default function WebAmpPlayback({ version, onEngineReady }) {
+export default function WebAmpPlayback({version, onEngineReady}) {
   // , height = 120
   const engineRef = useRef(null); // no external usage currently
   const [playing, setPlaying] = useState(false);
@@ -416,10 +415,10 @@ export default function WebAmpPlayback({ version, onEngineReady }) {
     () =>
       new PlaybackEngine({
         onProgress: (v) => setMs(v),
-        onTransport: ({ playing }) => setPlaying(playing),
+        onTransport: ({playing}) => setPlaying(playing),
         onError: (e) => console.error(e),
       }),
-    [],
+    []
   );
 
   // Attach and clean up engine
@@ -442,7 +441,11 @@ export default function WebAmpPlayback({ version, onEngineReady }) {
     progressStore.setLengthMs(version.lengthMs ?? 0);
     // allow waveform to request seeking
     progressStore.setSeeker((absMs) => {
-      try { engine.seekMs(absMs); } catch (e) { console.warn('seek request failed:', e); }
+      try {
+        engine.seekMs(absMs);
+      } catch (e) {
+        console.warn("seek request failed:", e);
+      }
     });
     engine
       .load(version)
@@ -540,7 +543,9 @@ export default function WebAmpPlayback({ version, onEngineReady }) {
       console.warn("goToStart failed:", err);
     }
     setMs(0);
-    try { progressStore.setMs(0); } catch {}
+    try {
+      progressStore.setMs(0);
+    } catch {}
   };
 
   // Publish progress to store whenever local ms updates
@@ -554,7 +559,10 @@ export default function WebAmpPlayback({ version, onEngineReady }) {
       if (!engine.master) return;
       if (muted) {
         // unmute to last saved volume
-        engine.master.gain.gain.value = Math.max(0, Math.min(1, savedVolumeRef.current ?? masterVol / 100));
+        engine.master.gain.gain.value = Math.max(
+          0,
+          Math.min(1, savedVolumeRef.current ?? masterVol / 100)
+        );
         setMuted(false);
       } else {
         // save current volume and mute
@@ -599,108 +607,181 @@ export default function WebAmpPlayback({ version, onEngineReady }) {
       }}
     >
       {/* left spacer to center the transport group */}
-      <div style={{ flex: 1 }} />
+      <div style={{flex: 1}} />
 
       {/* centered transport: time | start | back 10s | play/pause | fwd 10s */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+      <div style={{display: "flex", alignItems: "center", gap: 12}}>
         <button
           onClick={goToStart}
           title="Go to start"
-          style={{ background: 'transparent', border: 'none', padding: 0, margin: 0, cursor: 'pointer' }}
+          style={{
+            background: "transparent",
+            border: "none",
+            padding: 0,
+            margin: 0,
+            cursor: "pointer",
+          }}
         >
-          <img src={GoToStartIcon} alt="Go to start" style={{ height: 18, display: 'block' }} />
+          <img
+            src={GoToStartIcon}
+            alt="Go to start"
+            style={{height: 18, display: "block"}}
+          />
         </button>
-        <code style={{ fontSize: 12, opacity: 0.85, minWidth: 80, textAlign: "right" }}>
+        <code
+          style={{
+            fontSize: 12,
+            opacity: 0.85,
+            minWidth: 80,
+            textAlign: "right",
+          }}
+        >
           {fmtTime(ms)}
-          {typeof (version?.lengthMs) === 'number' && version.lengthMs > 0 ? ` / ${fmtTime(version.lengthMs)}` : ''}
+          {typeof version?.lengthMs === "number" && version.lengthMs > 0
+            ? ` / ${fmtTime(version.lengthMs)}`
+            : ""}
         </code>
         <button
           onClick={skipBack10}
           title="Back 10s"
-          style={{ background: 'transparent', border: 'none', padding: 0, margin: 0, cursor: 'pointer' }}
+          style={{
+            background: "transparent",
+            border: "none",
+            padding: 0,
+            margin: 0,
+            cursor: "pointer",
+          }}
         >
-          <img src={RewindIcon} alt="Rewind 10 seconds" style={{ height: 18, display: 'block' }} />
+          <img
+            src={RewindIcon}
+            alt="Rewind 10 seconds"
+            style={{height: 18, display: "block"}}
+          />
         </button>
         {playing ? (
           <button
             type="button"
             onClick={onPause}
             title="Pause"
-            style={{ background: 'transparent', border: 'none', padding: 0, margin: 0, cursor: 'pointer' }}
+            style={{
+              background: "transparent",
+              border: "none",
+              padding: 0,
+              margin: 0,
+              cursor: "pointer",
+            }}
             aria-label="Pause"
           >
-            <img src={PauseIcon} alt="Pause" style={{ height: 18, display: 'block' }} />
+            <img
+              src={PauseIcon}
+              alt="Pause"
+              style={{height: 18, display: "block"}}
+            />
           </button>
         ) : (
           <button
             type="button"
             onClick={onPlay}
             title="Play"
-            style={{ background: 'transparent', border: 'none', padding: 0, margin: 0, cursor: 'pointer' }}
+            style={{
+              background: "transparent",
+              border: "none",
+              padding: 0,
+              margin: 0,
+              cursor: "pointer",
+            }}
             aria-label="Play"
           >
-            <img src={PlayIcon} alt="Play" style={{ height: 18, display: 'block' }} />
+            <img
+              src={PlayIcon}
+              alt="Play"
+              style={{height: 18, display: "block"}}
+            />
           </button>
         )}
         <button
           onClick={skipFwd10}
           title="Forward 10s"
-          style={{ background: 'transparent', border: 'none', padding: 0, margin: 0, cursor: 'pointer' }}
+          style={{
+            background: "transparent",
+            border: "none",
+            padding: 0,
+            margin: 0,
+            cursor: "pointer",
+          }}
         >
-          <img src={ForwardIcon} alt="Forward 10 seconds" style={{ height: 18, display: 'block' }} />
+          <img
+            src={ForwardIcon}
+            alt="Forward 10 seconds"
+            style={{height: 18, display: "block"}}
+          />
         </button>
       </div>
 
       {/* right side: master volume */}
-      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8 }}>
+      <div
+        style={{
+          flex: 1,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "flex-end",
+          gap: 8,
+        }}
+      >
         <button
           type="button"
           onClick={onToggleMute}
           title={muted ? "Unmute" : "Mute"}
-          style={{ background: 'transparent', border: 'none', padding: 0, margin: 0, cursor: 'pointer' }}
+          style={{
+            background: "transparent",
+            border: "none",
+            padding: 0,
+            margin: 0,
+            cursor: "pointer",
+          }}
           aria-label={muted ? "Unmute" : "Mute"}
         >
           <img
             src={muted ? SoundOffIcon : SoundOnIcon}
             alt={muted ? "Muted" : "Sound on"}
-            style={{ height: 18, display: 'block' }}
+            style={{height: 18, display: "block"}}
           />
         </button>
         {/* Custom-styled slider wrapper */}
         <div
           style={{
-            position: 'relative',
+            position: "relative",
             width: 160, // match previous fixed width
             height: 28,
-            display: 'flex',
-            alignItems: 'center',
+            display: "flex",
+            alignItems: "center",
           }}
           aria-label="Master volume"
         >
           {/* Track background */}
           <div
             style={{
-              position: 'absolute',
+              position: "absolute",
               left: 0,
               right: 0,
-              top: '50%',
+              top: "50%",
               height: 10,
-              background: '#CDF8FF',
+              background: "#CDF8FF",
               borderRadius: 100,
-              transform: 'translateY(-50%)',
+              transform: "translateY(-50%)",
             }}
           />
           {/* Filled portion */}
           <div
             style={{
-              position: 'absolute',
+              position: "absolute",
               left: 0,
               width: `${masterVol}%`,
-              top: '50%',
+              top: "50%",
               height: 10,
-              background: '#17E1FF',
+              background: "#17E1FF",
               borderRadius: 100,
-              transform: 'translateY(-50%)',
+              transform: "translateY(-50%)",
             }}
           />
           {/* Knob */}
@@ -708,16 +789,18 @@ export default function WebAmpPlayback({ version, onEngineReady }) {
             src={VolumeKnob}
             alt="Volume knob"
             style={{
-              position: 'absolute',
+              position: "absolute",
               left: `${masterVol}%`,
-              top: '50%',
+              top: "50%",
               // Nudge downward slightly for visual centering
-              transform: `translate(-50%, -40%) ${draggingVol ? 'scale(1.05)' : 'scale(1)'}`,
+              transform: `translate(-50%, -40%) ${draggingVol ? "scale(1.05)" : "scale(1)"}`,
               height: 20,
               width: 20,
-              filter: draggingVol ? 'drop-shadow(0 0 6px rgba(61,133,225,0.4))' : 'drop-shadow(0 1px 2px rgba(0,0,0,0.15))',
-              transition: 'transform 120ms ease, filter 120ms ease',
-              pointerEvents: 'none',
+              filter: draggingVol
+                ? "drop-shadow(0 0 6px rgba(61,133,225,0.4))"
+                : "drop-shadow(0 1px 2px rgba(0,0,0,0.15))",
+              transition: "transform 120ms ease, filter 120ms ease",
+              pointerEvents: "none",
             }}
           />
           {/* Native input for interactions (invisible) */}
@@ -749,12 +832,12 @@ export default function WebAmpPlayback({ version, onEngineReady }) {
             onTouchStart={() => setDraggingVol(true)}
             onTouchEnd={() => setDraggingVol(false)}
             style={{
-              position: 'absolute',
+              position: "absolute",
               inset: 0,
-              width: '100%',
+              width: "100%",
               height: 28,
               opacity: 0,
-              cursor: 'pointer',
+              cursor: "pointer",
             }}
           />
         </div>

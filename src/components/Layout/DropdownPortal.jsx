@@ -1,40 +1,50 @@
-import React, { useState, useEffect, useRef } from 'react';
-import ReactDOM from 'react-dom';
-import { useNavigate } from 'react-router-dom';
-import './Header.css';
-import { 
-  ExportIcon, NewIcon, PreviousVersionsIcon, UndoIcon, RedoIcon, 
-  CutIcon, CopyIcon, PasteIcon, DeleteIcon, SoundQualityIcon, 
-  ThemesIcon, ColorAccessibilityIcon, GuestIcon 
-} from './Svgs';
+import React, {useState, useEffect, useRef} from "react";
+import ReactDOM from "react-dom";
+import {useNavigate} from "react-router-dom";
+import "./Header.css";
+import {
+  ExportIcon,
+  NewIcon,
+  PreviousVersionsIcon,
+  UndoIcon,
+  RedoIcon,
+  CutIcon,
+  CopyIcon,
+  PasteIcon,
+  DeleteIcon,
+  SoundQualityIcon,
+  ThemesIcon,
+  ColorAccessibilityIcon,
+  GuestIcon,
+} from "./Svgs";
 
-function DropdownPortal({ showMenuButtons = true, showGuestButton = false }) {
+function DropdownPortal({showMenuButtons = true, showGuestButton = false}) {
   const navigate = useNavigate();
   const [activeDropdown, setActiveDropdown] = useState(null);
-  const [position, setPosition] = useState({ top: 0, left: 0 });
-  
+  const [position, setPosition] = useState({top: 0, left: 0});
+
   const fileButtonRef = useRef(null);
   const editButtonRef = useRef(null);
   const toolsButtonRef = useRef(null);
   const settingsButtonRef = useRef(null);
   const guestButtonRef = useRef(null);
-  
+
   const fileDropdownRef = useRef(null);
   const editDropdownRef = useRef(null);
   const toolsDropdownRef = useRef(null);
   const settingsDropdownRef = useRef(null);
   const guestDropdownRef = useRef(null);
 
- const handleMenuItemClick = (action) => {
+  const handleMenuItemClick = (action) => {
     console.log(`Selected: ${action}`);
-    
+
     // Handle navigation for guest dropdown
-    if (action === 'Login') {
-      navigate('/login');
-    } else if (action === 'Register') {
-      navigate('/register');
+    if (action === "Login") {
+      navigate("/login");
+    } else if (action === "Register") {
+      navigate("/register");
     }
-    
+
     setActiveDropdown(null);
   };
 
@@ -43,10 +53,10 @@ function DropdownPortal({ showMenuButtons = true, showGuestButton = false }) {
       const rect = buttonRef.current.getBoundingClientRect();
       setPosition({
         top: rect.bottom + window.scrollY,
-        left: rect.left + window.scrollX
+        left: rect.left + window.scrollX,
       });
     }
-    
+
     setActiveDropdown(activeDropdown === dropdownName ? null : dropdownName);
   };
 
@@ -54,7 +64,7 @@ function DropdownPortal({ showMenuButtons = true, showGuestButton = false }) {
   const handleDropdownMouseLeave = (event) => {
     const relatedTarget = event.relatedTarget;
     const dropdown = event.currentTarget;
-    
+
     if (!dropdown.contains(relatedTarget)) {
       setActiveDropdown(null);
     }
@@ -67,269 +77,411 @@ function DropdownPortal({ showMenuButtons = true, showGuestButton = false }) {
         edit: editDropdownRef,
         tools: toolsDropdownRef,
         settings: settingsDropdownRef,
-        guest: guestDropdownRef
+        guest: guestDropdownRef,
       };
-      
+
       const buttonRefs = {
         file: fileButtonRef,
         edit: editButtonRef,
         tools: toolsButtonRef,
         settings: settingsButtonRef,
-        guest: guestButtonRef
+        guest: guestButtonRef,
       };
 
       const activeRef = dropdownRefs[activeDropdown];
       const activeButtonRef = buttonRefs[activeDropdown];
 
-      if (activeRef && activeRef.current && 
-          !activeRef.current.contains(event.target) &&
-          activeButtonRef && activeButtonRef.current && 
-          !activeButtonRef.current.contains(event.target)) {
+      if (
+        activeRef &&
+        activeRef.current &&
+        !activeRef.current.contains(event.target) &&
+        activeButtonRef &&
+        activeButtonRef.current &&
+        !activeButtonRef.current.contains(event.target)
+      ) {
         setActiveDropdown(null);
       }
     }
 
-    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [activeDropdown]);
 
   // Helper function to get button class with active state
   const getButtonClass = (buttonType, dropdownName) => {
-    const baseClass = `dropdown-btn${buttonType ? `-${buttonType}` : ''}`;
+    const baseClass = `dropdown-btn${buttonType ? `-${buttonType}` : ""}`;
     return activeDropdown === dropdownName ? `${baseClass} active` : baseClass;
   };
 
   // Dropdown content for each menu with individual styling
   const dropdownContent = {
     file: (
-      <div 
+      <div
         ref={fileDropdownRef}
         className="dropdown-content dropdown-content-file"
         style={{
-          position: 'fixed',
+          position: "fixed",
           top: position.top,
           left: position.left,
-          zIndex: 99999
+          zIndex: 99999,
         }}
         onMouseLeave={handleDropdownMouseLeave}
       >
-        <a href="#" onClick={(e) => { e.preventDefault(); handleMenuItemClick('New'); }}>
-          <span style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            width: '100%',
-            gap: '8px'
-          }}>
+        <a
+          href="#"
+          onClick={(e) => {
+            e.preventDefault();
+            handleMenuItemClick("New");
+          }}
+        >
+          <span
+            style={{
+              display: "flex",
+              alignItems: "center",
+              width: "100%",
+              gap: "8px",
+            }}
+          >
             <NewIcon />
             <span>New...</span>
           </span>
         </a>
-        <a href="#" onClick={(e) => { e.preventDefault(); handleMenuItemClick('Previous Versions'); }}>
-          <span style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            width: '100%',
-            gap: '8px'
-          }}>
+        <a
+          href="#"
+          onClick={(e) => {
+            e.preventDefault();
+            handleMenuItemClick("Previous Versions");
+          }}
+        >
+          <span
+            style={{
+              display: "flex",
+              alignItems: "center",
+              width: "100%",
+              gap: "8px",
+            }}
+          >
             <PreviousVersionsIcon />
             <span>Previous Versions</span>
           </span>
         </a>
-        <a href="#" onClick={(e) => { e.preventDefault(); handleMenuItemClick('Save'); }}>
+        <a
+          href="#"
+          onClick={(e) => {
+            e.preventDefault();
+            handleMenuItemClick("Save");
+          }}
+        >
           <span>Save</span>
         </a>
-        <a href="#" onClick={(e) => { e.preventDefault(); handleMenuItemClick('Export'); }}>
-          <span style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            width: '100%',
-            gap: '8px'
-          }}>
+        <a
+          href="#"
+          onClick={(e) => {
+            e.preventDefault();
+            handleMenuItemClick("Export");
+          }}
+        >
+          <span
+            style={{
+              display: "flex",
+              alignItems: "center",
+              width: "100%",
+              gap: "8px",
+            }}
+          >
             <ExportIcon />
             <span>Export</span>
           </span>
         </a>
       </div>
     ),
-    
+
     edit: (
       <div
         ref={editDropdownRef}
         className="dropdown-content dropdown-content-edit"
         style={{
-          position: 'fixed',
+          position: "fixed",
           top: position.top,
           left: position.left,
-          zIndex: 99999
+          zIndex: 99999,
         }}
         onMouseLeave={handleDropdownMouseLeave}
       >
-        <a href="#" onClick={(e) => { e.preventDefault(); handleMenuItemClick('Undo'); }}>
-          <span style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            width: '100%',
-            gap: '8px'
-          }}>
-          <UndoIcon />
-          <span>Undo</span>
+        <a
+          href="#"
+          onClick={(e) => {
+            e.preventDefault();
+            handleMenuItemClick("Undo");
+          }}
+        >
+          <span
+            style={{
+              display: "flex",
+              alignItems: "center",
+              width: "100%",
+              gap: "8px",
+            }}
+          >
+            <UndoIcon />
+            <span>Undo</span>
           </span>
         </a>
-        <a href="#" onClick={(e) => { e.preventDefault(); handleMenuItemClick('Redo'); }}>
-          <span style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            width: '100%',
-            gap: '8px'
-          }}>
-          <RedoIcon />
-          <span>Redo</span>
+        <a
+          href="#"
+          onClick={(e) => {
+            e.preventDefault();
+            handleMenuItemClick("Redo");
+          }}
+        >
+          <span
+            style={{
+              display: "flex",
+              alignItems: "center",
+              width: "100%",
+              gap: "8px",
+            }}
+          >
+            <RedoIcon />
+            <span>Redo</span>
           </span>
         </a>
-        <a href="#" onClick={(e) => { e.preventDefault(); handleMenuItemClick('Cut'); }}>
-          <span style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            width: '100%',
-            gap: '8px'
-          }}>
-          <CutIcon />
-          <span>Cut</span>
+        <a
+          href="#"
+          onClick={(e) => {
+            e.preventDefault();
+            handleMenuItemClick("Cut");
+          }}
+        >
+          <span
+            style={{
+              display: "flex",
+              alignItems: "center",
+              width: "100%",
+              gap: "8px",
+            }}
+          >
+            <CutIcon />
+            <span>Cut</span>
           </span>
         </a>
-        <a href="#" onClick={(e) => { e.preventDefault(); handleMenuItemClick('Copy'); }}>
-          <span style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            width: '100%',
-            gap: '8px'
-          }}>
-          <CopyIcon />
-          <span>Copy</span>
+        <a
+          href="#"
+          onClick={(e) => {
+            e.preventDefault();
+            handleMenuItemClick("Copy");
+          }}
+        >
+          <span
+            style={{
+              display: "flex",
+              alignItems: "center",
+              width: "100%",
+              gap: "8px",
+            }}
+          >
+            <CopyIcon />
+            <span>Copy</span>
           </span>
         </a>
-        <a href="#" onClick={(e) => { e.preventDefault(); handleMenuItemClick('Paste'); }}>
-          <span style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            width: '100%',
-            gap: '8px'
-          }}>
-          <PasteIcon />
-          <span>Paste</span>
+        <a
+          href="#"
+          onClick={(e) => {
+            e.preventDefault();
+            handleMenuItemClick("Paste");
+          }}
+        >
+          <span
+            style={{
+              display: "flex",
+              alignItems: "center",
+              width: "100%",
+              gap: "8px",
+            }}
+          >
+            <PasteIcon />
+            <span>Paste</span>
           </span>
         </a>
-        <a href="#" onClick={(e) => { e.preventDefault(); handleMenuItemClick('Delete'); }}>
-          <span style={{
-            display: 'flex', 
-            alignItems: 'center', 
-            width: '100%',
-            gap: '8px'
-          }}>
-          <DeleteIcon />
-          <span>Delete</span>
+        <a
+          href="#"
+          onClick={(e) => {
+            e.preventDefault();
+            handleMenuItemClick("Delete");
+          }}
+        >
+          <span
+            style={{
+              display: "flex",
+              alignItems: "center",
+              width: "100%",
+              gap: "8px",
+            }}
+          >
+            <DeleteIcon />
+            <span>Delete</span>
           </span>
         </a>
       </div>
     ),
 
     tools: (
-      <div 
+      <div
         ref={toolsDropdownRef}
         className="dropdown-content dropdown-content-tools"
         style={{
-          position: 'fixed',
+          position: "fixed",
           top: position.top,
           left: position.left,
-          zIndex: 99999
+          zIndex: 99999,
         }}
         onMouseLeave={handleDropdownMouseLeave}
       >
-        <a href="#" onClick={(e) => { e.preventDefault(); handleMenuItemClick('Tool 1'); }}>
+        <a
+          href="#"
+          onClick={(e) => {
+            e.preventDefault();
+            handleMenuItemClick("Tool 1");
+          }}
+        >
           Tool 1
         </a>
-        <a href="#" onClick={(e) => { e.preventDefault(); handleMenuItemClick('Tool 2'); }}>
+        <a
+          href="#"
+          onClick={(e) => {
+            e.preventDefault();
+            handleMenuItemClick("Tool 2");
+          }}
+        >
           Tool 2
         </a>
-        <a href="#" onClick={(e) => { e.preventDefault(); handleMenuItemClick('Tool 3'); }}>
+        <a
+          href="#"
+          onClick={(e) => {
+            e.preventDefault();
+            handleMenuItemClick("Tool 3");
+          }}
+        >
           Tool 3
         </a>
       </div>
     ),
-    
+
     settings: (
-      <div 
+      <div
         ref={settingsDropdownRef}
         className="dropdown-content dropdown-content-settings"
         style={{
-          position: 'fixed',
+          position: "fixed",
           top: position.top,
           left: position.left,
-          zIndex: 99999
+          zIndex: 99999,
         }}
         onMouseLeave={handleDropdownMouseLeave}
       >
-        <a href="#" onClick={(e) => { e.preventDefault(); handleMenuItemClick('Sound Quality'); }}>
-          <span style={{
-            display: 'flex', 
-            alignItems: 'center', 
-            width: '100%',
-            gap: '8px'
-          }}>
-          <SoundQualityIcon />
-          <span>Sound Quality</span>
+        <a
+          href="#"
+          onClick={(e) => {
+            e.preventDefault();
+            handleMenuItemClick("Sound Quality");
+          }}
+        >
+          <span
+            style={{
+              display: "flex",
+              alignItems: "center",
+              width: "100%",
+              gap: "8px",
+            }}
+          >
+            <SoundQualityIcon />
+            <span>Sound Quality</span>
           </span>
         </a>
-        <a href="#" onClick={(e) => { e.preventDefault(); handleMenuItemClick('Themes'); }}>
-          <span style={{
-            display: 'flex', 
-            alignItems: 'center', 
-            width: '100%',
-            gap: '8px'
-          }}>
-          <ThemesIcon />
-          <span>Themes</span>
+        <a
+          href="#"
+          onClick={(e) => {
+            e.preventDefault();
+            handleMenuItemClick("Themes");
+          }}
+        >
+          <span
+            style={{
+              display: "flex",
+              alignItems: "center",
+              width: "100%",
+              gap: "8px",
+            }}
+          >
+            <ThemesIcon />
+            <span>Themes</span>
           </span>
         </a>
-        <a href="#" onClick={(e) => { e.preventDefault(); handleMenuItemClick('Color Accessibility'); }}>
-          <span style={{
-            display: 'flex', 
-            alignItems: 'center', 
-            width: '100%',
-            gap: '8px'
-          }}>
-          <ColorAccessibilityIcon />
-          <span>Color Accessibility</span>
+        <a
+          href="#"
+          onClick={(e) => {
+            e.preventDefault();
+            handleMenuItemClick("Color Accessibility");
+          }}
+        >
+          <span
+            style={{
+              display: "flex",
+              alignItems: "center",
+              width: "100%",
+              gap: "8px",
+            }}
+          >
+            <ColorAccessibilityIcon />
+            <span>Color Accessibility</span>
           </span>
         </a>
-        <a href="#" onClick={(e) => { e.preventDefault(); handleMenuItemClick('About'); }}>
+        <a
+          href="#"
+          onClick={(e) => {
+            e.preventDefault();
+            handleMenuItemClick("About");
+          }}
+        >
           About
         </a>
       </div>
     ),
 
     guest: (
-      <div 
+      <div
         ref={guestDropdownRef}
         className="dropdown-content dropdown-content-guest"
         style={{
-          position: 'fixed',
+          position: "fixed",
           top: position.top,
           left: position.left,
-          zIndex: 99999
+          zIndex: 99999,
         }}
         onMouseLeave={handleDropdownMouseLeave}
       >
-        <a href="#" onClick={(e) => { e.preventDefault(); handleMenuItemClick('Login'); }}>
+        <a
+          href="#"
+          onClick={(e) => {
+            e.preventDefault();
+            handleMenuItemClick("Login");
+          }}
+        >
           Login
         </a>
-        <a href="#" onClick={(e) => { e.preventDefault(); handleMenuItemClick('Register'); }}>
+        <a
+          href="#"
+          onClick={(e) => {
+            e.preventDefault();
+            handleMenuItemClick("Register");
+          }}
+        >
           Register
         </a>
       </div>
-    )
+    ),
   };
 
   return (
@@ -341,10 +493,10 @@ function DropdownPortal({ showMenuButtons = true, showGuestButton = false }) {
           <>
             {/* File Dropdown */}
             <div className="dropdown">
-              <button 
+              <button
                 ref={fileButtonRef}
-                className={getButtonClass('', 'file')}
-                onClick={() => handleButtonClick('file', fileButtonRef)}
+                className={getButtonClass("", "file")}
+                onClick={() => handleButtonClick("file", fileButtonRef)}
               >
                 File
               </button>
@@ -352,10 +504,10 @@ function DropdownPortal({ showMenuButtons = true, showGuestButton = false }) {
 
             {/* Edit Dropdown */}
             <div className="dropdown">
-              <button 
+              <button
                 ref={editButtonRef}
-                className={getButtonClass('', 'edit')}
-                onClick={() => handleButtonClick('edit', editButtonRef)}
+                className={getButtonClass("", "edit")}
+                onClick={() => handleButtonClick("edit", editButtonRef)}
               >
                 Edit
               </button>
@@ -363,10 +515,10 @@ function DropdownPortal({ showMenuButtons = true, showGuestButton = false }) {
 
             {/* Tools Dropdown */}
             <div className="dropdown">
-              <button 
+              <button
                 ref={toolsButtonRef}
-                className={getButtonClass('tools', 'tools')}
-                onClick={() => handleButtonClick('tools', toolsButtonRef)}
+                className={getButtonClass("tools", "tools")}
+                onClick={() => handleButtonClick("tools", toolsButtonRef)}
               >
                 Tools
               </button>
@@ -374,10 +526,10 @@ function DropdownPortal({ showMenuButtons = true, showGuestButton = false }) {
 
             {/* Settings Dropdown */}
             <div className="dropdown">
-              <button 
+              <button
                 ref={settingsButtonRef}
-                className={getButtonClass('settings', 'settings')}
-                onClick={() => handleButtonClick('settings', settingsButtonRef)}
+                className={getButtonClass("settings", "settings")}
+                onClick={() => handleButtonClick("settings", settingsButtonRef)}
               >
                 Settings
               </button>
@@ -388,12 +540,12 @@ function DropdownPortal({ showMenuButtons = true, showGuestButton = false }) {
         {/* Guest Button */}
         {showGuestButton && (
           <div className="dropdown">
-            <button 
+            <button
               ref={guestButtonRef}
-              className={getButtonClass('guest', 'guest')}
-              onClick={() => handleButtonClick('guest', guestButtonRef)}
+              className={getButtonClass("guest", "guest")}
+              onClick={() => handleButtonClick("guest", guestButtonRef)}
             >
-              <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{display: "flex", alignItems: "center", gap: "8px"}}>
                 <GuestIcon />
                 <span>Guest</span>
               </span>
@@ -403,10 +555,8 @@ function DropdownPortal({ showMenuButtons = true, showGuestButton = false }) {
       </div>
 
       {/* Dropdowns rendered via portal */}
-      {activeDropdown && ReactDOM.createPortal(
-        dropdownContent[activeDropdown],
-        document.body
-      )}
+      {activeDropdown &&
+        ReactDOM.createPortal(dropdownContent[activeDropdown], document.body)}
     </>
   );
 }
