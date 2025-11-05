@@ -17,8 +17,14 @@ import {
   ColorAccessibilityIcon,
   GuestIcon,
 } from "./Svgs";
+import AudioExportButton from "../AudioExport/AudioExportButton";
 
-function DropdownPortal({showMenuButtons = true, showGuestButton = false}) {
+function DropdownPortal({
+  showMenuButtons = true,
+  showGuestButton = false,
+  audioBuffer, 
+  onExportComplete, 
+}) {
   const navigate = useNavigate();
   const [activeDropdown, setActiveDropdown] = useState(null);
   const [position, setPosition] = useState({top: 0, left: 0});
@@ -38,14 +44,15 @@ function DropdownPortal({showMenuButtons = true, showGuestButton = false}) {
   const handleMenuItemClick = (action) => {
     console.log(`Selected: ${action}`);
 
-    // Handle navigation for guest dropdown
     if (action === "Login") {
       navigate("/login");
     } else if (action === "Register") {
       navigate("/register");
     }
 
-    setActiveDropdown(null);
+    if (action !== "Export") {
+      setActiveDropdown(null);
+    }
   };
 
   const handleButtonClick = (dropdownName, buttonRef) => {
@@ -60,7 +67,6 @@ function DropdownPortal({showMenuButtons = true, showGuestButton = false}) {
     setActiveDropdown(activeDropdown === dropdownName ? null : dropdownName);
   };
 
-  // Handle mouse leave from dropdown
   const handleDropdownMouseLeave = (event) => {
     const relatedTarget = event.relatedTarget;
     const dropdown = event.currentTarget;
@@ -109,13 +115,11 @@ function DropdownPortal({showMenuButtons = true, showGuestButton = false}) {
     };
   }, [activeDropdown]);
 
-  // Helper function to get button class with active state
   const getButtonClass = (buttonType, dropdownName) => {
     const baseClass = `dropdown-btn${buttonType ? `-${buttonType}` : ""}`;
     return activeDropdown === dropdownName ? `${baseClass} active` : baseClass;
   };
 
-  // Dropdown content for each menu with individual styling
   const dropdownContent = {
     file: (
       <div
@@ -176,25 +180,31 @@ function DropdownPortal({showMenuButtons = true, showGuestButton = false}) {
         >
           <span>Save</span>
         </a>
-        <a
-          href="#"
-          onClick={(e) => {
-            e.preventDefault();
-            handleMenuItemClick("Export");
-          }}
+        
+        <AudioExportButton
+          audioBuffer={audioBuffer}
+          onExportComplete={onExportComplete}
         >
-          <span
-            style={{
-              display: "flex",
-              alignItems: "center",
-              width: "100%",
-              gap: "8px",
+          <a
+            href="#"
+            onClick={(e) => {
+              e.preventDefault();
+              handleMenuItemClick("Export");
             }}
           >
-            <ExportIcon />
-            <span>Export</span>
-          </span>
-        </a>
+            <span
+              style={{
+                display: "flex",
+                alignItems: "center",
+                width: "100%",
+                gap: "8px",
+              }}
+            >
+              <ExportIcon />
+              <span>Export</span>
+            </span>
+          </a>
+        </AudioExportButton>
       </div>
     ),
 
