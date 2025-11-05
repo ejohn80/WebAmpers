@@ -11,7 +11,7 @@ html,
 
 /* Header specific styling */
 .header {
-  background-color: #262529;
+  background-color: #242424;
   position: relative;
   z-index: 9999;
   overflow: visible;
@@ -28,19 +28,8 @@ html,
 
 /* Ensure other sections have lower z-index */
 
-.blue {
-  background-color: #4da6ff;
-  z-index: 1; /* Lower than header */
-}
-
-.purple {
-  background-color: #a366ff;
-  overflow: auto;
-  z-index: 1; /* Lower than header */
-}
-
-.lime {
-  background-color: #99ff4d;
+.footer {
+  background-color: #242424;
   z-index: 1; /* Lower than header */
 }
 
@@ -48,8 +37,17 @@ html,
 .section {
   padding: 10px;
   box-sizing: border-box;
-  color: white;
-  border: 1px solid black;
+  color: #e5e5e5; /* match header text color */
+  border: 1px solid #343239;
+}
+
+/* Footer-specific overrides to vertically center content inside the small footer row */
+.footer {
+  display: flex;
+  align-items: center;
+  padding: 0 10px; /* reduce vertical padding so controls sit centered */
+  height: 100%;
+  box-sizing: border-box;
 }
 
 /* Main content (center area) override — use a dark grey so TrackLane can be lighter */
