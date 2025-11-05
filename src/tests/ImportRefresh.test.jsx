@@ -1,56 +1,69 @@
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { dbManager } from '../managers/DBManager';
 import { audioManager } from '../managers/AudioManager';
 import * as Tone from 'tone';
 
 // Mock Tone.js runtime pieces used by AudioTrack so tests can run in Node
-jest.mock('tone');
-
-// Provide minimal stubs for the Tone pieces used by the code under test.
-beforeEach(() => {
-  Tone.context = {
-    state: 'suspended',
-    rawContext: { decodeAudioData: jest.fn() },
-    resume: jest.fn().mockResolvedValue(undefined),
-    createBuffer: (numberOfChannels, length, sampleRate) => {
-      // Simple in-memory buffer that supports copyToChannel and getChannelData
-      const channels = [];
-      for (let i = 0; i < numberOfChannels; i++) channels.push(new Float32Array(length));
-      return {
-        numberOfChannels,
-        length,
-        sampleRate,
-        duration: length / sampleRate,
-        copyToChannel: (data, ch) => {
-          channels[ch].set(data);
-        },
-        getChannelData: (i) => channels[i],
-      };
-    },
-  };
-  Tone.start = jest.fn().mockResolvedValue(undefined);
-  // Minimal ToneAudioBuffer constructor used in tests. Instances must pass
-  // `instanceof Tone.ToneAudioBuffer` checks in AudioSegment.
-  Tone.ToneAudioBuffer = class {
+vi.mock('tone', () => {
+  // Create mock classes that will be returned
+  class MockToneAudioBuffer {
     constructor(native) {
-      this.duration = native.duration || 1;
-      this.sampleRate = native.sampleRate || 44100;
-      this.numberOfChannels = native.numberOfChannels || 1;
-      this.get = () => ({
+      this.duration = native?.duration || 1;
+      this.sampleRate = native?.sampleRate || 44100;
+      this.numberOfChannels = native?.numberOfChannels || 1;
+      this._native = native;
+    }
+    
+    get() {
+      return {
         numberOfChannels: this.numberOfChannels,
         sampleRate: this.sampleRate,
-        length: native.length || 44100,
+        length: this._native?.length || 44100,
         duration: this.duration,
-        getChannelData: native.getChannelData,
-      });
+        getChannelData: this._native?.getChannelData || (() => new Float32Array(44100)),
+      };
     }
-  };
-  // Minimal Channel stub that exposes expected fields/methods used by AudioTrack
-  Tone.Channel = function (opts) {
-    this.volume = { value: typeof opts.volume === 'number' ? opts.volume : 0 };
-    this.pan = { value: typeof opts.pan === 'number' ? opts.pan : 0 };
-    this.mute = !!opts.mute;
-    this.solo = !!opts.solo;
-    this.toDestination = () => this;
+  }
+
+  class MockChannel {
+    constructor(opts = {}) {
+      this.volume = { value: typeof opts.volume === 'number' ? opts.volume : 0 };
+      this.pan = { value: typeof opts.pan === 'number' ? opts.pan : 0 };
+      this.mute = !!opts.mute;
+      this.solo = !!opts.solo;
+    }
+    
+    toDestination() {
+      return this;
+    }
+  }
+
+  return {
+    context: {
+      state: 'suspended',
+      rawContext: { decodeAudioData: vi.fn() },
+      resume: vi.fn().mockResolvedValue(undefined),
+      createBuffer: (numberOfChannels, length, sampleRate) => {
+        // Simple in-memory buffer that supports copyToChannel and getChannelData
+        const channels = [];
+        for (let i = 0; i < numberOfChannels; i++) {
+          channels.push(new Float32Array(length));
+        }
+        return {
+          numberOfChannels,
+          length,
+          sampleRate,
+          duration: length / sampleRate,
+          copyToChannel: (data, ch) => {
+            channels[ch].set(data);
+          },
+          getChannelData: (i) => channels[i],
+        };
+      },
+    },
+    start: vi.fn().mockResolvedValue(undefined),
+    ToneAudioBuffer: MockToneAudioBuffer,
+    Channel: MockChannel,
   };
 });
 
@@ -75,6 +88,7 @@ const makeImport = (name, seed = 1) => {
 
 describe('Import + Refresh workflow', () => {
   beforeEach(async () => {
+    vi.clearAllMocks();
     await dbManager.openDB();
     await dbManager.clearAllTracks();
     // Reset in-memory tracks
@@ -82,12 +96,17 @@ describe('Import + Refresh workflow', () => {
   });
 
   afterEach(async () => {
-    await dbManager.clearAllTracks();
-    if (dbManager.db) {
-      dbManager.db.close();
-      dbManager.db = null;
+    try {
+      await dbManager.clearAllTracks();
+      if (dbManager.db) {
+        dbManager.db.close();
+        dbManager.db = null;
+      }
+      audioManager.tracks.length = 0;
+    } catch (error) {
+      // Ignore cleanup errors
+      console.warn('Cleanup error:', error);
     }
-    audioManager.tracks.length = 0;
   });
 
   it('should preserve the latest imported track after successive refreshes', async () => {
@@ -128,5 +147,94 @@ describe('Import + Refresh workflow', () => {
     // Expect the last track to be file3
     expect(audioManager.tracks).toHaveLength(3);
     expect(audioManager.tracks[audioManager.tracks.length - 1].name).toBe('file3');
+  });
+
+  it('should restore track mixer settings after refresh', async () => {
+    // Import a track with specific mixer settings
+    const imp = makeImport('MixerTrack', 5);
+    const track = audioManager.addTrackFromBuffer(imp);
+    
+    // Set mixer values
+    track.volume = -6;
+    track.pan = 0.3;
+    track.mute = true;
+    track.solo = false;
+    
+    await dbManager.addTrack(track);
+
+    // Refresh: clear and reload from DB
+    audioManager.tracks.length = 0;
+    const saved = await dbManager.getAllTracks();
+    saved.forEach((s) => audioManager.addTrackFromBuffer(s));
+
+    expect(audioManager.tracks).toHaveLength(1);
+    const restored = audioManager.tracks[0];
+    expect(restored.name).toBe('MixerTrack');
+    expect(restored.volume).toBe(-6);
+    expect(restored.pan).toBe(0.3);
+    expect(restored.mute).toBe(true);
+    expect(restored.solo).toBe(false);
+  });
+
+  it('should handle multiple segments per track across refresh', async () => {
+    // Create a track manually with multiple segments
+    const imp = makeImport('MultiSegment', 10);
+    const track = audioManager.addTrackFromBuffer(imp);
+    
+    // Add a second segment manually
+    const mockNative2 = {
+      duration: 2,
+      sampleRate: 44100,
+      numberOfChannels: 2,
+      length: 88200,
+      getChannelData: (i) => new Float32Array([0.5, 0.6, 0.7]),
+    };
+    const toneBuf2 = new Tone.ToneAudioBuffer(mockNative2);
+    
+    // Import AudioSegment to create second segment
+    const { AudioSegment } = await import('../models/AudioSegment');
+    const seg2 = new AudioSegment({ buffer: toneBuf2, offset: 1.0 });
+    track.segments.push(seg2);
+
+    await dbManager.addTrack(track);
+
+    // Refresh
+    audioManager.tracks.length = 0;
+    const saved = await dbManager.getAllTracks();
+    saved.forEach((s) => audioManager.addTrackFromBuffer(s));
+
+    expect(audioManager.tracks).toHaveLength(1);
+    const restored = audioManager.tracks[0];
+    expect(restored.segments).toHaveLength(2);
+    expect(restored.segments[0].buffer).toBeDefined();
+    expect(restored.segments[1].buffer).toBeDefined();
+  });
+
+  it('should clear all tracks and start fresh', async () => {
+    // Import multiple tracks
+    const imp1 = makeImport('Clear1', 1);
+    const imp2 = makeImport('Clear2', 2);
+    const imp3 = makeImport('Clear3', 3);
+
+    audioManager.addTrackFromBuffer(imp1);
+    audioManager.addTrackFromBuffer(imp2);
+    audioManager.addTrackFromBuffer(imp3);
+
+    // Save all to DB
+    for (const track of audioManager.tracks) {
+      await dbManager.addTrack(track);
+    }
+
+    expect(audioManager.tracks).toHaveLength(3);
+
+    // Clear everything
+    await dbManager.clearAllTracks();
+    audioManager.tracks.length = 0;
+
+    // Refresh should show no tracks
+    const saved = await dbManager.getAllTracks();
+    saved.forEach((s) => audioManager.addTrackFromBuffer(s));
+
+    expect(audioManager.tracks).toHaveLength(0);
   });
 });
