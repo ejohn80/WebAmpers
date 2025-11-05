@@ -30,10 +30,22 @@ const AudioExportButton = ({audioBuffer, onExportComplete, children}) => {
     }
   };
 
+  // Clone the child element and inject the openModal handler
+  const triggerElement = React.cloneElement(children, {
+    onClick: (e) => {
+      // Preserve original click handler if it exists
+      if (children.props.onClick) {
+        children.props.onClick(e);
+      }
+      // Open the modal
+      openModal();
+    },
+  });
+
   return (
     <>
       {/* The trigger element from the dropdown */}
-      <span onClick={openModal}>{children}</span>
+      {triggerElement}
 
       {/* The actual modal content */}
       <AudioExportModal

@@ -19,10 +19,18 @@ import {
   ThemesIcon,
   ColorAccessibilityIcon,
   GuestIcon,
+  ImportIcon, // <-- ADDED ImportIcon
 } from "./Svgs";
 import AudioExportButton from "../AudioExport/AudioExportButton";
+import AudioImportButton from "../AudioImport/AudioImportButton"; // <-- ADDED Import Component
 
-function DropdownPortal({side, audioBuffer, onExportComplete}) {
+function DropdownPortal({
+  side,
+  audioBuffer,
+  onExportComplete,
+  onImportSuccess, // <-- ADDED Prop
+  onImportError, // <-- ADDED Prop
+}) {
   const navigate = useNavigate();
   const {userData} = useContext(AppContext);
 
@@ -50,7 +58,8 @@ function DropdownPortal({side, audioBuffer, onExportComplete}) {
       navigate("/register");
     }
 
-    if (action !== "Export") {
+    // Do not close the dropdown for "Export" or "Import", as the wrapper will handle the interaction (e.g., opening a modal/file dialog).
+    if (action !== "Export" && action !== "Import") {
       setActiveDropdown(null);
     }
   };
@@ -180,6 +189,33 @@ function DropdownPortal({side, audioBuffer, onExportComplete}) {
         >
           <span>Save</span>
         </a>
+
+        {/* --- AUDIO IMPORT BUTTON WRAPPER --- */}
+        <AudioImportButton
+          onImportSuccess={onImportSuccess}
+          onImportError={onImportError}
+        >
+          <a
+            href="#"
+            onClick={(e) => {
+              e.preventDefault();
+              handleMenuItemClick("Import");
+            }}
+          >
+            <span
+              style={{
+                display: "flex",
+                alignItems: "center",
+                width: "100%",
+                gap: "8px",
+              }}
+            >
+              <ImportIcon />
+              <span>Import Audio</span>
+            </span>
+          </a>
+        </AudioImportButton>
+        {/* ----------------------------------- */}
 
         <AudioExportButton
           audioBuffer={audioBuffer}

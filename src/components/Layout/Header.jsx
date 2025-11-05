@@ -1,4 +1,3 @@
-import AudioImportButton from "../AudioImport/AudioImportButton";
 import {logout} from "../Auth/AuthUtils";
 import {useUserData} from "../../hooks/useUserData";
 import {useNavigate} from "react-router-dom";
@@ -24,6 +23,8 @@ function Header({
             side="left"
             audioBuffer={audioBuffer}
             onExportComplete={onExportComplete}
+            onImportSuccess={onImportSuccess}
+            onImportError={onImportError}
           />
         </div>
 
@@ -35,12 +36,6 @@ function Header({
             height: "100%",
           }}
         >
-          {/* Audio Import Button */}
-          <AudioImportButton
-            onImportSuccess={onImportSuccess}
-            onImportError={onImportError}
-          />
-
           <DropdownPortal side="right" />
         </div>
       </div>
