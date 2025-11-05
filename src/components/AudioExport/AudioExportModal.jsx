@@ -15,6 +15,12 @@ const AudioExportModal = ({audioBuffer, onExportComplete, isOpen, onClose}) => {
     }
   };
 
+  const handleOverlayClick = (e) => {
+    if (e.target === e.currentTarget) {
+      onClose();
+    }
+  };
+
   return (
     <div
       style={{
@@ -29,6 +35,7 @@ const AudioExportModal = ({audioBuffer, onExportComplete, isOpen, onClose}) => {
         alignItems: "center",
         zIndex: 1000,
       }}
+      onClick={handleOverlayClick} 
     >
       {/* Modal Content */}
       <div
@@ -50,7 +57,7 @@ const AudioExportModal = ({audioBuffer, onExportComplete, isOpen, onClose}) => {
             border: "none",
             fontSize: "24px",
             cursor: "pointer",
-            color: "#333",
+            color: "#ffffffff",
             lineHeight: "20px",
           }}
           aria-label="Close Export Modal"
