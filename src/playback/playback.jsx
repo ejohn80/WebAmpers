@@ -291,7 +291,11 @@ class PlaybackEngine {
     tracks.forEach((t) => {
       const bus = this.trackBuses.get(t.id);
       if (!bus) return;
-      const shouldMute = anySolo ? !t.solo : !!t.mute;
+      // Mute should take precedence over solo. If a track is muted, it
+      // remains effectively silent even when soloed. If any track is
+      // soloed, non-soloed tracks are muted unless they are explicitly
+      // unmuted.
+      const shouldMute = !!t.mute || (anySolo && !t.solo);
 
       const now = Tone.now();
       bus.gain.gain.cancelAndHoldAtTime(now);
@@ -435,6 +439,7 @@ export default function WebAmpPlayback({version, onEngineReady}) {
   }, [engine]);
 
   // Load engine when version changes (do not reload on play/pause)
+  const prevLoadSigRef = React.useRef(null);
   useEffect(() => {
     if (!version) return;
     // update known length for waveform progress
@@ -447,21 +452,67 @@ export default function WebAmpPlayback({version, onEngineReady}) {
         console.warn("seek request failed:", e);
       }
     });
-    engine
-      .load(version)
-      .then(() => {
-        try {
-          // Initialize master volume to 50%
-          if (engine.master) {
-            engine.master.gain.gain.value = 0.5;
-            prevMasterGainRef.current = 0.5;
-            savedVolumeRef.current = 0.5;
-            setMasterVol(50);
-            setMuted(false);
+
+    // Build a lightweight signature for the loaded audio structure. We
+    // intentionally exclude per-track flags like mute/solo so toggling
+    // them doesn't force a full engine.reload (which resets master volume).
+    const segSig = (version.segments || [])
+      .map((s) => `${s.fileUrl}@${s.trackId}:${s.startOnTimelineMs || 0}-${s.durationMs || 0}`)
+      .join("|");
+    const sig = `${version.lengthMs || 0}::${segSig}`;
+
+    if (prevLoadSigRef.current !== sig) {
+      // Only load the engine when the actual timeline/segments change.
+      engine
+        .load(version)
+        .then(() => {
+          try {
+            // Initialize master volume to 50% on first real load
+            if (engine.master) {
+              engine.master.gain.gain.value = 0.5;
+              prevMasterGainRef.current = 0.5;
+              savedVolumeRef.current = 0.5;
+              setMasterVol(50);
+              setMuted(false);
+            }
+          } catch {}
+        })
+        .catch((e) => console.error("[UI] engine.load() failed:", e));
+      prevLoadSigRef.current = sig;
+    } else {
+      // If only metadata (e.g., mute/solo) changed, avoid reload. However,
+      // we still need to synchronize per-track flags into the running
+      // engine instance because the engine was not reloaded and its
+      // internal `version.tracks` may be out of sync with the new
+      // `version` prop. Apply any per-track mute/solo diffs by calling
+      // the engine control methods which will update internal state and
+      // call _applyMuteSolo.
+      try {
+        const current = engine.version?.tracks || [];
+        (version.tracks || []).forEach((t) => {
+          const existing = current.find((x) => x.id === t.id);
+          if (!existing) return; // new/removed tracks would have triggered reload
+          if (Boolean(existing.mute) !== Boolean(t.mute)) {
+            try {
+              engine.setTrackMute(t.id, !!t.mute);
+            } catch (e) {
+              // swallow - best effort
+            }
           }
-        } catch {}
-      })
-      .catch((e) => console.error("[UI] engine.load() failed:", e));
+          if (Boolean(existing.solo) !== Boolean(t.solo)) {
+            try {
+              engine.setTrackSolo(t.id, !!t.solo);
+            } catch (e) {
+              // swallow - best effort
+            }
+          }
+        });
+      } catch (e) {
+        // defensive: if sync fails, fall back to a full reload next time
+        prevLoadSigRef.current = null;
+      }
+    }
+
     return () => {
       // cleanup seeker on version change/unmount
       progressStore.setSeeker(null);
