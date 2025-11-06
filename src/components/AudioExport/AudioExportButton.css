@@ -70,3 +70,17 @@
 .modal-close-button:hover {
   color: #666;
 }
+
+/* Style for disabled dropdown link */
+.dropdown-item-disabled {
+  /* Lower the opacity to grey it out */
+  opacity: 0.5;
+  /* Prevent click events from firing even if the React logic fails */
+  pointer-events: none;
+  cursor: not-allowed;
+}
+
+/* Ensure disabled items don't show hover effects */
+.dropdown-item-disabled:hover {
+  background-color: transparent !important;
+}

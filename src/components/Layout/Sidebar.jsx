@@ -15,14 +15,14 @@ import ProjectsTab from "./Sidebar/ProjectsTab";
  */
 function Sidebar({width, onImportSuccess, onImportError}) {
   const {userData} = useContext(AppContext);
-  const [currentTab, setCurrentTab] = useState("projects");
+  const [currentTab, setCurrentTab] = useState("effects");
 
-  // Redirect to projects tab if user logs out
+  // If logged out, only redirect away from Assets (Effects/Projects stay allowed)
   useEffect(() => {
-    if (!userData) {
-      setCurrentTab("projects");
+    if (!userData && currentTab === "assets") {
+      setCurrentTab("effects");
     }
-  }, [userData]);
+  }, [userData, currentTab]);
 
   const tabs = {
     projects: {
@@ -45,8 +45,8 @@ function Sidebar({width, onImportSuccess, onImportError}) {
   };
 
   const handleTabClick = (key) => {
-    // Only allow tab switching if user is logged in
-    if (userData) {
+    // Allow Effects and Projects even when not logged in; keep Assets gated
+    if (userData || key !== "assets") {
       setCurrentTab(key);
     }
   };
@@ -58,7 +58,7 @@ function Sidebar({width, onImportSuccess, onImportError}) {
           <button
             key={key}
             onClick={() => handleTabClick(key)}
-            disabled={!userData && key !== "projects"}
+            disabled={!userData && key === "assets"}
             style={{
               flex: 1,
               padding: "10px 0",
@@ -66,9 +66,8 @@ function Sidebar({width, onImportSuccess, onImportError}) {
               background: currentTab === key ? "#00e5ff" : "#1a1a1a",
               color: currentTab === key ? "#000" : "#00e5ff",
               fontWeight: currentTab === key ? "bold" : "normal",
-              cursor:
-                userData || key === "projects" ? "pointer" : "not-allowed",
-              opacity: !userData && key !== "projects" ? 0.5 : 1,
+              cursor: userData || key !== "assets" ? "pointer" : "not-allowed",
+              opacity: !userData && key === "assets" ? 0.5 : 1,
               transition: "background 0.2s, color 0.2s, opacity 0.2s",
             }}
           >

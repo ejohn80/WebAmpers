@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from "react";
+import React, {useState, useEffect, useContext} from "react";
 import "./AudioPage.css";
 import * as Tone from "tone";
 
@@ -10,6 +10,7 @@ import Footer from "../components/Layout/Footer";
 import {audioManager} from "../managers/AudioManager";
 import WebAmpPlayback from "../playback/playback.jsx";
 import {dbManager} from "../managers/DBManager";
+import {AppContext} from "../context/AppContext";
 
 const MIN_WIDTH = 0; // Minimum allowed width for the sidebar in pixels
 const MAX_WIDTH = 300; // Maximum allowed width for the sidebar in pixels
@@ -18,6 +19,7 @@ const MAX_WIDTH = 300; // Maximum allowed width for the sidebar in pixels
  * AudioPage component provides a resizable layout with a sidebar and main content area.
  */
 function AudioPage() {
+  const {setEngineRef, applyEffectsToEngine} = useContext(AppContext);
   const [sidebarWidth, setSidebarWidth] = useState(MAX_WIDTH);
   const [tracks, setTracks] = useState(audioManager.tracks);
   // --- STATE FOR AUDIO DATA --- (Kept from main/old approach for backward compatibility)
@@ -204,6 +206,12 @@ function AudioPage() {
 
   const handleEngineReady = (engine) => {
     engineRef.current = engine;
+    setEngineRef(engineRef); // Provide engine ref to context
+
+    // Apply effects immediately after engine is ready
+    setTimeout(() => {
+      applyEffectsToEngine();
+    }, 100); // Small delay to ensure context is updated
   };
 
   return (

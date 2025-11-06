@@ -1,34 +1,10 @@
-import {useState} from "react";
+import {useContext, useCallback} from "react";
+import {AppContext} from "../../../context/AppContext";
 import styles from "../Layout.module.css";
 
 function EffectsTab() {
-  const [effects, setEffects] = useState({
-    pitch: 0,
-    volume: 100,
-    reverb: 0,
-  });
-
-  const handleEffectChange = (effectName, value) => {
-    setEffects((prev) => ({
-      ...prev,
-      [effectName]: parseFloat(value),
-    }));
-  };
-
-  const resetEffect = (effectName, defaultValue) => {
-    setEffects((prev) => ({
-      ...prev,
-      [effectName]: defaultValue,
-    }));
-  };
-
-  const resetAll = () => {
-    setEffects({
-      pitch: 0,
-      volume: 100,
-      reverb: 0,
-    });
-  };
+  const {effects, updateEffect, resetEffect, resetAllEffects} =
+    useContext(AppContext);
 
   const effectConfigs = [
     {
@@ -63,6 +39,15 @@ function EffectsTab() {
     },
   ];
 
+  const handleChange = useCallback(
+    (name) => (e) => {
+      const raw = e.target.value;
+      const num = Number(raw);
+      updateEffect(name, num);
+    },
+    [updateEffect]
+  );
+
   return (
     <div className={styles.container}>
       {effectConfigs.map((config) => (
@@ -80,8 +65,8 @@ function EffectsTab() {
             min={config.min}
             max={config.max}
             step={config.step}
-            value={effects[config.name]}
-            onChange={(e) => handleEffectChange(config.name, e.target.value)}
+            value={effects[config.name] ?? config.default}
+            onChange={handleChange(config.name)}
             className={styles.slider}
           />
           <div className={styles.controls}>
@@ -94,8 +79,7 @@ function EffectsTab() {
           </div>
         </div>
       ))}
-
-      <button className={styles.resetAllButton} onClick={resetAll}>
+      <button className={styles.resetAllButton} onClick={resetAllEffects}>
         Reset All Effects
       </button>
     </div>

@@ -1,4 +1,3 @@
-import {logout} from "../Auth/AuthUtils";
 import {useUserData} from "../../hooks/useUserData";
 import {useNavigate} from "react-router-dom";
 import DropdownPortal from "./DropdownPortal";

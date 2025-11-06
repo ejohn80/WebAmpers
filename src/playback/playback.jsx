@@ -1,6 +1,7 @@
-import React, {useEffect, useMemo, useRef, useState} from "react";
+import React, {useContext, useEffect, useMemo, useRef, useState} from "react";
 import * as Tone from "tone";
 import {progressStore} from "./progressStore";
+import {AppContext} from "../context/AppContext";
 import PlayIcon from "../assets/footer/PlayButton.svg";
 import PauseIcon from "../assets/footer/PauseButton.svg";
 import RewindIcon from "../assets/footer/RewindButton.svg";
@@ -101,6 +102,15 @@ class PlaybackEngine {
   /** Start playback of the Tone.Transport */
   async play() {
     await this.ensureAudioUnlocked();
+
+    // If we're at the end, restart from the beginning
+    const len = this.version?.lengthMs;
+    const currentMs = this.getPositionMs();
+    if (typeof len === "number" && len > 0 && currentMs >= len) {
+      this.seekMs(0);
+      this.ended = false;
+    }
+
     Tone.Transport.start("+" + this.renderAheadSec);
     this._emitTransport(true);
     this.ended = false;
@@ -189,15 +199,63 @@ class PlaybackEngine {
 
   /** Replace the master chain (placeholder for future FX support) */
   replaceMasterChain(chain) {
-    const newMaster = this._makeMaster(chain);
     const old = this.master;
-    if (old) (old.fxOut ?? old.gain).disconnect();
+    const prevLevel = (() => {
+      try {
+        return old?.gain?.gain?.value ?? 1;
+      } catch {
+        return 1;
+      }
+    })();
 
-    this.master = newMaster;
+    const newMaster = this._makeMaster(chain);
+    // preserve master output level (UI volume)
+    try {
+      newMaster.gain.gain.value = prevLevel;
+    } catch {}
+
+    // Reconnect buses to the new master head
     this.trackBuses.forEach((bus) => {
-      (bus.fxOut ?? bus.pan).disconnect();
-      (bus.fxOut ?? bus.pan).connect(this.master.fxIn ?? this.master.gain);
+      try {
+        (bus.fxOut ?? bus.pan).disconnect();
+      } catch {}
+      (bus.fxOut ?? bus.pan).connect(newMaster.fxIn ?? newMaster.gain);
     });
+
+    // Swap master and dispose old safely
+    this.master = newMaster;
+    if (old) {
+      try {
+        (old.fxOut ?? old.gain).disconnect();
+      } catch {}
+      try {
+        (old.chain || []).forEach((n) => n.dispose?.());
+      } catch {}
+      try {
+        old.gain.dispose?.();
+      } catch {}
+    }
+  }
+
+  /** Set master effects from UI (pitch in semitones, reverb 0-100, volume 0-200) */
+  setMasterEffects(effects) {
+    const chain = [];
+    // Pitch (semitones, can be negative)
+    if (typeof effects?.pitch === "number" && effects.pitch !== 0) {
+      chain.push({type: "pitch", semitones: effects.pitch});
+    }
+    // Reverb (map 0-100 -> wet 0-1, roomSize 0.1-0.95)
+    if (typeof effects?.reverb === "number" && effects.reverb > 0) {
+      const wet = Math.max(0, Math.min(1, effects.reverb / 100));
+      const roomSize = 0.1 + 0.85 * wet;
+      chain.push({type: "freeverb", wet, roomSize});
+    }
+    // Effect volume (0-200% -> 0.0-2.0 linear)
+    if (typeof effects?.volume === "number" && effects.volume !== 100) {
+      const linear = Math.max(0, Math.min(2, effects.volume / 100));
+      chain.push({type: "gain", gain: linear});
+    }
+    this.replaceMasterChain(chain);
   }
 
   /** Dispose all audio resources */
@@ -276,10 +334,60 @@ class PlaybackEngine {
   }
 
   /** Create a master bus and connect it to the audio output */
-  _makeMaster() {
-    const gain = new Tone.Gain(1);
-    gain.connect(Tone.Destination);
-    return {gain, chain: [], fxIn: null, fxOut: null};
+  _makeMaster(chain) {
+    const outGain = new Tone.Gain(1);
+
+    // Build FX chain if provided
+    const nodes = [];
+    if (Array.isArray(chain)) {
+      chain.forEach((cfg) => {
+        try {
+          switch (cfg?.type) {
+            case "pitch": {
+              const ps = new Tone.PitchShift(cfg.semitones ?? 0);
+              nodes.push(ps);
+              break;
+            }
+            case "freeverb": {
+              const fv = new Tone.Freeverb({
+                roomSize: Math.max(0, Math.min(1, cfg.roomSize ?? 0.8)),
+                dampening: 3000,
+                wet: Math.max(0, Math.min(1, cfg.wet ?? 0.5)),
+              });
+              nodes.push(fv);
+              break;
+            }
+            case "gain": {
+              const g = new Tone.Gain(Math.max(0, Math.min(2, cfg.gain ?? 1)));
+              nodes.push(g);
+              break;
+            }
+            default:
+              break;
+          }
+        } catch {}
+      });
+    }
+
+    // Wire: head -> ... -> tail -> outGain -> Destination
+    let fxIn = null;
+    let fxOut = null;
+    if (nodes.length > 0) {
+      fxIn = nodes[0];
+      fxOut = nodes[nodes.length - 1];
+      // connect nodes sequentially
+      for (let i = 0; i < nodes.length - 1; i++) {
+        try {
+          nodes[i].connect(nodes[i + 1]);
+        } catch {}
+      }
+      try {
+        fxOut.connect(outGain);
+      } catch {}
+    }
+
+    outGain.connect(Tone.Destination);
+    return {gain: outGain, chain: nodes, fxIn, fxOut};
   }
 
   /** Handle mute/solo logic and smoothly apply gain changes */
@@ -405,6 +513,8 @@ export {PlaybackEngine};
 export default function WebAmpPlayback({version, onEngineReady}) {
   // , height = 120
   const engineRef = useRef(null); // no external usage currently
+  const appCtx = useContext(AppContext) || {};
+  const {setEngineRef} = appCtx;
   const [playing, setPlaying] = useState(false);
   const [ms, setMs] = useState(0);
   // Restore persisted master volume / mute from localStorage when possible
@@ -446,6 +556,10 @@ export default function WebAmpPlayback({version, onEngineReady}) {
   // Attach and clean up engine
   useEffect(() => {
     engineRef.current = engine;
+    // expose engine to global app context so EffectsTab can control FX
+    try {
+      setEngineRef && setEngineRef(engineRef);
+    } catch {}
     // Inform parent that the engine instance is available so it can call
     // control methods (setTrackMute, setTrackSolo, etc.).
     try {
