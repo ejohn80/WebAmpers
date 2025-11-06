@@ -28,7 +28,8 @@ export default function PlaybackUI({version}) {
     const isEditableTarget = (el) => {
       if (!el || el === document.body) return false;
       const tag = el.tagName?.toLowerCase();
-      if (tag === "input" || tag === "textarea" || tag === "select") return true;
+      if (tag === "input" || tag === "textarea" || tag === "select")
+        return true;
       if (el.isContentEditable) return true;
       // Treat role="textbox" as editable as well
       const role = el.getAttribute?.("role");

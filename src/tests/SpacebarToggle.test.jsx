@@ -76,9 +76,7 @@ const makeVersion = () => ({
   bpm: 120,
   timeSig: [4, 4],
   lengthMs: 10000,
-  tracks: [
-    {id: "t1", gainDb: 0, pan: 0, mute: false, solo: false},
-  ],
+  tracks: [{id: "t1", gainDb: 0, pan: 0, mute: false, solo: false}],
   segments: [],
   loop: {enabled: false},
 });
@@ -92,7 +90,9 @@ describe("Spacebar toggles PlaybackUI play/pause", () => {
     render(<PlaybackUI version={makeVersion()} />);
 
     // Initially should show Play button
-    expect(await screen.findByRole("button", {name: /play/i})).toBeInTheDocument();
+    expect(
+      await screen.findByRole("button", {name: /play/i})
+    ).toBeInTheDocument();
 
     // Press Space on window
     fireEvent.keyDown(window, {code: "Space", key: " ", bubbles: true});

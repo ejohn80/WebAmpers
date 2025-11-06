@@ -75,9 +75,7 @@ const makeVersion = () => ({
   bpm: 120,
   timeSig: [4, 4],
   lengthMs: 60000,
-  tracks: [
-    {id: "t1", gainDb: 0, pan: 0, mute: false, solo: false},
-  ],
+  tracks: [{id: "t1", gainDb: 0, pan: 0, mute: false, solo: false}],
   segments: [],
   loop: {enabled: false},
 });
@@ -100,14 +98,22 @@ describe("Arrow keys seek in PlaybackUI", () => {
     expect(initial).toBeInTheDocument();
 
     // Right arrow should advance by 10s
-    fireEvent.keyDown(window, {code: "ArrowRight", key: "ArrowRight", bubbles: true});
+    fireEvent.keyDown(window, {
+      code: "ArrowRight",
+      key: "ArrowRight",
+      bubbles: true,
+    });
 
     await waitFor(() => {
       expect(getTimeText().textContent?.startsWith("0:10")).toBe(true);
     });
 
     // Left arrow should go back to 0:00
-    fireEvent.keyDown(window, {code: "ArrowLeft", key: "ArrowLeft", bubbles: true});
+    fireEvent.keyDown(window, {
+      code: "ArrowLeft",
+      key: "ArrowLeft",
+      bubbles: true,
+    });
 
     await waitFor(() => {
       expect(getTimeText().textContent?.startsWith("0:00")).toBe(true);
@@ -127,7 +133,11 @@ describe("Arrow keys seek in PlaybackUI", () => {
     input.focus();
 
     const timeBefore = await screen.findByText(/0:\d{2}/);
-    fireEvent.keyDown(input, {code: "ArrowRight", key: "ArrowRight", bubbles: true});
+    fireEvent.keyDown(input, {
+      code: "ArrowRight",
+      key: "ArrowRight",
+      bubbles: true,
+    });
 
     // Time stays the same (still 0:00)
     expect(timeBefore.textContent?.startsWith("0:00")).toBe(true);
