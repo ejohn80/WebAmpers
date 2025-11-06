@@ -78,9 +78,8 @@
 
 .footer-volume-btn:hover {
   background-color: #333239;
-} */
-
-.footer-volume-knob {
+}
+*/ .footer-volume-knob {
   width: 60px;
   height: 20px;
 }

@@ -2,7 +2,7 @@ import React, {useRef} from "react";
 import AudioImporter from "./AudioImporter";
 import {ImportIcon} from "../Layout/Svgs";
 import * as Tone from "tone";
-import './AudioImportButton.css'; 
+import "./AudioImportButton.css";
 
 /**
  * A UI component that provides a button to import audio files.

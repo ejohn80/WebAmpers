@@ -14,7 +14,6 @@
   position: relative;
   /* border: 2px solid red; */
   right: -150px;
-
 }
 
 /* ===========================
@@ -37,7 +36,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  position: relative; 
+  position: relative;
   z-index: 1;
 }
 
@@ -82,7 +81,7 @@
   position: relative;
   z-index: 1;
   /* border: 2px solid yellow; */
-  width: 210px
+  width: 210px;
 }
 
 .volume-button {

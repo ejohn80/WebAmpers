@@ -40,17 +40,17 @@ function Header({
           }}
         >
           {/* Add standalone AudioImportButton here */}
-          <AudioImportButton 
+          <AudioImportButton
             onImportSuccess={onImportSuccess}
             onImportError={onImportError}
           />
-          
+
           {/* Add standalone AudioExportButton here */}
           <AudioExportButton
             audioBuffer={audioBuffer}
             onExportComplete={onExportComplete}
           />
-          
+
           <DropdownPortal side="right" />
         </div>
       </div>
