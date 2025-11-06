@@ -10,16 +10,18 @@ const AppContextProvider = ({children}) => {
   const {userData, loading} = useUserData();
 
   const [activeProject, setActiveProject] = useState();
-  
+
   // Effects state with localStorage persistence
   const [effects, setEffects] = useState(() => {
     try {
       const saved = localStorage.getItem("webamp.effects");
-      return saved ? JSON.parse(saved) : {
-        pitch: 0,
-        volume: 100,
-        reverb: 0,
-      };
+      return saved
+        ? JSON.parse(saved)
+        : {
+            pitch: 0,
+            volume: 100,
+            reverb: 0,
+          };
     } catch (e) {
       return {
         pitch: 0,
@@ -28,10 +30,10 @@ const AppContextProvider = ({children}) => {
       };
     }
   });
-  
+
   // Engine reference to apply effects
   const [engineRef, setEngineRef] = useState(null);
-  
+
   // Utility function to apply effects to engine (no unlock requirement)
   const applyEffectsToEngine = (effectsToApply = effects) => {
     if (engineRef?.current) {
@@ -42,7 +44,7 @@ const AppContextProvider = ({children}) => {
       }
     }
   };
-  
+
   // Function to update effects and apply them to the engine
   const updateEffect = async (effectName, value) => {
     const newEffects = {
@@ -50,14 +52,14 @@ const AppContextProvider = ({children}) => {
       [effectName]: parseFloat(value),
     };
     setEffects(newEffects);
-    
+
     // Persist to localStorage
     try {
       localStorage.setItem("webamp.effects", JSON.stringify(newEffects));
     } catch (e) {
       console.warn("Failed to persist effects to localStorage:", e);
     }
-    
+
     // Attempt to unlock audio context (runs inside user gesture from slider)
     try {
       await engineRef?.current?.ensureAudioUnlocked?.();
@@ -65,11 +67,11 @@ const AppContextProvider = ({children}) => {
     // Apply effects to engine if available
     applyEffectsToEngine(newEffects);
   };
-  
+
   const resetEffect = (effectName, defaultValue) => {
     updateEffect(effectName, defaultValue);
   };
-  
+
   const resetAllEffects = () => {
     const defaultEffects = {
       pitch: 0,
@@ -84,11 +86,11 @@ const AppContextProvider = ({children}) => {
     } catch (e) {
       console.warn("Failed to persist effects reset to localStorage:", e);
     }
-    
+
     // Apply effects to engine if available
     applyEffectsToEngine(defaultEffects);
   };
-  
+
   // Apply current effects when engine becomes available
   useEffect(() => {
     applyEffectsToEngine();
@@ -100,7 +102,9 @@ const AppContextProvider = ({children}) => {
       if (!engineRef && window.__WebAmpEngineRef) {
         setEngineRef(window.__WebAmpEngineRef);
         // eslint-disable-next-line no-console
-        console.log("[AppContext] adopted engineRef from window.__WebAmpEngineRef");
+        console.log(
+          "[AppContext] adopted engineRef from window.__WebAmpEngineRef"
+        );
       }
     } catch {}
   }, [engineRef]);
@@ -125,9 +129,9 @@ const AppContextProvider = ({children}) => {
   return (
     <AppContext.Provider
       value={{
-        userData, 
-        loading, 
-        activeProject, 
+        userData,
+        loading,
+        activeProject,
         setActiveProject,
         effects,
         updateEffect,
@@ -135,7 +139,7 @@ const AppContextProvider = ({children}) => {
         resetAllEffects,
         engineRef,
         setEngineRef,
-        applyEffectsToEngine
+        applyEffectsToEngine,
       }}
     >
       {children}

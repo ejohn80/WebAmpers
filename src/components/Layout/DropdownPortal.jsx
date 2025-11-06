@@ -25,7 +25,13 @@ import {
   GuestIcon,
 } from "./Svgs";
 
-function DropdownPortal({side, audioBuffer, onExportComplete, onImportSuccess, onImportError}) {
+function DropdownPortal({
+  side,
+  audioBuffer,
+  onExportComplete,
+  onImportSuccess,
+  onImportError,
+}) {
   const navigate = useNavigate();
   const {userData} = useContext(AppContext);
 
@@ -161,7 +167,7 @@ function DropdownPortal({side, audioBuffer, onExportComplete, onImportSuccess, o
             <span>New...</span>
           </span>
         </a>
-        
+
         {/* DISABLED - Previous Versions */}
         <a
           href="#"
@@ -182,7 +188,7 @@ function DropdownPortal({side, audioBuffer, onExportComplete, onImportSuccess, o
             <span>Previous Versions</span>
           </span>
         </a>
-        
+
         {/* DISABLED - Save */}
         <a
           href="#"

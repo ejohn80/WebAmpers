@@ -3,7 +3,8 @@ import {AppContext} from "../../../context/AppContext";
 import styles from "../Layout.module.css";
 
 function EffectsTab() {
-  const {effects, updateEffect, resetEffect, resetAllEffects} = useContext(AppContext);
+  const {effects, updateEffect, resetEffect, resetAllEffects} =
+    useContext(AppContext);
 
   const effectConfigs = [
     {
@@ -38,11 +39,14 @@ function EffectsTab() {
     },
   ];
 
-  const handleChange = useCallback((name) => (e) => {
-    const raw = e.target.value;
-    const num = Number(raw);
-    updateEffect(name, num);
-  }, [updateEffect]);
+  const handleChange = useCallback(
+    (name) => (e) => {
+      const raw = e.target.value;
+      const num = Number(raw);
+      updateEffect(name, num);
+    },
+    [updateEffect]
+  );
 
   return (
     <div className={styles.container}>

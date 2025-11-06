@@ -207,7 +207,7 @@ function AudioPage() {
   const handleEngineReady = (engine) => {
     engineRef.current = engine;
     setEngineRef(engineRef); // Provide engine ref to context
-    
+
     // Apply effects immediately after engine is ready
     setTimeout(() => {
       applyEffectsToEngine();

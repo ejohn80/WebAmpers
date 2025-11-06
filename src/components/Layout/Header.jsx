@@ -18,7 +18,7 @@ function Header({
         {/* container for logo + dropdown */}
         <div className="leftContainer">
           <span className="webampText">Webamp</span>
-          <DropdownPortal 
+          <DropdownPortal
             side="left"
             audioBuffer={audioBuffer}
             onExportComplete={onExportComplete}

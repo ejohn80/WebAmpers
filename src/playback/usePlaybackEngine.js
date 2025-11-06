@@ -9,7 +9,8 @@ export default function usePlaybackEngine({
   onProgress,
   onTransport,
 } = {}) {
-  const {setEngineRef, applyEffectsToEngine, effects} = useContext(AppContext) || {};
+  const {setEngineRef, applyEffectsToEngine, effects} =
+    useContext(AppContext) || {};
   const engine = useMemo(
     () => new PlaybackEngine({onProgress, onTransport}),
     []

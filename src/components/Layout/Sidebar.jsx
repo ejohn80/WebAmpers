@@ -66,8 +66,7 @@ function Sidebar({width, onImportSuccess, onImportError}) {
               background: currentTab === key ? "#00e5ff" : "#1a1a1a",
               color: currentTab === key ? "#000" : "#00e5ff",
               fontWeight: currentTab === key ? "bold" : "normal",
-              cursor:
-                userData || key !== "assets" ? "pointer" : "not-allowed",
+              cursor: userData || key !== "assets" ? "pointer" : "not-allowed",
               opacity: !userData && key === "assets" ? 0.5 : 1,
               transition: "background 0.2s, color 0.2s, opacity 0.2s",
             }}

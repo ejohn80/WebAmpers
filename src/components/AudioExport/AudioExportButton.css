@@ -76,7 +76,7 @@
   /* Lower the opacity to grey it out */
   opacity: 0.5;
   /* Prevent click events from firing even if the React logic fails */
-  pointer-events: none; 
+  pointer-events: none;
   cursor: not-allowed;
 }
 

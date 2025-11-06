@@ -102,7 +102,7 @@ class PlaybackEngine {
   /** Start playback of the Tone.Transport */
   async play() {
     await this.ensureAudioUnlocked();
-    
+
     // If we're at the end, restart from the beginning
     const len = this.version?.lengthMs;
     const currentMs = this.getPositionMs();
@@ -110,7 +110,7 @@ class PlaybackEngine {
       this.seekMs(0);
       this.ended = false;
     }
-    
+
     Tone.Transport.start("+" + this.renderAheadSec);
     this._emitTransport(true);
     this.ended = false;
@@ -358,9 +358,7 @@ class PlaybackEngine {
               break;
             }
             case "gain": {
-              const g = new Tone.Gain(
-                Math.max(0, Math.min(2, cfg.gain ?? 1))
-              );
+              const g = new Tone.Gain(Math.max(0, Math.min(2, cfg.gain ?? 1)));
               nodes.push(g);
               break;
             }
