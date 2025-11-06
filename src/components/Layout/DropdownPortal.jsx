@@ -4,9 +4,13 @@ import {AppContext} from "../../context/AppContext";
 import ReactDOM from "react-dom";
 import {useNavigate} from "react-router-dom";
 
+import AudioExportButton from "../AudioExport/AudioExportButton";
+import AudioImportButton from "../AudioImport/AudioImportButton";
+
 import "./Header.css";
 import {
   ExportIcon,
+  ImportIcon,
   NewIcon,
   PreviousVersionsIcon,
   UndoIcon,
@@ -19,18 +23,9 @@ import {
   ThemesIcon,
   ColorAccessibilityIcon,
   GuestIcon,
-  ImportIcon, // <-- ADDED ImportIcon
 } from "./Svgs";
-import AudioExportButton from "../AudioExport/AudioExportButton";
-import AudioImportButton from "../AudioImport/AudioImportButton"; // <-- ADDED Import Component
 
-function DropdownPortal({
-  side,
-  audioBuffer,
-  onExportComplete,
-  onImportSuccess, // <-- ADDED Prop
-  onImportError, // <-- ADDED Prop
-}) {
+function DropdownPortal({side, audioBuffer, onExportComplete, onImportSuccess, onImportError}) {
   const navigate = useNavigate();
   const {userData} = useContext(AppContext);
 
@@ -52,14 +47,15 @@ function DropdownPortal({
   const handleMenuItemClick = (action) => {
     console.log(`Selected: ${action}`);
 
+    // Handle navigation for guest dropdown
     if (action === "Login") {
       navigate("/login");
     } else if (action === "Register") {
       navigate("/register");
     }
 
-    // Do not close the dropdown for "Export" or "Import", as the wrapper will handle the interaction (e.g., opening a modal/file dialog).
-    if (action !== "Export" && action !== "Import") {
+    // Don't close dropdown for Import/Export (handled by their wrappers)
+    if (action !== "Import" && action !== "Export") {
       setActiveDropdown(null);
     }
   };
@@ -76,15 +72,12 @@ function DropdownPortal({
     setActiveDropdown(activeDropdown === dropdownName ? null : dropdownName);
   };
 
+  // Handle mouse leave from dropdown
   const handleDropdownMouseLeave = (event) => {
     const relatedTarget = event.relatedTarget;
     const dropdown = event.currentTarget;
 
-    if (
-      relatedTarget &&
-      relatedTarget.nodeType === 1 &&
-      !dropdown.contains(relatedTarget)
-    ) {
+    if (!dropdown.contains(relatedTarget)) {
       setActiveDropdown(null);
     }
   };
@@ -128,11 +121,13 @@ function DropdownPortal({
     };
   }, [activeDropdown]);
 
+  // Helper function to get button class with active state
   const getButtonClass = (buttonType, dropdownName) => {
     const baseClass = `dropdown-btn${buttonType ? `-${buttonType}` : ""}`;
     return activeDropdown === dropdownName ? `${baseClass} active` : baseClass;
   };
 
+  // Dropdown content for each menu with individual styling
   const dropdownContent = {
     file: (
       <div
@@ -146,11 +141,12 @@ function DropdownPortal({
         }}
         onMouseLeave={handleDropdownMouseLeave}
       >
+        {/* DISABLED - New */}
         <a
           href="#"
+          className="dropdown-item-disabled"
           onClick={(e) => {
             e.preventDefault();
-            handleMenuItemClick("New");
           }}
         >
           <span
@@ -165,11 +161,13 @@ function DropdownPortal({
             <span>New...</span>
           </span>
         </a>
+        
+        {/* DISABLED - Previous Versions */}
         <a
           href="#"
+          className="dropdown-item-disabled"
           onClick={(e) => {
             e.preventDefault();
-            handleMenuItemClick("Previous Versions");
           }}
         >
           <span
@@ -184,17 +182,19 @@ function DropdownPortal({
             <span>Previous Versions</span>
           </span>
         </a>
+        
+        {/* DISABLED - Save */}
         <a
           href="#"
+          className="dropdown-item-disabled"
           onClick={(e) => {
             e.preventDefault();
-            handleMenuItemClick("Save");
           }}
         >
           <span>Save</span>
         </a>
 
-        {/* --- AUDIO IMPORT BUTTON WRAPPER --- */}
+        {/* ENABLED - Import Audio */}
         <AudioImportButton
           onImportSuccess={onImportSuccess}
           onImportError={onImportError}
@@ -219,16 +219,22 @@ function DropdownPortal({
             </span>
           </a>
         </AudioImportButton>
-        {/* ----------------------------------- */}
 
+        {/* ENABLED/DISABLED - Export (conditional) */}
         <AudioExportButton
           audioBuffer={audioBuffer}
           onExportComplete={onExportComplete}
+          disabled={!audioBuffer} // This prop is now ignored by AudioExportButton, but is harmless
         >
           <a
             href="#"
+            className={!audioBuffer ? "dropdown-item-disabled" : ""} // APPLIES GREY-OUT
             onClick={(e) => {
               e.preventDefault();
+              if (!audioBuffer) {
+                alert("Please import audio before exporting"); // PRESERVES ALERT
+                return;
+              }
               handleMenuItemClick("Export");
             }}
           >
@@ -260,12 +266,11 @@ function DropdownPortal({
         }}
         onMouseLeave={handleDropdownMouseLeave}
       >
+        {/* ALL DISABLED */}
         <a
           href="#"
-          onClick={(e) => {
-            e.preventDefault();
-            handleMenuItemClick("Undo");
-          }}
+          className="dropdown-item-disabled"
+          onClick={(e) => e.preventDefault()}
         >
           <span
             style={{
@@ -281,10 +286,8 @@ function DropdownPortal({
         </a>
         <a
           href="#"
-          onClick={(e) => {
-            e.preventDefault();
-            handleMenuItemClick("Redo");
-          }}
+          className="dropdown-item-disabled"
+          onClick={(e) => e.preventDefault()}
         >
           <span
             style={{
@@ -300,10 +303,8 @@ function DropdownPortal({
         </a>
         <a
           href="#"
-          onClick={(e) => {
-            e.preventDefault();
-            handleMenuItemClick("Cut");
-          }}
+          className="dropdown-item-disabled"
+          onClick={(e) => e.preventDefault()}
         >
           <span
             style={{
@@ -319,10 +320,8 @@ function DropdownPortal({
         </a>
         <a
           href="#"
-          onClick={(e) => {
-            e.preventDefault();
-            handleMenuItemClick("Copy");
-          }}
+          className="dropdown-item-disabled"
+          onClick={(e) => e.preventDefault()}
         >
           <span
             style={{
@@ -338,10 +337,8 @@ function DropdownPortal({
         </a>
         <a
           href="#"
-          onClick={(e) => {
-            e.preventDefault();
-            handleMenuItemClick("Paste");
-          }}
+          className="dropdown-item-disabled"
+          onClick={(e) => e.preventDefault()}
         >
           <span
             style={{
@@ -357,10 +354,8 @@ function DropdownPortal({
         </a>
         <a
           href="#"
-          onClick={(e) => {
-            e.preventDefault();
-            handleMenuItemClick("Delete");
-          }}
+          className="dropdown-item-disabled"
+          onClick={(e) => e.preventDefault()}
         >
           <span
             style={{
@@ -389,30 +384,25 @@ function DropdownPortal({
         }}
         onMouseLeave={handleDropdownMouseLeave}
       >
+        {/* ALL DISABLED */}
         <a
           href="#"
-          onClick={(e) => {
-            e.preventDefault();
-            handleMenuItemClick("Tool 1");
-          }}
+          className="dropdown-item-disabled"
+          onClick={(e) => e.preventDefault()}
         >
           Tool 1
         </a>
         <a
           href="#"
-          onClick={(e) => {
-            e.preventDefault();
-            handleMenuItemClick("Tool 2");
-          }}
+          className="dropdown-item-disabled"
+          onClick={(e) => e.preventDefault()}
         >
           Tool 2
         </a>
         <a
           href="#"
-          onClick={(e) => {
-            e.preventDefault();
-            handleMenuItemClick("Tool 3");
-          }}
+          className="dropdown-item-disabled"
+          onClick={(e) => e.preventDefault()}
         >
           Tool 3
         </a>
@@ -431,12 +421,11 @@ function DropdownPortal({
         }}
         onMouseLeave={handleDropdownMouseLeave}
       >
+        {/* ALL DISABLED */}
         <a
           href="#"
-          onClick={(e) => {
-            e.preventDefault();
-            handleMenuItemClick("Sound Quality");
-          }}
+          className="dropdown-item-disabled"
+          onClick={(e) => e.preventDefault()}
         >
           <span
             style={{
@@ -452,10 +441,8 @@ function DropdownPortal({
         </a>
         <a
           href="#"
-          onClick={(e) => {
-            e.preventDefault();
-            handleMenuItemClick("Themes");
-          }}
+          className="dropdown-item-disabled"
+          onClick={(e) => e.preventDefault()}
         >
           <span
             style={{
@@ -471,10 +458,8 @@ function DropdownPortal({
         </a>
         <a
           href="#"
-          onClick={(e) => {
-            e.preventDefault();
-            handleMenuItemClick("Color Accessibility");
-          }}
+          className="dropdown-item-disabled"
+          onClick={(e) => e.preventDefault()}
         >
           <span
             style={{
@@ -490,10 +475,8 @@ function DropdownPortal({
         </a>
         <a
           href="#"
-          onClick={(e) => {
-            e.preventDefault();
-            handleMenuItemClick("About");
-          }}
+          className="dropdown-item-disabled"
+          onClick={(e) => e.preventDefault()}
         >
           About
         </a>

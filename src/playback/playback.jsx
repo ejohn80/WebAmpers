@@ -102,6 +102,15 @@ class PlaybackEngine {
   /** Start playback of the Tone.Transport */
   async play() {
     await this.ensureAudioUnlocked();
+    
+    // If we're at the end, restart from the beginning
+    const len = this.version?.lengthMs;
+    const currentMs = this.getPositionMs();
+    if (typeof len === "number" && len > 0 && currentMs >= len) {
+      this.seekMs(0);
+      this.ended = false;
+    }
+    
     Tone.Transport.start("+" + this.renderAheadSec);
     this._emitTransport(true);
     this.ended = false;

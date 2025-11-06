@@ -1,4 +1,3 @@
-import {logout} from "../Auth/AuthUtils";
 import {useUserData} from "../../hooks/useUserData";
 import {useNavigate} from "react-router-dom";
 import DropdownPortal from "./DropdownPortal";
@@ -19,7 +18,7 @@ function Header({
         {/* container for logo + dropdown */}
         <div className="leftContainer">
           <span className="webampText">Webamp</span>
-          <DropdownPortal
+          <DropdownPortal 
             side="left"
             audioBuffer={audioBuffer}
             onExportComplete={onExportComplete}

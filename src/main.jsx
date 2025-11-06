@@ -9,7 +9,7 @@ export function Root() {
 		const onFirstInteract = async () => {
 			try {
 				await Tone.start();
-			} catch (e) {
+			} catch {
 				/* ignore */
 			}
 		};

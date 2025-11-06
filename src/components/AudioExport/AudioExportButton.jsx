@@ -4,18 +4,25 @@ import "./AudioExportButton.css";
 
 /**
  * Encapsulates the logic for showing the export modal.
- * This component is used as a drop-in replacement for the
- * previous inline button and modal logic.
- * @param {object} props
- * @param {Tone.ToneAudioBuffer} props.audioBuffer - The audio buffer to export.
- * @param {function} props.onExportComplete - Callback function on export success/failure.
- * @param {function} props.children - The element that triggers the modal (e.g., the dropdown link).
+ * ...
+ * @param {React.Element} [props.children] - The element that triggers the modal (e.g., the dropdown link).
+ * @param {boolean} [props.disabled] - Whether the button should be explicitly disabled.
  */
-const AudioExportButton = ({audioBuffer, onExportComplete, children}) => {
+const AudioExportButton = ({audioBuffer, onExportComplete, children, disabled: propDisabled}) => {
   const [isModalOpen, setIsModalOpen] = React.useState(false);
+  
+  // The button is disabled if propDisabled is true OR if no audioBuffer exists
+  const isDisabled = propDisabled || !audioBuffer;
 
   const closeModal = () => setIsModalOpen(false);
-  const openModal = () => {
+  
+  const openModal = (e) => {
+    // If disabled, prevent the default link action (navigation)
+    if (isDisabled) {
+        if (e && e.preventDefault) e.preventDefault();
+        return;
+    }
+
     if (audioBuffer) {
       setIsModalOpen(true);
     } else {
@@ -30,21 +37,38 @@ const AudioExportButton = ({audioBuffer, onExportComplete, children}) => {
     }
   };
 
-  // Clone the child element and inject the openModal handler
-  const triggerElement = React.cloneElement(children, {
-    onClick: (e) => {
-      // Preserve original click handler if it exists
-      if (children.props.onClick) {
-        children.props.onClick(e);
-      }
-      // Open the modal
-      openModal();
-    },
-  });
+  let triggerElement;
+
+  if (children) {
+    // Clone the child element (the dropdown link) and inject the logic
+    triggerElement = React.cloneElement(children, {
+        // Preserve original click handler if it exists
+        onClick: (e) => {
+            if (children.props.onClick) {
+                children.props.onClick(e);
+            }
+            openModal(e);
+        },
+        // Apply the disabled class for visual effect and ARIA attribute
+        className: (children.props.className || "") + (isDisabled ? " dropdown-item-disabled" : ""),
+        "aria-disabled": isDisabled,
+    });
+  } else {
+    // Render a default button (used in Header.jsx) which uses the native 'disabled' prop
+    triggerElement = (
+      <button
+        className="export-button"
+        onClick={openModal}
+        disabled={isDisabled}
+      >
+        Export Audio
+      </button>
+    );
+  }
 
   return (
     <>
-      {/* The trigger element from the dropdown */}
+      {/* The trigger element (default button or cloned child) */}
       {triggerElement}
 
       {/* The actual modal content */}
