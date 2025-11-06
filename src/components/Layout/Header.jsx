@@ -1,9 +1,11 @@
-import AudioImportButton from "../AudioImport/AudioImportButton";
-import AudioExportButton from "../AudioExport/AudioExportButton";
 import {useUserData} from "../../hooks/useUserData";
 import {useNavigate} from "react-router-dom";
 import DropdownPortal from "./DropdownPortal";
+import AudioImportButton from "../AudioImport/AudioImportButton";
+import AudioExportButton from "../AudioExport/AudioExportButton"; // Add this import
 import "./Header.css";
+import "../AudioImport/AudioImportButton.css"; // Import AudioImportButton CSS
+import "../AudioExport/AudioExportButton.css"; // Import AudioExportButton CSS
 
 function Header({
   onImportSuccess,
@@ -20,7 +22,13 @@ function Header({
         {/* container for logo + dropdown */}
         <div className="leftContainer">
           <span className="webampText">Webamp</span>
-          <DropdownPortal side="left" />
+          <DropdownPortal
+            side="left"
+            audioBuffer={audioBuffer}
+            onExportComplete={onExportComplete}
+            onImportSuccess={onImportSuccess}
+            onImportError={onImportError}
+          />
         </div>
 
         <div
@@ -31,18 +39,18 @@ function Header({
             height: "100%",
           }}
         >
-          {/* Audio Import Button */}
-          <AudioImportButton
+          {/* Add standalone AudioImportButton here */}
+          <AudioImportButton 
             onImportSuccess={onImportSuccess}
             onImportError={onImportError}
           />
-
-          {/* Audio Export Button */}
+          
+          {/* Add standalone AudioExportButton here */}
           <AudioExportButton
             audioBuffer={audioBuffer}
             onExportComplete={onExportComplete}
           />
-
+          
           <DropdownPortal side="right" />
         </div>
       </div>

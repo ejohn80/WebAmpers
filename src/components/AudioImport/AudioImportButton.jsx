@@ -1,34 +1,30 @@
 import React, {useRef} from "react";
-import * as Tone from "tone";
 import AudioImporter from "./AudioImporter";
-import "./AudioImportButton.css";
 import {ImportIcon} from "../Layout/Svgs";
+import * as Tone from "tone";
+import './AudioImportButton.css'; 
 
 /**
  * A UI component that provides a button to import audio files.
- * It uses the AudioImporter class to process the file and provides
- * callbacks for success and error events.
- *
- * @param {object} props
- * @param {function} props.onImportSuccess - Callback function for successful import. Receives import result.
- * @param {function} props.onImportError - Callback function for failed import. Receives error.
+ * Supports both standalone usage (renders a button) and wrapper usage (clones children).
  */
-const AudioImportButton = ({onImportSuccess, onImportError}) => {
+const AudioImportButton = ({onImportSuccess, onImportError, children}) => {
   const fileInputRef = useRef(null);
   const audioImporter = new AudioImporter();
 
   const handleButtonClick = () => {
-    // Programmatically click the hidden file input element
     fileInputRef.current.click();
   };
 
   const handleFileChange = async (event) => {
     const file = event.target.files[0];
     if (!file) {
-      return; // User cancelled the file dialog
+      return;
     }
 
-    console.log(`Attempting to import: ${file.name}`);
+    if (Tone.context.state !== "running") {
+      await Tone.start();
+    }
 
     try {
       const importResult = await audioImporter.importFile(file);
@@ -43,9 +39,34 @@ const AudioImportButton = ({onImportSuccess, onImportError}) => {
       }
     }
 
-    // Reset the file input to allow re-importing the same file
     event.target.value = "";
   };
+
+  let triggerElement;
+
+  if (children) {
+    // Dropdown Case (children is defined): Clone the child element to inject the click handler
+    triggerElement = React.cloneElement(children, {
+      onClick: (e) => {
+        // Preserve original click handler (for dropdown menu closing)
+        if (children.props.onClick) {
+          children.props.onClick(e);
+        }
+        // Trigger the file input
+        handleButtonClick();
+      },
+    });
+  } else {
+    // Standalone Case (children is undefined): Render the default button
+    triggerElement = (
+      <button className="import-button" onClick={handleButtonClick}>
+        <span style={{display: "flex", alignItems: "center", gap: "10px"}}>
+          <ImportIcon />
+          Import Audio
+        </span>
+      </button>
+    );
+  }
 
   return (
     <>
@@ -56,19 +77,8 @@ const AudioImportButton = ({onImportSuccess, onImportError}) => {
         accept=".wav, .mp3"
         style={{display: "none"}}
       />
-      <button className="import-button" onClick={handleButtonClick}>
-        <span style={{display: "flex", alignItems: "center", gap: "10px"}}>
-          <ImportIcon
-            style={{
-              strokeWidth: 2,
-              stroke: "#000000",
-              width: "16px",
-              height: "16px",
-            }}
-          />
-          <span>Import File</span>
-        </span>
-      </button>
+
+      {triggerElement}
     </>
   );
 };

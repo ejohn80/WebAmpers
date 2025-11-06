@@ -1,65 +1,90 @@
-import React, {useState} from "react";
-import AudioExporter from "./AudioExporter";
+import React from "react";
+import AudioExportModal from "./AudioExportModal";
 import "./AudioExportButton.css";
 
 /**
- * A button component that, when clicked, opens a modal
- * to display the AudioExporter component.
- *
- * @param {object} props
- * @param {Tone.ToneAudioBuffer} props.audioBuffer - The audio buffer to be exported.
- * @param {function} props.onExportComplete - Callback after a successful export.
+ * Encapsulates the logic for showing the export modal.
+ * ...
+ * @param {React.Element} [props.children] - The element that triggers the modal (e.g., the dropdown link).
+ * @param {boolean} [props.disabled] - Whether the button should be explicitly disabled.
  */
-const AudioExportButton = ({audioBuffer, onExportComplete}) => {
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const isReady = !!audioBuffer;
+const AudioExportButton = ({
+  audioBuffer,
+  onExportComplete,
+  children,
+  disabled: propDisabled,
+}) => {
+  const [isModalOpen, setIsModalOpen] = React.useState(false);
 
-  const handleOpen = () => {
-    if (isReady) {
+  // The button is disabled if propDisabled is true OR if no audioBuffer exists
+  const isDisabled = propDisabled || !audioBuffer;
+
+  const closeModal = () => setIsModalOpen(false);
+
+  const openModal = (e) => {
+    // If disabled, prevent the default link action (navigation)
+    if (isDisabled) {
+      if (e && e.preventDefault) e.preventDefault();
+      return;
+    }
+
+    if (audioBuffer) {
       setIsModalOpen(true);
     } else {
-      alert("Please import or generate an audio track first.");
+      console.log("Export disabled: No audio buffer loaded.");
     }
-  };
-
-  const handleClose = () => {
-    setIsModalOpen(false);
   };
 
   const handleExportComplete = (result) => {
-    handleClose();
+    closeModal();
     if (onExportComplete) {
       onExportComplete(result);
     }
-    // Simple alert on success
-    // alert(`Export complete: ${result.format} file saved.`);
   };
 
-  return (
-    <>
+  let triggerElement;
+
+  if (children) {
+    // Clone the child element (the dropdown link) and inject the logic
+    triggerElement = React.cloneElement(children, {
+      // Preserve original click handler if it exists
+      onClick: (e) => {
+        if (children.props.onClick) {
+          children.props.onClick(e);
+        }
+        openModal(e);
+      },
+      // Apply the disabled class for visual effect and ARIA attribute
+      className:
+        (children.props.className || "") +
+        (isDisabled ? " dropdown-item-disabled" : ""),
+      "aria-disabled": isDisabled,
+    });
+  } else {
+    // Render a default button (used in Header.jsx) which uses the native 'disabled' prop
+    triggerElement = (
       <button
-        className="import-button export-button"
-        onClick={handleOpen}
-        disabled={!isReady}
-        title={!isReady ? "Please load audio first" : "Open Export Settings"}
+        className="export-button"
+        onClick={openModal}
+        disabled={isDisabled}
       >
         Export Audio
       </button>
+    );
+  }
 
-      {isModalOpen && (
-        <div className="modal-backdrop" onClick={handleClose}>
-          {/* Prevent clicks on the content from closing the modal */}
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <button className="modal-close-button" onClick={handleClose}>
-              &times;
-            </button>
-            <AudioExporter
-              audioBuffer={audioBuffer}
-              onExportComplete={handleExportComplete}
-            />
-          </div>
-        </div>
-      )}
+  return (
+    <>
+      {/* The trigger element (default button or cloned child) */}
+      {triggerElement}
+
+      {/* The actual modal content */}
+      <AudioExportModal
+        audioBuffer={audioBuffer}
+        onExportComplete={handleExportComplete}
+        isOpen={isModalOpen}
+        onClose={closeModal}
+      />
     </>
   );
 };

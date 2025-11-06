@@ -38,25 +38,23 @@ export function PreviousVersionsIcon() {
   );
 }
 
-export function ExportIcon() {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="12"
-      height="16"
-      viewBox="0 0 14 18"
-      fill="none"
-    >
-      <path
-        d="M1 17H13M7 1V13M7 13L12 8M7 13L2 8"
-        stroke="#E5E5E5"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
+export const ExportIcon = () => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="16"
+    height="16"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="white"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+    <polyline points="17 8 12 3 7 8" />
+    <line x1="12" y1="3" x2="12" y2="15" />
+  </svg>
+);
 
 export function UndoIcon() {
   return (
@@ -313,26 +311,26 @@ export function GuestIcon() {
   );
 }
 
-export function ImportIcon() {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="20"
-      height="16"
-      viewBox="0 0 20 16"
-      fill="none"
-      stroke="#000000"
-    >
-      <path
-        d="M10 9.22271V1.22271M10 1.22271L6.9797 3.88938M10 1.22271L13.0203 3.88938M1.09755 9.22276C1.09755 10.2184 0.878073 13.6492 1.09754 14.0295C1.29058 14.364 1.59839 14.6365 1.97726 14.807C2.40756 15.0005 2.97115 15.0005 4.09663 15.0005H15.7814C16.9069 15.0005 17.4697 15.0005 17.9 14.807C18.2789 14.6365 18.5877 14.3642 18.7807 14.0297C19.0002 13.6494 19 10.2184 19 9.22276"
-        stroke="#000000"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
+// export function ImportIcon() {
+//   return (
+//     <svg
+//       xmlns="http://www.w3.org/2000/svg"
+//       width="20"
+//       height="16"
+//       viewBox="0 0 20 16"
+//       fill="none"
+//       stroke="#000000"
+//     >
+//       <path
+//         d="M10 9.22271V1.22271M10 1.22271L6.9797 3.88938M10 1.22271L13.0203 3.88938M1.09755 9.22276C1.09755 10.2184 0.878073 13.6492 1.09754 14.0295C1.29058 14.364 1.59839 14.6365 1.97726 14.807C2.40756 15.0005 2.97115 15.0005 4.09663 15.0005H15.7814C16.9069 15.0005 17.4697 15.0005 17.9 14.807C18.2789 14.6365 18.5877 14.3642 18.7807 14.0297C19.0002 13.6494 19 10.2184 19 9.22276"
+//         stroke="#000000"
+//         strokeWidth="2"
+//         strokeLinecap="round"
+//         strokeLinejoin="round"
+//       />
+//     </svg>
+//   );
+// }
 
 export function PlayIcon() {
   return (
@@ -564,3 +562,21 @@ export function VolumeKnob() {
     </svg>
   );
 }
+
+export const ImportIcon = () => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="16"
+    height="16"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="black"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+    <polyline points="7 10 12 15 17 10" />
+    <line x1="12" y1="15" x2="12" y2="3" />
+  </svg>
+);

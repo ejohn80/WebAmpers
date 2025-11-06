@@ -1,6 +1,7 @@
-import {useEffect, useMemo, useRef, useState} from "react";
+import {useContext, useEffect, useMemo, useRef, useState} from "react";
 import {PlaybackEngine} from "./playback.jsx";
 import {progressStore} from "./progressStore";
+import {AppContext} from "../context/AppContext";
 
 // Hook that wraps PlaybackEngine and exposes state/actions for the UI
 export default function usePlaybackEngine({
@@ -8,10 +9,13 @@ export default function usePlaybackEngine({
   onProgress,
   onTransport,
 } = {}) {
+  const {setEngineRef, applyEffectsToEngine, effects} =
+    useContext(AppContext) || {};
   const engine = useMemo(
     () => new PlaybackEngine({onProgress, onTransport}),
     []
   );
+  const engineRef = useRef(null);
 
   const [playing, setPlaying] = useState(false);
   const [ms, setMs] = useState(0);
@@ -43,6 +47,11 @@ export default function usePlaybackEngine({
     const t = ({playing}) => setPlaying(playing);
     engine.events.onProgress = onProgress ?? p;
     engine.events.onTransport = onTransport ?? t;
+    // expose engine to AppContext for global Effects control
+    try {
+      engineRef.current = engine;
+      setEngineRef && setEngineRef(engineRef);
+    } catch {}
     // keep local copies too
     return () => {
       engine.events.onProgress = undefined;
@@ -142,6 +151,10 @@ export default function usePlaybackEngine({
             setMasterVol(Math.round(initVol * 100));
             setMuted(initMuted);
           }
+          // Apply any persisted/global effects once engine is ready
+          try {
+            applyEffectsToEngine && applyEffectsToEngine();
+          } catch {}
         } catch (e) {
           console.error("engine.load failed:", e);
         }
@@ -164,6 +177,13 @@ export default function usePlaybackEngine({
       }
     })();
   }, [engine, version]);
+
+  // Re-apply effects whenever they change from the context
+  useEffect(() => {
+    try {
+      applyEffectsToEngine && applyEffectsToEngine();
+    } catch {}
+  }, [effects, engine]);
 
   // scrub handling (muting during scrubs) isn't part of the hook's external API in this
   // minimal refactor — keep it internal if needed later.
