@@ -4,8 +4,6 @@ import {AppContext} from "../../context/AppContext";
 import ReactDOM from "react-dom";
 import {useNavigate} from "react-router-dom";
 
-import AudioExportButton from "../AudioExport/AudioExportButton";
-
 import "./Header.css";
 import {
   ExportIcon,
@@ -21,9 +19,18 @@ import {
   ThemesIcon,
   ColorAccessibilityIcon,
   GuestIcon,
+  ImportIcon, // <-- ADDED ImportIcon
 } from "./Svgs";
+import AudioExportButton from "../AudioExport/AudioExportButton";
+import AudioImportButton from "../AudioImport/AudioImportButton"; // <-- ADDED Import Component
 
-function DropdownPortal({side}) {
+function DropdownPortal({
+  side,
+  audioBuffer,
+  onExportComplete,
+  onImportSuccess, // <-- ADDED Prop
+  onImportError, // <-- ADDED Prop
+}) {
   const navigate = useNavigate();
   const {userData} = useContext(AppContext);
 
@@ -45,14 +52,16 @@ function DropdownPortal({side}) {
   const handleMenuItemClick = (action) => {
     console.log(`Selected: ${action}`);
 
-    // Handle navigation for guest dropdown
     if (action === "Login") {
       navigate("/login");
     } else if (action === "Register") {
       navigate("/register");
     }
 
-    setActiveDropdown(null);
+    // Do not close the dropdown for "Export" or "Import", as the wrapper will handle the interaction (e.g., opening a modal/file dialog).
+    if (action !== "Export" && action !== "Import") {
+      setActiveDropdown(null);
+    }
   };
 
   const handleButtonClick = (dropdownName, buttonRef) => {
@@ -67,12 +76,15 @@ function DropdownPortal({side}) {
     setActiveDropdown(activeDropdown === dropdownName ? null : dropdownName);
   };
 
-  // Handle mouse leave from dropdown
   const handleDropdownMouseLeave = (event) => {
     const relatedTarget = event.relatedTarget;
     const dropdown = event.currentTarget;
 
-    if (!dropdown.contains(relatedTarget)) {
+    if (
+      relatedTarget &&
+      relatedTarget.nodeType === 1 &&
+      !dropdown.contains(relatedTarget)
+    ) {
       setActiveDropdown(null);
     }
   };
@@ -116,13 +128,11 @@ function DropdownPortal({side}) {
     };
   }, [activeDropdown]);
 
-  // Helper function to get button class with active state
   const getButtonClass = (buttonType, dropdownName) => {
     const baseClass = `dropdown-btn${buttonType ? `-${buttonType}` : ""}`;
     return activeDropdown === dropdownName ? `${baseClass} active` : baseClass;
   };
 
-  // Dropdown content for each menu with individual styling
   const dropdownContent = {
     file: (
       <div
@@ -183,25 +193,58 @@ function DropdownPortal({side}) {
         >
           <span>Save</span>
         </a>
-        <a
-          href="#"
-          onClick={(e) => {
-            e.preventDefault();
-            handleMenuItemClick("Export");
-          }}
+
+        {/* --- AUDIO IMPORT BUTTON WRAPPER --- */}
+        <AudioImportButton
+          onImportSuccess={onImportSuccess}
+          onImportError={onImportError}
         >
-          <span
-            style={{
-              display: "flex",
-              alignItems: "center",
-              width: "100%",
-              gap: "8px",
+          <a
+            href="#"
+            onClick={(e) => {
+              e.preventDefault();
+              handleMenuItemClick("Import");
             }}
           >
-            <ExportIcon />
-            <span>Export</span>
-          </span>
-        </a>
+            <span
+              style={{
+                display: "flex",
+                alignItems: "center",
+                width: "100%",
+                gap: "8px",
+              }}
+            >
+              <ImportIcon />
+              <span>Import Audio</span>
+            </span>
+          </a>
+        </AudioImportButton>
+        {/* ----------------------------------- */}
+
+        <AudioExportButton
+          audioBuffer={audioBuffer}
+          onExportComplete={onExportComplete}
+        >
+          <a
+            href="#"
+            onClick={(e) => {
+              e.preventDefault();
+              handleMenuItemClick("Export");
+            }}
+          >
+            <span
+              style={{
+                display: "flex",
+                alignItems: "center",
+                width: "100%",
+                gap: "8px",
+              }}
+            >
+              <ExportIcon />
+              <span>Export</span>
+            </span>
+          </a>
+        </AudioExportButton>
       </div>
     ),
 
