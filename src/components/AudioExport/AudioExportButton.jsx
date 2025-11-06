@@ -1,65 +1,59 @@
-import React, {useState} from "react";
-import AudioExporter from "./AudioExporter";
+import React from "react";
+import AudioExportModal from "./AudioExportModal";
 import "./AudioExportButton.css";
 
 /**
- * A button component that, when clicked, opens a modal
- * to display the AudioExporter component.
- *
+ * Encapsulates the logic for showing the export modal.
+ * This component is used as a drop-in replacement for the
+ * previous inline button and modal logic.
  * @param {object} props
- * @param {Tone.ToneAudioBuffer} props.audioBuffer - The audio buffer to be exported.
- * @param {function} props.onExportComplete - Callback after a successful export.
+ * @param {Tone.ToneAudioBuffer} props.audioBuffer - The audio buffer to export.
+ * @param {function} props.onExportComplete - Callback function on export success/failure.
+ * @param {function} props.children - The element that triggers the modal (e.g., the dropdown link).
  */
-const AudioExportButton = ({audioBuffer, onExportComplete}) => {
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const isReady = !!audioBuffer;
+const AudioExportButton = ({audioBuffer, onExportComplete, children}) => {
+  const [isModalOpen, setIsModalOpen] = React.useState(false);
 
-  const handleOpen = () => {
-    if (isReady) {
+  const closeModal = () => setIsModalOpen(false);
+  const openModal = () => {
+    if (audioBuffer) {
       setIsModalOpen(true);
     } else {
-      alert("Please import or generate an audio track first.");
+      console.log("Export disabled: No audio buffer loaded.");
     }
-  };
-
-  const handleClose = () => {
-    setIsModalOpen(false);
   };
 
   const handleExportComplete = (result) => {
-    handleClose();
+    closeModal();
     if (onExportComplete) {
       onExportComplete(result);
     }
-    // Simple alert on success
-    // alert(`Export complete: ${result.format} file saved.`);
   };
+
+  // Clone the child element and inject the openModal handler
+  const triggerElement = React.cloneElement(children, {
+    onClick: (e) => {
+      // Preserve original click handler if it exists
+      if (children.props.onClick) {
+        children.props.onClick(e);
+      }
+      // Open the modal
+      openModal();
+    },
+  });
 
   return (
     <>
-      <button
-        className="import-button export-button"
-        onClick={handleOpen}
-        disabled={!isReady}
-        title={!isReady ? "Please load audio first" : "Open Export Settings"}
-      >
-        Export Audio
-      </button>
+      {/* The trigger element from the dropdown */}
+      {triggerElement}
 
-      {isModalOpen && (
-        <div className="modal-backdrop" onClick={handleClose}>
-          {/* Prevent clicks on the content from closing the modal */}
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <button className="modal-close-button" onClick={handleClose}>
-              &times;
-            </button>
-            <AudioExporter
-              audioBuffer={audioBuffer}
-              onExportComplete={handleExportComplete}
-            />
-          </div>
-        </div>
-      )}
+      {/* The actual modal content */}
+      <AudioExportModal
+        audioBuffer={audioBuffer}
+        onExportComplete={handleExportComplete}
+        isOpen={isModalOpen}
+        onClose={closeModal}
+      />
     </>
   );
 };
