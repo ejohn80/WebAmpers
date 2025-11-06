@@ -23,6 +23,67 @@ export default function PlaybackUI({version}) {
     goToStart,
   } = usePlaybackEngine({version});
 
+  // Global spacebar handler: toggle play/pause unless the user is typing
+  React.useEffect(() => {
+    const isEditableTarget = (el) => {
+      if (!el || el === document.body) return false;
+      const tag = el.tagName?.toLowerCase();
+      if (tag === "input" || tag === "textarea" || tag === "select")
+        return true;
+      if (el.isContentEditable) return true;
+      // Treat role="textbox" as editable as well
+      const role = el.getAttribute?.("role");
+      if (role && role.toLowerCase() === "textbox") return true;
+      // Some inputs can be non-text; allow space for range to not toggle playback when focused
+      if (tag === "input") {
+        const type = (el.getAttribute?.("type") || "").toLowerCase();
+        const textLike = [
+          "text",
+          "search",
+          "password",
+          "email",
+          "number",
+          "url",
+          "tel",
+          "date",
+          "time",
+          "datetime-local",
+          "month",
+          "week",
+          "range",
+        ];
+        if (textLike.includes(type)) return true;
+      }
+      return false;
+    };
+
+    const onKeyDown = (e) => {
+      // Ignore when modifiers are pressed or key is repeating
+      if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+
+      // If user is focused in an editable control, don't hijack keys
+      if (isEditableTarget(e.target)) return;
+
+      const isSpace = e.code === "Space" || e.key === " ";
+      const isLeft = e.code === "ArrowLeft" || e.key === "ArrowLeft";
+      const isRight = e.code === "ArrowRight" || e.key === "ArrowRight";
+
+      if (isSpace) {
+        e.preventDefault();
+        togglePlay();
+      } else if (isLeft) {
+        e.preventDefault();
+        skipBack10();
+      } else if (isRight) {
+        e.preventDefault();
+        skipFwd10();
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [togglePlay, skipBack10, skipFwd10]);
+
   const fmtTime = (tMs) => {
     const t = Math.max(0, Math.floor((tMs || 0) / 1000));
     const m = Math.floor(t / 60);
