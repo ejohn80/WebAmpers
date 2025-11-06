@@ -1,29 +1,31 @@
 import React from "react";
-import DraggableDiv from "../Generic/DraggableDiv";
-import PlaybackUI from "./PlaybackUI";
+import WebAmpPlayback from "../../playback/playback.jsx";
 import RecorderButton from "../Recording/RecorderButton";
+import "./Footer.css";
 
-/**
- * Footer component for the application layout.
- */
 function Footer({version, onRecordComplete, onRecordStart, onRecordStop}) {
   return (
-    <DraggableDiv className="footer">
-      <div style={{display: "flex", alignItems: "center", width: "100%"}}>
+    <div className="footer">
+      <div className="footer-container">
         {/* Left: Recording control */}
-        <div style={{width: 160, display: "flex", alignItems: "center"}}>
+        <div className="footer-section footer-recording-section">
           <RecorderButton
             onComplete={onRecordComplete}
             onStart={onRecordStart}
             onStop={onRecordStop}
           />
         </div>
-        {/* Center/Right: Transport and volume */}
-        <div style={{flex: 1}}>
-          <PlaybackUI version={version} />
+
+        {/* Center: Transport controls (includes volume) */}
+        <div className="footer-section footer-transport-section">
+          <WebAmpPlayback version={version} />
+        </div>
+
+        <div className="footer-section footer-volume-section">
+          {/* Volume controls are handled in WebAmpPlayback component */}
         </div>
       </div>
-    </DraggableDiv>
+    </div>
   );
 }
 
