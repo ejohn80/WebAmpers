@@ -63,12 +63,6 @@
   justify-content: flex-start;
 }
 
-.footer-volume-controls {
-  display: flex;
-  align-items: left;
-  gap: 8px;
-}
-
 .footer-volume-btn {
   background: #262529;
   color: #e5e5e5;
@@ -84,7 +78,7 @@
 
 .footer-volume-btn:hover {
   background-color: #333239;
-}
+} */
 
 .footer-volume-knob {
   width: 60px;

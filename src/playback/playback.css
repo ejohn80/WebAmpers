@@ -1,3 +1,5 @@
+/* PS: Do not use transform: translateX(__) it will cause elements to overlap in ways that interfere with click events */
+
 /* ===========================
    Playback Layout
    =========================== */
@@ -8,9 +10,11 @@
   height: 100%;
   width: 100%;
   box-sizing: border-box;
-  padding: 0 20px;
-  overflow: visible;
+  padding-left: 20px;
   position: relative;
+  /* border: 2px solid red; */
+  right: -150px;
+
 }
 
 /* ===========================
@@ -20,6 +24,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
+  /* border: 2px solid blue; */
 }
 
 .transport-button {
@@ -32,6 +37,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  position: relative; 
+  z-index: 1;
 }
 
 .transport-button:hover {
@@ -50,7 +57,10 @@
   align-items: center;
   justify-content: center;
   flex: 1;
-  transform: translateX(100px);
+  position: absolute;
+  z-index: 1;
+  /* border: 2px solid lime; */
+  padding-left: 100px;
 }
 
 .time-display {
@@ -69,24 +79,24 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-left: 100px;
-  transform: translateX(150px);
   position: relative;
-  right: 10px;
-  z-index: 10;
-  overflow: visible;
+  z-index: 1;
+  /* border: 2px solid yellow; */
+  width: 210px
 }
 
 .volume-button {
   background: transparent;
   border: none;
-  padding-right: 5px;
+  padding: 0;
   margin: 0;
   cursor: pointer;
   transition: opacity 0.2s ease;
   display: flex;
   align-items: center;
   justify-content: center;
+  position: relative;
+  z-index: 2;
 }
 
 .volume-button:hover {
@@ -106,7 +116,8 @@
   height: 28px;
   display: flex;
   align-items: center;
-  padding: 0 15px;
+  padding-left: 20px;
+  /* border: solid 2px rebeccapurple; */
   overflow: visible;
 }
 
@@ -146,7 +157,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 10;
+  z-index: 3;
 }
 
 .volume-knob-wrapper.dragging {
@@ -167,5 +178,5 @@
   height: 28px;
   opacity: 0;
   cursor: pointer;
-  z-index: 2;
+  z-index: 4;
 }
