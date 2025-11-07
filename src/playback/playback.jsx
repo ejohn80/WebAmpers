@@ -1,6 +1,7 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, {useContext, useEffect, useMemo, useRef, useState} from "react";
 import * as Tone from "tone";
-import { progressStore } from './progressStore';
+import {progressStore} from "./progressStore";
+import {AppContext} from "../context/AppContext";
 import PlayIcon from "../assets/footer/PlayButton.svg";
 import PauseIcon from "../assets/footer/PauseButton.svg";
 import RewindIcon from "../assets/footer/RewindButton.svg";
@@ -101,6 +102,15 @@ class PlaybackEngine {
   /** Start playback of the Tone.Transport */
   async play() {
     await this.ensureAudioUnlocked();
+
+    // If we're at the end, restart from the beginning
+    const len = this.version?.lengthMs;
+    const currentMs = this.getPositionMs();
+    if (typeof len === "number" && len > 0 && currentMs >= len) {
+      this.seekMs(0);
+      this.ended = false;
+    }
+
     Tone.Transport.start("+" + this.renderAheadSec);
     this._emitTransport(true);
     this.ended = false;
@@ -136,15 +146,15 @@ class PlaybackEngine {
     return Tone.Transport.seconds * 1000;
   }
 
-  // /** Define a loop range for the transport */
-  // setLoop(startMs, endMs) {
-  //   if (!this.version) return;
-  //   Tone.Transport.setLoopPoints(
-  //     msToToneTime(startMs, this.version.bpm || 120),
-  //     msToToneTime(endMs, this.version.bpm || 120)
-  //   );
-  //   Tone.Transport.loop = endMs > startMs;
-  // }
+  /** Define a loop range for the transport */
+  setLoop(startMs, endMs) {
+    if (!this.version) return;
+    Tone.Transport.setLoopPoints(
+      msToToneTime(startMs, this.version.bpm || 120),
+      msToToneTime(endMs, this.version.bpm || 120)
+    );
+    Tone.Transport.loop = endMs > startMs;
+  }
 
   // /** Disable looping entirely */
   // clearLoop() {
@@ -189,15 +199,63 @@ class PlaybackEngine {
 
   /** Replace the master chain (placeholder for future FX support) */
   replaceMasterChain(chain) {
-    const newMaster = this._makeMaster(chain);
     const old = this.master;
-    if (old) (old.fxOut ?? old.gain).disconnect();
+    const prevLevel = (() => {
+      try {
+        return old?.gain?.gain?.value ?? 1;
+      } catch {
+        return 1;
+      }
+    })();
 
-    this.master = newMaster;
+    const newMaster = this._makeMaster(chain);
+    // preserve master output level (UI volume)
+    try {
+      newMaster.gain.gain.value = prevLevel;
+    } catch {}
+
+    // Reconnect buses to the new master head
     this.trackBuses.forEach((bus) => {
-      (bus.fxOut ?? bus.pan).disconnect();
-      (bus.fxOut ?? bus.pan).connect(this.master.fxIn ?? this.master.gain);
+      try {
+        (bus.fxOut ?? bus.pan).disconnect();
+      } catch {}
+      (bus.fxOut ?? bus.pan).connect(newMaster.fxIn ?? newMaster.gain);
     });
+
+    // Swap master and dispose old safely
+    this.master = newMaster;
+    if (old) {
+      try {
+        (old.fxOut ?? old.gain).disconnect();
+      } catch {}
+      try {
+        (old.chain || []).forEach((n) => n.dispose?.());
+      } catch {}
+      try {
+        old.gain.dispose?.();
+      } catch {}
+    }
+  }
+
+  /** Set master effects from UI (pitch in semitones, reverb 0-100, volume 0-200) */
+  setMasterEffects(effects) {
+    const chain = [];
+    // Pitch (semitones, can be negative)
+    if (typeof effects?.pitch === "number" && effects.pitch !== 0) {
+      chain.push({type: "pitch", semitones: effects.pitch});
+    }
+    // Reverb (map 0-100 -> wet 0-1, roomSize 0.1-0.95)
+    if (typeof effects?.reverb === "number" && effects.reverb > 0) {
+      const wet = Math.max(0, Math.min(1, effects.reverb / 100));
+      const roomSize = 0.1 + 0.85 * wet;
+      chain.push({type: "freeverb", wet, roomSize});
+    }
+    // Effect volume (0-200% -> 0.0-2.0 linear)
+    if (typeof effects?.volume === "number" && effects.volume !== 100) {
+      const linear = Math.max(0, Math.min(2, effects.volume / 100));
+      chain.push({type: "gain", gain: linear});
+    }
+    this.replaceMasterChain(chain);
   }
 
   /** Dispose all audio resources */
@@ -211,7 +269,7 @@ class PlaybackEngine {
   /** Prepare all segments (audio clips) and schedule them for playback */
   async _prepareSegments(version) {
     const urls = Array.from(
-      new Set((version.segments || []).map((s) => s.fileUrl)),
+      new Set((version.segments || []).map((s) => s.fileUrl))
     );
     urls.forEach((u) => this._preload(u));
 
@@ -259,7 +317,7 @@ class PlaybackEngine {
       // Schedule start time in the Transport
       const startTT = msToToneTime(
         seg.startOnTimelineMs || 0,
-        version.bpm || 120,
+        version.bpm || 120
       );
       player.start(startTT, offsetSec, durSec);
     }
@@ -272,14 +330,64 @@ class PlaybackEngine {
     const gain = new Tone.Gain(dbToGain(t.gainDb));
     const pan = new Tone.Panner(clamp(t.pan ?? 0, -1, 1));
     gain.connect(pan);
-    return { id: t.id, gain, pan, fxIn: null, fxOut: null, chain: [] };
+    return {id: t.id, gain, pan, fxIn: null, fxOut: null, chain: []};
   }
 
   /** Create a master bus and connect it to the audio output */
-  _makeMaster() {
-    const gain = new Tone.Gain(1);
-    gain.connect(Tone.Destination);
-    return { gain, chain: [], fxIn: null, fxOut: null };
+  _makeMaster(chain) {
+    const outGain = new Tone.Gain(1);
+
+    // Build FX chain if provided
+    const nodes = [];
+    if (Array.isArray(chain)) {
+      chain.forEach((cfg) => {
+        try {
+          switch (cfg?.type) {
+            case "pitch": {
+              const ps = new Tone.PitchShift(cfg.semitones ?? 0);
+              nodes.push(ps);
+              break;
+            }
+            case "freeverb": {
+              const fv = new Tone.Freeverb({
+                roomSize: Math.max(0, Math.min(1, cfg.roomSize ?? 0.8)),
+                dampening: 3000,
+                wet: Math.max(0, Math.min(1, cfg.wet ?? 0.5)),
+              });
+              nodes.push(fv);
+              break;
+            }
+            case "gain": {
+              const g = new Tone.Gain(Math.max(0, Math.min(2, cfg.gain ?? 1)));
+              nodes.push(g);
+              break;
+            }
+            default:
+              break;
+          }
+        } catch {}
+      });
+    }
+
+    // Wire: head -> ... -> tail -> outGain -> Destination
+    let fxIn = null;
+    let fxOut = null;
+    if (nodes.length > 0) {
+      fxIn = nodes[0];
+      fxOut = nodes[nodes.length - 1];
+      // connect nodes sequentially
+      for (let i = 0; i < nodes.length - 1; i++) {
+        try {
+          nodes[i].connect(nodes[i + 1]);
+        } catch {}
+      }
+      try {
+        fxOut.connect(outGain);
+      } catch {}
+    }
+
+    outGain.connect(Tone.Destination);
+    return {gain: outGain, chain: nodes, fxIn, fxOut};
   }
 
   /** Handle mute/solo logic and smoothly apply gain changes */
@@ -291,7 +399,11 @@ class PlaybackEngine {
     tracks.forEach((t) => {
       const bus = this.trackBuses.get(t.id);
       if (!bus) return;
-      const shouldMute = anySolo ? !t.solo : !!t.mute;
+      // Mute should take precedence over solo. If a track is muted, it
+      // remains effectively silent even when soloed. If any track is
+      // soloed, non-soloed tracks are muted unless they are explicitly
+      // unmuted.
+      const shouldMute = !!t.mute || (anySolo && !t.solo);
 
       const now = Tone.now();
       bus.gain.gain.cancelAndHoldAtTime(now);
@@ -306,13 +418,12 @@ class PlaybackEngine {
     this.preloaded.add(url);
     Tone.ToneAudioBuffer.load(url)
       .then(
-        () =>
-          this.events.onBuffer && this.events.onBuffer({ url, ready: true }),
+        () => this.events.onBuffer && this.events.onBuffer({url, ready: true})
       )
       .catch(
         (e) =>
           this.events.onBuffer &&
-          this.events.onBuffer({ url, ready: false, error: e }),
+          this.events.onBuffer({url, ready: false, error: e})
       );
   }
 
@@ -393,16 +504,36 @@ class PlaybackEngine {
   }
 }
 
+// Export the engine class so other modules (hooks/UI) can instantiate it
+export {PlaybackEngine};
+
 /** ---------- React wrapper component ----------
  * Provides UI controls (Play/Pause/Stop) and a progress bar for the PlaybackEngine.
  */
-export default function WebAmpPlayback({ version, onEngineReady }) {
+export default function WebAmpPlayback({version, onEngineReady}) {
   // , height = 120
   const engineRef = useRef(null); // no external usage currently
+  const appCtx = useContext(AppContext) || {};
+  const {setEngineRef} = appCtx;
   const [playing, setPlaying] = useState(false);
   const [ms, setMs] = useState(0);
-  const [masterVol, setMasterVol] = useState(50); // 0-100 visual percent, default 50%
-  const [muted, setMuted] = useState(false);
+  // Restore persisted master volume / mute from localStorage when possible
+  const [masterVol, setMasterVol] = useState(() => {
+    try {
+      const v = localStorage.getItem("webamp.masterVol");
+      return v !== null ? Number(v) : 50;
+    } catch (e) {
+      return 50;
+    }
+  }); // 0-100 visual percent, default 50%
+  const [muted, setMuted] = useState(() => {
+    try {
+      const m = localStorage.getItem("webamp.muted");
+      return m !== null ? m === "1" : false;
+    } catch (e) {
+      return false;
+    }
+  });
   const [draggingVol, setDraggingVol] = useState(false);
   const wasPlayingRef = useRef(false);
   const prevMasterGainRef = useRef(0.5);
@@ -416,15 +547,19 @@ export default function WebAmpPlayback({ version, onEngineReady }) {
     () =>
       new PlaybackEngine({
         onProgress: (v) => setMs(v),
-        onTransport: ({ playing }) => setPlaying(playing),
+        onTransport: ({playing}) => setPlaying(playing),
         onError: (e) => console.error(e),
       }),
-    [],
+    []
   );
 
   // Attach and clean up engine
   useEffect(() => {
     engineRef.current = engine;
+    // expose engine to global app context so EffectsTab can control FX
+    try {
+      setEngineRef && setEngineRef(engineRef);
+    } catch {}
     // Inform parent that the engine instance is available so it can call
     // control methods (setTrackMute, setTrackSolo, etc.).
     try {
@@ -436,29 +571,99 @@ export default function WebAmpPlayback({ version, onEngineReady }) {
   }, [engine]);
 
   // Load engine when version changes (do not reload on play/pause)
+  const prevLoadSigRef = React.useRef(null);
   useEffect(() => {
     if (!version) return;
     // update known length for waveform progress
     progressStore.setLengthMs(version.lengthMs ?? 0);
     // allow waveform to request seeking
     progressStore.setSeeker((absMs) => {
-      try { engine.seekMs(absMs); } catch (e) { console.warn('seek request failed:', e); }
+      try {
+        engine.seekMs(absMs);
+      } catch (e) {
+        console.warn("seek request failed:", e);
+      }
     });
-    engine
-      .load(version)
-      .then(() => {
-        try {
-          // Initialize master volume to 50%
-          if (engine.master) {
-            engine.master.gain.gain.value = 0.5;
-            prevMasterGainRef.current = 0.5;
-            savedVolumeRef.current = 0.5;
-            setMasterVol(50);
-            setMuted(false);
+
+    // Build a lightweight signature for the loaded audio structure. We
+    // intentionally exclude per-track flags like mute/solo so toggling
+    // them doesn't force a full engine.reload (which resets master volume).
+    const segSig = (version.segments || [])
+      .map(
+        (s) =>
+          `${s.fileUrl}@${s.trackId}:${s.startOnTimelineMs || 0}-${s.durationMs || 0}`
+      )
+      .join("|");
+    const sig = `${version.lengthMs || 0}::${segSig}`;
+
+    if (prevLoadSigRef.current !== sig) {
+      // Only load the engine when the actual timeline/segments change.
+      engine
+        .load(version)
+        .then(() => {
+          try {
+            if (engine.master) {
+              // Prefer persisted settings if available
+              let initVol = 0.5;
+              let initMuted = false;
+              try {
+                const v = localStorage.getItem("webamp.masterVol");
+                if (v !== null)
+                  initVol = Math.max(0, Math.min(1, Number(v) / 100));
+              } catch (e) {}
+              try {
+                const m = localStorage.getItem("webamp.muted");
+                if (m !== null) initMuted = m === "1";
+              } catch (e) {}
+
+              // remember linear values in refs
+              prevMasterGainRef.current = initVol;
+              savedVolumeRef.current = initVol;
+
+              engine.master.gain.gain.value = initMuted ? 0 : initVol;
+
+              // update UI state to reflect persisted values
+              setMasterVol(Math.round(initVol * 100));
+              setMuted(initMuted);
+            }
+          } catch {}
+        })
+        .catch((e) => console.error("[UI] engine.load() failed:", e));
+      prevLoadSigRef.current = sig;
+    } else {
+      // If only metadata (e.g., mute/solo) changed, avoid reload. However,
+      // we still need to synchronize per-track flags into the running
+      // engine instance because the engine was not reloaded and its
+      // internal `version.tracks` may be out of sync with the new
+      // `version` prop. Apply any per-track mute/solo diffs by calling
+      // the engine control methods which will update internal state and
+      // call _applyMuteSolo.
+      try {
+        const current = engine.version?.tracks || [];
+        (version.tracks || []).forEach((t) => {
+          const existing = current.find((x) => x.id === t.id);
+          if (!existing) return; // new/removed tracks would have triggered reload
+          if (Boolean(existing.mute) !== Boolean(t.mute)) {
+            try {
+              engine.setTrackMute(t.id, !!t.mute);
+            } catch (e) {
+              // swallow - best effort
+            }
           }
-        } catch {}
-      })
-      .catch((e) => console.error("[UI] engine.load() failed:", e));
+          if (Boolean(existing.solo) !== Boolean(t.solo)) {
+            try {
+              engine.setTrackSolo(t.id, !!t.solo);
+            } catch (e) {
+              // swallow - best effort
+            }
+          }
+        });
+      } catch (e) {
+        // defensive: if sync fails, fall back to a full reload next time
+        prevLoadSigRef.current = null;
+      }
+    }
+
     return () => {
       // cleanup seeker on version change/unmount
       progressStore.setSeeker(null);
@@ -540,7 +745,9 @@ export default function WebAmpPlayback({ version, onEngineReady }) {
       console.warn("goToStart failed:", err);
     }
     setMs(0);
-    try { progressStore.setMs(0); } catch {}
+    try {
+      progressStore.setMs(0);
+    } catch {}
   };
 
   // Publish progress to store whenever local ms updates
@@ -554,12 +761,24 @@ export default function WebAmpPlayback({ version, onEngineReady }) {
       if (!engine.master) return;
       if (muted) {
         // unmute to last saved volume
-        engine.master.gain.gain.value = Math.max(0, Math.min(1, savedVolumeRef.current ?? masterVol / 100));
+        const restore = Math.max(
+          0,
+          Math.min(1, savedVolumeRef.current ?? masterVol / 100)
+        );
+        engine.master.gain.gain.value = restore;
+        prevMasterGainRef.current = restore;
         setMuted(false);
+        try {
+          localStorage.setItem("webamp.muted", "0");
+        } catch (e) {}
       } else {
         // save current volume and mute
         savedVolumeRef.current = Math.max(0, Math.min(1, masterVol / 100));
+        try {
+          localStorage.setItem("webamp.muted", "1");
+        } catch (e) {}
         engine.master.gain.gain.value = 0;
+        prevMasterGainRef.current = 0;
         setMuted(true);
       }
     } catch (err) {
@@ -601,108 +820,181 @@ export default function WebAmpPlayback({ version, onEngineReady }) {
       }}
     >
       {/* left spacer to center the transport group */}
-      <div style={{ flex: 1 }} />
+      <div style={{flex: 1}} />
 
       {/* centered transport: time | start | back 10s | play/pause | fwd 10s */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+      <div style={{display: "flex", alignItems: "center", gap: 12}}>
         <button
           onClick={goToStart}
           title="Go to start"
-          style={{ background: 'transparent', border: 'none', padding: 0, margin: 0, cursor: 'pointer' }}
+          style={{
+            background: "transparent",
+            border: "none",
+            padding: 0,
+            margin: 0,
+            cursor: "pointer",
+          }}
         >
-          <img src={GoToStartIcon} alt="Go to start" style={{ height: 18, display: 'block' }} />
+          <img
+            src={GoToStartIcon}
+            alt="Go to start"
+            style={{height: 26, display: "block"}}
+          />
         </button>
-        <code style={{ fontSize: 12, opacity: 0.85, minWidth: 80, textAlign: "right" }}>
+        <code
+          style={{
+            fontSize: 12,
+            opacity: 0.85,
+            minWidth: 80,
+            textAlign: "right",
+          }}
+        >
           {fmtTime(ms)}
-          {typeof (version?.lengthMs) === 'number' && version.lengthMs > 0 ? ` / ${fmtTime(version.lengthMs)}` : ''}
+          {typeof version?.lengthMs === "number" && version.lengthMs > 0
+            ? ` / ${fmtTime(version.lengthMs)}`
+            : ""}
         </code>
         <button
           onClick={skipBack10}
           title="Back 10s"
-          style={{ background: 'transparent', border: 'none', padding: 0, margin: 0, cursor: 'pointer' }}
+          style={{
+            background: "transparent",
+            border: "none",
+            padding: 0,
+            margin: 0,
+            cursor: "pointer",
+          }}
         >
-          <img src={RewindIcon} alt="Rewind 10 seconds" style={{ height: 18, display: 'block' }} />
+          <img
+            src={RewindIcon}
+            alt="Rewind 10 seconds"
+            style={{height: 26, display: "block"}}
+          />
         </button>
         {playing ? (
           <button
             type="button"
             onClick={onPause}
             title="Pause"
-            style={{ background: 'transparent', border: 'none', padding: 0, margin: 0, cursor: 'pointer' }}
+            style={{
+              background: "transparent",
+              border: "none",
+              padding: 0,
+              margin: 0,
+              cursor: "pointer",
+            }}
             aria-label="Pause"
           >
-            <img src={PauseIcon} alt="Pause" style={{ height: 18, display: 'block' }} />
+            <img
+              src={PauseIcon}
+              alt="Pause"
+              style={{height: 26, display: "block"}}
+            />
           </button>
         ) : (
           <button
             type="button"
             onClick={onPlay}
             title="Play"
-            style={{ background: 'transparent', border: 'none', padding: 0, margin: 0, cursor: 'pointer' }}
+            style={{
+              background: "transparent",
+              border: "none",
+              padding: 0,
+              margin: 0,
+              cursor: "pointer",
+            }}
             aria-label="Play"
           >
-            <img src={PlayIcon} alt="Play" style={{ height: 18, display: 'block' }} />
+            <img
+              src={PlayIcon}
+              alt="Play"
+              style={{height: 26, display: "block"}}
+            />
           </button>
         )}
         <button
           onClick={skipFwd10}
           title="Forward 10s"
-          style={{ background: 'transparent', border: 'none', padding: 0, margin: 0, cursor: 'pointer' }}
+          style={{
+            background: "transparent",
+            border: "none",
+            padding: 0,
+            margin: 0,
+            cursor: "pointer",
+          }}
         >
-          <img src={ForwardIcon} alt="Forward 10 seconds" style={{ height: 18, display: 'block' }} />
+          <img
+            src={ForwardIcon}
+            alt="Forward 10 seconds"
+            style={{height: 26, display: "block"}}
+          />
         </button>
       </div>
 
       {/* right side: master volume */}
-      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8 }}>
+      <div
+        style={{
+          flex: 1,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "flex-end",
+          gap: 8,
+        }}
+      >
         <button
           type="button"
           onClick={onToggleMute}
           title={muted ? "Unmute" : "Mute"}
-          style={{ background: 'transparent', border: 'none', padding: 0, margin: 0, cursor: 'pointer' }}
+          style={{
+            background: "transparent",
+            border: "none",
+            padding: 0,
+            margin: 0,
+            cursor: "pointer",
+          }}
           aria-label={muted ? "Unmute" : "Mute"}
         >
           <img
             src={muted ? SoundOffIcon : SoundOnIcon}
             alt={muted ? "Muted" : "Sound on"}
-            style={{ height: 18, display: 'block' }}
+            style={{height: 26, display: "block"}}
           />
         </button>
         {/* Custom-styled slider wrapper */}
         <div
           style={{
-            position: 'relative',
+            position: "relative",
             width: 160, // match previous fixed width
             height: 28,
-            display: 'flex',
-            alignItems: 'center',
+            display: "flex",
+            alignItems: "center",
           }}
           aria-label="Master volume"
         >
           {/* Track background */}
           <div
             style={{
-              position: 'absolute',
+              position: "absolute",
               left: 0,
               right: 0,
-              top: '50%',
+              top: "50%",
               height: 10,
-              background: '#CDF8FF',
+              background: "#CDF8FF",
               borderRadius: 100,
-              transform: 'translateY(-50%)',
+              transform: "translateY(-50%)",
             }}
           />
           {/* Filled portion */}
           <div
             style={{
-              position: 'absolute',
+              position: "absolute",
               left: 0,
               width: `${masterVol}%`,
-              top: '50%',
+              top: "50%",
               height: 10,
-              background: '#17E1FF',
+              background: "#17E1FF",
               borderRadius: 100,
-              transform: 'translateY(-50%)',
+              transform: "translateY(-50%)",
             }}
           />
           {/* Knob */}
@@ -710,16 +1002,18 @@ export default function WebAmpPlayback({ version, onEngineReady }) {
             src={VolumeKnob}
             alt="Volume knob"
             style={{
-              position: 'absolute',
+              position: "absolute",
               left: `${masterVol}%`,
-              top: '50%',
+              top: "50%",
               // Nudge downward slightly for visual centering
-              transform: `translate(-50%, -40%) ${draggingVol ? 'scale(1.05)' : 'scale(1)'}`,
+              transform: `translate(-50%, -40%) ${draggingVol ? "scale(1.05)" : "scale(1)"}`,
               height: 20,
               width: 20,
-              filter: draggingVol ? 'drop-shadow(0 0 6px rgba(61,133,225,0.4))' : 'drop-shadow(0 1px 2px rgba(0,0,0,0.15))',
-              transition: 'transform 120ms ease, filter 120ms ease',
-              pointerEvents: 'none',
+              filter: draggingVol
+                ? "drop-shadow(0 0 6px rgba(61,133,225,0.4))"
+                : "drop-shadow(0 1px 2px rgba(0,0,0,0.15))",
+              transition: "transform 120ms ease, filter 120ms ease",
+              pointerEvents: "none",
             }}
           />
           {/* Native input for interactions (invisible) */}
@@ -734,12 +1028,19 @@ export default function WebAmpPlayback({ version, onEngineReady }) {
               setMasterVol(v);
               try {
                 // master volume: linear 0.0 - 1.0
-                if (engine.master) {
-                  const linear = Math.max(0, Math.min(1, v / 100));
-                  savedVolumeRef.current = linear; // always remember intended volume
-                  if (!muted) {
-                    engine.master.gain.gain.value = linear;
-                  }
+                const linear = Math.max(0, Math.min(1, v / 100));
+                // persist user's master volume preference (0-100)
+                try {
+                  localStorage.setItem("webamp.masterVol", String(v));
+                } catch (e) {}
+
+                // remember intended volume
+                savedVolumeRef.current = linear;
+                prevMasterGainRef.current = linear;
+
+                // apply to engine unless muted
+                if (engine.master && !muted) {
+                  engine.master.gain.gain.value = linear;
                 }
               } catch (err) {
                 console.warn("master volume set failed:", err);
@@ -751,12 +1052,12 @@ export default function WebAmpPlayback({ version, onEngineReady }) {
             onTouchStart={() => setDraggingVol(true)}
             onTouchEnd={() => setDraggingVol(false)}
             style={{
-              position: 'absolute',
+              position: "absolute",
               inset: 0,
-              width: '100%',
+              width: "100%",
               height: 28,
               opacity: 0,
-              cursor: 'pointer',
+              cursor: "pointer",
             }}
           />
         </div>

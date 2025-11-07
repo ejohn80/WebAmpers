@@ -1,5 +1,7 @@
 /* General Reset and Base Styling */
-body, html, #root {
+body,
+html,
+#root {
   margin: 0;
   padding: 0;
   height: 100%;
@@ -9,7 +11,7 @@ body, html, #root {
 
 /* Header specific styling */
 .header {
-  background-color: #262529;
+  background-color: #242424;
   position: relative;
   z-index: 9999;
   overflow: visible;
@@ -21,24 +23,13 @@ body, html, #root {
 .app-container {
   height: 100vh;
   display: grid;
-  grid-template-rows: 40px 1fr 40px; 
+  grid-template-rows: 40px 1fr 40px;
 }
 
 /* Ensure other sections have lower z-index */
 
-.blue {
-  background-color: #4da6ff;
-  z-index: 1; /* Lower than header */
-}
-
-.purple {
-  background-color: #a366ff;
-  overflow: auto;
-  z-index: 1; /* Lower than header */
-}
-
-.lime {
-  background-color: #99ff4d;
+.footer {
+  background-color: #242424;
   z-index: 1; /* Lower than header */
 }
 
@@ -46,8 +37,17 @@ body, html, #root {
 .section {
   padding: 10px;
   box-sizing: border-box;
-  color: white;
-  border: 1px solid black;
+  color: #e5e5e5; /* match header text color */
+  border: 1px solid #343239;
+}
+
+/* Footer-specific overrides to vertically center content inside the small footer row */
+.footer {
+  display: flex;
+  align-items: center;
+  padding: 0 10px; /* reduce vertical padding so controls sit centered */
+  height: 100%;
+  box-sizing: border-box;
 }
 
 /* Main content (center area) override — use a dark grey so TrackLane can be lighter */

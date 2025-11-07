@@ -8,7 +8,9 @@
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
-  transition: background-color 0.2s, box-shadow 0.2s;
+  transition:
+    background-color 0.2s,
+    box-shadow 0.2s;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -17,5 +19,5 @@
 
 .import-button:hover {
   background-color: #4a4a4c;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }

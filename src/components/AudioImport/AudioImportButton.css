@@ -1,5 +1,5 @@
 .import-button {
-  background-color: #EFEFEF;
+  background-color: #efefef;
   color: #333;
   border: 1px solid #333239;
   padding: 8px 16px;
@@ -7,10 +7,12 @@
   font-size: 14px;
   font-weight: bold;
   cursor: pointer;
-  transition: background-color 0.2s, box-shadow 0.2s;
+  transition:
+    background-color 0.2s,
+    box-shadow 0.2s;
 }
 
 .import-button:hover {
-  background-color: #17E1FF;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  background-color: #17e1ff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }

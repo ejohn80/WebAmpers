@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Audio Import/Export Test Harness</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <style>
+      body {
+        font-family: sans-serif;
+        max-width: 600px;
+        margin: 50px auto;
+        padding: 20px;
+        background: #282c34;
+        color: white;
+      }
+      .container {
+        background: #3c414c;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+      }
+      h1 {
+        color: #4da6ff;
+        border-bottom: 2px solid #4da6ff;
+        padding-bottom: 10px;
+      }
+      button {
+        background: #61afef;
+        color: white;
+        border: none;
+        padding: 10px 15px;
+        margin: 5px;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: background 0.2s;
+      }
+      button:hover:not(:disabled) {
+        background: #4a90e2;
+      }
+      button:disabled {
+        background: #5a5f6b;
+        cursor: not-allowed;
+      }
+      .status-box {
+        margin-top: 20px;
+        padding: 10px;
+        border-radius: 4px;
+      }
+      .success {
+        background: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+      }
+      .error {
+        background: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+      }
+      .info {
+        background: #cce5ff;
+        color: #004085;
+        border: 1px solid #b8daff;
+      }
+      input[type="file"] {
+        display: none;
+      }
+      .button-group {
+        display: flex;
+        justify-content: space-around;
+        margin-top: 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>WebAmpers Manual Test Harness</h1>
+      <p>
+        Test the basic audio import (Tone.js decoding) and browser-side WAV
+        export.
+      </p>
+
+      <div class="button-group">
+        <input type="file" id="audio-file-input" accept=".wav, .mp3, audio/*" />
+        <button id="import-btn">📂 Import Audio File</button>
+
+        <button id="export-wav-btn" disabled>💾 Export as WAV</button>
+
+        <button id="start-context-btn">▶️ Start Audio Context</button>
+      </div>
+
+      <div id="status-display" class="status-box info">
+        Status: Ready. Please click "Start Audio Context" first.
+      </div>
+
+      <h2>Audio Info</h2>
+      <pre id="audio-info">No file loaded.</pre>
+    </div>
+
+    <script>
+      let importedToneBuffer = null;
+      const fileInput = document.getElementById("audio-file-input");
+      const importButton = document.getElementById("import-btn");
+      const exportButton = document.getElementById("export-wav-btn");
+      const startContextButton = document.getElementById("start-context-btn");
+      const statusDisplay = document.getElementById("status-display");
+      const audioInfoDisplay = document.getElementById("audio-info");
+
+      // --- Utility Functions ---
+
+      function updateStatus(type, message) {
+        statusDisplay.className = `status-box ${type}`;
+        statusDisplay.innerHTML = `<strong>${type.toUpperCase()}</strong>: ${message}`;
+      }
+
+      function updateAudioInfo(buffer) {
+        if (!buffer) {
+          audioInfoDisplay.textContent = "No file loaded.";
+          return;
+        }
+        audioInfoDisplay.textContent = JSON.stringify(
+          {
+            channels: buffer.numberOfChannels,
+            sampleRate: buffer.sampleRate,
+            duration: buffer.duration.toFixed(2) + " seconds",
+            lengthInSamples: buffer.length,
+          },
+          null,
+          2
+        );
+      }
+
+      // --- Audio Context and Import ---
+
+      startContextButton.onclick = async () => {
+        try {
+          // Your AudioImporter.jsx uses Tone.start() and Tone.context.rawContext.decodeAudioData
+          await Tone.start();
+          updateStatus(
+            "success",
+            "Tone.js Audio Context started successfully."
+          );
+          startContextButton.disabled = true;
+        } catch (e) {
+          updateStatus("error", "Failed to start Audio Context: " + e.message);
+        }
+      };
+
+      importButton.onclick = () => {
+        if (Tone.context.state !== "running") {
+          updateStatus(
+            "error",
+            'Audio Context is not running. Click "Start Audio Context" first.'
+          );
+          return;
+        }
+        fileInput.click();
+      };
+
+      fileInput.onchange = async (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        updateStatus("info", `Loading and decoding ${file.name}...`);
+        exportButton.disabled = true;
+        importedToneBuffer = null;
+        updateAudioInfo(null);
+
+        try {
+          // 1. Read file as ArrayBuffer
+          const arrayBuffer = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => resolve(e.target.result);
+            reader.onerror = () => reject(new Error("Failed to read file."));
+            reader.readAsArrayBuffer(file);
+          });
+
+          // 2. Decode using Web Audio API (Tone.js context)
+          const audioBuffer =
+            await Tone.context.rawContext.decodeAudioData(arrayBuffer);
+
+          // 3. Wrap in ToneAudioBuffer (matches your React app's logic)
+          importedToneBuffer = new Tone.ToneAudioBuffer(audioBuffer);
+
+          updateStatus(
+            "success",
+            `Successfully imported and decoded "${file.name}"`
+          );
+          updateAudioInfo(importedToneBuffer);
+          exportButton.disabled = false;
+        } catch (e) {
+          updateStatus("error", "Import Failed: " + e.message);
+          console.error("Import error:", e);
+        }
+      };
+
+      // --- Export (Browser-side WAV generation) ---
+
+      // This helper function is taken directly from the logic implied in your ExportManager.js
+      // It creates a WAV Blob from a Web Audio API AudioBuffer.
+      function createWavBlob(audioBuffer) {
+        // Get raw data from the underlying AudioBuffer (since we're using ToneAudioBuffer.get())
+        const buffer = audioBuffer.get ? audioBuffer.get() : audioBuffer;
+
+        const numChannels = buffer.numberOfChannels;
+        const sampleRate = buffer.sampleRate;
+        const length = buffer.length;
+        const data = [];
+        for (let i = 0; i < numChannels; i++) {
+          data.push(buffer.getChannelData(i));
+        }
+
+        // --- WAV Header Generation ---
+        const bufferSize = length * numChannels * 2; // 16-bit PCM = 2 bytes per sample
+        const arrayBuffer = new ArrayBuffer(44 + bufferSize);
+        const view = new DataView(arrayBuffer);
+
+        // RIFF chunk descriptor
+        writeString(view, 0, "RIFF");
+        view.setUint32(4, 36 + bufferSize, true);
+        writeString(view, 8, "WAVE");
+
+        // fmt sub-chunk
+        writeString(view, 12, "fmt ");
+        view.setUint32(16, 16, true); // Sub-chunk size (16 for PCM)
+        view.setUint16(20, 1, true); // Audio format (1 for PCM)
+        view.setUint16(22, numChannels, true);
+        view.setUint32(24, sampleRate, true);
+        view.setUint32(28, sampleRate * numChannels * 2, true); // Byte rate
+        view.setUint16(32, numChannels * 2, true); // Block align
+        view.setUint16(34, 16, true); // Bits per sample
+
+        // data sub-chunk
+        writeString(view, 36, "data");
+        view.setUint32(40, bufferSize, true);
+
+        // --- Write PCM Data ---
+        let offset = 44;
+        for (let i = 0; i < length; i++) {
+          for (let channel = 0; channel < numChannels; channel++) {
+            // Convert Float32 (-1.0 to 1.0) to Int16 (-32768 to 32767)
+            const sample = Math.max(-1, Math.min(1, data[channel][i]));
+            view.setInt16(offset, sample * 32767, true);
+            offset += 2;
+          }
+        }
+
+        return new Blob([view], {type: "audio/wav"});
+
+        function writeString(view, offset, string) {
+          for (let i = 0; i < string.length; i++) {
+            view.setUint8(offset + i, string.charCodeAt(i));
+          }
+        }
+      }
+
+      exportButton.onclick = () => {
+        if (!importedToneBuffer) {
+          updateStatus("error", "No audio buffer to export.");
+          return;
+        }
+
+        try {
+          // 1. Convert buffer to WAV Blob
+          const wavBlob = createWavBlob(importedToneBuffer);
+
+          // 2. Trigger download
+          const url = URL.createObjectURL(wavBlob);
+          const a = document.createElement("a");
+          a.style.display = "none";
+          a.href = url;
+          a.download = "exported_test_audio.wav";
+          document.body.appendChild(a);
+          a.click();
+
+          // 3. Cleanup
+          window.URL.revokeObjectURL(url);
+          a.remove();
+
+          updateStatus(
+            "success",
+            `Successfully generated and downloaded 'exported_test_audio.wav'.`
+          );
+        } catch (e) {
+          updateStatus("error", "WAV Export Failed: " + e.message);
+          console.error("Export error:", e);
+        }
+      };
+
+      // Initialize state
+      window.onload = () => {
+        if (Tone.context.state === "running") {
+          startContextButton.disabled = true;
+          updateStatus("info", "Audio Context is already running.");
+        }
+      };
+    </script>
+  </body>
+</html>
