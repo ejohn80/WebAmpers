@@ -149,11 +149,8 @@
   margin: 0;
   cursor: pointer;
   transition: opacity 0.2s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  z-index: 2;
+  overflow: visible;
+  /* border: 2px solid pink; */
 }
 
 .volume-button:hover {
@@ -175,7 +172,9 @@
   align-items: center;
   padding-left: 20px;
   /* border: solid 2px rebeccapurple; */
+  position: absolute;
   overflow: visible;
+  margin-left: 33px;
 }
 
 .volume-track {

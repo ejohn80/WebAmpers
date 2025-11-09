@@ -2,8 +2,6 @@ import React, {useContext, useEffect, useMemo, useRef, useState} from "react";
 import * as Tone from "tone";
 import {progressStore} from "./progressStore";
 import {
-  PlayIcon,
-  PauseIcon,
   RewindIcon,
   ForwardIcon,
   GoToStartIcon,
@@ -11,6 +9,9 @@ import {
   SoundOffIcon,
   VolumeKnob,
   GoToEndIcon,
+  SoundOnLowIcon,
+  SoundOnMediumIcon,
+  SoundOnHighIcon,
 } from "../components/Layout/Svgs.jsx";
 
 import "./playback.css";
@@ -685,7 +686,6 @@ export default function WebAmpPlayback({version, onEngineReady}) {
 
   const onPause = () => engine.pause();
 
-  // ADD THIS MISSING FUNCTION
   const onTogglePlay = async () => {
     if (playing) {
       onPause();
@@ -745,27 +745,50 @@ export default function WebAmpPlayback({version, onEngineReady}) {
     try {
       if (!engine.master) return;
       if (muted) {
+        // Unmute: restore to saved volume and update slider
         const restore = Math.max(
           0,
           Math.min(1, savedVolumeRef.current ?? masterVol / 100)
         );
+        const restorePercent = Math.round(restore * 100);
+
         engine.master.gain.gain.value = restore;
         prevMasterGainRef.current = restore;
+        setMasterVol(restorePercent); // Update slider position
         setMuted(false);
         try {
           localStorage.setItem("webamp.muted", "0");
+          localStorage.setItem("webamp.masterVol", String(restorePercent));
         } catch (e) {}
       } else {
+        // Mute: save current volume, set slider to 0, and mute
         savedVolumeRef.current = Math.max(0, Math.min(1, masterVol / 100));
         try {
           localStorage.setItem("webamp.muted", "1");
         } catch (e) {}
+
         engine.master.gain.gain.value = 0;
         prevMasterGainRef.current = 0;
+        setMasterVol(0); // Set slider to 0 when muting
         setMuted(true);
       }
     } catch (err) {
       console.warn("toggle mute failed:", err);
+    }
+  };
+
+  // Determines the appropriate volume icon
+  const getVolumeIcon = (volume, muted) => {
+    if (muted || volume === 0) {
+      return <SoundOffIcon />;
+    }
+
+    if (volume <= 30) {
+      return <SoundOnLowIcon />;
+    } else if (volume <= 60) {
+      return <SoundOnMediumIcon />;
+    } else {
+      return <SoundOnHighIcon />;
     }
   };
 
@@ -812,11 +835,11 @@ export default function WebAmpPlayback({version, onEngineReady}) {
         <button
           type="button"
           onClick={onToggleMute}
-          title={muted ? "Unmute" : "Mute"}
+          title={muted ? "Unmute" : `Volume: ${masterVol}%`}
           className="volume-button"
-          aria-label={muted ? "Unmute" : "Mute"}
+          aria-label={muted ? "Unmute" : `Volume: ${masterVol}%`}
         >
-          {muted ? <SoundOffIcon /> : <SoundOnIcon />}
+          {getVolumeIcon(masterVol, muted)}
         </button>
         <div className="volume-slider-container" aria-label="Master volume">
           <div className="volume-track" />
@@ -827,6 +850,7 @@ export default function WebAmpPlayback({version, onEngineReady}) {
           >
             <VolumeKnob />
           </div>
+
           <input
             type="range"
             min={0}
@@ -836,27 +860,61 @@ export default function WebAmpPlayback({version, onEngineReady}) {
             onChange={(e) => {
               const v = Number(e.target.value) || 0;
               setMasterVol(v);
+
               try {
                 const linear = Math.max(0, Math.min(1, v / 100));
+
+                // Save to localStorage
                 try {
                   localStorage.setItem("webamp.masterVol", String(v));
                 } catch (e) {}
 
+                // Update refs
                 savedVolumeRef.current = linear;
                 prevMasterGainRef.current = linear;
 
-                if (engine.master && !muted) {
-                  engine.master.gain.gain.value = linear;
+                // AUTO-UNMUTE LOGIC: Unmute immediately when slider is adjusted
+                if (muted && v > 0) {
+                  setMuted(false);
+                  try {
+                    localStorage.setItem("webamp.muted", "0");
+                  } catch (e) {}
+                }
+
+                // Apply volume to engine (respect mute state)
+                if (engine.master) {
+                  engine.master.gain.gain.value = muted ? 0 : linear;
                 }
               } catch (err) {
                 console.warn("master volume set failed:", err);
               }
             }}
             onMouseDown={() => setDraggingVol(true)}
-            onMouseUp={() => setDraggingVol(false)}
+            onMouseUp={() => {
+              setDraggingVol(false);
+              // Auto-mute if user explicitly sets volume to zero
+              if (masterVol === 0 && !muted) {
+                setMuted(true);
+                try {
+                  localStorage.setItem("webamp.muted", "1");
+                } catch (e) {}
+                if (engine.master) {
+                  engine.master.gain.gain.value = 0;
+                }
+              }
+            }}
             onMouseLeave={() => setDraggingVol(false)}
             onTouchStart={() => setDraggingVol(true)}
-            onTouchEnd={() => setDraggingVol(false)}
+            onTouchEnd={() => {
+              setDraggingVol(false);
+              // Same auto-mute logic for touch devices
+              if (masterVol === 0 && !muted) {
+                setMuted(true);
+                try {
+                  localStorage.setItem("webamp.muted", "1");
+                } catch (e) {}
+              }
+            }}
             className="volume-input"
           />
         </div>
