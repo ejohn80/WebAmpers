@@ -26,6 +26,7 @@
   flex-shrink: 0;
   /* border: 2px solid purple; */
   margin-left: 30%;
+  overflow: visible;
 }
 
 .transport-section {
@@ -33,6 +34,7 @@
   align-items: center;
   gap: 12px;
   /* border: 2px solid blue; */
+  overflow: visible;
 }
 
 .transport-button svg {
@@ -45,16 +47,67 @@
   padding: 0;
   margin: 0;
   cursor: pointer;
-  transition: opacity 0.2s ease;
+  transition: all 0.3s ease; /* Changed to all for comprehensive transitions */
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
   z-index: 1;
+  width: 30px; /* Fixed width to prevent size changes */
+  height: 30px; /* Fixed height to prevent size changes */
 }
 
 .transport-button:hover {
   opacity: 0.8;
+  transform: scale(1.05); /* Subtle hover effect */
+}
+
+/* Play/Pause button specific transitions */
+.play-pause-button {
+  position: relative;
+  overflow: hidden; /* Contain the transitioning elements */
+}
+
+/* Container for both icons to enable cross-fade */
+.play-pause-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Individual icon states */
+.play-icon,
+.pause-icon {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  transition: all 0.3s ease;
+}
+
+/* Play icon states */
+.play-icon.visible {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+.play-icon.hidden {
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.8);
+}
+
+/* Pause icon states */
+.pause-icon.visible {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+.pause-icon.hidden {
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.8);
 }
 
 /* ===========================
@@ -84,7 +137,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  border: 2px solid yellow;
+  /* border: 2px solid yellow; */
   width: 200px;
   flex-shrink: 0;
 }

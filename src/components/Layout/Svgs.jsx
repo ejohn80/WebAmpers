@@ -561,3 +561,28 @@ export const ImportIcon = () => (
     <line x1="12" y1="15" x2="12" y2="3" />
   </svg>
 );
+
+export function GoToEndIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="30"
+      height="30"
+      viewBox="0 0 42 42"
+      fill="none"
+    >
+      <circle cx="21" cy="21" r="21" fill="#373639" />
+      <rect
+        width="2.25497"
+        height="14.2509"
+        rx="1.12749"
+        transform="matrix(-1 0 0 1 28.5879 14.1895)"
+        fill="#E5E5E5"
+      />
+      <path
+        d="M25.1209 20.6501C25.6783 21.0493 25.6783 21.878 25.1209 22.2765L16.3964 28.5146C15.7346 28.9878 14.8145 28.5142 14.8145 27.7005V15.2141C14.8145 14.4003 15.7346 13.9279 16.3964 14.4018L25.1209 20.6501Z"
+        fill="#D9D9D9"
+      />
+    </svg>
+  );
+}

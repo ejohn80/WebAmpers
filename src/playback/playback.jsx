@@ -10,10 +10,12 @@ import {
   SoundOnIcon,
   SoundOffIcon,
   VolumeKnob,
+  GoToEndIcon,
 } from "../components/Layout/Svgs.jsx";
 
 import "./playback.css";
 import {AppContext} from "../context/AppContext";
+import PlayPauseButton from "./PlayPauseButton";
 
 // === Utility functions ===
 
@@ -718,6 +720,23 @@ export default function WebAmpPlayback({version, onEngineReady}) {
     } catch {}
   };
 
+  const goToEnd = () => {
+    const endMs = version?.lengthMs || 0;
+    try {
+      engine.seekMs(endMs);
+      // Also pause if currently playing
+      if (playing) {
+        engine.pause();
+      }
+    } catch (err) {
+      console.warn("goToEnd failed:", err);
+    }
+    setMs(endMs);
+    try {
+      progressStore.setMs(endMs);
+    } catch {}
+  };
+
   useEffect(() => {
     progressStore.setMs(ms);
   }, [ms]);
@@ -778,17 +797,13 @@ export default function WebAmpPlayback({version, onEngineReady}) {
           <button onClick={skipBack10} className="transport-button">
             <RewindIcon />
           </button>
-          {playing ? (
-            <button onClick={onPause} className="transport-button">
-              <PauseIcon />
-            </button>
-          ) : (
-            <button onClick={onPlay} className="transport-button">
-              <PlayIcon />
-            </button>
-          )}
+          <PlayPauseButton isPlaying={playing} onToggle={onTogglePlay} />
+
           <button onClick={skipFwd10} className="transport-button">
             <ForwardIcon />
+          </button>
+          <button onClick={goToEnd} className="transport-button">
+            <GoToEndIcon />
           </button>
         </div>
       </div>
