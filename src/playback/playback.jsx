@@ -760,59 +760,37 @@ export default function WebAmpPlayback({version, onEngineReady}) {
   // Render player UI with CSS classes
   return (
     <div className="playback-container">
-      <div className="spacer"></div>
-      <div className="time-section">
-        <code className="time-display">
-          {fmtTime(ms)}
-          {typeof version?.lengthMs === "number" && version.lengthMs > 0
-            ? ` / ${fmtTime(version.lengthMs)}`
-            : ""}
-        </code>
-      </div>
+      {/* Combined transport + time section */}
+      <div className="transport-time-container">
+        <div className="time-section">
+          <code className="time-display">
+            {fmtTime(ms)}
+            {typeof version?.lengthMs === "number" && version.lengthMs > 0
+              ? ` / ${fmtTime(version.lengthMs)}`
+              : ""}
+          </code>
+        </div>
 
-      <div className="transport-section">
-        <button
-          onClick={goToStart}
-          title="Go to start"
-          className="transport-button"
-        >
-          <GoToStartIcon />
-        </button>
-        <button
-          onClick={skipBack10}
-          title="Back 10s"
-          className="transport-button"
-        >
-          <RewindIcon />
-        </button>
-        {playing ? (
-          <button
-            type="button"
-            onClick={onPause}
-            title="Pause"
-            className="transport-button"
-            aria-label="Pause"
-          >
-            <PauseIcon />
+        <div className="transport-section">
+          <button onClick={goToStart} className="transport-button">
+            <GoToStartIcon />
           </button>
-        ) : (
-          <button
-            type="button"
-            onClick={onPlay}
-            title="Play"
-            className="transport-button"
-            aria-label="Play"
-          >
-            <PlayIcon />
+          <button onClick={skipBack10} className="transport-button">
+            <RewindIcon />
           </button>
-        )}
-        <button
-          onClick={skipFwd10}
-          title="Forward 10s"
-          className="transport-button"
-        >
-          <ForwardIcon />
-        </button>
+          {playing ? (
+            <button onClick={onPause} className="transport-button">
+              <PauseIcon />
+            </button>
+          ) : (
+            <button onClick={onPlay} className="transport-button">
+              <PlayIcon />
+            </button>
+          )}
+          <button onClick={skipFwd10} className="transport-button">
+            <ForwardIcon />
+          </button>
+        </div>
       </div>
 
       <div className="volume-section">

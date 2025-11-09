@@ -10,20 +10,33 @@
   height: 100%;
   width: 100%;
   box-sizing: border-box;
-  padding-left: 20px;
   position: relative;
   /* border: 2px solid red; */
-  right: -150px;
+  gap: 40px;
+  padding-left: 20px;
 }
 
 /* ===========================
-   Transport Buttons (Left side)
+   Transport + Time Combined Section
    =========================== */
+.transport-time-container {
+  display: flex;
+  align-items: center;
+  gap: 20px; /* Space between transport buttons and time */
+  flex-shrink: 0;
+  /* border: 2px solid purple; */
+  margin-left: 30%;
+}
+
 .transport-section {
   display: flex;
   align-items: center;
   gap: 12px;
   /* border: 2px solid blue; */
+}
+
+.transport-button svg {
+  display: block;
 }
 
 .transport-button {
@@ -44,22 +57,14 @@
   opacity: 0.8;
 }
 
-.transport-button svg {
-  display: block;
-}
-
 /* ===========================
-   Time Display (Center)
+   Time Display
    =========================== */
 .time-section {
   display: flex;
   align-items: center;
   justify-content: center;
-  flex: 1;
-  position: absolute;
-  z-index: 1;
   /* border: 2px solid lime; */
-  padding-left: 100px;
 }
 
 .time-display {
@@ -69,6 +74,7 @@
   text-align: center;
   font-family: monospace;
   color: #e5e5e5;
+  /* border: 2px solid magenta; */
 }
 
 /* ===========================
@@ -78,10 +84,9 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  position: relative;
-  z-index: 1;
-  /* border: 2px solid yellow; */
-  width: 210px;
+  border: 2px solid yellow;
+  width: 200px;
+  flex-shrink: 0;
 }
 
 .volume-button {
@@ -111,7 +116,7 @@
    =========================== */
 .volume-slider-container {
   position: relative;
-  width: 160px;
+  width: 150px;
   height: 28px;
   display: flex;
   align-items: center;

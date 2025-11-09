@@ -16,13 +16,8 @@ function Footer({version, onRecordComplete, onRecordStart, onRecordStop}) {
           />
         </div>
 
-        {/* Center: Transport controls (includes volume) */}
         <div className="footer-section footer-transport-section">
           <WebAmpPlayback version={version} />
-        </div>
-
-        <div className="footer-section footer-volume-section">
-          {/* Volume controls are handled in WebAmpPlayback component */}
         </div>
       </div>
     </div>
