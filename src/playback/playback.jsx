@@ -519,7 +519,7 @@ export {PlaybackEngine};
 export default function WebAmpPlayback({version, onEngineReady}) {
   const engineRef = useRef(null);
   const appCtx = useContext(AppContext) || {};
-  const {setEngineRef} = appCtx;
+  const {setEngineRef, effects} = appCtx;
   const [playing, setPlaying] = useState(false);
   const [ms, setMs] = useState(0);
   // Restore persisted master volume / mute from localStorage when possible
@@ -545,6 +545,7 @@ export default function WebAmpPlayback({version, onEngineReady}) {
   const savedVolumeRef = useRef(0.5);
   const mutingDuringScrubRef = useRef(false);
 
+  // Create and memoize the engine so it persists across re-renders
   const engine = useMemo(
     () =>
       new PlaybackEngine({
@@ -555,18 +556,33 @@ export default function WebAmpPlayback({version, onEngineReady}) {
     []
   );
 
+  // Attach and clean up engine
   useEffect(() => {
     engineRef.current = engine;
+    // expose engine to global app context so EffectsTab can control FX
     try {
       setEngineRef && setEngineRef(engineRef);
     } catch {}
+    // Inform parent that the engine instance is available so it can call
+    // control methods (setTrackMute, setTrackSolo, etc.).
     try {
       onEngineReady && onEngineReady(engine);
     } catch (e) {
       // swallow
     }
     return () => engine.dispose();
-  }, [engine, setEngineRef, onEngineReady]); // Added missing dependencies
+  }, [engine, setEngineRef, onEngineReady]);
+
+  // Apply effects when they change from AppContext
+  useEffect(() => {
+    if (engine && effects) {
+      try {
+        engine.setMasterEffects(effects);
+      } catch (error) {
+        console.warn("Failed to apply effects to engine:", error);
+      }
+    }
+  }, [engine, effects]);
 
   // Load engine when version changes (do not reload on play/pause)
   const prevLoadSigRef = React.useRef(null);
@@ -614,6 +630,11 @@ export default function WebAmpPlayback({version, onEngineReady}) {
 
               setMasterVol(Math.round(initVol * 100));
               setMuted(initMuted);
+
+              // Apply any persisted effects after engine is loaded
+              if (effects) {
+                engine.setMasterEffects(effects);
+              }
             }
           } catch {}
         })
@@ -621,38 +642,53 @@ export default function WebAmpPlayback({version, onEngineReady}) {
       prevLoadSigRef.current = sig;
     } else {
       try {
-        const current = engine.version?.tracks || [];
-        (version.tracks || []).forEach((t) => {
-          const existing = current.find((x) => x.id === t.id);
-          if (!existing) return;
-          if (Boolean(existing.mute) !== Boolean(t.mute)) {
-            try {
-              engine.setTrackMute(t.id, !!t.mute);
-            } catch (e) {}
-          }
-          if (Boolean(existing.solo) !== Boolean(t.solo)) {
-            try {
-              engine.setTrackSolo(t.id, !!t.solo);
-            } catch (e) {}
+        // Apply persisted track states to all tracks in the version
+        // This ensures mute/solo states are restored after refresh
+        (version.tracks || []).forEach((track) => {
+          try {
+            const saved = localStorage.getItem(`webamp.track.${track.id}`);
+            if (saved) {
+              const trackState = JSON.parse(saved);
+              if (trackState.muted !== undefined) {
+                engine.setTrackMute(track.id, trackState.muted);
+              }
+              if (trackState.soloed !== undefined) {
+                engine.setTrackSolo(track.id, trackState.soloed);
+              }
+            }
+          } catch (e) {
+            console.warn(`Failed to restore state for track ${track.id}:`, e);
           }
         });
       } catch (e) {
-        prevLoadSigRef.current = null;
+        console.warn("Failed to apply persisted track states:", e);
       }
     }
 
     return () => {
       progressStore.setSeeker(null);
     };
-  }, [engine, version]);
+  }, [engine, version]); // ← REMOVED effects dependency to prevent unnecessary reloads
 
+  // Keep effects application separate - this doesn't reload the engine
+  useEffect(() => {
+    if (engine && effects) {
+      try {
+        engine.setMasterEffects(effects);
+      } catch (error) {
+        console.warn("Failed to apply effects to engine:", error);
+      }
+    }
+  }, [engine, effects]); // This only applies effects, doesn't reload engine
+
+  // Keep scrub handlers updated with current playing state without reloading engine
   useEffect(() => {
     progressStore.setScrubStart(() => {
       wasPlayingRef.current = playing;
       if (playing && engine.master) {
         try {
           prevMasterGainRef.current = engine.master.gain.gain.value;
-          engine.master.gain.gain.value = 0.0001;
+          engine.master.gain.gain.value = 0.0001; // virtually silent
           mutingDuringScrubRef.current = true;
         } catch {}
       }
@@ -664,6 +700,7 @@ export default function WebAmpPlayback({version, onEngineReady}) {
         } catch {}
       }
       mutingDuringScrubRef.current = false;
+      // if it was playing before scrub, resume playback
       if (wasPlayingRef.current) {
         engine.play().catch(() => {});
       }
@@ -674,7 +711,7 @@ export default function WebAmpPlayback({version, onEngineReady}) {
     };
   }, [playing, engine]);
 
-  // Control handlers
+  // Control handlers for play, pause, stop
   const onPlay = async () => {
     try {
       await engine.play();
@@ -682,9 +719,9 @@ export default function WebAmpPlayback({version, onEngineReady}) {
       console.error("[UI] engine.play() failed:", e);
     }
   };
-
   const onPause = () => engine.pause();
 
+  // Combined play/pause toggle
   const onTogglePlay = async () => {
     if (playing) {
       onPause();
@@ -693,6 +730,7 @@ export default function WebAmpPlayback({version, onEngineReady}) {
     }
   };
 
+  // Skip helpers (±10s)
   const skipMs = (delta) => {
     const len = version?.lengthMs ?? Number.POSITIVE_INFINITY;
     const next = Math.max(0, Math.min((ms || 0) + delta, len));
@@ -707,6 +745,7 @@ export default function WebAmpPlayback({version, onEngineReady}) {
   const skipBack10 = () => skipMs(-10000);
   const skipFwd10 = () => skipMs(10000);
 
+  // Jump to start (0:00)
   const goToStart = () => {
     try {
       engine.seekMs(0);
@@ -719,6 +758,7 @@ export default function WebAmpPlayback({version, onEngineReady}) {
     } catch {}
   };
 
+  // Jump to end of timeline
   const goToEnd = () => {
     const endMs = version?.lengthMs || 0;
     try {
@@ -736,112 +776,126 @@ export default function WebAmpPlayback({version, onEngineReady}) {
     } catch {}
   };
 
+  // Publish progress to store whenever local ms updates
   useEffect(() => {
     progressStore.setMs(ms);
   }, [ms]);
 
-useEffect(() => {
-  const isEditableTarget = (el) => {
-    if (!el || el === document.body) return false;
-    const tag = el.tagName?.toLowerCase();
-    if (tag === "input" || tag === "textarea" || tag === "select")
-      return true;
-    if (el.isContentEditable) return true;
-    const role = el.getAttribute?.("role");
-    if (role && role.toLowerCase() === "textbox") return true;
-    if (tag === "input") {
-      const type = (el.getAttribute?.("type") || "").toLowerCase();
-      const textLike = [
-        "text", "search", "password", "email", "number", "url", "tel", 
-        "date", "time", "datetime-local", "month", "week", "range",
-      ];
-      if (textLike.includes(type)) return true;
-    }
-    return false;
-  };
-
-  const onKeyDown = (e) => {
-    if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
-    if (isEditableTarget(e.target)) return;
-
-    const isSpace = e.code === "Space" || e.key === " ";
-    const isLeft = e.code === "ArrowLeft" || e.key === "ArrowLeft";
-    const isRight = e.code === "ArrowRight" || e.key === "ArrowRight";
-    const isUp = e.code === "ArrowUp" || e.key === "ArrowUp";
-    const isDown = e.code === "ArrowDown" || e.key === "ArrowDown";
-
-    if (isSpace) {
-      e.preventDefault();
-      onTogglePlay();
-    } else if (isLeft) {
-      e.preventDefault();
-      skipBack10();
-    } else if (isRight) {
-      e.preventDefault();
-      skipFwd10();
-    } else if (isUp || isDown) {
-      e.preventDefault();
-      
-      // Volume control: Up increases, Down decreases
-      const volumeStep = 5; // Change volume by 5% per keypress
-      let newVolume = masterVol;
-      
-      if (isUp) {
-        newVolume = Math.min(100, masterVol + volumeStep);
-      } else if (isDown) {
-        newVolume = Math.max(0, masterVol - volumeStep);
+  // Global keyboard shortcuts for playback control
+  useEffect(() => {
+    const isEditableTarget = (el) => {
+      if (!el || el === document.body) return false;
+      const tag = el.tagName?.toLowerCase();
+      if (tag === "input" || tag === "textarea" || tag === "select")
+        return true;
+      if (el.isContentEditable) return true;
+      const role = el.getAttribute?.("role");
+      if (role && role.toLowerCase() === "textbox") return true;
+      if (tag === "input") {
+        const type = (el.getAttribute?.("type") || "").toLowerCase();
+        const textLike = [
+          "text",
+          "search",
+          "password",
+          "email",
+          "number",
+          "url",
+          "tel",
+          "date",
+          "time",
+          "datetime-local",
+          "month",
+          "week",
+          "range",
+        ];
+        if (textLike.includes(type)) return true;
       }
-      
-      // Update volume state and engine
-      setMasterVol(newVolume);
-      
-      try {
-        const linear = Math.max(0, Math.min(1, newVolume / 100));
+      return false;
+    };
 
-        // Save to localStorage
+    const onKeyDown = (e) => {
+      if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (isEditableTarget(e.target)) return;
+
+      const isSpace = e.code === "Space" || e.key === " ";
+      const isLeft = e.code === "ArrowLeft" || e.key === "ArrowLeft";
+      const isRight = e.code === "ArrowRight" || e.key === "ArrowRight";
+      const isUp = e.code === "ArrowUp" || e.key === "ArrowUp";
+      const isDown = e.code === "ArrowDown" || e.key === "ArrowDown";
+
+      if (isSpace) {
+        e.preventDefault();
+        onTogglePlay();
+      } else if (isLeft) {
+        e.preventDefault();
+        skipBack10();
+      } else if (isRight) {
+        e.preventDefault();
+        skipFwd10();
+      } else if (isUp || isDown) {
+        e.preventDefault();
+
+        // Volume control: Up increases, Down decreases
+        const volumeStep = 5; // Change volume by 5% per keypress
+        let newVolume = masterVol;
+
+        if (isUp) {
+          newVolume = Math.min(100, masterVol + volumeStep);
+        } else if (isDown) {
+          newVolume = Math.max(0, masterVol - volumeStep);
+        }
+
+        // Update volume state and engine
+        setMasterVol(newVolume);
+
         try {
-          localStorage.setItem("webamp.masterVol", String(newVolume));
-        } catch (e) {}
+          const linear = Math.max(0, Math.min(1, newVolume / 100));
 
-        // Update refs
-        savedVolumeRef.current = linear;
-        prevMasterGainRef.current = linear;
-
-        // AUTO-UNMUTE LOGIC: Unmute immediately when increasing volume
-        if (muted && newVolume > 0) {
-          setMuted(false);
+          // Save to localStorage
           try {
-            localStorage.setItem("webamp.muted", "0");
+            localStorage.setItem("webamp.masterVol", String(newVolume));
           } catch (e) {}
-        }
 
-        // AUTO-MUTE LOGIC: Mute when volume reaches 0
-        if (newVolume === 0 && !muted) {
-          setMuted(true);
-          try {
-            localStorage.setItem("webamp.muted", "1");
-          } catch (e) {}
-        }
+          // Update refs
+          savedVolumeRef.current = linear;
+          prevMasterGainRef.current = linear;
 
-        // Apply volume to engine (respect mute state)
-        if (engine.master) {
-          engine.master.gain.gain.value = muted ? 0 : linear;
+          // AUTO-UNMUTE LOGIC: Unmute immediately when increasing volume
+          if (muted && newVolume > 0) {
+            setMuted(false);
+            try {
+              localStorage.setItem("webamp.muted", "0");
+            } catch (e) {}
+          }
+
+          // AUTO-MUTE LOGIC: Mute when volume reaches 0
+          if (newVolume === 0 && !muted) {
+            setMuted(true);
+            try {
+              localStorage.setItem("webamp.muted", "1");
+            } catch (e) {}
+          }
+
+          // Apply volume to engine (respect mute state)
+          if (engine.master) {
+            engine.master.gain.gain.value = muted ? 0 : linear;
+          }
+        } catch (err) {
+          console.warn("master volume set failed:", err);
         }
-      } catch (err) {
-        console.warn("master volume set failed:", err);
       }
-    }
-  };
+    };
 
-  window.addEventListener("keydown", onKeyDown);
-  return () => window.removeEventListener("keydown", onKeyDown);
-}, [onTogglePlay, skipBack10, skipFwd10, masterVol, muted, engine]); // Added masterVol, muted, engine dependencies
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onTogglePlay, skipBack10, skipFwd10, masterVol, muted, engine]);
 
+  // Toggle mute while preserving slider value
   const onToggleMute = () => {
     try {
       if (!engine.master) return;
       if (muted) {
-        // Unmute: restore to saved volume and update slider
+        // unmute to last saved volume
         const restore = Math.max(
           0,
           Math.min(1, savedVolumeRef.current ?? masterVol / 100)
@@ -857,7 +911,7 @@ useEffect(() => {
           localStorage.setItem("webamp.masterVol", String(restorePercent));
         } catch (e) {}
       } else {
-        // Mute: save current volume, set slider to 0, and mute
+        // save current volume and mute
         savedVolumeRef.current = Math.max(0, Math.min(1, masterVol / 100));
         try {
           localStorage.setItem("webamp.muted", "1");
@@ -873,7 +927,7 @@ useEffect(() => {
     }
   };
 
-  // Determines the appropriate volume icon
+  // Determines the appropriate volume icon based on volume level and mute state
   const getVolumeIcon = (volume, muted) => {
     if (muted || volume === 0) {
       return <SoundOffIcon />;
@@ -888,6 +942,7 @@ useEffect(() => {
     }
   };
 
+  // Format milliseconds as M:SS
   const fmtTime = (tMs) => {
     const t = Math.max(0, Math.floor((tMs || 0) / 1000));
     const m = Math.floor(t / 60);
