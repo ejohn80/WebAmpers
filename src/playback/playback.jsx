@@ -5,7 +5,6 @@ import {
   RewindIcon,
   ForwardIcon,
   GoToStartIcon,
-  SoundOnIcon,
   SoundOffIcon,
   VolumeKnob,
   GoToEndIcon,
@@ -740,6 +739,103 @@ export default function WebAmpPlayback({version, onEngineReady}) {
   useEffect(() => {
     progressStore.setMs(ms);
   }, [ms]);
+
+useEffect(() => {
+  const isEditableTarget = (el) => {
+    if (!el || el === document.body) return false;
+    const tag = el.tagName?.toLowerCase();
+    if (tag === "input" || tag === "textarea" || tag === "select")
+      return true;
+    if (el.isContentEditable) return true;
+    const role = el.getAttribute?.("role");
+    if (role && role.toLowerCase() === "textbox") return true;
+    if (tag === "input") {
+      const type = (el.getAttribute?.("type") || "").toLowerCase();
+      const textLike = [
+        "text", "search", "password", "email", "number", "url", "tel", 
+        "date", "time", "datetime-local", "month", "week", "range",
+      ];
+      if (textLike.includes(type)) return true;
+    }
+    return false;
+  };
+
+  const onKeyDown = (e) => {
+    if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (isEditableTarget(e.target)) return;
+
+    const isSpace = e.code === "Space" || e.key === " ";
+    const isLeft = e.code === "ArrowLeft" || e.key === "ArrowLeft";
+    const isRight = e.code === "ArrowRight" || e.key === "ArrowRight";
+    const isUp = e.code === "ArrowUp" || e.key === "ArrowUp";
+    const isDown = e.code === "ArrowDown" || e.key === "ArrowDown";
+
+    if (isSpace) {
+      e.preventDefault();
+      onTogglePlay();
+    } else if (isLeft) {
+      e.preventDefault();
+      skipBack10();
+    } else if (isRight) {
+      e.preventDefault();
+      skipFwd10();
+    } else if (isUp || isDown) {
+      e.preventDefault();
+      
+      // Volume control: Up increases, Down decreases
+      const volumeStep = 5; // Change volume by 5% per keypress
+      let newVolume = masterVol;
+      
+      if (isUp) {
+        newVolume = Math.min(100, masterVol + volumeStep);
+      } else if (isDown) {
+        newVolume = Math.max(0, masterVol - volumeStep);
+      }
+      
+      // Update volume state and engine
+      setMasterVol(newVolume);
+      
+      try {
+        const linear = Math.max(0, Math.min(1, newVolume / 100));
+
+        // Save to localStorage
+        try {
+          localStorage.setItem("webamp.masterVol", String(newVolume));
+        } catch (e) {}
+
+        // Update refs
+        savedVolumeRef.current = linear;
+        prevMasterGainRef.current = linear;
+
+        // AUTO-UNMUTE LOGIC: Unmute immediately when increasing volume
+        if (muted && newVolume > 0) {
+          setMuted(false);
+          try {
+            localStorage.setItem("webamp.muted", "0");
+          } catch (e) {}
+        }
+
+        // AUTO-MUTE LOGIC: Mute when volume reaches 0
+        if (newVolume === 0 && !muted) {
+          setMuted(true);
+          try {
+            localStorage.setItem("webamp.muted", "1");
+          } catch (e) {}
+        }
+
+        // Apply volume to engine (respect mute state)
+        if (engine.master) {
+          engine.master.gain.gain.value = muted ? 0 : linear;
+        }
+      } catch (err) {
+        console.warn("master volume set failed:", err);
+      }
+    }
+  };
+
+  window.addEventListener("keydown", onKeyDown);
+  return () => window.removeEventListener("keydown", onKeyDown);
+}, [onTogglePlay, skipBack10, skipFwd10, masterVol, muted, engine]); // Added masterVol, muted, engine dependencies
 
   const onToggleMute = () => {
     try {
