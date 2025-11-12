@@ -197,8 +197,7 @@ const Waveform = ({
     if (!el) return;
 
     // Use whichever axis has the stronger signal so normal mouse wheels work
-    const delta =
-      Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+    const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
 
     if (delta === 0) return;
 

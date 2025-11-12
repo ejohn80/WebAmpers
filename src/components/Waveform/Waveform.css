@@ -3,7 +3,7 @@
   height: 100%;
   position: relative;
   cursor: pointer;
-  overflow-x: auto;   /* allows sliding left/right for long tracks */
+  overflow-x: auto; /* allows sliding left/right for long tracks */
   overflow-y: hidden;
 }
 
