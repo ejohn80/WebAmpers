@@ -7,3 +7,10 @@ The goal is to create an accessible and free browser-based audio processing serv
 [Living Document](https://docs.google.com/document/d/1iWrHvP_rDxYkGMSReI9TkP29NTkfiGw9akhMeHcdd4I/edit?tab=t.0#heading=h.zccxj59ie2v)
 [User Guide](docs/USER_GUIDE.md)
 [Developer Guide](docs/DEVELOPER_GUIDE.md)
+
+Functional use-cases:
+  - Recording audio
+  - Playing an imported audio file
+  - Adding live effects to audio
+  - Exporting audio
+  - Make account and login
