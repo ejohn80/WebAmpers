@@ -1,0 +1,235 @@
+/* PS: Do not use transform: translateX(__) it will cause elements to overlap in ways that interfere with click events */
+
+/* ===========================
+   Playback Layout
+   =========================== */
+.playback-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 100%;
+  width: 100%;
+  box-sizing: border-box;
+  position: relative;
+  /* border: 2px solid red; */
+  gap: 40px;
+  padding-left: 20px;
+}
+
+/* ===========================
+   Transport + Time Combined Section
+   =========================== */
+.transport-time-container {
+  display: flex;
+  align-items: center;
+  gap: 20px; /* Space between transport buttons and time */
+  flex-shrink: 0;
+  /* border: 2px solid purple; */
+  margin-left: 30%;
+  overflow: visible;
+}
+
+.transport-section {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  /* border: 2px solid blue; */
+  overflow: visible;
+}
+
+.transport-button svg {
+  display: block;
+}
+
+.transport-button {
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  transition: all 0.3s ease; /* Changed to all for comprehensive transitions */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  z-index: 1;
+  width: 30px; /* Fixed width to prevent size changes */
+  height: 30px; /* Fixed height to prevent size changes */
+}
+
+.transport-button:hover {
+  opacity: 0.8;
+  transform: scale(1.05); /* Subtle hover effect */
+}
+
+/* Play/Pause button specific transitions */
+.play-pause-button {
+  position: relative;
+  overflow: hidden; /* Contain the transitioning elements */
+}
+
+/* Container for both icons to enable cross-fade */
+.play-pause-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Individual icon states */
+.play-icon,
+.pause-icon {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  transition: all 0.3s ease;
+}
+
+/* Play icon states */
+.play-icon.visible {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+.play-icon.hidden {
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.8);
+}
+
+/* Pause icon states */
+.pause-icon.visible {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+.pause-icon.hidden {
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.8);
+}
+
+/* ===========================
+   Time Display
+   =========================== */
+.time-section {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* border: 2px solid lime; */
+}
+
+.time-display {
+  font-size: 12px;
+  opacity: 0.85;
+  min-width: 80px;
+  text-align: center;
+  font-family: monospace;
+  color: #e5e5e5;
+  /* border: 2px solid magenta; */
+}
+
+/* ===========================
+   Volume Section (Right side)
+   =========================== */
+.volume-section {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  /* border: 2px solid yellow; */
+  width: 200px;
+  flex-shrink: 0;
+}
+
+.volume-button {
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+  overflow: visible;
+  /* border: 2px solid pink; */
+}
+
+.volume-button:hover {
+  opacity: 0.8;
+}
+
+.volume-button svg {
+  display: block;
+}
+
+/* ===========================
+   Volume Slider
+   =========================== */
+.volume-slider-container {
+  position: relative;
+  width: 150px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  padding-left: 20px;
+  position: absolute;
+  overflow: visible;
+  margin-left: 33px;
+  transform: translateZ(0);
+  will-change: transform;
+}
+
+.volume-track {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 10px;
+  background: #cdf8ff;
+  border-radius: 100px;
+  transform: translateY(-50%);
+}
+
+.volume-fill {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  height: 10px;
+  background: #17e1ff;
+  border-radius: 100px;
+  transform: translateY(-50%);
+  pointer-events: none;
+  transform: translateY(-50%) translateZ(0);
+  will-change: width;
+}
+
+.volume-knob-wrapper {
+  position: absolute;
+  top: 50%;
+  height: 20px;
+  width: 20px;
+  transform: translate(-50%, -50%);
+  transition: transform 120ms ease;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 3;
+  transform: translate(-50%, -50%) translateZ(0);
+  will-change: transform;
+}
+
+.volume-knob-wrapper.dragging {
+  transform: translate(-50%, -50%) scale(1.05) translateZ(0);
+  filter: drop-shadow(0 0 6px rgba(61, 133, 225, 0.4));
+}
+
+.volume-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 28px;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 4;
+  touch-action: pan-y;
+}

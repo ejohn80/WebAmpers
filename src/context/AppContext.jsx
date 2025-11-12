@@ -1,7 +1,5 @@
 import {createContext, useState, useEffect} from "react";
-
 import {useUserData} from "../hooks/useUserData";
-
 export const AppContext = createContext();
 
 const AppContextProvider = ({children}) => {

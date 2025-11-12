@@ -1,6 +1,6 @@
 import {describe, it, expect, vi, beforeEach} from "vitest";
 import {render, screen, fireEvent, waitFor} from "@testing-library/react";
-import PlaybackUI from "../components/Layout/PlaybackUI.jsx";
+import PlaybackUI from "../playback/playback.jsx";
 
 // Mock Tone similarly to other playback tests so engine methods work in jsdom
 vi.mock("tone", () => {

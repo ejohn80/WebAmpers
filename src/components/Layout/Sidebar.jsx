@@ -15,7 +15,7 @@ import ProjectsTab from "./Sidebar/ProjectsTab";
  */
 function Sidebar({width, onImportSuccess, onImportError}) {
   const {userData} = useContext(AppContext);
-  const [currentTab, setCurrentTab] = useState("effects");
+  const [currentTab, setCurrentTab] = useState("projects");
 
   // If logged out, only redirect away from Assets (Effects/Projects stay allowed)
   useEffect(() => {

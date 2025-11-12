@@ -9,8 +9,9 @@ The goal is to create an accessible and free browser-based audio processing serv
 [Developer Guide](docs/DEVELOPER_GUIDE.md)
 
 Functional use-cases:
-  - Recording audio
-  - Playing an imported audio file
-  - Adding live effects to audio
-  - Exporting audio
-  - Make account and login
+
+- Recording audio
+- Playing an imported audio file
+- Adding live effects to audio
+- Exporting audio
+- Make account and login
