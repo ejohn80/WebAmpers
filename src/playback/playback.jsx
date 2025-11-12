@@ -89,11 +89,11 @@ class PlaybackEngine {
     await this._prepareSegments(version);
 
     // Enable or clear looping if defined
-    // if (version.loop && version.loop.enabled) {
-    //   this.setLoop(version.loop.startMs, version.loop.endMs);
-    // } else {
-    //   this.clearLoop();
-    // }
+    if (version.loop && version.loop.enabled) {
+      this.setLoop(version.loop.startMs, version.loop.endMs);
+    } else {
+      this.clearLoop();
+    }
 
     // Start updating progress via requestAnimationFrame
     this._startRaf();
@@ -141,7 +141,7 @@ class PlaybackEngine {
     Tone.Transport.seconds = seconds;
   }
 
-  // /** Get the current playback position in milliseconds */
+  /** Get the current playback position in milliseconds */
   getPositionMs() {
     return Tone.Transport.seconds * 1000;
   }
@@ -156,18 +156,18 @@ class PlaybackEngine {
     Tone.Transport.loop = endMs > startMs;
   }
 
-  // /** Disable looping entirely */
-  // clearLoop() {
-  //   Tone.Transport.loop = false;
-  // }
+  /** Disable looping entirely */
+  clearLoop() {
+    Tone.Transport.loop = false;
+  }
 
-  // /** Mute or unmute a specific track */
-  // setTrackMute(trackId, mute) {
-  //   if (!this.version) return;
-  //   const t = this.version.tracks.find((x) => x.id === trackId);
-  //   if (t) t.mute = !!mute;
-  //   this._applyMuteSolo();
-  // }
+  /** Mute or unmute a specific track */
+  setTrackMute(trackId, mute) {
+    if (!this.version) return;
+    const t = this.version.tracks.find((x) => x.id === trackId);
+    if (t) t.mute = !!mute;
+    this._applyMuteSolo();
+  }
 
   /** Solo or unsolo a specific track */
   setTrackSolo(trackId, solo) {
@@ -794,13 +794,11 @@ export default function WebAmpPlayback({version, onEngineReady}) {
     return `${m}:${s.toString().padStart(2, "0")}`;
   };
 
-  // // Format time as mm:ss.mmm
   // Format time as mm:ss.mmm
   // const fmt = (t) => {
   //   const s = Math.floor(t / 1000);
   //   const m = Math.floor(s / 60);
   //   const r = s % 60;
-  //   const msPart = Math.floor(t % 1000).toString().padStart(3, "0");
   //   const msPart = Math.floor(t % 1000)
   //     .toString()
   //     .padStart(3, "0");
