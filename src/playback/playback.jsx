@@ -668,7 +668,7 @@ export default function WebAmpPlayback({version, onEngineReady}) {
     return () => {
       progressStore.setSeeker(null);
     };
-  }, [engine, version]); // ← REMOVED effects dependency to prevent unnecessary reloads
+  }, [engine, version]);
 
   // Keep effects application separate - this doesn't reload the engine
   useEffect(() => {
@@ -679,7 +679,7 @@ export default function WebAmpPlayback({version, onEngineReady}) {
         console.warn("Failed to apply effects to engine:", error);
       }
     }
-  }, [engine, effects]); // This only applies effects, doesn't reload engine
+  }, [engine, effects]);
 
   // Keep scrub handlers updated with current playing state without reloading engine
   useEffect(() => {
@@ -851,11 +851,6 @@ export default function WebAmpPlayback({version, onEngineReady}) {
         try {
           const linear = Math.max(0, Math.min(1, newVolume / 100));
 
-          // Save to localStorage
-          try {
-            localStorage.setItem("webamp.masterVol", String(newVolume));
-          } catch (e) {}
-
           // Update refs
           savedVolumeRef.current = linear;
           prevMasterGainRef.current = linear;
@@ -863,17 +858,11 @@ export default function WebAmpPlayback({version, onEngineReady}) {
           // AUTO-UNMUTE LOGIC: Unmute immediately when increasing volume
           if (muted && newVolume > 0) {
             setMuted(false);
-            try {
-              localStorage.setItem("webamp.muted", "0");
-            } catch (e) {}
           }
 
           // AUTO-MUTE LOGIC: Mute when volume reaches 0
           if (newVolume === 0 && !muted) {
             setMuted(true);
-            try {
-              localStorage.setItem("webamp.muted", "1");
-            } catch (e) {}
           }
 
           // Apply volume to engine (respect mute state)
@@ -1015,11 +1004,6 @@ export default function WebAmpPlayback({version, onEngineReady}) {
               try {
                 const linear = Math.max(0, Math.min(1, v / 100));
 
-                // Save to localStorage
-                try {
-                  localStorage.setItem("webamp.masterVol", String(v));
-                } catch (e) {}
-
                 // Update refs
                 savedVolumeRef.current = linear;
                 prevMasterGainRef.current = linear;
@@ -1027,9 +1011,6 @@ export default function WebAmpPlayback({version, onEngineReady}) {
                 // AUTO-UNMUTE LOGIC: Unmute immediately when slider is adjusted
                 if (muted && v > 0) {
                   setMuted(false);
-                  try {
-                    localStorage.setItem("webamp.muted", "0");
-                  } catch (e) {}
                 }
 
                 // Apply volume to engine (respect mute state)
@@ -1043,12 +1024,15 @@ export default function WebAmpPlayback({version, onEngineReady}) {
             onMouseDown={() => setDraggingVol(true)}
             onMouseUp={() => {
               setDraggingVol(false);
+              // Persist state when dragging ends
+              try {
+                localStorage.setItem("webamp.masterVol", String(masterVol));
+                localStorage.setItem("webamp.muted", muted ? "1" : "0");
+              } catch (e) {}
+
               // Auto-mute if user explicitly sets volume to zero
               if (masterVol === 0 && !muted) {
                 setMuted(true);
-                try {
-                  localStorage.setItem("webamp.muted", "1");
-                } catch (e) {}
                 if (engine.master) {
                   engine.master.gain.gain.value = 0;
                 }
@@ -1058,12 +1042,15 @@ export default function WebAmpPlayback({version, onEngineReady}) {
             onTouchStart={() => setDraggingVol(true)}
             onTouchEnd={() => {
               setDraggingVol(false);
+              // Persist state when touch ends
+              try {
+                localStorage.setItem("webamp.masterVol", String(masterVol));
+                localStorage.setItem("webamp.muted", muted ? "1" : "0");
+              } catch (e) {}
+
               // Same auto-mute logic for touch devices
               if (masterVol === 0 && !muted) {
                 setMuted(true);
-                try {
-                  localStorage.setItem("webamp.muted", "1");
-                } catch (e) {}
               }
             }}
             className="volume-input"
