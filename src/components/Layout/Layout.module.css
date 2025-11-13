@@ -374,6 +374,11 @@
   border: 1px solid black;
 }
 
+.sliderContainer.dragging .sliderFill {
+  background: #59bcc5; /* Brighter blue when pending */
+  transition: none;
+}
+
 /* No transition when actively dragging */
 .sliderContainer.dragging .sliderFill {
   transition: none;

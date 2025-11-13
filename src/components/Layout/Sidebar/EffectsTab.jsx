@@ -1,4 +1,4 @@
-import {useContext, useCallback, useState} from "react";
+import {useContext, useCallback, useState, useRef} from "react";
 import {AppContext} from "../../../context/AppContext";
 import styles from "../Layout.module.css";
 import {EffectsSliderKnob} from "../Svgs.jsx";
@@ -8,6 +8,8 @@ function EffectsTab() {
     useContext(AppContext);
 
   const [draggingSlider, setDraggingSlider] = useState(null);
+  const [localValues, setLocalValues] = useState({}); // Store temporary values
+  const pendingUpdates = useRef(new Map()); // Track pending effect updates
 
   const effectConfigs = [
     {
@@ -42,11 +44,30 @@ function EffectsTab() {
     },
   ];
 
+  // Update local state immediately for smooth UI
   const handleChange = useCallback(
     (name) => (e) => {
       const raw = e.target.value;
       const num = Number(raw);
-      updateEffect(name, num);
+
+      // Update local state for immediate visual feedback
+      setLocalValues((prev) => ({...prev, [name]: num}));
+
+      // Store the pending update but don't apply it yet
+      pendingUpdates.current.set(name, num);
+    },
+    []
+  );
+
+  // Apply all pending effects when user releases slider
+  const handleSliderEnd = useCallback(
+    (name) => () => {
+      const pendingValue = pendingUpdates.current.get(name);
+      if (pendingValue !== undefined) {
+        updateEffect(name, pendingValue);
+        pendingUpdates.current.delete(name);
+      }
+      setDraggingSlider(null);
     },
     [updateEffect]
   );
@@ -56,10 +77,21 @@ function EffectsTab() {
     return ((currentValue - config.min) / (config.max - config.min)) * 100;
   };
 
+  // Use local value if dragging, otherwise use actual effect value
+  const getCurrentValue = (config) => {
+    if (
+      draggingSlider === config.name &&
+      localValues[config.name] !== undefined
+    ) {
+      return localValues[config.name];
+    }
+    return effects[config.name] ?? config.default;
+  };
+
   return (
     <div className={styles.container}>
       {effectConfigs.map((config) => {
-        const currentValue = effects[config.name] ?? config.default;
+        const currentValue = getCurrentValue(config);
         const fillPercentage = getSliderFillPercentage(config, currentValue);
 
         return (
@@ -102,9 +134,9 @@ function EffectsTab() {
                 value={currentValue}
                 onChange={handleChange(config.name)}
                 onMouseDown={() => setDraggingSlider(config.name)}
-                onMouseUp={() => setDraggingSlider(null)}
+                onMouseUp={handleSliderEnd(config.name)}
                 onTouchStart={() => setDraggingSlider(config.name)}
-                onTouchEnd={() => setDraggingSlider(null)}
+                onTouchEnd={handleSliderEnd(config.name)}
                 className={styles.sliderInput}
               />
             </div>
