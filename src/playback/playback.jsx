@@ -1,15 +1,21 @@
 import React, {useContext, useEffect, useMemo, useRef, useState} from "react";
 import * as Tone from "tone";
 import {progressStore} from "./progressStore";
+import {
+  RewindIcon,
+  ForwardIcon,
+  GoToStartIcon,
+  SoundOffIcon,
+  VolumeKnob,
+  GoToEndIcon,
+  SoundOnLowIcon,
+  SoundOnMediumIcon,
+  SoundOnHighIcon,
+} from "../components/Layout/Svgs.jsx";
+
+import "./playback.css";
 import {AppContext} from "../context/AppContext";
-import PlayIcon from "../assets/footer/PlayButton.svg";
-import PauseIcon from "../assets/footer/PauseButton.svg";
-import RewindIcon from "../assets/footer/RewindButton.svg";
-import ForwardIcon from "../assets/footer/FastForwardButton.svg";
-import GoToStartIcon from "../assets/footer/GoToStartButton.svg";
-import SoundOnIcon from "../assets/footer/SoundOnButton.svg";
-import SoundOffIcon from "../assets/footer/SoundOffButton.svg";
-import VolumeKnob from "../assets/footer/VolumeKnob.svg";
+import PlayPauseButton from "./PlayPauseButton";
 
 // === Utility functions ===
 
@@ -511,10 +517,9 @@ export {PlaybackEngine};
  * Provides UI controls (Play/Pause/Stop) and a progress bar for the PlaybackEngine.
  */
 export default function WebAmpPlayback({version, onEngineReady}) {
-  // , height = 120
-  const engineRef = useRef(null); // no external usage currently
+  const engineRef = useRef(null);
   const appCtx = useContext(AppContext) || {};
-  const {setEngineRef} = appCtx;
+  const {setEngineRef, effects} = appCtx;
   const [playing, setPlaying] = useState(false);
   const [ms, setMs] = useState(0);
   // Restore persisted master volume / mute from localStorage when possible
@@ -525,7 +530,7 @@ export default function WebAmpPlayback({version, onEngineReady}) {
     } catch (e) {
       return 50;
     }
-  }); // 0-100 visual percent, default 50%
+  });
   const [muted, setMuted] = useState(() => {
     try {
       const m = localStorage.getItem("webamp.muted");
@@ -537,10 +542,8 @@ export default function WebAmpPlayback({version, onEngineReady}) {
   const [draggingVol, setDraggingVol] = useState(false);
   const wasPlayingRef = useRef(false);
   const prevMasterGainRef = useRef(0.5);
-  const savedVolumeRef = useRef(0.5); // remembers last non-muted linear volume
+  const savedVolumeRef = useRef(0.5);
   const mutingDuringScrubRef = useRef(false);
-
-  // No per-track sliders in footer; keep track gains from version
 
   // Create and memoize the engine so it persists across re-renders
   const engine = useMemo(
@@ -568,15 +571,24 @@ export default function WebAmpPlayback({version, onEngineReady}) {
       // swallow
     }
     return () => engine.dispose();
-  }, [engine]);
+  }, [engine, setEngineRef, onEngineReady]);
+
+  // Apply effects when they change from AppContext
+  useEffect(() => {
+    if (engine && effects) {
+      try {
+        engine.setMasterEffects(effects);
+      } catch (error) {
+        console.warn("Failed to apply effects to engine:", error);
+      }
+    }
+  }, [engine, effects]);
 
   // Load engine when version changes (do not reload on play/pause)
   const prevLoadSigRef = React.useRef(null);
   useEffect(() => {
     if (!version) return;
-    // update known length for waveform progress
     progressStore.setLengthMs(version.lengthMs ?? 0);
-    // allow waveform to request seeking
     progressStore.setSeeker((absMs) => {
       try {
         engine.seekMs(absMs);
@@ -585,9 +597,6 @@ export default function WebAmpPlayback({version, onEngineReady}) {
       }
     });
 
-    // Build a lightweight signature for the loaded audio structure. We
-    // intentionally exclude per-track flags like mute/solo so toggling
-    // them doesn't force a full engine.reload (which resets master volume).
     const segSig = (version.segments || [])
       .map(
         (s) =>
@@ -597,13 +606,11 @@ export default function WebAmpPlayback({version, onEngineReady}) {
     const sig = `${version.lengthMs || 0}::${segSig}`;
 
     if (prevLoadSigRef.current !== sig) {
-      // Only load the engine when the actual timeline/segments change.
       engine
         .load(version)
         .then(() => {
           try {
             if (engine.master) {
-              // Prefer persisted settings if available
               let initVol = 0.5;
               let initMuted = false;
               try {
@@ -616,59 +623,63 @@ export default function WebAmpPlayback({version, onEngineReady}) {
                 if (m !== null) initMuted = m === "1";
               } catch (e) {}
 
-              // remember linear values in refs
               prevMasterGainRef.current = initVol;
               savedVolumeRef.current = initVol;
 
               engine.master.gain.gain.value = initMuted ? 0 : initVol;
 
-              // update UI state to reflect persisted values
               setMasterVol(Math.round(initVol * 100));
               setMuted(initMuted);
+
+              // Apply any persisted effects after engine is loaded
+              if (effects) {
+                engine.setMasterEffects(effects);
+              }
             }
           } catch {}
         })
         .catch((e) => console.error("[UI] engine.load() failed:", e));
       prevLoadSigRef.current = sig;
     } else {
-      // If only metadata (e.g., mute/solo) changed, avoid reload. However,
-      // we still need to synchronize per-track flags into the running
-      // engine instance because the engine was not reloaded and its
-      // internal `version.tracks` may be out of sync with the new
-      // `version` prop. Apply any per-track mute/solo diffs by calling
-      // the engine control methods which will update internal state and
-      // call _applyMuteSolo.
       try {
-        const current = engine.version?.tracks || [];
-        (version.tracks || []).forEach((t) => {
-          const existing = current.find((x) => x.id === t.id);
-          if (!existing) return; // new/removed tracks would have triggered reload
-          if (Boolean(existing.mute) !== Boolean(t.mute)) {
-            try {
-              engine.setTrackMute(t.id, !!t.mute);
-            } catch (e) {
-              // swallow - best effort
+        // Apply persisted track states to all tracks in the version
+        // This ensures mute/solo states are restored after refresh
+        (version.tracks || []).forEach((track) => {
+          try {
+            const saved = localStorage.getItem(`webamp.track.${track.id}`);
+            if (saved) {
+              const trackState = JSON.parse(saved);
+              if (trackState.muted !== undefined) {
+                engine.setTrackMute(track.id, trackState.muted);
+              }
+              if (trackState.soloed !== undefined) {
+                engine.setTrackSolo(track.id, trackState.soloed);
+              }
             }
-          }
-          if (Boolean(existing.solo) !== Boolean(t.solo)) {
-            try {
-              engine.setTrackSolo(t.id, !!t.solo);
-            } catch (e) {
-              // swallow - best effort
-            }
+          } catch (e) {
+            console.warn(`Failed to restore state for track ${track.id}:`, e);
           }
         });
       } catch (e) {
-        // defensive: if sync fails, fall back to a full reload next time
-        prevLoadSigRef.current = null;
+        console.warn("Failed to apply persisted track states:", e);
       }
     }
 
     return () => {
-      // cleanup seeker on version change/unmount
       progressStore.setSeeker(null);
     };
   }, [engine, version]);
+
+  // Keep effects application separate - this doesn't reload the engine
+  useEffect(() => {
+    if (engine && effects) {
+      try {
+        engine.setMasterEffects(effects);
+      } catch (error) {
+        console.warn("Failed to apply effects to engine:", error);
+      }
+    }
+  }, [engine, effects]);
 
   // Keep scrub handlers updated with current playing state without reloading engine
   useEffect(() => {
@@ -719,9 +730,6 @@ export default function WebAmpPlayback({version, onEngineReady}) {
     }
   };
 
-  // Seek slider handler
-  // no direct seek slider in footer
-
   // Skip helpers (±10s)
   const skipMs = (delta) => {
     const len = version?.lengthMs ?? Number.POSITIVE_INFINITY;
@@ -750,10 +758,126 @@ export default function WebAmpPlayback({version, onEngineReady}) {
     } catch {}
   };
 
+  // Jump to end of timeline
+  const goToEnd = () => {
+    const endMs = version?.lengthMs || 0;
+    try {
+      engine.seekMs(endMs);
+      // Also pause if currently playing
+      if (playing) {
+        engine.pause();
+      }
+    } catch (err) {
+      console.warn("goToEnd failed:", err);
+    }
+    setMs(endMs);
+    try {
+      progressStore.setMs(endMs);
+    } catch {}
+  };
+
   // Publish progress to store whenever local ms updates
   useEffect(() => {
     progressStore.setMs(ms);
   }, [ms]);
+
+  // Global keyboard shortcuts for playback control
+  useEffect(() => {
+    const isEditableTarget = (el) => {
+      if (!el || el === document.body) return false;
+      const tag = el.tagName?.toLowerCase();
+      if (tag === "input" || tag === "textarea" || tag === "select")
+        return true;
+      if (el.isContentEditable) return true;
+      const role = el.getAttribute?.("role");
+      if (role && role.toLowerCase() === "textbox") return true;
+      if (tag === "input") {
+        const type = (el.getAttribute?.("type") || "").toLowerCase();
+        const textLike = [
+          "text",
+          "search",
+          "password",
+          "email",
+          "number",
+          "url",
+          "tel",
+          "date",
+          "time",
+          "datetime-local",
+          "month",
+          "week",
+          "range",
+        ];
+        if (textLike.includes(type)) return true;
+      }
+      return false;
+    };
+
+    const onKeyDown = (e) => {
+      if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (isEditableTarget(e.target)) return;
+
+      const isSpace = e.code === "Space" || e.key === " ";
+      const isLeft = e.code === "ArrowLeft" || e.key === "ArrowLeft";
+      const isRight = e.code === "ArrowRight" || e.key === "ArrowRight";
+      const isUp = e.code === "ArrowUp" || e.key === "ArrowUp";
+      const isDown = e.code === "ArrowDown" || e.key === "ArrowDown";
+
+      if (isSpace) {
+        e.preventDefault();
+        onTogglePlay();
+      } else if (isLeft) {
+        e.preventDefault();
+        skipBack10();
+      } else if (isRight) {
+        e.preventDefault();
+        skipFwd10();
+      } else if (isUp || isDown) {
+        e.preventDefault();
+
+        // Volume control: Up increases, Down decreases
+        const volumeStep = 5; // Change volume by 5% per keypress
+        let newVolume = masterVol;
+
+        if (isUp) {
+          newVolume = Math.min(100, masterVol + volumeStep);
+        } else if (isDown) {
+          newVolume = Math.max(0, masterVol - volumeStep);
+        }
+
+        // Update volume state and engine
+        setMasterVol(newVolume);
+
+        try {
+          const linear = Math.max(0, Math.min(1, newVolume / 100));
+
+          // Update refs
+          savedVolumeRef.current = linear;
+          prevMasterGainRef.current = linear;
+
+          // AUTO-UNMUTE LOGIC: Unmute immediately when increasing volume
+          if (muted && newVolume > 0) {
+            setMuted(false);
+          }
+
+          // AUTO-MUTE LOGIC: Mute when volume reaches 0
+          if (newVolume === 0 && !muted) {
+            setMuted(true);
+          }
+
+          // Apply volume to engine (respect mute state)
+          if (engine.master) {
+            engine.master.gain.gain.value = muted ? 0 : linear;
+          }
+        } catch (err) {
+          console.warn("master volume set failed:", err);
+        }
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onTogglePlay, skipBack10, skipFwd10, masterVol, muted, engine]);
 
   // Toggle mute while preserving slider value
   const onToggleMute = () => {
@@ -765,11 +889,15 @@ export default function WebAmpPlayback({version, onEngineReady}) {
           0,
           Math.min(1, savedVolumeRef.current ?? masterVol / 100)
         );
+        const restorePercent = Math.round(restore * 100);
+
         engine.master.gain.gain.value = restore;
         prevMasterGainRef.current = restore;
+        setMasterVol(restorePercent); // Update slider position
         setMuted(false);
         try {
           localStorage.setItem("webamp.muted", "0");
+          localStorage.setItem("webamp.masterVol", String(restorePercent));
         } catch (e) {}
       } else {
         // save current volume and mute
@@ -777,12 +905,29 @@ export default function WebAmpPlayback({version, onEngineReady}) {
         try {
           localStorage.setItem("webamp.muted", "1");
         } catch (e) {}
+
         engine.master.gain.gain.value = 0;
         prevMasterGainRef.current = 0;
+        setMasterVol(0); // Set slider to 0 when muting
         setMuted(true);
       }
     } catch (err) {
       console.warn("toggle mute failed:", err);
+    }
+  };
+
+  // Determines the appropriate volume icon based on volume level and mute state
+  const getVolumeIcon = (volume, muted) => {
+    if (muted || volume === 0) {
+      return <SoundOffIcon />;
+    }
+
+    if (volume <= 30) {
+      return <SoundOnLowIcon />;
+    } else if (volume <= 60) {
+      return <SoundOnMediumIcon />;
+    } else {
+      return <SoundOnHighIcon />;
     }
   };
 
@@ -794,227 +939,58 @@ export default function WebAmpPlayback({version, onEngineReady}) {
     return `${m}:${s.toString().padStart(2, "0")}`;
   };
 
-  // Format time as mm:ss.mmm
-  // const fmt = (t) => {
-  //   const s = Math.floor(t / 1000);
-  //   const m = Math.floor(s / 60);
-  //   const r = s % 60;
-  //   const msPart = Math.floor(t % 1000)
-  //     .toString()
-  //     .padStart(3, "0");
-  //   return `${m}:${r.toString().padStart(2, "0")}.${msPart}`;
-  // };
-
-  // Render player UI
+  // Render player UI with CSS classes
   return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        height: "100%",
-        width: "100%",
-        gap: 12,
-        boxSizing: "border-box",
-      }}
-    >
-      {/* left spacer to center the transport group */}
-      <div style={{flex: 1}} />
+    <div className="playback-container">
+      {/* Combined transport + time section */}
+      <div className="transport-time-container">
+        <div className="time-section">
+          <code className="time-display">
+            {fmtTime(ms)}
+            {typeof version?.lengthMs === "number" && version.lengthMs > 0
+              ? ` / ${fmtTime(version.lengthMs)}`
+              : ""}
+          </code>
+        </div>
 
-      {/* centered transport: time | start | back 10s | play/pause | fwd 10s */}
-      <div style={{display: "flex", alignItems: "center", gap: 12}}>
-        <button
-          onClick={goToStart}
-          title="Go to start"
-          style={{
-            background: "transparent",
-            border: "none",
-            padding: 0,
-            margin: 0,
-            cursor: "pointer",
-          }}
-        >
-          <img
-            src={GoToStartIcon}
-            alt="Go to start"
-            style={{height: 26, display: "block"}}
-          />
-        </button>
-        <code
-          style={{
-            fontSize: 12,
-            opacity: 0.85,
-            minWidth: 80,
-            textAlign: "right",
-          }}
-        >
-          {fmtTime(ms)}
-          {typeof version?.lengthMs === "number" && version.lengthMs > 0
-            ? ` / ${fmtTime(version.lengthMs)}`
-            : ""}
-        </code>
-        <button
-          onClick={skipBack10}
-          title="Back 10s"
-          style={{
-            background: "transparent",
-            border: "none",
-            padding: 0,
-            margin: 0,
-            cursor: "pointer",
-          }}
-        >
-          <img
-            src={RewindIcon}
-            alt="Rewind 10 seconds"
-            style={{height: 26, display: "block"}}
-          />
-        </button>
-        {playing ? (
-          <button
-            type="button"
-            onClick={onPause}
-            title="Pause"
-            style={{
-              background: "transparent",
-              border: "none",
-              padding: 0,
-              margin: 0,
-              cursor: "pointer",
-            }}
-            aria-label="Pause"
-          >
-            <img
-              src={PauseIcon}
-              alt="Pause"
-              style={{height: 26, display: "block"}}
-            />
+        <div className="transport-section">
+          <button onClick={goToStart} className="transport-button">
+            <GoToStartIcon />
           </button>
-        ) : (
-          <button
-            type="button"
-            onClick={onPlay}
-            title="Play"
-            style={{
-              background: "transparent",
-              border: "none",
-              padding: 0,
-              margin: 0,
-              cursor: "pointer",
-            }}
-            aria-label="Play"
-          >
-            <img
-              src={PlayIcon}
-              alt="Play"
-              style={{height: 26, display: "block"}}
-            />
+          <button onClick={skipBack10} className="transport-button">
+            <RewindIcon />
           </button>
-        )}
-        <button
-          onClick={skipFwd10}
-          title="Forward 10s"
-          style={{
-            background: "transparent",
-            border: "none",
-            padding: 0,
-            margin: 0,
-            cursor: "pointer",
-          }}
-        >
-          <img
-            src={ForwardIcon}
-            alt="Forward 10 seconds"
-            style={{height: 26, display: "block"}}
-          />
-        </button>
+          <PlayPauseButton isPlaying={playing} onToggle={onTogglePlay} />
+
+          <button onClick={skipFwd10} className="transport-button">
+            <ForwardIcon />
+          </button>
+          <button onClick={goToEnd} className="transport-button">
+            <GoToEndIcon />
+          </button>
+        </div>
       </div>
 
-      {/* right side: master volume */}
-      <div
-        style={{
-          flex: 1,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "flex-end",
-          gap: 8,
-        }}
-      >
+      <div className="volume-section">
         <button
           type="button"
           onClick={onToggleMute}
-          title={muted ? "Unmute" : "Mute"}
-          style={{
-            background: "transparent",
-            border: "none",
-            padding: 0,
-            margin: 0,
-            cursor: "pointer",
-          }}
-          aria-label={muted ? "Unmute" : "Mute"}
+          title={muted ? "Unmute" : `Volume: ${masterVol}%`}
+          className="volume-button"
+          aria-label={muted ? "Unmute" : `Volume: ${masterVol}%`}
         >
-          <img
-            src={muted ? SoundOffIcon : SoundOnIcon}
-            alt={muted ? "Muted" : "Sound on"}
-            style={{height: 26, display: "block"}}
-          />
+          {getVolumeIcon(masterVol, muted)}
         </button>
-        {/* Custom-styled slider wrapper */}
-        <div
-          style={{
-            position: "relative",
-            width: 160, // match previous fixed width
-            height: 28,
-            display: "flex",
-            alignItems: "center",
-          }}
-          aria-label="Master volume"
-        >
-          {/* Track background */}
+        <div className="volume-slider-container" aria-label="Master volume">
+          <div className="volume-track" />
+          <div className="volume-fill" style={{width: `${masterVol}%`}} />
           <div
-            style={{
-              position: "absolute",
-              left: 0,
-              right: 0,
-              top: "50%",
-              height: 10,
-              background: "#CDF8FF",
-              borderRadius: 100,
-              transform: "translateY(-50%)",
-            }}
-          />
-          {/* Filled portion */}
-          <div
-            style={{
-              position: "absolute",
-              left: 0,
-              width: `${masterVol}%`,
-              top: "50%",
-              height: 10,
-              background: "#17E1FF",
-              borderRadius: 100,
-              transform: "translateY(-50%)",
-            }}
-          />
-          {/* Knob */}
-          <img
-            src={VolumeKnob}
-            alt="Volume knob"
-            style={{
-              position: "absolute",
-              left: `${masterVol}%`,
-              top: "50%",
-              // Nudge downward slightly for visual centering
-              transform: `translate(-50%, -40%) ${draggingVol ? "scale(1.05)" : "scale(1)"}`,
-              height: 20,
-              width: 20,
-              filter: draggingVol
-                ? "drop-shadow(0 0 6px rgba(61,133,225,0.4))"
-                : "drop-shadow(0 1px 2px rgba(0,0,0,0.15))",
-              transition: "transform 120ms ease, filter 120ms ease",
-              pointerEvents: "none",
-            }}
-          />
-          {/* Native input for interactions (invisible) */}
+            className={`volume-knob-wrapper ${draggingVol ? "dragging" : ""}`}
+            style={{left: `${masterVol}%`}}
+          >
+            <VolumeKnob />
+          </div>
+
           <input
             type="range"
             min={0}
@@ -1024,39 +1000,60 @@ export default function WebAmpPlayback({version, onEngineReady}) {
             onChange={(e) => {
               const v = Number(e.target.value) || 0;
               setMasterVol(v);
-              try {
-                // master volume: linear 0.0 - 1.0
-                const linear = Math.max(0, Math.min(1, v / 100));
-                // persist user's master volume preference (0-100)
-                try {
-                  localStorage.setItem("webamp.masterVol", String(v));
-                } catch (e) {}
 
-                // remember intended volume
+              try {
+                const linear = Math.max(0, Math.min(1, v / 100));
+
+                // Update refs
                 savedVolumeRef.current = linear;
                 prevMasterGainRef.current = linear;
 
-                // apply to engine unless muted
-                if (engine.master && !muted) {
-                  engine.master.gain.gain.value = linear;
+                // AUTO-UNMUTE LOGIC: Unmute immediately when slider is adjusted
+                if (muted && v > 0) {
+                  setMuted(false);
+                }
+
+                // Apply volume to engine (respect mute state)
+                if (engine.master) {
+                  engine.master.gain.gain.value = muted ? 0 : linear;
                 }
               } catch (err) {
                 console.warn("master volume set failed:", err);
               }
             }}
             onMouseDown={() => setDraggingVol(true)}
-            onMouseUp={() => setDraggingVol(false)}
+            onMouseUp={() => {
+              setDraggingVol(false);
+              // Persist state when dragging ends
+              try {
+                localStorage.setItem("webamp.masterVol", String(masterVol));
+                localStorage.setItem("webamp.muted", muted ? "1" : "0");
+              } catch (e) {}
+
+              // Auto-mute if user explicitly sets volume to zero
+              if (masterVol === 0 && !muted) {
+                setMuted(true);
+                if (engine.master) {
+                  engine.master.gain.gain.value = 0;
+                }
+              }
+            }}
             onMouseLeave={() => setDraggingVol(false)}
             onTouchStart={() => setDraggingVol(true)}
-            onTouchEnd={() => setDraggingVol(false)}
-            style={{
-              position: "absolute",
-              inset: 0,
-              width: "100%",
-              height: 28,
-              opacity: 0,
-              cursor: "pointer",
+            onTouchEnd={() => {
+              setDraggingVol(false);
+              // Persist state when touch ends
+              try {
+                localStorage.setItem("webamp.masterVol", String(masterVol));
+                localStorage.setItem("webamp.muted", muted ? "1" : "0");
+              } catch (e) {}
+
+              // Same auto-mute logic for touch devices
+              if (masterVol === 0 && !muted) {
+                setMuted(true);
+              }
             }}
+            className="volume-input"
           />
         </div>
       </div>
