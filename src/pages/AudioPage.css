@@ -38,7 +38,6 @@ html,
   padding: 10px;
   box-sizing: border-box;
   color: #e5e5e5; /* match header text color */
-  border: 1px solid #343239;
 }
 
 /* Footer-specific overrides to vertically center content inside the small footer row */

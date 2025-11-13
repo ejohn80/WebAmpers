@@ -1,6 +1,7 @@
 import {useContext, useCallback, useState} from "react";
 import {AppContext} from "../../../context/AppContext";
 import styles from "../Layout.module.css";
+import {EffectsSliderKnob} from "../Svgs.jsx";
 
 function EffectsTab() {
   const {effects, updateEffect, resetEffect, resetAllEffects} =
@@ -72,7 +73,7 @@ function EffectsTab() {
             </div>
             <div className={styles.description}>{config.description}</div>
 
-            {/* Custom Universal Slider */}
+            {/* Custom Slider */}
             <div
               className={`${styles.sliderContainer} ${
                 draggingSlider === config.name ? styles.dragging : ""
@@ -91,7 +92,7 @@ function EffectsTab() {
                 }`}
                 style={{left: `${fillPercentage}%`}}
               >
-                <div className={styles.sliderKnob}></div>
+                <EffectsSliderKnob />
               </div>
               <input
                 type="range"

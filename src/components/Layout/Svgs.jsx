@@ -686,3 +686,36 @@ export function GoToEndIcon() {
     </svg>
   );
 }
+
+export function EffectsSliderKnob() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="19"
+      height="12"
+      viewBox="0 0 19 13"
+      fill="none"
+    >
+      <rect
+        x="0.25"
+        y="0.25"
+        width="18.5"
+        height="12.5"
+        rx="2.25"
+        fill="#BEBEBE"
+        stroke="black"
+        stroke-width="0.5"
+      />
+      <path
+        d="M3.3418 12.5H2.5C1.39543 12.5 0.5 11.6046 0.5 10.5V2.5C0.5 1.39543 1.39543 0.5 2.5 0.5H3.3418V12.5Z"
+        fill="#A0A09F"
+      />
+      <path
+        d="M15.6582 0.5H16.5C17.6046 0.5 18.5 1.39543 18.5 2.5V10.5C18.5 11.6046 17.6046 12.5 16.5 12.5H15.6582L15.6582 0.5Z"
+        fill="#A0A09F"
+      />
+      <rect x="8.07861" y="0.5" width="2.84211" height="12" fill="#666666" />
+      <rect x="9.02637" y="0.5" width="0.947368" height="12" fill="#676766" />
+    </svg>
+  );
+}

@@ -5,7 +5,7 @@
 }
 
 .container {
-  background-color: #1a1a1a;
+  background-color: #000000;
   padding: 12px;
   color: #ffffff;
   height: 78vh;
@@ -131,9 +131,9 @@
 .effectItem {
   margin-bottom: 20px;
   padding: 12px;
-  background: #2b2b2b;
+  background: #1e1d20;
   border-radius: 6px;
-  border: 1px solid #3a3a3a;
+  border: 2px solid #333239;
 }
 
 .header {
@@ -146,7 +146,7 @@
 .label {
   font-size: 14px;
   font-weight: 600;
-  color: #00e5ff;
+  color: #e5e5e5;
 }
 
 .value {
@@ -162,17 +162,6 @@
   margin-bottom: 8px;
 }
 
-/* .slider {
-  width: 100%;
-  height: 6px;
-  border-radius: 3px;
-  background: #1a1a1a;
-  outline: none;
-  cursor: pointer;
-} */
-
-/* Custom Slider Styles */
-
 .controls {
   display: flex;
   gap: 8px;
@@ -182,22 +171,22 @@
 .button {
   padding: 4px 10px;
   font-size: 11px;
-  background: #3a3a3a;
-  color: #00e5ff;
-  border: 1px solid #4a4a4a;
+  background: #172528;
+  color: #17e1ff;
+  border: none;
   border-radius: 4px;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .button:hover {
-  background: #4a4a4a;
+  background: #1e3034;
 }
 
 .resetAllButton {
   padding: 10px 20px;
   margin-top: 10px;
-  background: #00e5ff;
+  background: #17e1ff;
   color: #000;
   border: none;
   border-radius: 6px;
@@ -351,12 +340,12 @@
 .sliderContainer {
   position: relative;
   width: 100%;
-  height: 40px;
+  height: 24px;
   display: flex;
   align-items: center;
-  margin: 20px 0;
+  margin: 8px 0;
   overflow: visible;
-  /* border: 3px solid red; */
+  /* border: 2px solid red; */
 }
 
 .sliderTrack {
@@ -364,24 +353,25 @@
   left: 0;
   right: 0;
   top: 50%;
-  height: 8px;
+  height: 6px;
   background: #1a1a1a;
-  border-radius: 3px;
+  border-radius: 1.5px;
   transform: translateY(-50%);
-  border: 2px solid cyan;
+  outline: 1px solid #787879;
+  overflow: visible;
 }
 
 .sliderFill {
   position: absolute;
   left: 0;
   top: 50%;
-  height: 8px;
-  background: #00e5ff;
-  border-radius: 3px;
+  height: 6px;
+  background: #11a1b7;
+  border-radius: 1.5px;
   transform: translateY(-50%);
   pointer-events: none;
   transition: width 0.05s linear;
-  /* border: 2px solid lime; */
+  border: 1px solid black;
 }
 
 /* No transition when actively dragging */
@@ -401,28 +391,17 @@
   align-items: center;
   justify-content: center;
   z-index: 3;
-  /* border: 2px solid yellow; */
 }
 
 .sliderKnobWrapperDragging {
   transform: translate(-50%, -50%) scale(1.1);
 }
 
-.sliderKnob {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: #00e5ff;
-  border: 2px solid #ffffff;
-  box-shadow: 0 0 4px rgba(0, 0, 0, 0.5);
-  pointer-events: none;
-}
-
 .sliderInput {
   position: absolute;
   inset: 0;
   width: 100%;
-  height: 40px !important;
+  height: 20px;
   opacity: 0;
   cursor: pointer;
   z-index: 4;
