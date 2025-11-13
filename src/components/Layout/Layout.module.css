@@ -162,14 +162,16 @@
   margin-bottom: 8px;
 }
 
-.slider {
+/* .slider {
   width: 100%;
   height: 6px;
   border-radius: 3px;
   background: #1a1a1a;
   outline: none;
   cursor: pointer;
-}
+} */
+
+/* Custom Slider Styles */
 
 .controls {
   display: flex;
@@ -343,4 +345,85 @@
   background: #3a3a3a;
   color: #666;
   cursor: not-allowed;
+}
+
+/* Universal Slider Styles - Works on all browsers */
+.sliderContainer {
+  position: relative;
+  width: 100%;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  margin: 20px 0;
+  overflow: visible;
+  /* border: 3px solid red; */
+}
+
+.sliderTrack {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 8px;
+  background: #1a1a1a;
+  border-radius: 3px;
+  transform: translateY(-50%);
+  border: 2px solid cyan;
+}
+
+.sliderFill {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  height: 8px;
+  background: #00e5ff;
+  border-radius: 3px;
+  transform: translateY(-50%);
+  pointer-events: none;
+  transition: width 0.05s linear;
+  /* border: 2px solid lime; */
+}
+
+/* No transition when actively dragging */
+.sliderContainer.dragging .sliderFill {
+  transition: none;
+}
+
+.sliderKnobWrapper {
+  position: absolute;
+  top: 50%;
+  height: 20px;
+  width: 20px;
+  transform: translate(-50%, -50%);
+  transition: transform 120ms ease;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 3;
+  /* border: 2px solid yellow; */
+}
+
+.sliderKnobWrapperDragging {
+  transform: translate(-50%, -50%) scale(1.1);
+}
+
+.sliderKnob {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #00e5ff;
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+}
+
+.sliderInput {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 40px !important;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 4;
 }

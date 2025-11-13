@@ -1,10 +1,12 @@
-import {useContext, useCallback} from "react";
+import {useContext, useCallback, useState} from "react";
 import {AppContext} from "../../../context/AppContext";
 import styles from "../Layout.module.css";
 
 function EffectsTab() {
   const {effects, updateEffect, resetEffect, resetAllEffects} =
     useContext(AppContext);
+
+  const [draggingSlider, setDraggingSlider] = useState(null);
 
   const effectConfigs = [
     {
@@ -48,37 +50,75 @@ function EffectsTab() {
     [updateEffect]
   );
 
+  const getSliderFillPercentage = (config, value) => {
+    const currentValue = value ?? config.default;
+    return ((currentValue - config.min) / (config.max - config.min)) * 100;
+  };
+
   return (
     <div className={styles.container}>
-      {effectConfigs.map((config) => (
-        <div key={config.name} className={styles.effectItem}>
-          <div className={styles.header}>
-            <span className={styles.label}>{config.label}</span>
-            <span className={styles.value}>
-              {effects[config.name]}
-              {config.unit}
-            </span>
-          </div>
-          <div className={styles.description}>{config.description}</div>
-          <input
-            type="range"
-            min={config.min}
-            max={config.max}
-            step={config.step}
-            value={effects[config.name] ?? config.default}
-            onChange={handleChange(config.name)}
-            className={styles.slider}
-          />
-          <div className={styles.controls}>
-            <button
-              className={styles.button}
-              onClick={() => resetEffect(config.name, config.default)}
+      {effectConfigs.map((config) => {
+        const currentValue = effects[config.name] ?? config.default;
+        const fillPercentage = getSliderFillPercentage(config, currentValue);
+
+        return (
+          <div key={config.name} className={styles.effectItem}>
+            <div className={styles.header}>
+              <span className={styles.label}>{config.label}</span>
+              <span className={styles.value}>
+                {currentValue}
+                {config.unit}
+              </span>
+            </div>
+            <div className={styles.description}>{config.description}</div>
+
+            {/* Custom Universal Slider */}
+            <div
+              className={`${styles.sliderContainer} ${
+                draggingSlider === config.name ? styles.dragging : ""
+              }`}
             >
-              Reset
-            </button>
+              <div className={styles.sliderTrack}></div>
+              <div
+                className={styles.sliderFill}
+                style={{width: `${fillPercentage}%`}}
+              ></div>
+              <div
+                className={`${styles.sliderKnobWrapper} ${
+                  draggingSlider === config.name
+                    ? styles.sliderKnobWrapperDragging
+                    : ""
+                }`}
+                style={{left: `${fillPercentage}%`}}
+              >
+                <div className={styles.sliderKnob}></div>
+              </div>
+              <input
+                type="range"
+                min={config.min}
+                max={config.max}
+                step={config.step}
+                value={currentValue}
+                onChange={handleChange(config.name)}
+                onMouseDown={() => setDraggingSlider(config.name)}
+                onMouseUp={() => setDraggingSlider(null)}
+                onTouchStart={() => setDraggingSlider(config.name)}
+                onTouchEnd={() => setDraggingSlider(null)}
+                className={styles.sliderInput}
+              />
+            </div>
+
+            <div className={styles.controls}>
+              <button
+                className={styles.button}
+                onClick={() => resetEffect(config.name, config.default)}
+              >
+                Reset
+              </button>
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
       <button className={styles.resetAllButton} onClick={resetAllEffects}>
         Reset All Effects
       </button>
