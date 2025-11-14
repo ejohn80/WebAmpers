@@ -5,7 +5,7 @@
 }
 
 .container {
-  background-color: #1a1a1a;
+  background-color: #0f0f0f;
   padding: 12px;
   color: #ffffff;
   height: 78vh;
@@ -131,9 +131,9 @@
 .effectItem {
   margin-bottom: 20px;
   padding: 12px;
-  background: #2b2b2b;
+  background: #1e1d20;
   border-radius: 6px;
-  border: 1px solid #3a3a3a;
+  border: 2px solid #333239;
 }
 
 .header {
@@ -146,7 +146,7 @@
 .label {
   font-size: 14px;
   font-weight: 600;
-  color: #00e5ff;
+  color: #e5e5e5;
 }
 
 .value {
@@ -162,15 +162,6 @@
   margin-bottom: 8px;
 }
 
-.slider {
-  width: 100%;
-  height: 6px;
-  border-radius: 3px;
-  background: #1a1a1a;
-  outline: none;
-  cursor: pointer;
-}
-
 .controls {
   display: flex;
   gap: 8px;
@@ -180,34 +171,68 @@
 .button {
   padding: 4px 10px;
   font-size: 11px;
-  background: #3a3a3a;
-  color: #00e5ff;
-  border: 1px solid #4a4a4a;
+  background: #172528;
+  color: #17e1ff;
+  border: none;
   border-radius: 4px;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .button:hover {
-  background: #4a4a4a;
+  background: #1e3034;
+}
+
+/* Disabled state for reset buttons */
+.buttonDisabled {
+  background: #131313 !important;
+  color: #4a4a4a !important;
+  cursor: not-allowed !important;
+  opacity: 0.5;
+}
+
+.buttonDisabled:hover {
+  background: #2a2a2a !important;
+  transform: none !important;
 }
 
 .resetAllButton {
   padding: 10px 20px;
   margin-top: 10px;
-  background: #00e5ff;
-  color: #000;
+  background: #172528;
+  color: #17e1ff;
   border: none;
   border-radius: 6px;
   font-weight: bold;
   cursor: pointer;
   width: 100%;
   transition: all 0.2s;
+  line-height: 1;
+}
+
+.resetAllButtonContent {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  line-height: 1;
 }
 
 .resetAllButton:hover {
-  background: #00c8d4;
-  transform: scale(1.02);
+  background: #1e3135;
+}
+
+/* Disabled state for reset all button */
+.resetAllButtonDisabled {
+  background: #2a2a2a !important;
+  color: #666666 !important;
+  cursor: not-allowed !important;
+  opacity: 0.5;
+}
+
+.resetAllButtonDisabled:hover {
+  background: #313131 !important;
+  transform: none !important;
 }
 
 /* Projects Tab */
@@ -343,4 +368,95 @@
   background: #3a3a3a;
   color: #666;
   cursor: not-allowed;
+}
+
+/* Universal Slider Styles - Works on all browsers */
+.sliderContainer {
+  position: relative;
+  width: 100%;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  margin: 8px 0;
+  overflow: visible;
+  /* border: 2px solid red; */
+}
+
+.sliderTrack {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 6px;
+  background: #1a1a1a;
+  border-radius: 1.5px;
+  transform: translateY(-50%);
+  outline: 1px solid #787879;
+  overflow: visible;
+}
+
+.sliderFill {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  height: 6px;
+  background: #11a1b7;
+  border-radius: 1.5px;
+  transform: translateY(-50%);
+  pointer-events: none;
+  transition: width 0.05s linear;
+  border: 1px solid black;
+}
+
+/* No transition when actively dragging */
+.sliderContainer.dragging .sliderFill {
+  transition: none;
+}
+
+/* Gray when at default value */
+.sliderFill.default {
+  background: #797f80;
+}
+
+/* Blue when changed from default */
+.sliderFill.changed {
+  background: #11a1b7;
+}
+
+/* Brighter blue when actively dragging */
+.sliderContainer.dragging .sliderFill.changed {
+  background: #17e1ff;
+}
+
+/* No transition when actively dragging */
+.sliderContainer.dragging .sliderFill {
+  transition: none;
+}
+
+.sliderKnobWrapper {
+  position: absolute;
+  top: 50%;
+  height: 20px;
+  width: 20px;
+  transform: translate(-50%, -50%);
+  transition: transform 120ms ease;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 3;
+}
+
+.sliderKnobWrapperDragging {
+  transform: translate(-50%, -50%) scale(1.1);
+}
+
+.sliderInput {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 20px;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 4;
 }
