@@ -1,7 +1,11 @@
 import {useContext, useCallback, useState, useRef} from "react";
 import {AppContext} from "../../../context/AppContext";
 import styles from "../Layout.module.css";
-import {EffectsSliderKnob} from "../Svgs.jsx";
+import {
+  EffectsSliderKnob,
+  ResetAllButtonEnabled,
+  ResetAllButtonDisabled,
+} from "../Svgs.jsx";
 
 function EffectsTab() {
   const {effects, updateEffect, resetEffect, resetAllEffects} =
@@ -88,11 +92,23 @@ function EffectsTab() {
     return effects[config.name] ?? config.default;
   };
 
+  // Check if effect is at default value
+  const isAtDefaultValue = (config) => {
+    const currentValue = getCurrentValue(config);
+    return currentValue === config.default;
+  };
+
+  // Check if ALL effects are at their default values
+  const areAllEffectsAtDefault = () => {
+    return effectConfigs.every((config) => isAtDefaultValue(config));
+  };
+
   return (
     <div className={styles.container}>
       {effectConfigs.map((config) => {
         const currentValue = getCurrentValue(config);
         const fillPercentage = getSliderFillPercentage(config, currentValue);
+        const isDefault = isAtDefaultValue(config);
 
         return (
           <div key={config.name} className={styles.effectItem}>
@@ -113,7 +129,9 @@ function EffectsTab() {
             >
               <div className={styles.sliderTrack}></div>
               <div
-                className={styles.sliderFill}
+                className={`${styles.sliderFill} ${
+                  isDefault ? styles.default : styles.changed
+                }`}
                 style={{width: `${fillPercentage}%`}}
               ></div>
               <div
@@ -143,8 +161,15 @@ function EffectsTab() {
 
             <div className={styles.controls}>
               <button
-                className={styles.button}
-                onClick={() => resetEffect(config.name, config.default)}
+                className={`${styles.button} ${
+                  isDefault ? styles.buttonDisabled : ""
+                }`}
+                onClick={
+                  isDefault
+                    ? undefined
+                    : () => resetEffect(config.name, config.default)
+                }
+                disabled={isDefault}
               >
                 Reset
               </button>
@@ -152,8 +177,21 @@ function EffectsTab() {
           </div>
         );
       })}
-      <button className={styles.resetAllButton} onClick={resetAllEffects}>
-        Reset All Effects
+      <button
+        className={`${styles.resetAllButton} ${
+          areAllEffectsAtDefault() ? styles.resetAllButtonDisabled : ""
+        }`}
+        onClick={areAllEffectsAtDefault() ? undefined : resetAllEffects}
+        disabled={areAllEffectsAtDefault()}
+      >
+        <span className={styles.resetAllButtonContent}>
+          {areAllEffectsAtDefault() ? (
+            <ResetAllButtonDisabled />
+          ) : (
+            <ResetAllButtonEnabled />
+          )}
+          <span style={{marginTop: "2px"}}>Reset All Effects</span>
+        </span>
       </button>
     </div>
   );

@@ -719,3 +719,43 @@ export function EffectsSliderKnob() {
     </svg>
   );
 }
+
+export function ResetAllButtonEnabled() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="15"
+      height="12"
+      viewBox="0 0 15 12"
+      fill="none"
+    >
+      <path
+        d="M3.63889 7.60714L0.75 4.17857M0.75 4.17857L3.63889 0.75M0.75 4.17857H10.1389C12.1332 4.17857 13.75 5.24021 13.75 7.60714C13.75 9.97408 12.1333 11.25 10.1389 11.25H2.25"
+        stroke="#17E1FF"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      />
+    </svg>
+  );
+}
+
+export function ResetAllButtonDisabled() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="15"
+      height="12"
+      viewBox="0 0 15 12"
+      fill="none"
+    >
+      <path
+        d="M3.63889 7.60714L0.75 4.17857M0.75 4.17857L3.63889 0.75M0.75 4.17857H10.1389C12.1332 4.17857 13.75 5.24021 13.75 7.60714C13.75 9.97408 12.1333 11.25 10.1389 11.25H2.25"
+        stroke="#666666"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      />
+    </svg>
+  );
+}

@@ -5,7 +5,7 @@
 }
 
 .container {
-  background-color: #000000;
+  background-color: #0f0f0f;
   padding: 12px;
   color: #ffffff;
   height: 78vh;
@@ -183,22 +183,56 @@
   background: #1e3034;
 }
 
+/* Disabled state for reset buttons */
+.buttonDisabled {
+  background: #131313 !important;
+  color: #4a4a4a !important;
+  cursor: not-allowed !important;
+  opacity: 0.5;
+}
+
+.buttonDisabled:hover {
+  background: #2a2a2a !important;
+  transform: none !important;
+}
+
 .resetAllButton {
   padding: 10px 20px;
   margin-top: 10px;
-  background: #17e1ff;
-  color: #000;
+  background: #172528;
+  color: #17e1ff;
   border: none;
   border-radius: 6px;
   font-weight: bold;
   cursor: pointer;
   width: 100%;
   transition: all 0.2s;
+  line-height: 1;
+}
+
+.resetAllButtonContent {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  line-height: 1;
 }
 
 .resetAllButton:hover {
-  background: #00c8d4;
-  transform: scale(1.02);
+  background: #1e3135;
+}
+
+/* Disabled state for reset all button */
+.resetAllButtonDisabled {
+  background: #2a2a2a !important;
+  color: #666666 !important;
+  cursor: not-allowed !important;
+  opacity: 0.5;
+}
+
+.resetAllButtonDisabled:hover {
+  background: #313131 !important;
+  transform: none !important;
 }
 
 /* Projects Tab */
@@ -374,9 +408,24 @@
   border: 1px solid black;
 }
 
+/* No transition when actively dragging */
 .sliderContainer.dragging .sliderFill {
-  background: #59bcc5; /* Brighter blue when pending */
   transition: none;
+}
+
+/* Gray when at default value */
+.sliderFill.default {
+  background: #797f80;
+}
+
+/* Blue when changed from default */
+.sliderFill.changed {
+  background: #11a1b7;
+}
+
+/* Brighter blue when actively dragging */
+.sliderContainer.dragging .sliderFill.changed {
+  background: #17e1ff;
 }
 
 /* No transition when actively dragging */
