@@ -15,7 +15,7 @@ import ProjectsTab from "./Sidebar/ProjectsTab";
  */
 function Sidebar({width, onImportSuccess, onImportError}) {
   const {userData} = useContext(AppContext);
-  const [currentTab, setCurrentTab] = useState("effects");
+  const [currentTab, setCurrentTab] = useState("projects");
 
   // If logged out, only redirect away from Assets (Effects/Projects stay allowed)
   useEffect(() => {
@@ -63,9 +63,9 @@ function Sidebar({width, onImportSuccess, onImportError}) {
               flex: 1,
               padding: "10px 0",
               border: "none",
-              background: currentTab === key ? "#00e5ff" : "#1a1a1a",
-              color: currentTab === key ? "#000" : "#00e5ff",
-              fontWeight: currentTab === key ? "bold" : "normal",
+              background: currentTab === key ? "#17E1FF" : "#193338",
+              color: currentTab === key ? "#193338" : "#17E1FF",
+              fontWeight: currentTab === key ? "bold" : "bold",
               cursor: userData || key !== "assets" ? "pointer" : "not-allowed",
               opacity: !userData && key === "assets" ? 0.5 : 1,
               transition: "background 0.2s, color 0.2s, opacity 0.2s",

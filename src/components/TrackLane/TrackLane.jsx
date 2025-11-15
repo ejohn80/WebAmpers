@@ -9,45 +9,84 @@ import "./TrackLane.css";
  *
  * props:
  *  - track: AudioTrack object (expected to have `name` and `segments` array)
+ *  - showTitle: boolean to control whether to display the track name
+ *  - onMute: callback function for mute toggle events
+ *  - onSolo: callback function for solo toggle events
  */
 function TrackLane({track, showTitle = true, onMute, onSolo}) {
   if (!track) return null;
 
   const segments = Array.isArray(track.segments) ? track.segments : [];
 
-  // Local UI state: keep mute/solo so the buttons reflect user actions.
-  // We don't assume direct access to the PlaybackEngine here; callers may
-  // wire `onMute`/`onSolo` to connect to the engine.
-  const [muted, setMuted] = useState(!!track.mute);
-  const [soloed, setSoloed] = useState(!!track.solo);
+  /**
+   * Get initial state from localStorage with fallback to track props
+   * This ensures mute/solo state persists across page refreshes
+   */
+  const getInitialState = () => {
+    try {
+      const saved = localStorage.getItem(`webamp.track.${track.id}`);
+      return saved
+        ? JSON.parse(saved)
+        : {muted: !!track.mute, soloed: !!track.solo};
+    } catch (e) {
+      return {muted: !!track.mute, soloed: !!track.solo};
+    }
+  };
 
-  // If parent updates the track prop (e.g. mute/solo changed elsewhere),
-  // keep the UI in sync.
+  // Local UI state: keep mute/solo so the buttons reflect user actions
+  const [muted, setMuted] = useState(getInitialState().muted);
+  const [soloed, setSoloed] = useState(getInitialState().soloed);
+
+  /**
+   * Persist state to localStorage whenever mute/solo state changes
+   * This ensures the state survives page refreshes
+   */
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        `webamp.track.${track.id}`,
+        JSON.stringify({muted, soloed})
+      );
+    } catch (e) {
+      console.warn("Failed to persist track state:", e);
+    }
+  }, [muted, soloed, track.id]);
+
+  /**
+   * Sync UI state with track props when they change externally
+   * This handles cases where mute/solo is changed from other components
+   */
   useEffect(() => {
     setMuted(!!track.mute);
-  }, [track?.mute, track?.id]);
+  }, [track.mute, track.id]);
 
   useEffect(() => {
     setSoloed(!!track.solo);
-  }, [track?.solo, track?.id]);
+  }, [track.solo, track.id]);
 
+  /**
+   * Handle mute toggle - updates both UI state and persists to storage
+   */
   const toggleMute = () => {
     const next = !muted;
     setMuted(next);
     try {
       onMute && onMute(track.id, next);
     } catch (e) {
-      // swallow to avoid breaking UI
+      console.warn("Mute toggle failed:", e);
     }
   };
 
+  /**
+   * Handle solo toggle - updates both UI state and persists to storage
+   */
   const toggleSolo = () => {
     const next = !soloed;
     setSoloed(next);
     try {
       onSolo && onSolo(track.id, next);
     } catch (e) {
-      // swallow to avoid breaking UI
+      console.warn("Solo toggle failed:", e);
     }
   };
 
