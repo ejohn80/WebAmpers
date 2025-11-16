@@ -5,10 +5,11 @@ import {
   EffectsSliderKnob,
   ResetAllButtonEnabled,
   ResetAllButtonDisabled,
+  PlusSignIcon,
 } from "../Svgs.jsx";
 
 function EffectsTab() {
-  const {effects, updateEffect, resetEffect, resetAllEffects} =
+  const {effects, updateEffect, resetEffect, resetAllEffects, openEffectsMenu} =
     useContext(AppContext);
 
   const [draggingSlider, setDraggingSlider] = useState(null);
@@ -105,6 +106,15 @@ function EffectsTab() {
 
   return (
     <div className={styles.container}>
+      {/* Add Effects Button */}
+      <button className={styles.addEffectsButton} onClick={openEffectsMenu}>
+        <span className={styles.addEffectsButtonContent}>
+          <PlusSignIcon />
+          <span>Add Effects</span>
+        </span>
+      </button>
+
+      {/* Effect sliders */}
       {effectConfigs.map((config) => {
         const currentValue = getCurrentValue(config);
         const fillPercentage = getSliderFillPercentage(config, currentValue);
@@ -177,6 +187,8 @@ function EffectsTab() {
           </div>
         );
       })}
+
+      {/* Reset All Effects Button */}
       <button
         className={`${styles.resetAllButton} ${
           areAllEffectsAtDefault() ? styles.resetAllButtonDisabled : ""

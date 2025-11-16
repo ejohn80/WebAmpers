@@ -759,3 +759,23 @@ export function ResetAllButtonDisabled() {
     </svg>
   );
 }
+
+export function PlusSignIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="11"
+      height="12"
+      viewBox="0 0 13 12"
+      fill="none"
+    >
+      <path
+        d="M1 6H6.5M6.5 6H12M6.5 6V11M6.5 6V1"
+        stroke="#17E1FF"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      />
+    </svg>
+  );
+}

@@ -29,8 +29,30 @@ const AppContextProvider = ({children}) => {
     }
   });
 
+  // Effects Menu State
+  const [isEffectsMenuOpen, setIsEffectsMenuOpen] = useState(false);
+
   // Engine reference to apply effects
   const [engineRef, setEngineRef] = useState(null);
+
+  // Effects Menu Functions
+  const openEffectsMenu = () => setIsEffectsMenuOpen(true);
+  const closeEffectsMenu = () => setIsEffectsMenuOpen(false);
+
+  // Function to add new effects (for the menu)
+  const addEffect = (effectId) => {
+    // For now, this just closes the menu
+    // Later you can implement logic to add new effects to the UI
+    console.log("Adding effect:", effectId);
+    closeEffectsMenu();
+
+    // Example of how you might handle adding new effects:
+    // const newEffects = {
+    //   ...effects,
+    //   [effectId]: getDefaultValueForEffect(effectId)
+    // };
+    // setEffects(newEffects);
+  };
 
   // Utility function to apply effects to engine (no unlock requirement)
   const applyEffectsToEngine = (effectsToApply = effects) => {
@@ -138,6 +160,11 @@ const AppContextProvider = ({children}) => {
         engineRef,
         setEngineRef,
         applyEffectsToEngine,
+        // Effects Menu State
+        isEffectsMenuOpen,
+        openEffectsMenu,
+        closeEffectsMenu,
+        addEffect,
       }}
     >
       {children}

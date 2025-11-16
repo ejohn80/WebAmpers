@@ -460,3 +460,31 @@
   cursor: pointer;
   z-index: 4;
 }
+
+/* Add effects button */
+.addEffectsButtonContent {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+
+.addEffectsButton {
+  padding: 12px 20px;
+  margin-bottom: 16px;
+  background: #172528;
+  color: #17e1ff;
+  border: 2px solid #23393d;
+  border-radius: 6px;
+  font-weight: bold;
+  cursor: pointer;
+  width: 100%;
+  transition: all 0.2s ease;
+  font-size: 14px;
+}
+
+.addEffectsButton:hover {
+  background: #1e3135;
+  border-color: #17e1ff;
+  transform: translateY(-1px);
+}

@@ -1,6 +1,9 @@
-import React from "react";
+import React, {useContext} from "react";
 import DraggableDiv from "../Generic/DraggableDiv";
 import TrackLane from "../../components/TrackLane/TrackLane";
+import {AppContext} from "../../context/AppContext";
+import EffectsMenu from "./Effects/EffectsMenu";
+import styles from "./MainContent.module.css";
 
 /**
  * MainContent component for the application layout.
@@ -9,13 +12,14 @@ import TrackLane from "../../components/TrackLane/TrackLane";
  * @param {import('../../models/AudioTrack').AudioTrack} props.track - The currently active audio track.
  */
 function MainContent({track, onMute, onSolo}) {
+  const {isEffectsMenuOpen} = useContext(AppContext);
+
   return (
-    <DraggableDiv className="maincontent">
+    <DraggableDiv
+      className={`maincontent ${isEffectsMenuOpen ? styles.blurred : ""}`}
+    >
+      {/* Main Content */}
       {track ? (
-        // Delegate rendering to the TrackLane which is responsible for
-        // rendering track segments and waveform visualizations.
-        // Hide the title when rendered inside MainContent so naming
-        // doesn't appear in the central view.
         <TrackLane
           track={track}
           showTitle={false}
@@ -26,6 +30,13 @@ function MainContent({track, onMute, onSolo}) {
         <div style={{textAlign: "center", alignSelf: "center"}}>
           <h2>Main Content</h2>
           <p>Import an audio file to see its waveform here.</p>
+        </div>
+      )}
+
+      {/* Effects Menu */}
+      {isEffectsMenuOpen && (
+        <div className={styles.effectsMenuContainer}>
+          <EffectsMenu />
         </div>
       )}
     </DraggableDiv>
