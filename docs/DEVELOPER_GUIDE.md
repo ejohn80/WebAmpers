@@ -20,21 +20,65 @@ cd WebAmpers
 
 ```bash
 WebAmpers/
-  src/                       # React source code
-    components/             # UI components
-  public/                    # Static assets (icons, etc.)
-  backend/                   # (planned) Python for export & format conversion
-    tests/                   # Pytest tests for backend
-  docs/
-    USER_GUIDE.md            # User manual
-    DEVELOPER_GUIDE.md       # This file
+  README.md                       # Project overview + setup
+  coding-guidelines.md            # Team code standards
+  team-resources.md               # Internal references
+
+  package.json                    # Frontend dependencies + scripts
+  package-lock.json
+  vite.config.js                  # Vite config
+  vitest.config.mjs               # Vitest config
+  jest.config.js                  # (optional) Jest config
+  .gitignore
+  .eslintrc.json
+  .prettierrc.json
+  .pylintrc                       # Python backend linting
+
   .github/
-    workflows/ci.yml         # GitHub Actions pipeline
-  package.json               # Frontend deps and scripts
-  package-lock.json          # Locked versions for reproducible installs
-  eslint.config.js           # ESLint rules
-  prettier config (...whatever you’re using)
-  README.md                  # Project overview + links
+    workflows/
+      ci.yml                      # GitHub Actions CI pipeline
+
+  docs/
+    USER_GUIDE.md
+    DEVELOPER_GUIDE.md
+
+  public/                         # Static assets
+    soundwave.jpg
+
+  reports/                        # Weekly reports
+
+  src/
+    main.jsx                      
+    App.jsx                       
+    index.css                     # Global styles
+
+    assets/                       # Icons, images, UI assets
+      footer/
+
+    backend/                      # Python backend + JS API wrapper
+      app.py
+      AudioProcessor.py
+      requirements.txt
+
+    components/                   # All React components
+      AudioImport/
+      AudioExport/
+      Layout/
+      Auth/
+      Waveform/
+      TrackLane/
+      Recording/
+      Generic/
+
+    context/                      
+    firebase/                     # Firebase 
+    hooks/                        # Custom hooks
+    managers/                     # Application logic 
+    models/                       
+    pages/                        
+    playback/                     # Playback logic + UI
+    tests/                        # Vitest tests (JS) + Pytest tests
+
 
 ```
 
@@ -51,11 +95,13 @@ npm install
 # 2. Start the development server
 npm run dev
 
+# 3. Open localhost
+Navigate and open http://localhost:5173/ 
 ```
 
 ---
 
-## 4. How to test
+## 3. How to test
 
 We have default tests available to test expected functions
 
@@ -65,7 +111,7 @@ npm run test
 
 ---
 
-## 5. How to add tests
+## 4. How to add tests
 
 Name the file in this format:
 
@@ -105,4 +151,5 @@ When preparing for a release:
 2. Verify that `npm run lint` and `npm run test` pass.
 3. All code is formatted with `npm run format`.
 4. Run the production build `npm run build`
-5. Test expected functionality
+5. Navigate and open http://localhost:5173/ 
+6. Test expected functionality
