@@ -228,9 +228,10 @@ function AudioPage() {
   return (
     <div className="app-container">
       <Header
+        tracks={tracks} // Changed from audioBuffer
+        totalLengthMs={version?.lengthMs || 0} // Add this
         onImportSuccess={handleImportSuccess}
         onImportError={handleImportError}
-        audioBuffer={audioBuffer}
         onExportComplete={handleExportComplete}
       />
 
@@ -250,6 +251,7 @@ function AudioPage() {
         <MainContent
           tracks={tracks}
           recording={recording}
+          totalLengthMs={version?.lengthMs || 0}
           onMute={async (trackId, muted) => {
             try {
               engineRef.current?.setTrackMute(trackId, muted);

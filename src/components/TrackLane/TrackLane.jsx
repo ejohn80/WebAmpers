@@ -4,7 +4,7 @@ import "./TrackLane.css";
 
 /**
  * TrackLane
- * Renders a single track container with controls for mute/solo/delete
+ * Renders a single track container with proportional waveform sizing
  */
 function TrackLane({ 
   track, 
@@ -13,7 +13,8 @@ function TrackLane({
   onSolo, 
   onDelete,
   trackIndex = 0,
-  totalTracks = 1
+  totalTracks = 1,
+  totalLengthMs = 0 // Total timeline length for proportional sizing
 }) {
   if (!track) return null;
 
@@ -116,7 +117,6 @@ function TrackLane({
 
             <div className="tracklane-divider" />
 
-            {/* Delete button */}
             <button
               className="tl-btn tl-btn-delete"
               onClick={handleDelete}
@@ -129,7 +129,8 @@ function TrackLane({
       </div>
 
       <div className="tracklane-main">
-        <div className="tracklane-segments">
+        {/* Timeline ruler - shows full timeline length */}
+        <div className="tracklane-timeline">
           {segments.length === 0 && (
             <div className="tracklane-empty">
               No segments — import audio to add one.
@@ -138,27 +139,49 @@ function TrackLane({
 
           {segments.map((seg) => {
             const audioBuffer = seg.buffer ?? seg.fileBuffer ?? null;
+            
+            // Calculate positioning and sizing
+            const startOnTimelineMs = seg.startOnTimelineMs || 0;
+            const durationMs = seg.durationMs || 0;
+            
+            // Calculate percentage positions relative to total timeline
+            const leftPercent = totalLengthMs > 0 
+              ? (startOnTimelineMs / totalLengthMs) * 100 
+              : 0;
+            const widthPercent = totalLengthMs > 0 
+              ? (durationMs / totalLengthMs) * 100 
+              : 100;
 
             return (
               <div
-                className="tracklane-segment"
+                className="tracklane-segment-positioned"
                 key={seg.id || seg.fileUrl || Math.random()}
+                style={{
+                  position: 'absolute',
+                  left: `${leftPercent}%`,
+                  width: `${widthPercent}%`,
+                  height: '100%'
+                }}
               >
-                <div className="segment-meta">
-                  <div className="segment-name">
-                    {seg.id ?? seg.fileUrl ?? "segment"}
+                <div className="tracklane-segment">
+                  <div className="segment-meta">
+                    <div className="segment-name">
+                      {seg.id ?? seg.fileUrl ?? "segment"}
+                    </div>
+                    <div className="segment-duration">
+                      {seg.durationMs ? `${Math.round(seg.durationMs)} ms` : ""}
+                    </div>
                   </div>
 
-                </div>
-
-                <div className="segment-waveform">
-                  {audioBuffer ? (
-                    <Waveform audioBuffer={audioBuffer} color={track?.color} />
-                  ) : (
-                    <div className="waveform-placeholder">
-                      (No buffer available for this segment)
-                    </div>
-                  )}
+                  <div className="segment-waveform">
+                    {audioBuffer ? (
+                      <Waveform audioBuffer={audioBuffer} color={track?.color} />
+                    ) : (
+                      <div className="waveform-placeholder">
+                        (No buffer available for this segment)
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             );

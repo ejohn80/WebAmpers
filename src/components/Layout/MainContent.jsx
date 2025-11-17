@@ -5,14 +5,9 @@ import "./MainContent.css";
 
 /**
  * MainContent component for the application layout.
- * Displays all audio tracks or a placeholder message.
- * @param {object} props
- * @param {Array} props.tracks - Array of all audio tracks
- * @param {Function} props.onMute - Callback for mute toggle
- * @param {Function} props.onSolo - Callback for solo toggle
- * @param {Function} props.onDelete - Callback for track deletion
+ * Displays all audio tracks with proportional waveform sizing.
  */
-function MainContent({ tracks = [], onMute, onSolo, onDelete }) {
+function MainContent({ tracks = [], onMute, onSolo, onDelete, totalLengthMs = 0 }) {
   return (
     <DraggableDiv className="maincontent">
       {tracks && tracks.length > 0 ? (
@@ -23,6 +18,7 @@ function MainContent({ tracks = [], onMute, onSolo, onDelete }) {
                 track={track}
                 trackIndex={index}
                 totalTracks={tracks.length}
+                totalLengthMs={totalLengthMs}
                 showTitle={true}
                 onMute={onMute}
                 onSolo={onSolo}

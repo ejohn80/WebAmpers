@@ -6,7 +6,8 @@ import "./Header.css";
 function Header({
   onImportSuccess,
   onImportError,
-  audioBuffer,
+  tracks,
+  totalLengthMs,
   onExportComplete,
 }) {
   const navigate = useNavigate();
@@ -20,7 +21,8 @@ function Header({
           <span className="webampText">Webamp</span>
           <DropdownPortal
             side="left"
-            audioBuffer={audioBuffer}
+            tracks={tracks}
+            totalLengthMs={totalLengthMs}
             onExportComplete={onExportComplete}
             onImportSuccess={onImportSuccess}
             onImportError={onImportError}

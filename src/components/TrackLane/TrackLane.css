@@ -22,6 +22,7 @@
 
 .tracklane-main {
   flex: 1 1 auto;
+  min-height: 80px;
 }
 
 .tracklane-header {
@@ -114,6 +115,22 @@
   margin: 4px 0;
 }
 
+/* Timeline container for positioned segments */
+.tracklane-timeline {
+  position: relative;
+  width: 100%;
+  min-height: 80px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+}
+
+.tracklane-segment-positioned {
+  /* Positioned absolutely within timeline */
+  position: absolute;
+  top: 0;
+  bottom: 0;
+}
+
 .tracklane-segments {
   display: flex;
   flex-direction: column;
@@ -125,6 +142,9 @@
   border: 1px solid rgba(255, 255, 255, 0.03);
   padding: 8px;
   border-radius: 6px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .segment-meta {
@@ -133,21 +153,27 @@
   align-items: center;
   width: 100%;
   margin-bottom: 8px;
+  flex-shrink: 0;
 }
 
 .segment-name {
   font-size: 11px;
   color: #9a9a9a;
   font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .segment-duration {
   font-size: 11px;
   color: #a9a9a9;
+  white-space: nowrap;
 }
 
 .segment-waveform {
-  height: 64px;
+  flex: 1;
+  min-height: 50px;
   width: 100%;
 }
 
@@ -165,4 +191,8 @@
   padding: 12px;
   text-align: center;
   font-size: 13px;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
 }
