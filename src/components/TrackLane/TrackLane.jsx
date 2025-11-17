@@ -1,61 +1,49 @@
-import React, {useState, useEffect} from "react";
+import React, { useState, useEffect } from "react";
 import Waveform from "../Waveform/Waveform";
 import "./TrackLane.css";
 
 /**
  * TrackLane
- * Renders a single track container and its segments. The visual waveform
- * drawing is delegated to the existing `Waveform` component.
- *
- * props:
- *  - track: AudioTrack object (expected to have `name` and `segments` array)
- *  - showTitle: boolean to control whether to display the track name
- *  - onMute: callback function for mute toggle events
- *  - onSolo: callback function for solo toggle events
+ * Renders a single track container with controls for mute/solo/delete
  */
-function TrackLane({track, showTitle = true, onMute, onSolo}) {
+function TrackLane({ 
+  track, 
+  showTitle = true, 
+  onMute, 
+  onSolo, 
+  onDelete,
+  trackIndex = 0,
+  totalTracks = 1
+}) {
   if (!track) return null;
 
   const segments = Array.isArray(track.segments) ? track.segments : [];
 
-  /**
-   * Get initial state from localStorage with fallback to track props
-   * This ensures mute/solo state persists across page refreshes
-   */
   const getInitialState = () => {
     try {
       const saved = localStorage.getItem(`webamp.track.${track.id}`);
       return saved
         ? JSON.parse(saved)
-        : {muted: !!track.mute, soloed: !!track.solo};
+        : { muted: !!track.mute, soloed: !!track.solo };
     } catch (e) {
-      return {muted: !!track.mute, soloed: !!track.solo};
+      return { muted: !!track.mute, soloed: !!track.solo };
     }
   };
 
-  // Local UI state: keep mute/solo so the buttons reflect user actions
   const [muted, setMuted] = useState(getInitialState().muted);
   const [soloed, setSoloed] = useState(getInitialState().soloed);
 
-  /**
-   * Persist state to localStorage whenever mute/solo state changes
-   * This ensures the state survives page refreshes
-   */
   useEffect(() => {
     try {
       localStorage.setItem(
         `webamp.track.${track.id}`,
-        JSON.stringify({muted, soloed})
+        JSON.stringify({ muted, soloed })
       );
     } catch (e) {
       console.warn("Failed to persist track state:", e);
     }
   }, [muted, soloed, track.id]);
 
-  /**
-   * Sync UI state with track props when they change externally
-   * This handles cases where mute/solo is changed from other components
-   */
   useEffect(() => {
     setMuted(!!track.mute);
   }, [track.mute, track.id]);
@@ -64,9 +52,6 @@ function TrackLane({track, showTitle = true, onMute, onSolo}) {
     setSoloed(!!track.solo);
   }, [track.solo, track.id]);
 
-  /**
-   * Handle mute toggle - updates both UI state and persists to storage
-   */
   const toggleMute = () => {
     const next = !muted;
     setMuted(next);
@@ -77,9 +62,6 @@ function TrackLane({track, showTitle = true, onMute, onSolo}) {
     }
   };
 
-  /**
-   * Handle solo toggle - updates both UI state and persists to storage
-   */
   const toggleSolo = () => {
     const next = !soloed;
     setSoloed(next);
@@ -90,12 +72,25 @@ function TrackLane({track, showTitle = true, onMute, onSolo}) {
     }
   };
 
+  const handleDelete = () => {
+    try {
+      onDelete && onDelete(track.id);
+    } catch (e) {
+      console.warn("Delete failed:", e);
+    }
+  };
+
   return (
     <div className="tracklane-root">
       <div className="tracklane-side">
         {showTitle && (
-          <div className="tracklane-title">
-            {track.name ?? "Untitled Track"}
+          <div className="tracklane-header">
+            <div className="tracklane-title">
+              {track.name ?? "Untitled Track"}
+            </div>
+            <div className="tracklane-track-number">
+              Track {trackIndex + 1} of {totalTracks}
+            </div>
           </div>
         )}
 
@@ -118,6 +113,17 @@ function TrackLane({track, showTitle = true, onMute, onSolo}) {
             >
               {soloed ? "Soloed" : "Solo"}
             </button>
+
+            <div className="tracklane-divider" />
+
+            {/* Delete button */}
+            <button
+              className="tl-btn tl-btn-delete"
+              onClick={handleDelete}
+              title="Delete track"
+            >
+              Delete
+            </button>
           </div>
         </div>
       </div>
@@ -131,10 +137,6 @@ function TrackLane({track, showTitle = true, onMute, onSolo}) {
           )}
 
           {segments.map((seg) => {
-            // Prefer an explicit buffer on the segment. If not present, try
-            // any buffer reference available on the segment object (many
-            // importers attach different shapes). Waveform component is
-            // tolerant of Tone/ToneAudioBuffer and native AudioBuffer.
             const audioBuffer = seg.buffer ?? seg.fileBuffer ?? null;
 
             return (
@@ -146,9 +148,7 @@ function TrackLane({track, showTitle = true, onMute, onSolo}) {
                   <div className="segment-name">
                     {seg.id ?? seg.fileUrl ?? "segment"}
                   </div>
-                  <div className="segment-duration">
-                    {seg.durationMs ? `${Math.round(seg.durationMs)} ms` : ""}
-                  </div>
+
                 </div>
 
                 <div className="segment-waveform">

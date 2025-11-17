@@ -1,0 +1,45 @@
+/* MainContent.css - Styles for multi-track display */
+
+.maincontent {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 16px;
+}
+
+.tracks-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+
+.track-wrapper {
+  width: 100%;
+  /* Add a subtle separator between tracks */
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  padding-bottom: 16px;
+}
+
+.track-wrapper:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+/* Ensure smooth scrolling */
+.maincontent::-webkit-scrollbar {
+  width: 8px;
+}
+
+.maincontent::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.maincontent::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+}
+
+.maincontent::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}

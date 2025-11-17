@@ -1,167 +1,149 @@
-import {AudioTrack} from "../models/AudioTrack";
-import {AudioSegment} from "../models/AudioSegment";
-import * as Tone from "tone";
+import { AudioTrack } from "../models/AudioTrack";
+import { AudioSegment } from "../models/AudioSegment";
 
 /**
- * @class AudioManager
- * @classdesc Manages all audio tracks and their state for the application.
- * This class is a singleton, and you should only use the exported `audioManager` instance.
+ * AudioManager - Manages multiple audio tracks
  */
 class AudioManager {
-  /**
-   * A list of all audio tracks in the project.
-   * @type {Array<AudioTrack>}
-   */
-  tracks = [];
-
   constructor() {
-    if (AudioManager._instance) {
-      return AudioManager._instance;
-    }
-    AudioManager._instance = this;
+    this.tracks = [];
   }
 
   /**
-   * Creates a new AudioTrack and an AudioSegment from an imported audio buffer.
-   * @param {object} audioData - The data from the audio import.
-   * @param {Tone.ToneAudioBuffer} audioData.buffer - The audio buffer of the imported file.
-   * @param {File} audioData.file - The original file object.
-   * @returns {AudioTrack} The newly created audio track.
+   * Creates a new track from imported audio data or recording
+   * @param {Object} audioData - Contains buffer, metadata, name, etc.
+   * @returns {AudioTrack} The newly created track
    */
-  addTrackFromBuffer(data) {
-    // Accept either the importer shape ({ buffer, originalFile }) or a
-    // saved track object from the DB which may include primitive mixer
-    // fields and optionally `segments`.
+  addTrackFromBuffer(audioData) {
+    if (!audioData || !audioData.buffer) {
+      console.error("Invalid audio data provided to addTrackFromBuffer");
+      return null;
+    }
 
-    const buffer = data?.buffer;
-    const file = data?.originalFile || data?.file || null;
+    // Generate a unique color for this track
+    const colors = [
+      "#FF6B6B", "#4ECDC4", "#45B7D1", "#FFA07A", 
+      "#98D8C8", "#F7DC6F", "#BB8FCE", "#85C1E2"
+    ];
+    const color = colors[this.tracks.length % colors.length];
 
-    // Prefer explicit name, else derive from filename or default
-    const name =
-      data?.name || (file ? file.name.replace(/\.[^/.]+$/, "") : "Imported");
-    const color = data?.color || this.getNewTrackColor();
-
-    const volume =
-      typeof data?.volume === "number"
-        ? data.volume
-        : typeof data?._volumeDb === "number"
-          ? data._volumeDb
-          : 0;
-    const pan =
-      typeof data?.pan === "number"
-        ? data.pan
-        : typeof data?._pan === "number"
-          ? data._pan
-          : 0;
-    const mute = typeof data?.mute !== "undefined" ? data.mute : !!data?._mute;
-    const solo = typeof data?.solo !== "undefined" ? data.solo : !!data?._solo;
-
-    // 1. Create a new AudioTrack with primitive fields so state is persisted.
-    const newTrack = new AudioTrack({
-      id: data?.id,
-      name,
-      color,
-      volume,
-      pan,
-      mute,
-      solo,
+    // Create a new AudioSegment from the buffer
+    const segment = new AudioSegment({
+      buffer: audioData.buffer,
+      offset: 0,
+      duration: audioData.buffer.duration,
     });
 
-    // 2. Restore segments if supplied, otherwise create a single segment
-    // using the provided buffer (if any).
-    if (Array.isArray(data?.segments) && data.segments.length > 0) {
-      data.segments.forEach((s) => {
-        try {
-          // If the saved segment contains a Tone.ToneAudioBuffer in s.buffer,
-          // use it. Otherwise, if the segment stores raw channel data (from DB),
-          // reconstruct a Tone.ToneAudioBuffer. If neither, fall back to the
-          // track-level buffer passed in.
-          let segBuffer = null;
+    // Calculate duration in milliseconds
+    const durationMs = Math.round(audioData.buffer.duration * 1000);
 
-          if (s.buffer instanceof AudioSegment) {
-            // unlikely: defensive
-            segBuffer = s.buffer;
-          } else if (s.buffer && typeof s.buffer.get === "function") {
-            // already a Tone.ToneAudioBuffer
-            segBuffer = s.buffer;
-          } else if (s.buffer && s.buffer.channels) {
-            // stored raw channel data from DB: reconstruct native AudioBuffer
-            try {
-              const bd = s.buffer;
-              const audioBuffer = Tone.context.createBuffer(
-                bd.numberOfChannels,
-                bd.length,
-                bd.sampleRate
-              );
-              for (let i = 0; i < bd.numberOfChannels; i++) {
-                audioBuffer.copyToChannel(bd.channels[i], i);
-              }
-              segBuffer = new Tone.ToneAudioBuffer(audioBuffer);
-            } catch (e) {
-              console.warn("Failed to reconstruct segment AudioBuffer:", e);
-              segBuffer = null;
-            }
-          }
+    // Prepare segment data for storage
+    segment.durationMs = durationMs;
+    segment.startOnTimelineMs = 0;
+    segment.startInFileMs = 0;
 
-          if (!segBuffer && buffer) segBuffer = buffer;
+    // Create the new track
+    const track = new AudioTrack({
+      // 🚨 FIX: Pass the existing ID if it's available
+      id: audioData.id, 
+      name: audioData.name || audioData.metadata?.name || `Track ${this.tracks.length + 1}`,
+      color: color,
+      segments: [segment],
+      // 🚨 FIX: Pass saved mixer properties if they are available
+      volume: audioData.volume ?? 0,
+      pan: audioData.pan ?? 0,
+      mute: audioData.mute ?? false,
+      solo: audioData.solo ?? false,
+    });
 
-          if (segBuffer) {
-            const offset =
-              typeof s.offset === "number"
-                ? s.offset
-                : typeof s.startInFileMs === "number"
-                  ? s.startInFileMs / 1000
-                  : 0;
-            const duration =
-              typeof s.duration === "number"
-                ? s.duration
-                : typeof s.durationMs === "number"
-                  ? s.durationMs / 1000
-                  : undefined;
+    // Add buffer reference at track level for compatibility
+    track.buffer = audioData.buffer;
 
-            const seg = new AudioSegment({
-              id: s.id,
-              buffer: segBuffer,
-              offset,
-              duration,
-              effects: s.effects || [],
-            });
-            newTrack.segments.push(seg);
-          }
-        } catch (e) {
-          // Skip malformed segments but continue restoring others.
-          console.warn("Failed to restore segment for track", newTrack.id, e);
-        }
-      });
-    } else if (buffer) {
-      // Create a single segment that covers the entire buffer
-      try {
-        const seg = new AudioSegment({buffer});
-        newTrack.segments.push(seg);
-      } catch (e) {
-        console.warn("Failed to create segment from buffer:", e);
-      }
-    }
+    // Add to tracks array
+    this.tracks.push(track);
 
-    // 3. Add the new track to the manager's list.
-    this.tracks.push(newTrack);
-
-    console.log("New track added:", newTrack);
-    return newTrack;
+    console.log(`Created new track: ${track.name} (ID: ${track.id})`);
+    return track;
   }
 
-  getNewTrackColor() {
-    // Simple color rotation for new tracks
-    const colors = [
-      "#FF5733",
-      "#33FF57",
-      "#3357FF",
-      "#FF33A1",
-      "#A133FF",
-      "#33FFA1",
-    ];
-    return colors[this.tracks.length % colors.length];
+  /**
+   * Delete a track by ID
+   * @param {string} trackId - The ID of the track to delete
+   * @returns {boolean} True if deleted, false if not found
+   */
+  deleteTrack(trackId) {
+    const index = this.tracks.findIndex(t => t.id === trackId);
+    if (index === -1) {
+      console.warn(`Track ${trackId} not found`);
+      return false;
+    }
+
+    const track = this.tracks[index];
+    
+    // Dispose of Tone.js resources
+    try {
+      track.dispose();
+    } catch (e) {
+      console.warn("Error disposing track:", e);
+    }
+
+    // Remove from array
+    this.tracks.splice(index, 1);
+    
+    console.log(`Deleted track: ${track.name} (ID: ${trackId})`);
+    return true;
+  }
+
+  /**
+   * Reorder tracks by moving a track from one index to another
+   * @param {number} fromIndex - Current index of the track
+   * @param {number} toIndex - Target index for the track
+   */
+  reorderTracks(fromIndex, toIndex) {
+    if (fromIndex < 0 || fromIndex >= this.tracks.length ||
+        toIndex < 0 || toIndex >= this.tracks.length) {
+      console.warn("Invalid indices for reordering");
+      return;
+    }
+
+    const [movedTrack] = this.tracks.splice(fromIndex, 1);
+    this.tracks.splice(toIndex, 0, movedTrack);
+    
+    console.log(`Moved track ${movedTrack.name} from index ${fromIndex} to ${toIndex}`);
+  }
+
+  /**
+   * Get a track by ID
+   * @param {string} trackId - The ID of the track
+   * @returns {AudioTrack|null}
+   */
+  getTrack(trackId) {
+    return this.tracks.find(t => t.id === trackId) || null;
+  }
+
+  /**
+   * Clear all tracks
+   */
+  clearAllTracks() {
+    this.tracks.forEach(track => {
+      try {
+        track.dispose();
+      } catch (e) {
+        console.warn("Error disposing track:", e);
+      }
+    });
+    this.tracks = [];
+    console.log("Cleared all tracks");
+  }
+
+  /**
+   * Get track count
+   * @returns {number}
+   */
+  getTrackCount() {
+    return this.tracks.length;
   }
 }
 
+// Export singleton instance
 export const audioManager = new AudioManager();

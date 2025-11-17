@@ -1,10 +1,9 @@
 .tracklane-side {
-  width: 100px; /* reduced width so box sits further left */
-  min-width: 80px;
+  width: 120px;
+  min-width: 100px;
   display: flex;
   flex-direction: column;
   gap: 6px;
-  /* Allow the side column to stretch to match the height of the main area */
   align-self: stretch;
   padding-right: 6px;
 }
@@ -15,22 +14,33 @@
   gap: 12px;
   width: 100%;
   align-items: stretch;
+  background: #2f2f2f;
+  color: #eaeaea;
+  padding: 8px;
+  border-radius: 6px;
 }
 
 .tracklane-main {
   flex: 1 1 auto;
 }
 
-.tracklane-root {
-  background: #2f2f2f; /* lighter grey */
-  color: #eaeaea;
-  padding: 8px;
-  border-radius: 6px;
+.tracklane-header {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 4px;
 }
 
 .tracklane-title {
   font-weight: 600;
   color: #eee;
+  font-size: 14px;
+}
+
+.tracklane-track-number {
+  font-size: 10px;
+  color: #999;
+  font-weight: 400;
 }
 
 .tracklane-controls-box {
@@ -41,24 +51,16 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  /* Fill remaining vertical space so height matches the waveform area */
   flex: 1 1 auto;
 }
 
-/* Ensure the controls area centers its buttons vertically */
 .tracklane-controls-box .tracklane-controls {
   width: 100%;
   display: flex;
-  flex-direction: column; /* stack buttons vertically */
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
   justify-content: center;
-  gap: 8px;
-}
-
-.tracklane-controls-box .tl-btn {
-  width: 100%;
-  padding: 6px 6px;
-  font-size: 12px;
+  gap: 6px;
 }
 
 .tracklane-controls {
@@ -71,16 +73,45 @@
   background: rgba(255, 255, 255, 0.03);
   color: #ddd;
   border: 1px solid rgba(255, 255, 255, 0.06);
-  padding: 4px 8px;
+  padding: 6px 8px;
   border-radius: 4px;
-  font-size: 12px;
+  font-size: 11px;
   cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.tl-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.tl-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
 }
 
 .tl-btn--active {
   background: rgba(255, 255, 255, 0.12);
   color: #fff;
   border-color: rgba(255, 255, 255, 0.12);
+}
+
+.tl-btn-delete {
+  background: rgba(220, 53, 69, 0.15);
+  color: #ff6b6b;
+  border-color: rgba(220, 53, 69, 0.3);
+}
+
+.tl-btn-delete:hover {
+  background: rgba(220, 53, 69, 0.25);
+  border-color: rgba(220, 53, 69, 0.5);
+}
+
+.tracklane-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.05);
+  margin: 4px 0;
 }
 
 .tracklane-segments {
@@ -101,10 +132,11 @@
   justify-content: space-between;
   align-items: center;
   width: 100%;
+  margin-bottom: 8px;
 }
 
 .segment-name {
-  font-size: 11px; /* smaller name text */
+  font-size: 11px;
   color: #9a9a9a;
   font-weight: 500;
 }
@@ -115,7 +147,7 @@
 }
 
 .segment-waveform {
-  height: 64px; /* default waveform height */
+  height: 64px;
   width: 100%;
 }
 
@@ -132,4 +164,5 @@
   color: #9b9b9b;
   padding: 12px;
   text-align: center;
+  font-size: 13px;
 }

@@ -185,140 +185,124 @@ class DBManager {
     });
   }
 
+  /**
+   * Delete a track from IndexedDB
+   */
   async deleteTrack(trackId) {
     const db = await this.openDB();
+    
     return new Promise((resolve, reject) => {
       const transaction = db.transaction([TRACKS_STORE_NAME], "readwrite");
       const store = transaction.objectStore(TRACKS_STORE_NAME);
-      const request = store.delete(trackId);
+      
+      const deleteRequest = store.delete(trackId);
 
-      request.onsuccess = () => {
-        resolve();
+      deleteRequest.onsuccess = () => {
+        console.log(`Track ${trackId} deleted from IndexedDB`);
+        resolve(true);
       };
 
-      request.onerror = (event) => {
-        console.error("Error deleting track:", event.target.error);
-        reject(new Error("Could not delete track from the database."));
+      deleteRequest.onerror = () => {
+        console.error(`Failed to delete track ${trackId}`);
+        reject(new Error("Failed to delete track"));
+      };
+
+      transaction.oncomplete = () => resolve(true);
+      transaction.onerror = () => {
+        reject(new Error("Transaction failed"));
       };
     });
   }
 
-  async clearAllTracks() {
-    const db = await this.openDB();
+
+  /**
+   * Update an existing track in IndexedDB
+   * @param {AudioTrack} track - The track to update
+   * @returns {Promise<void>}
+   */
+  async updateTrack(track) {
+    const db = await this.openDB(); // <-- Consistent DB opening
+
     return new Promise((resolve, reject) => {
+      // Use the stored constants
       const transaction = db.transaction([TRACKS_STORE_NAME], "readwrite");
       const store = transaction.objectStore(TRACKS_STORE_NAME);
-      const request = store.clear();
+        
+      // Serialize the track before storing
+      const trackData = this.serializeTrack(track);
+        
+      const updateRequest = store.put(trackData);
 
-      request.onsuccess = () => resolve();
-      request.onerror = (event) => {
-        reject(new Error("Could not clear tracks from the database."));
+      updateRequest.onsuccess = () => {
+        console.log(`Track ${track.id} updated in IndexedDB`);
+        // We let the transaction.oncomplete handle the resolve
+      };
+
+      updateRequest.onerror = (event) => {
+        console.error(`Failed to update track ${track.id}:`, event.target.error);
+        reject(new Error("Failed to update track"));
+      };
+
+      // Handle the transaction completion/error without closing the persistent DB
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = (event) => {
+        console.error("Transaction failed during update:", event.target.error);
+        reject(new Error("Transaction failed"));
       };
     });
   }
 
   /**
-   * Update an existing track record in the database. If the track does not
-   * have an `id` it will be added as a new record.
-   * @param {object} trackData
+   * Helper to serialize a track for storage
+   * @param {AudioTrack} track
+   * @returns {Object} Serializable track data
    */
-  async updateTrack(trackData) {
-    const db = await this.openDB();
-    return new Promise((resolve, reject) => {
-      const transaction = db.transaction([TRACKS_STORE_NAME], "readwrite");
-      const store = transaction.objectStore(TRACKS_STORE_NAME);
+  serializeTrack(track) {
+    const serialized = {
+      id: track.id,
+      name: track.name,
+      color: track.color,
+      volume: track.volume,
+      pan: track.pan,
+      mute: track.mute,
+      solo: track.solo,
+      order: track.order ?? 0,
+      segments: [],
+    };
 
-      // Normalize object using toJSON() if available, and convert buffers
-      // similarly to addTrack so the stored shape is consistent.
-      const base =
-        typeof trackData?.toJSON === "function"
-          ? trackData.toJSON()
-          : {...trackData};
-
-      const storable = {
-        ...base,
-        id: base.id ?? trackData.id,
-        volume: base.volume ?? trackData.volume ?? base._volumeDb ?? undefined,
-        pan: base.pan ?? trackData.pan ?? base._pan ?? undefined,
-        mute:
-          typeof base.mute !== "undefined"
-            ? base.mute
-            : typeof trackData.mute !== "undefined"
-              ? trackData.mute
-              : base._mute,
-        solo:
-          typeof base.solo !== "undefined"
-            ? base.solo
-            : typeof trackData.solo !== "undefined"
-              ? trackData.solo
-              : base._solo,
+    // Serialize segments with buffer data
+    (track.segments || []).forEach((seg) => {
+      const segData = {
+        id: seg.id,
+        offset: seg.offset,
+        duration: seg.duration,
+        durationMs: seg.durationMs,
+        startOnTimelineMs: seg.startOnTimelineMs,
+        startInFileMs: seg.startInFileMs,
       };
 
-      // Serialize segments similarly to addTrack
-      const segments = Array.isArray(base.segments)
-        ? base.segments
-        : Array.isArray(trackData.segments)
-          ? trackData.segments
-          : [];
-      if (segments.length > 0) {
-        storable.segments = segments.map((s) => {
-          const seg = {...s};
-          let audioBuffer = null;
-          try {
-            const candidate =
-              s.buffer ||
-              (trackData.segments &&
-                trackData.segments.find((ss) => ss.id === s.id)?.buffer);
-            if (candidate) {
-              if (typeof candidate.get === "function")
-                audioBuffer = candidate.get();
-              else if (candidate instanceof AudioBuffer)
-                audioBuffer = candidate;
-              else if (
-                candidate._buffer &&
-                candidate._buffer instanceof AudioBuffer
-              )
-                audioBuffer = candidate._buffer;
-            }
-          } catch (e) {
-            console.warn(
-              "Failed to extract segment AudioBuffer for updateTrack:",
-              e
-            );
+      // Serialize the audio buffer
+      if (seg.buffer) {
+        const buffer = seg.buffer.get ? seg.buffer.get() : seg.buffer;
+        if (buffer) {
+          const channels = [];
+          for (let i = 0; i < buffer.numberOfChannels; i++) {
+            channels.push(buffer.getChannelData(i));
           }
 
-          if (audioBuffer) {
-            const channels = [];
-            for (let i = 0; i < audioBuffer.numberOfChannels; i++)
-              channels.push(audioBuffer.getChannelData(i));
-            seg.buffer = {
-              channels,
-              sampleRate: audioBuffer.sampleRate,
-              length: audioBuffer.length,
-              duration: audioBuffer.duration,
-              numberOfChannels: audioBuffer.numberOfChannels,
-            };
-          } else {
-            if (
-              seg.buffer &&
-              typeof seg.buffer === "object" &&
-              !seg.buffer.channels
-            )
-              delete seg.buffer;
-          }
-
-          return seg;
-        });
+          segData.buffer = {
+            numberOfChannels: buffer.numberOfChannels,
+            length: buffer.length,
+            sampleRate: buffer.sampleRate,
+            channels: channels,
+          };
+        }
       }
 
-      const request = store.put(storable);
-
-      request.onsuccess = (event) => resolve(event.target.result);
-      request.onerror = (event) => {
-        console.error("Error updating track:", event.target.error);
-        reject(new Error("Could not update track in the database."));
-      };
+      serialized.segments.push(segData);
     });
+
+    return serialized;
   }
 }
 

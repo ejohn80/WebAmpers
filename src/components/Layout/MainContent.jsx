@@ -1,31 +1,40 @@
 import React from "react";
 import DraggableDiv from "../Generic/DraggableDiv";
 import TrackLane from "../../components/TrackLane/TrackLane";
+import "./MainContent.css";
 
 /**
  * MainContent component for the application layout.
- * Displays the audio waveform or a placeholder message.
+ * Displays all audio tracks or a placeholder message.
  * @param {object} props
- * @param {import('../../models/AudioTrack').AudioTrack} props.track - The currently active audio track.
+ * @param {Array} props.tracks - Array of all audio tracks
+ * @param {Function} props.onMute - Callback for mute toggle
+ * @param {Function} props.onSolo - Callback for solo toggle
+ * @param {Function} props.onDelete - Callback for track deletion
  */
-function MainContent({track, onMute, onSolo}) {
+function MainContent({ tracks = [], onMute, onSolo, onDelete }) {
   return (
     <DraggableDiv className="maincontent">
-      {track ? (
-        // Delegate rendering to the TrackLane which is responsible for
-        // rendering track segments and waveform visualizations.
-        // Hide the title when rendered inside MainContent so naming
-        // doesn't appear in the central view.
-        <TrackLane
-          track={track}
-          showTitle={false}
-          onMute={onMute}
-          onSolo={onSolo}
-        />
+      {tracks && tracks.length > 0 ? (
+        <div className="tracks-container">
+          {tracks.map((track, index) => (
+            <div key={track.id} className="track-wrapper">
+              <TrackLane
+                track={track}
+                trackIndex={index}
+                totalTracks={tracks.length}
+                showTitle={true}
+                onMute={onMute}
+                onSolo={onSolo}
+                onDelete={onDelete}
+              />
+            </div>
+          ))}
+        </div>
       ) : (
-        <div style={{textAlign: "center", alignSelf: "center"}}>
-          <h2>Main Content</h2>
-          <p>Import an audio file to see its waveform here.</p>
+        <div className="empty-state">
+          <h2>No Tracks Yet</h2>
+          <p>Import an audio file or start recording to add tracks.</p>
         </div>
       )}
     </DraggableDiv>
