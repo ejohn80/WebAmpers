@@ -20,6 +20,12 @@ class AudioManager {
       return null;
     }
 
+    // Check if this track already exists by ID to prevent duplicates
+    if (audioData.id && this.tracks.some(t => t.id === audioData.id)) {
+      console.warn(`Track with ID ${audioData.id} already exists, skipping duplicate`);
+      return this.tracks.find(t => t.id === audioData.id);
+    }
+
     // Generate a unique color for this track
     const colors = [
       "#FF6B6B", "#4ECDC4", "#45B7D1", "#FFA07A", 
@@ -44,12 +50,10 @@ class AudioManager {
 
     // Create the new track
     const track = new AudioTrack({
-      // 🚨 FIX: Pass the existing ID if it's available
-      id: audioData.id, 
+      id: audioData.id, // Preserve existing ID
       name: audioData.name || audioData.metadata?.name || `Track ${this.tracks.length + 1}`,
-      color: color,
+      color: audioData.color || color,
       segments: [segment],
-      // 🚨 FIX: Pass saved mixer properties if they are available
       volume: audioData.volume ?? 0,
       pan: audioData.pan ?? 0,
       mute: audioData.mute ?? false,
@@ -92,24 +96,6 @@ class AudioManager {
     
     console.log(`Deleted track: ${track.name} (ID: ${trackId})`);
     return true;
-  }
-
-  /**
-   * Reorder tracks by moving a track from one index to another
-   * @param {number} fromIndex - Current index of the track
-   * @param {number} toIndex - Target index for the track
-   */
-  reorderTracks(fromIndex, toIndex) {
-    if (fromIndex < 0 || fromIndex >= this.tracks.length ||
-        toIndex < 0 || toIndex >= this.tracks.length) {
-      console.warn("Invalid indices for reordering");
-      return;
-    }
-
-    const [movedTrack] = this.tracks.splice(fromIndex, 1);
-    this.tracks.splice(toIndex, 0, movedTrack);
-    
-    console.log(`Moved track ${movedTrack.name} from index ${fromIndex} to ${toIndex}`);
   }
 
   /**

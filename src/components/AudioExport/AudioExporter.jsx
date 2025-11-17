@@ -1,7 +1,9 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useContext } from "react";
 import ExportManager from "./ExportManager.js";
+import { AppContext } from "../../context/AppContext";
 
 const AudioExporter = ({ tracks, totalLengthMs, onExportComplete }) => {
+  const { effects } = useContext(AppContext);
   const exportManager = useMemo(() => new ExportManager(), []);
   const [format, setFormat] = useState("mp3");
   const [qualitySetting, setQualitySetting] = useState("320k");
@@ -64,11 +66,16 @@ const AudioExporter = ({ tracks, totalLengthMs, onExportComplete }) => {
       format === "mp3" || format === "ogg" ? qualitySetting : undefined;
 
     try {
-      const result = await exportManager.exportAudio(tracks, totalLengthMs, {
-        format,
-        filename,
-        bitrate: exportBitrate,
-      });
+      const result = await exportManager.exportAudio(
+        tracks, 
+        totalLengthMs, 
+        effects,
+        {
+          format,
+          filename,
+          bitrate: exportBitrate,
+        }
+      );
 
       if (result.success) {
         console.log(`Exported successfully: ${result.format}`);

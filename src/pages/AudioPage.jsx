@@ -21,10 +21,67 @@ function AudioPage() {
   const [audioData, setAudioData] = useState(null);
   const [recording, setRecording] = useState({ stream: null, startTs: 0 });
   
-  // Track if we've already loaded from DB to prevent duplication
   const hasLoadedFromDB = useRef(false);
-
   const engineRef = React.useRef(null);
+
+  // Helper function to build version from tracks
+  const buildVersionFromTracks = (tracksArray) => {
+    if (!tracksArray || tracksArray.length === 0) return null;
+    
+    const vs = {
+      bpm: 120,
+      timeSig: [4, 4],
+      lengthMs: 60000,
+      tracks: [],
+      segments: [],
+      loop: { enabled: false },
+      masterChain: [],
+    };
+
+    let maxEndMs = 0;
+
+    tracksArray.forEach((track) => {
+      vs.tracks.push({
+        id: track.id,
+        name: track.name ?? "Untitled",
+        gainDb: typeof track.volume === "number" ? track.volume : 0,
+        pan: typeof track.pan === "number" ? track.pan : 0,
+        mute: !!track.mute,
+        solo: !!track.solo,
+        color: track.color || "#888",
+      });
+
+      (track.segments || []).forEach((s) => {
+        const fileUrl = s.buffer ?? s.fileUrl ?? null;
+        const startOnTimelineMs =
+          s.startOnTimelineMs ??
+          (s.startOnTimeline ? Math.round(s.startOnTimeline * 1000) : 0);
+        const startInFileMs = s.offset
+          ? Math.round(s.offset * 1000)
+          : (s.startInFileMs ?? 0);
+        const durationMs = s.duration
+          ? Math.round(s.duration * 1000)
+          : (s.durationMs ?? 0);
+
+        vs.segments.push({
+          id: s.id ?? `seg_${Math.random().toString(36).slice(2, 8)}`,
+          trackId: track.id,
+          fileUrl,
+          startOnTimelineMs,
+          startInFileMs,
+          durationMs,
+          gainDb: s.gainDb ?? 0,
+          fades: s.fades ?? { inMs: 5, outMs: 5 },
+        });
+
+        const endMs = startOnTimelineMs + (durationMs || 0);
+        if (endMs > maxEndMs) maxEndMs = endMs;
+      });
+    });
+
+    vs.lengthMs = maxEndMs || 60000;
+    return vs;
+  };
 
   // Load tracks from IndexedDB on mount - ONLY ONCE
   useEffect(() => {
@@ -36,10 +93,19 @@ function AudioPage() {
         if (savedTracks && savedTracks.length > 0) {
           console.log("Loading tracks from IndexedDB:", savedTracks);
           
-          // Clear existing tracks to prevent duplication
           audioManager.clearAllTracks();
           
+          // Track which IDs we've processed to prevent duplicates
+          const processedIds = new Set();
+          
           for (const savedTrack of savedTracks) {
+            // Skip duplicates
+            if (processedIds.has(savedTrack.id)) {
+              console.warn(`Skipping duplicate track ${savedTrack.id}`);
+              continue;
+            }
+            processedIds.add(savedTrack.id);
+            
             const maybeBufferData = savedTrack.buffer?.channels
               ? savedTrack.buffer
               : savedTrack.segments?.[0]?.buffer?.channels
@@ -58,8 +124,13 @@ function AudioPage() {
                 audioBuffer.copyToChannel(bufferData.channels[i], i);
               }
 
-              savedTrack.buffer = new Tone.ToneAudioBuffer(audioBuffer);
-              audioManager.addTrackFromBuffer(savedTrack);
+              // Pass ALL properties to preserve state
+              const trackData = {
+                ...savedTrack,
+                buffer: new Tone.ToneAudioBuffer(audioBuffer)
+              };
+              
+              audioManager.addTrackFromBuffer(trackData);
             }
           }
           
@@ -78,7 +149,7 @@ function AudioPage() {
     };
 
     loadTracksFromDB();
-  }, []); // Empty dependency array - run only once
+  }, []);
 
   const toggleSidebar = () => {
     setSidebarWidth((prevWidth) =>
@@ -86,17 +157,12 @@ function AudioPage() {
     );
   };
 
-  // Handle audio import - creates a NEW track
   const handleImportSuccess = async (importedAudioData) => {
     console.log("Audio imported successfully, creating NEW track:", importedAudioData);
     
-    // Create a NEW track (not replacing existing ones)
     const createdTrack = audioManager.addTrackFromBuffer(importedAudioData);
-
-    // Update state to include all tracks
     setTracks([...audioManager.tracks]);
 
-    // Set audioData if this is the first track
     if (audioManager.tracks.length === 1) {
       setAudioData(importedAudioData);
     }
@@ -119,94 +185,70 @@ function AudioPage() {
     console.log("Export process complete.");
   };
 
-  // Handle track deletion - NO CONFIRMATION POPUP
+  // Handle track deletion with proper cleanup
   const handleDeleteTrack = async (trackId) => {
     try {
       console.log(`Deleting track ${trackId}...`);
       
-      // Delete from AudioManager
+      // STOP PLAYBACK FIRST and reset to play button
+      if (engineRef.current) {
+        try {
+          engineRef.current.stop();
+        } catch (e) {
+          console.warn("Failed to stop playback:", e);
+        }
+      }
+      
       const deleted = audioManager.deleteTrack(trackId);
       
       if (deleted) {
-        // Delete from IndexedDB
         try {
           await dbManager.deleteTrack(trackId);
-          console.log(`Track ${trackId} deleted from database`);
         } catch (e) {
           console.warn("Failed to delete track from DB:", e);
         }
 
-        // Update state
         setTracks([...audioManager.tracks]);
         
-        console.log(`Track ${trackId} deleted successfully`);
-      } else {
-        console.warn(`Failed to delete track ${trackId} from manager`);
+        // If no tracks left, dispose engine completely
+        if (audioManager.tracks.length === 0) {
+          try {
+            if (engineRef.current) {
+              engineRef.current.dispose();
+              // Create a new empty engine to prevent ghost playback
+              const emptyVersion = {
+                bpm: 120,
+                timeSig: [4, 4],
+                lengthMs: 0,
+                tracks: [],
+                segments: [],
+                loop: { enabled: false },
+                masterChain: [],
+              };
+              await engineRef.current.load(emptyVersion);
+            }
+          } catch (e) {
+            console.warn("Failed to dispose engine:", e);
+          }
+        } else {
+          // Reload engine with remaining tracks
+          const newVersion = buildVersionFromTracks(audioManager.tracks);
+          if (newVersion && engineRef.current) {
+            try {
+              await engineRef.current.load(newVersion);
+            } catch (e) {
+              console.warn("Failed to reload engine:", e);
+            }
+          }
+        }
       }
     } catch (error) {
       console.error("Failed to delete track:", error);
     }
   };
 
-  // Build version object for playback engine - includes ALL tracks
-  const version = tracks && tracks.length > 0
-    ? (() => {
-        const vs = {
-          bpm: 120,
-          timeSig: [4, 4],
-          lengthMs: 60000,
-          tracks: [],
-          segments: [],
-          loop: { enabled: false },
-          masterChain: [],
-        };
-
-        let maxEndMs = 0;
-
-        // Process ALL tracks
-        tracks.forEach((track) => {
-          vs.tracks.push({
-            id: track.id,
-            name: track.name ?? "Untitled",
-            gainDb: typeof track.volume === "number" ? track.volume : 0,
-            pan: typeof track.pan === "number" ? track.pan : 0,
-            mute: !!track.mute,
-            solo: !!track.solo,
-            color: track.color || "#888",
-          });
-
-          (track.segments || []).forEach((s) => {
-            const fileUrl = s.buffer ?? s.fileUrl ?? null;
-            const startOnTimelineMs =
-              s.startOnTimelineMs ??
-              (s.startOnTimeline ? Math.round(s.startOnTimeline * 1000) : 0);
-            const startInFileMs = s.offset
-              ? Math.round(s.offset * 1000)
-              : (s.startInFileMs ?? 0);
-            const durationMs = s.duration
-              ? Math.round(s.duration * 1000)
-              : (s.durationMs ?? 0);
-
-            vs.segments.push({
-              id: s.id ?? `seg_${Math.random().toString(36).slice(2, 8)}`,
-              trackId: track.id,
-              fileUrl,
-              startOnTimelineMs,
-              startInFileMs,
-              durationMs,
-              gainDb: s.gainDb ?? 0,
-              fades: s.fades ?? { inMs: 5, outMs: 5 },
-            });
-
-            const endMs = startOnTimelineMs + (durationMs || 0);
-            if (endMs > maxEndMs) maxEndMs = endMs;
-          });
-        });
-
-        vs.lengthMs = maxEndMs || 60000;
-        return vs;
-      })()
-    : null;
+  // Build version object for playback engine
+  const version = buildVersionFromTracks(tracks);
 
   const audioBuffer = tracks.length > 0
     ? tracks[0].buffer || tracks[0].segments?.[0]?.buffer
@@ -228,8 +270,8 @@ function AudioPage() {
   return (
     <div className="app-container">
       <Header
-        tracks={tracks} // Changed from audioBuffer
-        totalLengthMs={version?.lengthMs || 0} // Add this
+        tracks={tracks}
+        totalLengthMs={version?.lengthMs || 0}
         onImportSuccess={handleImportSuccess}
         onImportError={handleImportError}
         onExportComplete={handleExportComplete}
@@ -293,7 +335,17 @@ function AudioPage() {
       <Footer
         version={version}
         onRecordComplete={handleImportSuccess}
-        onRecordStart={({ stream, startTs }) => setRecording({ stream, startTs })}
+        onRecordStart={({ stream, startTs }) => {
+          // STOP PLAYBACK when recording starts
+          if (engineRef.current) {
+            try {
+              engineRef.current.stop();
+            } catch (e) {
+              console.warn("Failed to stop playback:", e);
+            }
+          }
+          setRecording({ stream, startTs });
+        }}
         onRecordStop={() => setRecording({ stream: null, startTs: 0 })}
       />
     </div>
