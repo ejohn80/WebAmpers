@@ -5,6 +5,9 @@
   overflow-y: auto;
   overflow-x: hidden;
   padding: 16px;
+  position: relative; /* allow global playhead to span entire area */
+  /* left offset = track lane padding (8px) + side width (120px) + gap (12px) */
+  --playhead-left-offset: 140px;
 }
 
 .tracks-container {
@@ -12,6 +15,32 @@
   flex-direction: column;
   gap: 16px;
   width: 100%;
+}
+
+/* Wrapper to position global playhead across all tracks */
+.tracks-relative {
+  position: relative;
+}
+
+.global-playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: red;
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* Rail that matches the timeline area (to the right of track controls) */
+.global-playhead-rail {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  pointer-events: none;
+  z-index: 10;
 }
 
 .track-wrapper {

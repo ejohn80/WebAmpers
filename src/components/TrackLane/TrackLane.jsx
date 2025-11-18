@@ -180,6 +180,7 @@ function TrackLane({
                         color={track?.color}
                         startOnTimelineMs={startOnTimelineMs}
                         durationMs={durationMs}
+                        showProgress={false}
                       />
                     ) : (
                       <div className="waveform-placeholder">

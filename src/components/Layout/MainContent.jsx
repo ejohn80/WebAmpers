@@ -1,5 +1,6 @@
 import React from "react";
 import DraggableDiv from "../Generic/DraggableDiv";
+import GlobalPlayhead from "../Generic/GlobalPlayhead";
 import TrackLane from "../../components/TrackLane/TrackLane";
 import "./MainContent.css";
 
@@ -16,8 +17,12 @@ import "./MainContent.css";
 function MainContent({ tracks = [], onMute, onSolo, onDelete, totalLengthMs = 0 }) {
   return (
     <DraggableDiv className="maincontent">
+      <div className="global-playhead-rail">
+        <GlobalPlayhead totalLengthMs={totalLengthMs} />
+      </div>
       {tracks && tracks.length > 0 ? (
-        <div className="tracks-container">
+        <div className="tracks-relative">
+          <div className="tracks-container">
           {tracks.map((track, index) => (
             <div key={track.id} className="track-wrapper">
               <TrackLane
@@ -32,6 +37,7 @@ function MainContent({ tracks = [], onMute, onSolo, onDelete, totalLengthMs = 0 
               />
             </div>
           ))}
+          </div>
         </div>
       ) : (
         <div className="empty-state">

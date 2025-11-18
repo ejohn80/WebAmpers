@@ -9,8 +9,9 @@ import {progressStore} from "../../playback/progressStore";
  * @param {string} [props.color] - Stroke color for the waveform.
  * @param {number} [props.startOnTimelineMs] - Segment start time on the global timeline (ms).
  * @param {number} [props.durationMs] - Segment duration on the global timeline (ms).
+ * @param {boolean} [props.showProgress] - Whether to render the progress bar within this waveform (default true).
  */
-const Waveform = ({audioBuffer, color = "#ffffff", startOnTimelineMs = 0, durationMs = null}) => {
+const Waveform = ({audioBuffer, color = "#ffffff", startOnTimelineMs = 0, durationMs = null, showProgress = true}) => {
   const canvasRef = useRef(null);
   const draggingRef = useRef(false);
 
@@ -170,7 +171,9 @@ const Waveform = ({audioBuffer, color = "#ffffff", startOnTimelineMs = 0, durati
       onTouchEnd={onTouchEnd}
     >
       <canvas ref={canvasRef} className="waveform-canvas" />
-      <div className="waveform-progress" style={{left: `${pct}%`}} />
+      {showProgress && (
+        <div className="waveform-progress" style={{left: `${pct}%`}} />
+      )}
     </div>
   );
 };
