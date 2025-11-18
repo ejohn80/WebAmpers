@@ -48,8 +48,8 @@ WebAmpers/
   reports/                        # Weekly reports
 
   src/
-    main.jsx                      
-    App.jsx                       
+    main.jsx
+    App.jsx
     index.css                     # Global styles
 
     assets/                       # Icons, images, UI assets
@@ -70,12 +70,12 @@ WebAmpers/
       Recording/
       Generic/
 
-    context/                      
-    firebase/                     # Firebase 
+    context/
+    firebase/                     # Firebase
     hooks/                        # Custom hooks
-    managers/                     # Application logic 
-    models/                       
-    pages/                        
+    managers/                     # Application logic
+    models/
+    pages/
     playback/                     # Playback logic + UI
     tests/                        # Vitest tests (JS) + Pytest tests
 
@@ -96,7 +96,7 @@ npm install
 npm run dev
 
 # 3. Open localhost
-Navigate and open http://localhost:5173/ 
+Navigate and open http://localhost:5173/
 ```
 
 ---
@@ -151,5 +151,5 @@ When preparing for a release:
 2. Verify that `npm run lint` and `npm run test` pass.
 3. All code is formatted with `npm run format`.
 4. Run the production build `npm run build`
-5. Navigate and open http://localhost:5173/ 
+5. Navigate and open http://localhost:5173/
 6. Test expected functionality

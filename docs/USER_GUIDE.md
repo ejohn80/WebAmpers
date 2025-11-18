@@ -12,7 +12,6 @@ WebAmp is an in-browser audio editor. You can:
 
 You do **not** need to install desktop DAW software. WebAmp was made to be for anyone who needs to produce a fast audio track.
 
-
 ## 2. Installation / prerequisites
 
 ### Option A: Use WebAmp in the browser (recommended)
@@ -27,9 +26,9 @@ Recommended Browsers:
 If the page loads, you’re setup.
 
 ### Option B: Run local repository:
-Instructions are available in the **Developer Guide**:  
- [docs/DEVELOPER_GUIDE.md](docs/DEVELOPER_GUIDE.md)  
 
+Instructions are available in the **Developer Guide**:  
+ [docs/DEVELOPER_GUIDE.md](docs/DEVELOPER_GUIDE.md)
 
 ## 3. How to Use the Software
 
@@ -72,7 +71,6 @@ Instructions are available in the **Developer Guide**:
 - Click **Export** to render your project into a single audio file.
 - Choose **WAV** or **MP3**.
 
-
 ## 4. How to Report a Bug
 
 To report an issue:
@@ -88,7 +86,6 @@ To report an issue:
    - What actually happened.
    - Your browser and OS version.
    - Screenshots or console errors (if available).
-
 
 ## 5. Known Bugs and Limitations
 
