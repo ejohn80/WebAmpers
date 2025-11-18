@@ -17,7 +17,7 @@ export default function TimelineRuler({totalLengthMs = 0}) {
         if (!main || !tl) return;
         const mrect = main.getBoundingClientRect();
         const trect = tl.getBoundingClientRect();
-        const offsetPx = Math.max(0, trect.left - mrect.left);
+  const offsetPx = (trect.left - mrect.left); // allow negative when scrolled right
         const widthPx = Math.max(0, trect.width);
         setGeom({offsetPx, widthPx});
       } catch {}

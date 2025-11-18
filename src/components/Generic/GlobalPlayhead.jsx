@@ -7,7 +7,7 @@ import {progressStore} from "../../playback/progressStore";
  */
 export default function GlobalPlayhead({totalLengthMs = 0}) {
   const [{ms, lengthMs}, setProgress] = useState(progressStore.getState());
-  const [geom, setGeom] = useState({offsetPx: 0, widthPx: 0});
+  const [geom, setGeom] = useState({offsetPx: 0, widthPx: 0, viewportWidth: 0});
 
   useEffect(() => progressStore.subscribe(setProgress), []);
 
@@ -19,11 +19,12 @@ export default function GlobalPlayhead({totalLengthMs = 0}) {
         const main = document.querySelector('.maincontent');
         const tl = document.querySelector('.tracklane-timeline');
         if (!main || !tl) return;
-        const mrect = main.getBoundingClientRect();
+  const mrect = main.getBoundingClientRect();
         const trect = tl.getBoundingClientRect();
-        const offsetPx = Math.max(0, trect.left - mrect.left);
+  const offsetPx = (trect.left - mrect.left); // allow negative when scrolled right
         const widthPx = Math.max(0, trect.width);
-        setGeom({offsetPx, widthPx});
+  const viewportWidth = Math.max(0, main.clientWidth);
+  setGeom({offsetPx, widthPx, viewportWidth});
       } catch {}
     };
 
@@ -66,6 +67,9 @@ export default function GlobalPlayhead({totalLengthMs = 0}) {
   const denom = totalLengthMs > 0 ? totalLengthMs : lengthMs || 0;
   const p = denom > 0 ? Math.max(0, Math.min(1, ms / denom)) : 0;
   const leftPx = Math.round(geom.offsetPx + p * geom.widthPx);
+  const visibleLeft = 0; // left edge of maincontent viewport
+  const visibleRight = geom.viewportWidth; // right edge of maincontent viewport
+  const isVisible = leftPx >= visibleLeft && leftPx <= visibleRight;
 
-  return <div className="global-playhead" style={{left: `${leftPx}px`}} />;
+  return <div className="global-playhead" style={{left: `${leftPx}px`, visibility: isVisible ? 'visible' : 'hidden'}} />;
 }

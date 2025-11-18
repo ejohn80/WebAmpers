@@ -2,12 +2,14 @@
 
 .maincontent {
   flex: 1;
-  overflow-y: auto;
+  overflow-y: hidden; /* remove vertical scrolling in main content */
   overflow-x: auto; /* allow horizontal scroll for long timelines */
-  padding: 48px 16px 16px 16px; /* extra top padding to accommodate ruler */
+  padding: 48px 16px 56px 16px; /* extra top padding for ruler; bottom for zoom bar + scrollbar */
   position: relative; /* allow global playhead to span entire area */
   /* left offset = track lane padding (8px) + side width (120px) + gap (12px) */
   --playhead-left-offset: 140px;
+  /* Reserve gutter so the horizontal scrollbar has space and is always predictable */
+  scrollbar-gutter: stable both-edges;
 }
 
 .tracks-container {
@@ -15,6 +17,8 @@
   flex-direction: column;
   gap: 16px;
   width: 100%;
+  /* Allow width to expand with computed timeline content width */
+  min-width: var(--timeline-content-width, 100%);
 }
 
 /* Wrapper to position global playhead across all tracks */
@@ -75,6 +79,44 @@
   white-space: nowrap;
 }
 
+/* Zoom controls bar at bottom */
+.zoom-controls-bar {
+  position: sticky;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: flex-end;
+  padding: 6px 8px;
+  background: linear-gradient(to top, rgba(0,0,0,0.35), rgba(0,0,0,0));
+  border-top: 1px solid rgba(255,255,255,0.08);
+  z-index: 12;
+}
+
+.zoom-controls {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  background: rgba(0,0,0,0.35);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 6px;
+  padding: 4px 6px;
+}
+
+.zoom-btn {
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.15);
+  color: #eee;
+  font-size: 12px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.zoom-btn:hover { background: rgba(255,255,255,0.15); }
+.zoom-btn.reset { opacity: 0.85; }
+.zoom-label { font-size: 12px; color: #ddd; min-width: 40px; text-align: center; }
+
 /* Shorter in-between (minor) ticks */
 .timeline-tick.minor .timeline-tick-line {
   height: 10px;
@@ -99,7 +141,8 @@
 
 /* Ensure smooth scrolling */
 .maincontent::-webkit-scrollbar {
-  width: 8px;
+  width: 8px;   /* vertical */
+  height: 12px; /* horizontal */
 }
 
 .maincontent::-webkit-scrollbar-track {
@@ -123,8 +166,7 @@
   background: #2f2f2f; /* match root background to mask scrolled content underneath */
 }
 
-/* Timeline grows wider than viewport when content exceeds default length */
+/* Timeline width is driven by global CSS var; can be < or > viewport based on zoom */
 .tracklane-timeline {
   width: var(--timeline-content-width, 100%);
-  min-width: 100%;
 }

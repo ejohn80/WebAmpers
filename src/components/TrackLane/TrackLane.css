@@ -23,6 +23,8 @@
 .tracklane-main {
   flex: 1 1 auto;
   min-height: 80px;
+  /* Let the track lane content expand with the computed timeline width when zoomed */
+  min-width: var(--timeline-content-width, 100%);
 }
 
 .tracklane-header {
