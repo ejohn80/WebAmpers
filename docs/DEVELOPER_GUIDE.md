@@ -14,7 +14,6 @@ git clone https://github.com/ejohn80/WebAmpers.git
 cd WebAmpers
 ```
 
-
 ## 2. Repository layout
 
 ```bash
@@ -47,8 +46,8 @@ WebAmpers/
   reports/                        # Weekly reports
 
   src/
-    main.jsx                      
-    App.jsx                       
+    main.jsx
+    App.jsx
     index.css                     # Global styles
 
     assets/                       # Icons, images, UI assets
@@ -69,19 +68,17 @@ WebAmpers/
       Recording/
       Generic/
 
-    context/                      
-    firebase/                     # Firebase 
+    context/
+    firebase/                     # Firebase
     hooks/                        # Custom hooks
-    managers/                     # Application logic 
-    models/                       
-    pages/                        
+    managers/                     # Application logic
+    models/
+    pages/
     playback/                     # Playback logic + UI
     tests/                        # Vitest tests (JS) + Pytest tests
 
 
 ```
-
-
 
 ## 3. How to build/run
 
@@ -95,8 +92,9 @@ npm install
 npm run dev
 
 ```
+
 3. Open localhost
-Navigate and open http://localhost:5173/ 
+   Navigate and open http://localhost:5173/
 
 4. Setup Python Backend:
 
@@ -104,19 +102,19 @@ Navigate and open http://localhost:5173/
 
 If `python` doesn’t work, try `py` (Windows) or `python3` (macOS/Linux).
 
-| Operating System           | Command               |
-|----------------------------|-----------------------|
-| Windows (Command Prompt)   | python -m venv .venv  |
-| Windows (PowerShell)       | python -m venv .venv  |
-| macOS / Linux              | python3 -m venv .venv |
+| Operating System         | Command               |
+| ------------------------ | --------------------- |
+| Windows (Command Prompt) | python -m venv .venv  |
+| Windows (PowerShell)     | python -m venv .venv  |
+| macOS / Linux            | python3 -m venv .venv |
 
 ### Activate the Virtual Environment
 
-| Operating System           | Activation Command               |
-|----------------------------|----------------------------------|
-| Windows (Command Prompt)   | .\.venv\Scripts\activate.bat     |
-| Windows (PowerShell)       | .\.venv\Scripts\Activate.ps1     |
-| macOS / Linux (Bash/Zsh)   | source .venv/bin/activate        |
+| Operating System         | Activation Command           |
+| ------------------------ | ---------------------------- |
+| Windows (Command Prompt) | .\.venv\Scripts\activate.bat |
+| Windows (PowerShell)     | .\.venv\Scripts\Activate.ps1 |
+| macOS / Linux (Bash/Zsh) | source .venv/bin/activate    |
 
 When activated, your terminal should show the environment name like
 
@@ -150,6 +148,7 @@ pylint example.py
 cd src/backend
 flask run
 ```
+
 ## 3. How to test
 
 We have default tests available to test expected functions
@@ -196,7 +195,7 @@ When preparing for a release:
 2. Verify that `npm run lint` and `npm run test` pass.
 3. All code is formatted with `npm run format`.
 4. Run the production build `npm run build`
-5. Navigate and open http://localhost:5173/ 
+5. Navigate and open http://localhost:5173/
 6. Test expected functionality
 7. Create and push to seperate branch
 8. Ensure it passes all CI tests
