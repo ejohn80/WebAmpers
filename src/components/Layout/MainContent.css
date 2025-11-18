@@ -52,7 +52,7 @@
 /* Rail that matches the timeline area (to the right of track controls) */
 .global-playhead-rail {
   position: absolute;
-  top: 32px;
+  top: 0;
   bottom: 0;
   left: var(--timeline-left-offset);
   width: var(--timeline-content-width, 100%);
