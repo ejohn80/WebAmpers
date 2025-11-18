@@ -72,6 +72,10 @@ class PlaybackEngine {
     this._cancelRaf();
     this._disposeAll();
 
+    // FIX: Add this line to synchronize the React state with the transport stop.
+    // This will set the 'playing' state to false and update the Play/Pause button UI.
+    this._emitTransport(false);
+
     // Save the version reference
     this.version = version;
     this.ended = false;
