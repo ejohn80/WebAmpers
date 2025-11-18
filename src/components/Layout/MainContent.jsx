@@ -1,6 +1,7 @@
 import React from "react";
 import DraggableDiv from "../Generic/DraggableDiv";
 import GlobalPlayhead from "../Generic/GlobalPlayhead";
+import TimelineRuler from "./TimelineRuler";
 import TrackLane from "../../components/TrackLane/TrackLane";
 import "./MainContent.css";
 
@@ -17,6 +18,7 @@ import "./MainContent.css";
 function MainContent({ tracks = [], onMute, onSolo, onDelete, totalLengthMs = 0 }) {
   return (
     <DraggableDiv className="maincontent">
+      <TimelineRuler totalLengthMs={totalLengthMs} />
       <div className="global-playhead-rail">
         <GlobalPlayhead totalLengthMs={totalLengthMs} />
       </div>
