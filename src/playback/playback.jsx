@@ -220,7 +220,7 @@ class PlaybackEngine {
     const hasEffects =
       (effects?.pitch && effects.pitch !== 0) ||
       (effects?.reverb && effects.reverb > 0) ||
-      (effects?.volume && effects.volume !== 100);
+      (effects?.volume !== undefined && effects.volume !== 100);
 
     // No effects --> don't do anything
     if (!hasEffects) {
@@ -293,7 +293,7 @@ class PlaybackEngine {
     }
 
     // Volume/Gain
-    if (effects?.volume && effects.volume !== 100) {
+    if (effects?.volume !== undefined && effects.volume !== 100) {
       try {
         const gain = Math.max(0, Math.min(2, effects.volume / 100));
         const gainNode = new Tone.Gain({
