@@ -37,6 +37,38 @@ class DBManager {
     });
   }
 
+  /**
+   * Remove all tracks from the database (used by tests and reset flows)
+   */
+  async clearAllTracks() {
+    const db = await this.openDB();
+    return new Promise((resolve, reject) => {
+      try {
+        const tx = db.transaction([TRACKS_STORE_NAME], "readwrite");
+        const store = tx.objectStore(TRACKS_STORE_NAME);
+        const req = store.clear();
+
+        req.onsuccess = () => {
+          resolve();
+        };
+        req.onerror = (event) => {
+          console.error("Error clearing tracks:", event.target.error);
+          reject(new Error("Could not clear tracks from the database."));
+        };
+
+        tx.oncomplete = () => {
+          // no-op; resolution handled in req.onsuccess
+        };
+        tx.onerror = (event) => {
+          console.error("Transaction failed during clear:", event.target.error);
+          // If store.clear() already errored, req.onerror has handled reject
+        };
+      } catch (e) {
+        reject(e);
+      }
+    });
+  }
+
   async addTrack(trackData) {
     const db = await this.openDB();
     return new Promise((resolve, reject) => {

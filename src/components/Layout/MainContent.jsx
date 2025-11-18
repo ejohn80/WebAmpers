@@ -11,8 +11,9 @@ import "./MainContent.css";
  * @param {Function} props.onMute - Callback for mute toggle
  * @param {Function} props.onSolo - Callback for solo toggle
  * @param {Function} props.onDelete - Callback for track deletion
+ * @param {number} props.totalLengthMs - Global timeline length in milliseconds for proportional sizing
  */
-function MainContent({ tracks = [], onMute, onSolo, onDelete }) {
+function MainContent({ tracks = [], onMute, onSolo, onDelete, totalLengthMs = 0 }) {
   return (
     <DraggableDiv className="maincontent">
       {tracks && tracks.length > 0 ? (
@@ -27,6 +28,7 @@ function MainContent({ tracks = [], onMute, onSolo, onDelete }) {
                 onMute={onMute}
                 onSolo={onSolo}
                 onDelete={onDelete}
+                totalLengthMs={totalLengthMs}
               />
             </div>
           ))}

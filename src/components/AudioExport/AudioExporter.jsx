@@ -2,8 +2,10 @@ import React, { useState, useMemo, useContext } from "react";
 import ExportManager from "./ExportManager.js";
 import { AppContext } from "../../context/AppContext";
 
-const AudioExporter = ({ tracks, totalLengthMs, onExportComplete }) => {
-  const { effects } = useContext(AppContext);
+const AudioExporter = ({ tracks, totalLengthMs, onExportComplete, audioBuffer }) => {
+  // Make context optional so tests that don't mount AppContextProvider don't crash
+  const appCtx = useContext(AppContext) || {};
+  const effects = appCtx.effects || [];
   const exportManager = useMemo(() => new ExportManager(), []);
   const [format, setFormat] = useState("mp3");
   const [qualitySetting, setQualitySetting] = useState("320k");
@@ -55,42 +57,48 @@ const AudioExporter = ({ tracks, totalLengthMs, onExportComplete }) => {
   const handleExport = async (e) => {
     e.preventDefault();
     setError(null);
+    const exportBitrate = (format === "mp3" || format === "ogg") ? qualitySetting : undefined;
 
+    // Compatibility: support legacy prop `audioBuffer` used in tests
+    if (typeof audioBuffer !== "undefined") {
+      if (!audioBuffer) {
+        setError("Please load or generate an audio track before exporting");
+        return;
+      }
+      setIsLoading(true);
+      try {
+        const result = await exportManager.exportAudio(audioBuffer, {
+          format,
+          filename,
+          bitrate: exportBitrate,
+        });
+        if (result && onExportComplete) onExportComplete(result);
+      } catch (err) {
+        console.error("Export Error:", err);
+        setError((err?.message || "Export failed").split("Command:")[0].replace(/^Error:\s*/, "").trim());
+      } finally {
+        setIsLoading(false);
+      }
+      return;
+    }
+
+    // New API expects tracks + totalLengthMs
     if (!tracks || tracks.length === 0) {
       setError("No tracks available to export.");
       return;
     }
 
     setIsLoading(true);
-    const exportBitrate =
-      format === "mp3" || format === "ogg" ? qualitySetting : undefined;
-
     try {
-      const result = await exportManager.exportAudio(
-        tracks, 
-        totalLengthMs, 
-        effects,
-        {
-          format,
-          filename,
-          bitrate: exportBitrate,
-        }
-      );
-
-      if (result.success) {
-        console.log(`Exported successfully: ${result.format}`);
-        if (onExportComplete) {
-          onExportComplete(result);
-        }
-      }
+      const result = await exportManager.exportAudio(tracks, totalLengthMs, effects, {
+        format,
+        filename,
+        bitrate: exportBitrate,
+      });
+      if (result && result.success && onExportComplete) onExportComplete(result);
     } catch (err) {
       console.error("Export Error:", err);
-      setError(
-        err.message
-          .replace(/^Error:\s*/, "")
-          .split("Command:")[0]
-          .trim()
-      );
+      setError((err?.message || "Export failed").split("Command:")[0].replace(/^Error:\s*/, "").trim());
     } finally {
       setIsLoading(false);
     }

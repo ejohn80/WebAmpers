@@ -175,7 +175,12 @@ function TrackLane({
 
                   <div className="segment-waveform">
                     {audioBuffer ? (
-                      <Waveform audioBuffer={audioBuffer} color={track?.color} />
+                      <Waveform
+                        audioBuffer={audioBuffer}
+                        color={track?.color}
+                        startOnTimelineMs={startOnTimelineMs}
+                        durationMs={durationMs}
+                      />
                     ) : (
                       <div className="waveform-placeholder">
                         (No buffer available for this segment)

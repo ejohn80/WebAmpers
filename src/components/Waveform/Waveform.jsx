@@ -6,8 +6,11 @@ import {progressStore} from "../../playback/progressStore";
  * A component that renders an audio buffer as a waveform on a canvas.
  * @param {object} props
  * @param {Tone.ToneAudioBuffer} props.audioBuffer - The audio buffer to visualize.
+ * @param {string} [props.color] - Stroke color for the waveform.
+ * @param {number} [props.startOnTimelineMs] - Segment start time on the global timeline (ms).
+ * @param {number} [props.durationMs] - Segment duration on the global timeline (ms).
  */
-const Waveform = ({audioBuffer, color = "#ffffff"}) => {
+const Waveform = ({audioBuffer, color = "#ffffff", startOnTimelineMs = 0, durationMs = null}) => {
   const canvasRef = useRef(null);
   const draggingRef = useRef(false);
 
@@ -67,16 +70,29 @@ const Waveform = ({audioBuffer, color = "#ffffff"}) => {
     return progressStore.subscribe(setProgress);
   }, []);
 
-  const pct =
-    lengthMs > 0 ? Math.max(0, Math.min(100, (ms / lengthMs) * 100)) : 0;
+  // Compute playhead position within this segment if we have segment timing,
+  // otherwise fall back to global percentage (legacy behavior)
+  let pct = 0;
+  if (durationMs && durationMs > 0) {
+    const rel = (ms - (startOnTimelineMs || 0)) / durationMs;
+    const clamped = Math.max(0, Math.min(1, rel));
+    pct = clamped * 100;
+  } else {
+    pct = lengthMs > 0 ? Math.max(0, Math.min(100, (ms / lengthMs) * 100)) : 0;
+  }
 
   // Scrub helpers
   const msAtClientX = (clientX) => {
     const el = canvasRef.current?.parentElement; // container div
-    if (!el || !lengthMs) return;
+    if (!el) return;
     const rect = el.getBoundingClientRect();
     const rel = Math.max(0, Math.min(rect.width, clientX - rect.left));
     const p = rect.width > 0 ? rel / rect.width : 0;
+    // If segment timing provided, map within this segment; else map across global length
+    if (durationMs && durationMs > 0) {
+      return (startOnTimelineMs || 0) + p * durationMs;
+    }
+    if (!lengthMs) return;
     return p * lengthMs;
   };
 

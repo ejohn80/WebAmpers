@@ -278,15 +278,30 @@ class PlaybackEngine {
 
   /** Prepare all segments (audio clips) and schedule them for playback */
   async _prepareSegments(version) {
+    // Preload only string URLs; skip objects (AudioBuffer/ToneAudioBuffer)
     const urls = Array.from(
-      new Set((version.segments || []).map((s) => s.fileUrl))
+      new Set((version.segments || [])
+        .map((s) => s.fileUrl)
+        .filter((u) => typeof u === "string" && u.length > 0))
     );
     urls.forEach((u) => this._preload(u));
 
     for (const seg of version.segments || []) {
+      // Normalize file source: allow string URL, AudioBuffer, or Tone.ToneAudioBuffer
+      let src = seg.fileUrl;
+      try {
+        if (src && typeof src.get === "function") {
+          // Tone.ToneAudioBuffer -> native AudioBuffer
+          src = src.get();
+        } else if (src && src._buffer && typeof src._buffer.getChannelData === "function") {
+          // Some Tone versions expose native buffer under _buffer
+          src = src._buffer;
+        }
+      } catch {}
+
       // Create a Tone.Player for each segment
       const player = new Tone.Player({
-        url: seg.fileUrl,
+        url: src,
         autostart: false,
         loop: false,
         fadeIn: (seg.fades?.inMs ?? this.defaultFadeMs) / 1000,
@@ -424,6 +439,7 @@ class PlaybackEngine {
 
   /** Preload an audio file asynchronously */
   _preload(url) {
+    if (typeof url !== "string") return; // only preload network/Blob URLs
     if (this.preloaded.has(url)) return;
     this.preloaded.add(url);
     Tone.ToneAudioBuffer.load(url)
