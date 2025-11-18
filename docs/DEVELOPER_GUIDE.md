@@ -14,31 +14,71 @@ git clone https://github.com/ejohn80/WebAmpers.git
 cd WebAmpers
 ```
 
----
-
 ## 2. Repository layout
 
 ```bash
 WebAmpers/
-  src/                       # React source code
-    components/             # UI components
-  public/                    # Static assets (icons, etc.)
-  backend/                   # (planned) Python for export & format conversion
-    tests/                   # Pytest tests for backend
-  docs/
-    USER_GUIDE.md            # User manual
-    DEVELOPER_GUIDE.md       # This file
+  README.md                       # Project overview + setup
+  coding-guidelines.md            # Team code standards
+  team-resources.md               # Internal references
+
+  package.json                    # Frontend dependencies + scripts
+  package-lock.json
+  vite.config.js                  # Vite config
+  vitest.config.mjs               # Vitest config
+  jest.config.js                  # (optional) Jest config
+  .gitignore
+  .eslintrc.json
+  .prettierrc.json
+  .pylintrc                       # Python backend linting
+
   .github/
-    workflows/ci.yml         # GitHub Actions pipeline
-  package.json               # Frontend deps and scripts
-  package-lock.json          # Locked versions for reproducible installs
-  eslint.config.js           # ESLint rules
-  prettier config (...whatever you’re using)
-  README.md                  # Project overview + links
+    workflows/
+      ci.yml                      # GitHub Actions CI pipeline
+
+  docs/
+    USER_GUIDE.md
+    DEVELOPER_GUIDE.md
+
+  public/                         # Static assets
+    soundwave.jpg
+
+  reports/                        # Weekly reports
+
+  src/
+    main.jsx
+    App.jsx
+    index.css                     # Global styles
+
+    assets/                       # Icons, images, UI assets
+      footer/
+
+    backend/                      # Python backend + JS API wrapper
+      app.py
+      AudioProcessor.py
+      requirements.txt
+
+    components/                   # All React components
+      AudioImport/
+      AudioExport/
+      Layout/
+      Auth/
+      Waveform/
+      TrackLane/
+      Recording/
+      Generic/
+
+    context/
+    firebase/                     # Firebase
+    hooks/                        # Custom hooks
+    managers/                     # Application logic
+    models/
+    pages/
+    playback/                     # Playback logic + UI
+    tests/                        # Vitest tests (JS) + Pytest tests
+
 
 ```
-
----
 
 ## 3. How to build/run
 
@@ -53,9 +93,63 @@ npm run dev
 
 ```
 
----
+3. Open localhost
+   Navigate and open http://localhost:5173/
 
-## 4. How to test
+4. Setup Python Backend:
+
+### Create a Virtual Environment
+
+If `python` doesn’t work, try `py` (Windows) or `python3` (macOS/Linux).
+
+| Operating System         | Command               |
+| ------------------------ | --------------------- |
+| Windows (Command Prompt) | python -m venv .venv  |
+| Windows (PowerShell)     | python -m venv .venv  |
+| macOS / Linux            | python3 -m venv .venv |
+
+### Activate the Virtual Environment
+
+| Operating System         | Activation Command           |
+| ------------------------ | ---------------------------- |
+| Windows (Command Prompt) | .\.venv\Scripts\activate.bat |
+| Windows (PowerShell)     | .\.venv\Scripts\Activate.ps1 |
+| macOS / Linux (Bash/Zsh) | source .venv/bin/activate    |
+
+When activated, your terminal should show the environment name like
+
+```
+(.venv)
+```
+
+### Install Backend Dependencies
+
+```bash
+pip install -r src/backend/requirements.txt
+```
+
+### Optional: Run Backend Tools
+
+**Run tests (Pytest):**
+
+```bash
+pytest
+```
+
+**Run linter (Pylint):**
+
+```bash
+pylint example.py
+```
+
+### Start the Backend Server
+
+```bash
+cd src/backend
+flask run
+```
+
+## 3. How to test
 
 We have default tests available to test expected functions
 
@@ -63,9 +157,7 @@ We have default tests available to test expected functions
 npm run test
 ```
 
----
-
-## 5. How to add tests
+## 4. How to add tests
 
 Name the file in this format:
 
@@ -95,9 +187,7 @@ Then run:
 npm run test
 ```
 
----
-
-## 6. Release Preparation
+## 6. Contributing
 
 When preparing for a release:
 
@@ -105,4 +195,8 @@ When preparing for a release:
 2. Verify that `npm run lint` and `npm run test` pass.
 3. All code is formatted with `npm run format`.
 4. Run the production build `npm run build`
-5. Test expected functionality
+5. Navigate and open http://localhost:5173/
+6. Test expected functionality
+7. Create and push to seperate branch
+8. Ensure it passes all CI tests
+9. Create a pull request
