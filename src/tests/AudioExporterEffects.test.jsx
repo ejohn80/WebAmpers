@@ -8,7 +8,7 @@ import * as Tone from "tone";
 vi.mock("tone", () => {
   // Track offline rendering calls to verify effects are applied
   const mockOfflineRenders = [];
-  
+
   return {
     context: {
       state: "suspended",
@@ -20,23 +20,23 @@ vi.mock("tone", () => {
       })),
     },
     start: vi.fn().mockResolvedValue(undefined),
-    
+
     // Mock offline rendering to capture effects processing
     Offline: vi.fn((renderCallback, duration) => {
       const mockContext = {
-        destination: { connect: vi.fn() },
+        destination: {connect: vi.fn()},
         sampleRate: 44100,
       };
-      
+
       const renderPromise = renderCallback(mockContext);
-      
+
       // Store render info for verification
       mockOfflineRenders.push({
         duration,
         context: mockContext,
         renderCallback,
       });
-      
+
       // Return a mock rendered buffer with different characteristics
       const renderedBuffer = {
         numberOfChannels: 2,
@@ -65,10 +65,10 @@ vi.mock("tone", () => {
           }),
         }),
       };
-      
+
       return Promise.resolve(renderedBuffer);
     }),
-    
+
     // Mock effects
     Player: class MockPlayer {
       constructor(opts = {}) {
@@ -91,7 +91,7 @@ vi.mock("tone", () => {
         this._connected.push(node);
       }
     },
-    
+
     PitchShift: class MockPitchShift {
       constructor(opts = {}) {
         this.pitch = opts.pitch;
@@ -99,7 +99,7 @@ vi.mock("tone", () => {
         this._effectType = "pitch";
       }
     },
-    
+
     Freeverb: class MockFreeverb {
       constructor(opts = {}) {
         this.roomSize = opts.roomSize;
@@ -109,19 +109,20 @@ vi.mock("tone", () => {
         this._effectType = "reverb";
       }
     },
-    
+
     Gain: class MockGain {
       constructor(opts = {}) {
-        this.gain = { value: opts.gain || 1 };
+        this.gain = {value: opts.gain || 1};
         this.context = opts.context;
         this._effectType = "gain";
       }
     },
-    
+
     // Expose mock data for testing
     __mockData: {
       getOfflineRenders: () => mockOfflineRenders,
-      clearOfflineRenders: () => mockOfflineRenders.splice(0, mockOfflineRenders.length),
+      clearOfflineRenders: () =>
+        mockOfflineRenders.splice(0, mockOfflineRenders.length),
     },
   };
 });
@@ -145,7 +146,9 @@ vi.mock("../components/AudioExport/ExportManager", () => {
 vi.mock("../../backend/PythonApiClient", () => {
   return {
     default: vi.fn().mockImplementation(() => ({
-      exportAudio: vi.fn().mockResolvedValue(new Blob(["mock"], {type: "audio/mp3"})),
+      exportAudio: vi
+        .fn()
+        .mockResolvedValue(new Blob(["mock"], {type: "audio/mp3"})),
       downloadBlob: vi.fn(),
     })),
   };
@@ -216,50 +219,56 @@ describe("AudioExporter with Effects", () => {
 
     // Create mock engine with renderAudioWithEffects
     mockEngine = {
-      renderAudioWithEffects: vi.fn().mockImplementation(async (buffer, effects) => {
-        // Simulate the actual renderAudioWithEffects method
-        const hasEffects =
-          (effects?.pitch && effects.pitch !== 0) ||
-          (effects?.reverb && effects.reverb > 0) ||
-          (effects?.volume !== undefined && effects.volume !== 100);
+      renderAudioWithEffects: vi
+        .fn()
+        .mockImplementation(async (buffer, effects) => {
+          // Simulate the actual renderAudioWithEffects method
+          const hasEffects =
+            (effects?.pitch && effects.pitch !== 0) ||
+            (effects?.reverb && effects.reverb > 0) ||
+            (effects?.volume !== undefined && effects.volume !== 100);
 
-        if (!hasEffects) {
-          return buffer;
-        }
-
-        // Use Tone.Offline to simulate rendering
-        return await Tone.Offline(async (context) => {
-          const player = new Tone.Player({ url: buffer, context });
-          
-          const effectsChain = [];
-          
-          if (effects?.pitch && effects.pitch !== 0) {
-            effectsChain.push(new Tone.PitchShift({ pitch: effects.pitch, context }));
-          }
-          
-          if (effects?.reverb && effects.reverb > 0) {
-            const wet = Math.max(0, Math.min(1, effects.reverb / 100));
-            effectsChain.push(new Tone.Freeverb({ 
-              roomSize: 0.1 + 0.85 * wet,
-              wet,
-              context 
-            }));
-          }
-          
-          if (effects?.volume !== undefined && effects.volume !== 100) {
-            const gain = Math.max(0, Math.min(2, effects.volume / 100));
-            effectsChain.push(new Tone.Gain({ gain, context }));
+          if (!hasEffects) {
+            return buffer;
           }
 
-          if (effectsChain.length > 0) {
-            player.chain(...effectsChain, context.destination);
-          } else {
-            player.toDestination();
-          }
+          // Use Tone.Offline to simulate rendering
+          return await Tone.Offline(async (context) => {
+            const player = new Tone.Player({url: buffer, context});
 
-          player.start(0);
-        }, buffer.duration);
-      }),
+            const effectsChain = [];
+
+            if (effects?.pitch && effects.pitch !== 0) {
+              effectsChain.push(
+                new Tone.PitchShift({pitch: effects.pitch, context})
+              );
+            }
+
+            if (effects?.reverb && effects.reverb > 0) {
+              const wet = Math.max(0, Math.min(1, effects.reverb / 100));
+              effectsChain.push(
+                new Tone.Freeverb({
+                  roomSize: 0.1 + 0.85 * wet,
+                  wet,
+                  context,
+                })
+              );
+            }
+
+            if (effects?.volume !== undefined && effects.volume !== 100) {
+              const gain = Math.max(0, Math.min(2, effects.volume / 100));
+              effectsChain.push(new Tone.Gain({gain, context}));
+            }
+
+            if (effectsChain.length > 0) {
+              player.chain(...effectsChain, context.destination);
+            } else {
+              player.toDestination();
+            }
+
+            player.start(0);
+          }, buffer.duration);
+        }),
     };
 
     // Mock context value with effects
@@ -269,12 +278,12 @@ describe("AudioExporter with Effects", () => {
         volume: 150, // 150% volume
         reverb: 30, // 30% reverb
       },
-      engineRef: { current: mockEngine },
+      engineRef: {current: mockEngine},
     };
 
     // Setup export manager mocks
-    mockExportAudio.mockResolvedValue({ success: true, format: "mp3" });
-    mockCreateWavBlob.mockReturnValue(new Blob(["mock"], { type: "audio/wav" }));
+    mockExportAudio.mockResolvedValue({success: true, format: "mp3"});
+    mockCreateWavBlob.mockReturnValue(new Blob(["mock"], {type: "audio/wav"}));
   });
 
   afterEach(() => {
@@ -303,7 +312,7 @@ describe("AudioExporter with Effects", () => {
       />
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /export audio/i }));
+    fireEvent.click(screen.getByRole("button", {name: /export audio/i}));
 
     await waitFor(() => {
       expect(mockGetProcessedBuffer).toHaveBeenCalled();
@@ -318,13 +327,10 @@ describe("AudioExporter with Effects", () => {
 
   it("uses original buffer when getProcessedBuffer is not provided", async () => {
     render(
-      <AudioExporter
-        audioBuffer={mockAudioBuffer}
-        onExportComplete={vi.fn()}
-      />
+      <AudioExporter audioBuffer={mockAudioBuffer} onExportComplete={vi.fn()} />
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /export audio/i }));
+    fireEvent.click(screen.getByRole("button", {name: /export audio/i}));
 
     await waitFor(() => {
       expect(mockExportAudio).toHaveBeenCalled();
@@ -357,12 +363,12 @@ describe("AudioExporter with Effects", () => {
 
     render(<TestComponent />);
 
-    fireEvent.click(screen.getByRole("button", { name: /export audio/i }));
+    fireEvent.click(screen.getByRole("button", {name: /export audio/i}));
 
     await waitFor(() => {
       expect(mockEngine.renderAudioWithEffects).toHaveBeenCalledWith(
         mockAudioBuffer,
-        expect.objectContaining({ pitch: 5 })
+        expect.objectContaining({pitch: 5})
       );
     });
 
@@ -392,12 +398,12 @@ describe("AudioExporter with Effects", () => {
 
     render(<TestComponent />);
 
-    fireEvent.click(screen.getByRole("button", { name: /export audio/i }));
+    fireEvent.click(screen.getByRole("button", {name: /export audio/i}));
 
     await waitFor(() => {
       expect(mockEngine.renderAudioWithEffects).toHaveBeenCalledWith(
         mockAudioBuffer,
-        expect.objectContaining({ reverb: 50 })
+        expect.objectContaining({reverb: 50})
       );
     });
 
@@ -427,12 +433,12 @@ describe("AudioExporter with Effects", () => {
 
     render(<TestComponent />);
 
-    fireEvent.click(screen.getByRole("button", { name: /export audio/i }));
+    fireEvent.click(screen.getByRole("button", {name: /export audio/i}));
 
     await waitFor(() => {
       expect(mockEngine.renderAudioWithEffects).toHaveBeenCalledWith(
         mockAudioBuffer,
-        expect.objectContaining({ volume: 200 })
+        expect.objectContaining({volume: 200})
       );
     });
 
@@ -445,9 +451,9 @@ describe("AudioExporter with Effects", () => {
     const TestComponent = () => {
       const getProcessedBuffer = async () => {
         return await mockEngine.renderAudioWithEffects(mockAudioBuffer, {
-          pitch: 3,    // 3 semitones up
-          volume: 80,  // 80% volume
-          reverb: 25,  // 25% reverb
+          pitch: 3, // 3 semitones up
+          volume: 80, // 80% volume
+          reverb: 25, // 25% reverb
         });
       };
 
@@ -462,7 +468,7 @@ describe("AudioExporter with Effects", () => {
 
     render(<TestComponent />);
 
-    fireEvent.click(screen.getByRole("button", { name: /export audio/i }));
+    fireEvent.click(screen.getByRole("button", {name: /export audio/i}));
 
     await waitFor(() => {
       expect(mockEngine.renderAudioWithEffects).toHaveBeenCalledWith(
@@ -484,9 +490,9 @@ describe("AudioExporter with Effects", () => {
     const TestComponent = () => {
       const getProcessedBuffer = async () => {
         return await mockEngine.renderAudioWithEffects(mockAudioBuffer, {
-          pitch: 0,    // No pitch change
+          pitch: 0, // No pitch change
           volume: 100, // Default volume
-          reverb: 0,   // No reverb
+          reverb: 0, // No reverb
         });
       };
 
@@ -501,7 +507,7 @@ describe("AudioExporter with Effects", () => {
 
     render(<TestComponent />);
 
-    fireEvent.click(screen.getByRole("button", { name: /export audio/i }));
+    fireEvent.click(screen.getByRole("button", {name: /export audio/i}));
 
     await waitFor(() => {
       expect(mockEngine.renderAudioWithEffects).toHaveBeenCalled();
@@ -513,9 +519,9 @@ describe("AudioExporter with Effects", () => {
   });
 
   it("handles processing errors gracefully", async () => {
-    const mockGetProcessedBuffer = vi.fn().mockRejectedValue(
-      new Error("Effects processing failed")
-    );
+    const mockGetProcessedBuffer = vi
+      .fn()
+      .mockRejectedValue(new Error("Effects processing failed"));
 
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
@@ -527,7 +533,7 @@ describe("AudioExporter with Effects", () => {
       />
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /export audio/i }));
+    fireEvent.click(screen.getByRole("button", {name: /export audio/i}));
 
     await waitFor(() => {
       expect(mockGetProcessedBuffer).toHaveBeenCalled();
@@ -546,14 +552,17 @@ describe("AudioExporter with Effects", () => {
 
   it("verifies audio characteristics change after effect processing", async () => {
     let processedBuffer;
-    
+
     const TestComponent = () => {
       const getProcessedBuffer = async () => {
-        processedBuffer = await mockEngine.renderAudioWithEffects(mockAudioBuffer, {
-          pitch: 7,    // Significant pitch change
-          volume: 150, // Volume boost
-          reverb: 40,  // Moderate reverb
-        });
+        processedBuffer = await mockEngine.renderAudioWithEffects(
+          mockAudioBuffer,
+          {
+            pitch: 7, // Significant pitch change
+            volume: 150, // Volume boost
+            reverb: 40, // Moderate reverb
+          }
+        );
         return processedBuffer;
       };
 
@@ -568,7 +577,7 @@ describe("AudioExporter with Effects", () => {
 
     render(<TestComponent />);
 
-    fireEvent.click(screen.getByRole("button", { name: /export audio/i }));
+    fireEvent.click(screen.getByRole("button", {name: /export audio/i}));
 
     await waitFor(() => {
       expect(processedBuffer).toBeDefined();
@@ -578,16 +587,20 @@ describe("AudioExporter with Effects", () => {
     // Verify that the processed audio has different characteristics
     const originalData = mockAudioBuffer.getChannelData(0);
     const processedData = processedBuffer.getChannelData(0);
-    
+
     // Check that data is different (processed vs original)
     let isDifferent = false;
-    for (let i = 0; i < Math.min(originalData.length, processedData.length); i++) {
+    for (
+      let i = 0;
+      i < Math.min(originalData.length, processedData.length);
+      i++
+    ) {
       if (Math.abs(originalData[i] - processedData[i]) > 0.01) {
         isDifferent = true;
         break;
       }
     }
-    
+
     expect(isDifferent).toBe(true);
   });
 });
