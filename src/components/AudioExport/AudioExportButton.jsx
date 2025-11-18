@@ -1,5 +1,6 @@
-import React from "react";
+import React, {useState, useContext} from "react";
 import AudioExportModal from "./AudioExportModal";
+import {AppContext} from "../../context/AppContext";
 import "./AudioExportButton.css";
 
 /**
@@ -14,10 +15,13 @@ const AudioExportButton = ({
   children,
   disabled: propDisabled,
 }) => {
-  const [isModalOpen, setIsModalOpen] = React.useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  const {effects, engineRef} = useContext(AppContext);
 
   // The button is disabled if propDisabled is true OR if no audioBuffer exists
-  const isDisabled = propDisabled || !audioBuffer;
+  const isDisabled = propDisabled || !audioBuffer || isProcessing;
 
   const closeModal = () => setIsModalOpen(false);
 
@@ -32,6 +36,40 @@ const AudioExportButton = ({
       setIsModalOpen(true);
     } else {
       console.log("Export disabled: No audio buffer loaded.");
+    }
+  };
+
+  /**
+   * Get processed audio buffer with effects applied
+   * @returns {Promise<Tone.ToneAudioBuffer>} Processed buffer
+   */
+  const getProcessedBuffer = async () => {
+    if (!audioBuffer) {
+      throw new Error("No audio buffer available");
+    }
+
+    // Check if engine is available
+    if (!engineRef?.current) {
+      console.warn("Engine not available, using original buffer");
+      return audioBuffer;
+    }
+
+    try {
+      setIsProcessing(true);
+
+      // Render with effects applied
+      const renderedBuffer = await engineRef.current.renderAudioWithEffects(
+        audioBuffer,
+        effects
+      );
+
+      return renderedBuffer;
+    } catch (error) {
+      console.error("Failed to process audio with effects:", error);
+      // Go back to og buffer
+      return audioBuffer;
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -81,6 +119,7 @@ const AudioExportButton = ({
       {/* The actual modal content */}
       <AudioExportModal
         audioBuffer={audioBuffer}
+        getProcessedBuffer={getProcessedBuffer}
         onExportComplete={handleExportComplete}
         isOpen={isModalOpen}
         onClose={closeModal}
