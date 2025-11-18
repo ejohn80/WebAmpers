@@ -203,6 +203,112 @@ class PlaybackEngine {
     }
   }
 
+  /**
+   * Render audio buffer with effects applied using offline rendering
+   * @param {Tone.ToneAudioBuffer} audioBuffer - The source audio buffer
+   * @param {Object} effects - Effects object with pitch, reverb, volume
+   * @returns {Promise<Tone.ToneAudioBuffer>} Rendered buffer with effects
+   */
+  async renderAudioWithEffects(audioBuffer, effects) {
+    if (!audioBuffer) {
+      throw new Error("No audio buffer provided for rendering");
+    }
+
+    const durationSeconds = audioBuffer.duration;
+
+    // Any effects applied?
+    const hasEffects =
+      (effects?.pitch && effects.pitch !== 0) ||
+      (effects?.reverb && effects.reverb > 0) ||
+      (effects?.volume && effects.volume !== 100);
+
+    // No effects --> don't do anything
+    if (!hasEffects) {
+      return audioBuffer;
+    }
+
+    console.log("Rendering audio with effects:", effects);
+
+    // Render audio offline with effects applied
+    const renderedBuffer = await Tone.Offline(async (context) => {
+      // Original buffer
+      const player = new Tone.Player({
+        url: audioBuffer,
+        context: context,
+      });
+
+      // Build and apply the effects chain
+      const effectsChain = this._buildEffectsChain(effects, context);
+
+      if (effectsChain.length > 0) {
+        player.chain(...effectsChain, context.destination);
+      } else {
+        player.toDestination();
+      }
+
+      player.start(0);
+    }, durationSeconds);
+
+    console.log("Audio rendering complete");
+    return renderedBuffer;
+  }
+
+  /**
+   * Build Tone.js effects chain from effects object
+   * @param {Object} effects - Effects configuration
+   * @param {AudioContext} context - Audio context for offline rendering
+   * @returns {Array} Array of Tone.js effect nodes
+   */
+  _buildEffectsChain(effects, context) {
+    const chain = [];
+
+    // Pitch
+    if (effects?.pitch && effects.pitch !== 0) {
+      try {
+        const pitchShift = new Tone.PitchShift({
+          pitch: effects.pitch,
+          context: context,
+        });
+        chain.push(pitchShift);
+      } catch (e) {
+        console.warn("Failed to create pitch shift effect:", e);
+      }
+    }
+
+    // Reverb
+    if (effects?.reverb && effects.reverb > 0) {
+      try {
+        const wet = Math.max(0, Math.min(1, effects.reverb / 100));
+        const roomSize = 0.1 + 0.85 * wet;
+        const reverb = new Tone.Freeverb({
+          roomSize: roomSize,
+          dampening: 3000,
+          wet: wet,
+          context: context,
+        });
+        chain.push(reverb);
+      } catch (e) {
+        console.warn("Failed to create reverb effect:", e);
+      }
+    }
+
+    // Volume/Gain
+    if (effects?.volume && effects.volume !== 100) {
+      try {
+        const gain = Math.max(0, Math.min(2, effects.volume / 100));
+        const gainNode = new Tone.Gain({
+          gain: gain,
+          context: context,
+        });
+        chain.push(gainNode);
+      } catch (e) {
+        console.warn("Failed to create gain effect:", e);
+      }
+    }
+
+    return chain;
+  }
+
   /** Replace the master chain (placeholder for future FX support) */
   replaceMasterChain(chain) {
     const old = this.master;

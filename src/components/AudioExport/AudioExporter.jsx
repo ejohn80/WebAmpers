@@ -1,7 +1,7 @@
 import React, {useState, useMemo} from "react";
 import ExportManager from "./ExportManager.js";
 
-const AudioExporter = ({audioBuffer, onExportComplete}) => {
+const AudioExporter = ({audioBuffer, getProcessedBuffer, onExportComplete}) => {
   const exportManager = useMemo(() => new ExportManager(), []);
   // State for form inputs
   const [format, setFormat] = useState("mp3");
@@ -70,7 +70,14 @@ const AudioExporter = ({audioBuffer, onExportComplete}) => {
       format === "mp3" || format === "ogg" ? qualitySetting : undefined;
 
     try {
-      const result = await exportManager.exportAudio(audioBuffer, {
+      // Get processed buffer with effects if available
+      let bufferToExport = audioBuffer;
+
+      if (getProcessedBuffer) {
+        bufferToExport = await getProcessedBuffer();
+      }
+
+      const result = await exportManager.exportAudio(bufferToExport, {
         format,
         filename,
         bitrate: exportBitrate, // Pass the selected quality/bitrate
