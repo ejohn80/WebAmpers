@@ -95,17 +95,21 @@ function AudioPage() {
           
           audioManager.clearAllTracks();
           
-          // Track which IDs we've processed to prevent duplicates
-          const processedIds = new Set();
+          // FIX: Use a Map to track unique tracks by ID to prevent duplicates
+          const uniqueTracks = new Map();
           
           for (const savedTrack of savedTracks) {
-            // Skip duplicates
-            if (processedIds.has(savedTrack.id)) {
+            // Skip if we've already processed this track ID
+            if (uniqueTracks.has(savedTrack.id)) {
               console.warn(`Skipping duplicate track ${savedTrack.id}`);
               continue;
             }
-            processedIds.add(savedTrack.id);
             
+            uniqueTracks.set(savedTrack.id, savedTrack);
+          }
+          
+          // Now process the unique tracks
+          for (const savedTrack of uniqueTracks.values()) {
             const maybeBufferData = savedTrack.buffer?.channels
               ? savedTrack.buffer
               : savedTrack.segments?.[0]?.buffer?.channels
@@ -169,8 +173,18 @@ function AudioPage() {
 
     try {
       if (createdTrack) {
-        await dbManager.addTrack(createdTrack);
-        console.log("Track saved to IndexedDB");
+        // FIX: Capture the DB-assigned ID and update the track object
+        const assignedId = await dbManager.addTrack(createdTrack);
+        
+        // Update the track's ID to match what's in IndexedDB
+        if (assignedId !== undefined && assignedId !== createdTrack.id) {
+          console.log(`Updating track ID from ${createdTrack.id} to ${assignedId}`);
+          createdTrack.id = assignedId;
+          // Force a re-render with the updated ID
+          setTracks([...audioManager.tracks]);
+        }
+        
+        console.log("Track saved to IndexedDB with ID:", assignedId);
       }
     } catch (error) {
       console.error("Failed to save track to IndexedDB:", error);
@@ -204,6 +218,13 @@ function AudioPage() {
       if (deleted) {
         try {
           await dbManager.deleteTrack(trackId);
+          
+          // FIX: Also clean up any localStorage track state when deleting
+          try {
+            localStorage.removeItem(`webamp.track.${trackId}`);
+          } catch (e) {
+            console.warn("Failed to remove track state from localStorage:", e);
+          }
         } catch (e) {
           console.warn("Failed to delete track from DB:", e);
         }

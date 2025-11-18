@@ -74,8 +74,8 @@ class DBManager {
     return new Promise((resolve, reject) => {
       const transaction = db.transaction([TRACKS_STORE_NAME], "readwrite");
       const store = transaction.objectStore(TRACKS_STORE_NAME);
+      
       // Prefer to use a `toJSON()` serializer if the object provides one
-      // (e.g. AudioTrack.toJSON). Otherwise shallow-copy properties.
       const base =
         typeof trackData?.toJSON === "function"
           ? trackData.toJSON()
@@ -160,36 +160,33 @@ class DBManager {
         });
       }
 
-      // If the provided track already has an id, use put() so we upsert
-      // instead of failing with add() on duplicate keys. However, when the
-      // id looks like a client-generated string (e.g. 'track_xxx') prefer to
-      // let IndexedDB assign a numeric key (via add) so stored keys remain
-      // monotonic and ordering by key reflects insertion order.
-      let request;
+      // FIX: Always let IndexedDB assign the ID for new tracks
+      // Remove any client-generated string ID so IndexedDB assigns a numeric one
       const hasId =
         typeof storableTrack.id !== "undefined" && storableTrack.id !== null;
       const isClientGeneratedString =
         hasId &&
         typeof storableTrack.id === "string" &&
         /^track_/.test(storableTrack.id);
-      if (!hasId || isClientGeneratedString) {
-        // Remove id if it's a client-generated string so add() assigns a numeric id
-        if (isClientGeneratedString) {
-          // shallow copy without id
-          const {id, ...withoutId} = storableTrack;
-          request = store.add(withoutId);
-        } else {
-          request = store.add(storableTrack);
-        }
+      
+      let request;
+      if (isClientGeneratedString || !hasId) {
+        // Remove the client-generated ID so IndexedDB assigns a numeric one
+        const {id, ...withoutId} = storableTrack;
+        request = store.add(withoutId);
+      } else if (typeof storableTrack.id === "number") {
+        // Numeric ID: try to update existing record, or add if it doesn't exist
+        request = store.put(storableTrack);
       } else {
-        // has a numeric or externally-managed id: upsert with put()
+        // String ID that's not client-generated: use put
         request = store.put(storableTrack);
       }
 
       request.onsuccess = (event) => {
-        // Return the key (either provided or generated). Callers may want to
-        // update their in-memory object to match the DB-assigned key.
-        resolve(event.target.result);
+        // Return the key (either provided or generated)
+        const assignedId = event.target.result;
+        console.log(`Track saved to IndexedDB with ID: ${assignedId}`);
+        resolve(assignedId);
       };
 
       request.onerror = (event) => {
@@ -253,21 +250,27 @@ class DBManager {
    * @returns {Promise<void>}
    */
   async updateTrack(track) {
-    const db = await this.openDB(); // <-- Consistent DB opening
+    const db = await this.openDB();
 
     return new Promise((resolve, reject) => {
-      // Use the stored constants
       const transaction = db.transaction([TRACKS_STORE_NAME], "readwrite");
       const store = transaction.objectStore(TRACKS_STORE_NAME);
         
       // Serialize the track before storing
       const trackData = this.serializeTrack(track);
+      
+      // FIX: Ensure we're using a numeric ID for updates
+      // If the track has a client-generated string ID, we have a problem
+      if (typeof trackData.id === "string" && /^track_/.test(trackData.id)) {
+        console.error(`Cannot update track with client-generated ID: ${trackData.id}`);
+        reject(new Error("Track must have a numeric DB-assigned ID for updates"));
+        return;
+      }
         
       const updateRequest = store.put(trackData);
 
       updateRequest.onsuccess = () => {
         console.log(`Track ${track.id} updated in IndexedDB`);
-        // We let the transaction.oncomplete handle the resolve
       };
 
       updateRequest.onerror = (event) => {
@@ -275,7 +278,6 @@ class DBManager {
         reject(new Error("Failed to update track"));
       };
 
-      // Handle the transaction completion/error without closing the persistent DB
       transaction.oncomplete = () => resolve();
       transaction.onerror = (event) => {
         console.error("Transaction failed during update:", event.target.error);
