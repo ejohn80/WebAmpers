@@ -1,30 +1,35 @@
 .tracklane-side {
-  width: 120px;
-  min-width: 100px;
+  width: var(--track-controls-width);
+  min-width: var(--track-controls-width);
+  flex: 0 0 var(--track-controls-width);
   display: flex;
   flex-direction: column;
   gap: 6px;
   align-self: stretch;
   padding-right: 6px;
+  background: #2f2f2f;
+  box-shadow: 6px 0 12px rgba(0, 0, 0, 0.45);
+  position: sticky;
+  left: 0;
+  z-index: 5;
 }
 
 .tracklane-root {
   display: flex;
-  flex-direction: row;
-  gap: 12px;
-  width: 100%;
+  gap: var(--track-controls-gap);
   align-items: stretch;
   background: #2f2f2f;
   color: #eaeaea;
   padding: 8px;
   border-radius: 6px;
+  min-width: calc(var(--timeline-left-offset) + var(--timeline-content-width, 100%));
+  position: relative;
 }
 
 .tracklane-main {
+  min-height: var(--track-height, 96px);
+  width: var(--timeline-content-width, 100%);
   flex: 1 1 auto;
-  min-height: 80px;
-  /* Let the track lane content expand with the computed timeline width when zoomed */
-  min-width: var(--timeline-content-width, 100%);
 }
 
 .tracklane-header {
@@ -121,7 +126,7 @@
 .tracklane-timeline {
   position: relative;
   width: 100%;
-  min-height: 80px;
+  min-height: var(--track-height, 96px);
   background: rgba(0, 0, 0, 0.2);
   border-radius: 4px;
 }
@@ -175,7 +180,7 @@
 
 .segment-waveform {
   flex: 1;
-  min-height: 50px;
+  min-height: calc(var(--track-height, 96px) - 32px);
   width: 100%;
 }
 

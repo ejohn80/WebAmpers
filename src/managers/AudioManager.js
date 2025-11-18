@@ -86,7 +86,7 @@ class AudioManager {
             }
             segToneBuf = new Tone.ToneAudioBuffer(native);
           }
-        } catch (e) {
+        } catch {
           // fallback to main toneBuffer
         }
 

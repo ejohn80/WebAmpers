@@ -1,71 +1,23 @@
-import React, {useEffect, useMemo, useState} from "react";
+import React, {useMemo} from "react";
 
 /**
  * TimelineRuler
  * Draws a time ruler with tick marks aligned to the start of the waveform area.
  */
-export default function TimelineRuler({totalLengthMs = 0}) {
-  const [geom, setGeom] = useState({offsetPx: 0, widthPx: 0});
-
-  useEffect(() => {
-    let observedTl = null;
-
-    const compute = () => {
-      try {
-        const main = document.querySelector('.maincontent');
-        const tl = document.querySelector('.tracklane-timeline');
-        if (!main || !tl) return;
-        const mrect = main.getBoundingClientRect();
-        const trect = tl.getBoundingClientRect();
-  const offsetPx = (trect.left - mrect.left); // allow negative when scrolled right
-        const widthPx = Math.max(0, trect.width);
-        setGeom({offsetPx, widthPx});
-      } catch {}
-    };
-
-    compute();
-    const onResize = () => compute();
-    const onScroll = () => compute();
-    window.addEventListener('resize', onResize);
-    const ro = new ResizeObserver(() => compute());
-    try {
-      const main = document.querySelector('.maincontent');
-      const tl = document.querySelector('.tracklane-timeline');
-      if (main) ro.observe(main);
-      if (tl) { ro.observe(tl); observedTl = tl; }
-      if (main) main.addEventListener('scroll', onScroll, { passive: true });
-
-      // Watch for the timeline element appearing/changing
-      const mo = new MutationObserver(() => {
-        const nextTl = document.querySelector('.tracklane-timeline');
-        if (nextTl && nextTl !== observedTl) {
-          try { if (observedTl) ro.unobserve(observedTl); } catch {}
-          try { ro.observe(nextTl); observedTl = nextTl; } catch {}
-        }
-        compute();
-      });
-      mo.observe(main || document.body, { childList: true, subtree: true, attributes: true });
-      // Stash on window for cleanup access
-      window.__timelineRulerMO = mo;
-    } catch {}
-    return () => {
-      window.removeEventListener('resize', onResize);
-      try {
-        const main = document.querySelector('.maincontent');
-        if (main) main.removeEventListener('scroll', onScroll);
-      } catch {}
-      try { ro.disconnect(); } catch {}
-      try { window.__timelineRulerMO && window.__timelineRulerMO.disconnect(); } catch {}
-    };
-  }, []);
-
-  const {majorTicks, minorTicks} = useMemo(() => {
+export default function TimelineRuler({totalLengthMs = 0, timelineWidth = 0}) {
+  const {majorTicks, minorTicks, preMajorTicks, preMinorTicks, preHighlightWidthPx} = useMemo(() => {
     const majors = [];
     const minors = [];
-    if (!totalLengthMs || geom.widthPx <= 0) return {majorTicks: majors, minorTicks: minors};
+    const preMajors = [];
+    const preMinors = [];
+    let preHighlightWidthPx = 0;
+    if (!totalLengthMs || timelineWidth <= 0) {
+      return {majorTicks: majors, minorTicks: minors, preMajorTicks: preMajors, preMinorTicks: preMinors, preHighlightWidthPx};
+    }
 
     const totalSec = totalLengthMs / 1000;
-    const pxPerSec = geom.widthPx / totalSec;
+    const pxPerSec = timelineWidth / totalSec;
+    const pxPerMs = timelineWidth / totalLengthMs;
 
     // Choose a major tick step aiming for ~80px spacing
     const candidates = [0.1, 0.2, 0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300];
@@ -81,7 +33,7 @@ export default function TimelineRuler({totalLengthMs = 0}) {
     const majorTimes = [];
     for (let t = 0; t <= totalLengthMs + 1; t += stepMs) {
       const p = t / totalLengthMs; // 0..1
-      const left = Math.round(geom.offsetPx + p * geom.widthPx);
+      const left = Math.round(p * timelineWidth);
       majors.push({t, left});
       majorTimes.push(t);
     }
@@ -99,18 +51,35 @@ export default function TimelineRuler({totalLengthMs = 0}) {
     const minorStepMs = stepMs / subdivisions;
     for (let i = 0; i < majorTimes.length - 1; i++) {
       const start = majorTimes[i];
-      const end = majorTimes[i + 1];
       for (let k = 1; k < subdivisions; k++) {
         const t = start + k * minorStepMs;
         if (t > totalLengthMs) break;
         const p = t / totalLengthMs;
-        const left = Math.round(geom.offsetPx + p * geom.widthPx);
+        const left = Math.round(p * timelineWidth);
         minors.push({t, left});
       }
     }
 
-    return {majorTicks: majors, minorTicks: minors};
-  }, [totalLengthMs, geom]);
+    const preIntervals = 4;
+    const negativeExtent = preIntervals * stepMs;
+    preHighlightWidthPx = Math.max(0, Math.round(negativeExtent * pxPerMs));
+    for (let t = -stepMs; Math.abs(t) <= negativeExtent; t -= stepMs) {
+      const left = Math.round((t / totalLengthMs) * timelineWidth);
+      preMajors.push({t, left});
+    }
+
+    for (let interval = 0; interval < preIntervals; interval++) {
+      const base = interval * stepMs;
+      for (let k = 1; k < subdivisions; k++) {
+        const t = -(base + k * minorStepMs);
+        if (Math.abs(t) > negativeExtent) break;
+        const left = Math.round(t * pxPerMs);
+        preMinors.push({t, left});
+      }
+    }
+
+    return {majorTicks: majors, minorTicks: minors, preMajorTicks: preMajors, preMinorTicks: preMinors, preHighlightWidthPx};
+  }, [totalLengthMs, timelineWidth]);
 
   const fmt = (ms) => {
     const s = Math.floor(ms / 1000);
@@ -119,17 +88,33 @@ export default function TimelineRuler({totalLengthMs = 0}) {
     return `${m}:${ss}`;
   };
 
-  if (!totalLengthMs || geom.widthPx <= 0) return null;
+  if (!totalLengthMs || timelineWidth <= 0) return null;
 
   return (
     <div className="timeline-ruler-bar">
+      {preHighlightWidthPx > 0 && (
+        <div
+          className="timeline-pre-highlight"
+          style={{width: `${preHighlightWidthPx}px`, left: `${-preHighlightWidthPx}px`}}
+        />
+      )}
+      {preMinorTicks.map(({t, left}) => (
+        <div key={`pre-mi-${t}-${left}`} className="timeline-tick minor pre" style={{left: `${left}px`}}>
+          <div className="timeline-tick-line" />
+        </div>
+      ))}
+      {preMajorTicks.map(({t, left}) => (
+        <div key={`pre-ma-${t}`} className="timeline-tick pre" style={{left: `${left}px`}}>
+          <div className="timeline-tick-line" />
+        </div>
+      ))}
       {minorTicks.map(({t, left}) => (
-        <div key={`mi-${t}-${left}`} className="timeline-tick minor" style={{left}}>
+        <div key={`mi-${t}-${left}`} className="timeline-tick minor" style={{left: `${left}px`}}>
           <div className="timeline-tick-line" />
         </div>
       ))}
       {majorTicks.map(({t, left}) => (
-        <div key={`ma-${t}`} className="timeline-tick" style={{left}}>
+        <div key={`ma-${t}`} className="timeline-tick" style={{left: `${left}px`}}>
           <div className="timeline-tick-line" />
           <div className="timeline-tick-label">{fmt(t)}</div>
         </div>

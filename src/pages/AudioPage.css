@@ -57,7 +57,7 @@ html,
 /* --- Main Content Area Styling (The Core Grid) --- */
 .main-content-area {
   display: grid;
-  grid-template-columns: var(--sidebar-width) 5px 1fr;
+  grid-template-columns: var(--sidebar-width) 5px minmax(0, 1fr);
   height: 100%;
   position: relative;
   z-index: 1; /* Ensure main content is below header */

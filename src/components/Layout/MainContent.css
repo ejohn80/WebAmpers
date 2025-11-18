@@ -1,15 +1,29 @@
 /* MainContent.css - Styles for multi-track display */
 
 .maincontent {
-  flex: 1;
-  overflow-y: hidden; /* remove vertical scrolling in main content */
-  overflow-x: auto; /* allow horizontal scroll for long timelines */
-  padding: 48px 16px 56px 16px; /* extra top padding for ruler; bottom for zoom bar + scrollbar */
-  position: relative; /* allow global playhead to span entire area */
-  /* left offset = track lane padding (8px) + side width (120px) + gap (12px) */
-  --playhead-left-offset: 140px;
-  /* Reserve gutter so the horizontal scrollbar has space and is always predictable */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+  width: 100%;
+  padding: 0;
+  position: relative;
+  --track-controls-width: 180px;
+  --track-controls-gap: 12px;
+  --timeline-left-offset: calc(var(--track-controls-width) + var(--track-controls-gap));
+}
+
+.timeline-scroll-area {
+  flex: 1 1 auto;
+  overflow: auto;
+  padding-bottom: 32px;
   scrollbar-gutter: stable both-edges;
+}
+
+.timeline-scroll-content {
+  position: relative;
+  min-width: calc(var(--timeline-left-offset) + var(--timeline-content-width, 100%));
+  padding-bottom: 24px;
 }
 
 .tracks-container {
@@ -17,13 +31,12 @@
   flex-direction: column;
   gap: 16px;
   width: 100%;
-  /* Allow width to expand with computed timeline content width */
-  min-width: var(--timeline-content-width, 100%);
 }
 
 /* Wrapper to position global playhead across all tracks */
 .tracks-relative {
   position: relative;
+  min-width: calc(var(--timeline-left-offset) + var(--timeline-content-width, 100%));
 }
 
 .global-playhead {
@@ -39,25 +52,37 @@
 /* Rail that matches the timeline area (to the right of track controls) */
 .global-playhead-rail {
   position: absolute;
-  top: 0;
+  top: 32px;
   bottom: 0;
-  left: 0;
-  right: 0;
+  left: var(--timeline-left-offset);
+  width: var(--timeline-content-width, 100%);
   pointer-events: none;
   z-index: 10;
 }
 
 /* Timeline ruler overlay */
 .timeline-ruler-bar {
-  position: absolute;
+  position: sticky;
   top: 0;
-  left: 0;
-  right: 0;
+  margin-left: var(--timeline-left-offset);
+  width: var(--timeline-content-width, 100%);
   height: 32px;
-  background:rgba(82, 73, 73, 0.06);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: #2c2c2f;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
   pointer-events: none;
   z-index: 11;
+  margin-bottom: 12px;
+  overflow: visible;
+}
+
+.timeline-pre-highlight {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, rgba(234, 41, 41, 0.18), rgba(234, 41, 41, 0));
+  border-right: 1px solid rgba(234, 41, 41, 0.35);
+  pointer-events: none;
 }
 
 .timeline-tick {
@@ -79,6 +104,15 @@
   white-space: nowrap;
 }
 
+.timeline-tick.pre .timeline-tick-line {
+  height: 14px;
+  opacity: 0.3;
+}
+
+.timeline-tick.pre .timeline-tick-label {
+  display: none;
+}
+
 /* Zoom controls bar at bottom */
 .zoom-controls-bar {
   position: sticky;
@@ -87,17 +121,18 @@
   right: 0;
   display: flex;
   justify-content: flex-end;
-  padding: 6px 8px;
-  background: linear-gradient(to top, rgba(0,0,0,0.35), rgba(0,0,0,0));
-  border-top: 1px solid rgba(255,255,255,0.08);
+  padding: 2px 8px;
+  background: transparent;
   z-index: 12;
+  pointer-events: none;
 }
 
 .zoom-controls {
+  pointer-events: auto;
   display: inline-flex;
   gap: 6px;
   align-items: center;
-  background: rgba(0,0,0,0.35);
+  background: rgba(0,0,0,0.7);
   border: 1px solid rgba(255,255,255,0.12);
   border-radius: 6px;
   padding: 4px 6px;
@@ -128,7 +163,6 @@
 }
 
 .track-wrapper {
-  width: 100%;
   /* Add a subtle separator between tracks */
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
   padding-bottom: 16px;
@@ -140,30 +174,22 @@
 }
 
 /* Ensure smooth scrolling */
-.maincontent::-webkit-scrollbar {
+.timeline-scroll-area::-webkit-scrollbar {
   width: 8px;   /* vertical */
   height: 12px; /* horizontal */
 }
 
-.maincontent::-webkit-scrollbar-track {
+.timeline-scroll-area::-webkit-scrollbar-track {
   background: rgba(0, 0, 0, 0.1);
 }
 
-.maincontent::-webkit-scrollbar-thumb {
+.timeline-scroll-area::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.2);
   border-radius: 4px;
 }
 
-.maincontent::-webkit-scrollbar-thumb:hover {
+.timeline-scroll-area::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.3);
-}
-
-/* Keep the left-side controls visible while horizontally scrolling */
-.tracklane-side {
-  position: sticky;
-  left: 0;
-  z-index: 4;
-  background: #2f2f2f; /* match root background to mask scrolled content underneath */
 }
 
 /* Timeline width is driven by global CSS var; can be < or > viewport based on zoom */
