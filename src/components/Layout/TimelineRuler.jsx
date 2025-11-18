@@ -8,6 +8,8 @@ export default function TimelineRuler({totalLengthMs = 0}) {
   const [geom, setGeom] = useState({offsetPx: 0, widthPx: 0});
 
   useEffect(() => {
+    let observedTl = null;
+
     const compute = () => {
       try {
         const main = document.querySelector('.maincontent');
@@ -23,17 +25,37 @@ export default function TimelineRuler({totalLengthMs = 0}) {
 
     compute();
     const onResize = () => compute();
+    const onScroll = () => compute();
     window.addEventListener('resize', onResize);
     const ro = new ResizeObserver(() => compute());
     try {
       const main = document.querySelector('.maincontent');
       const tl = document.querySelector('.tracklane-timeline');
       if (main) ro.observe(main);
-      if (tl) ro.observe(tl);
+      if (tl) { ro.observe(tl); observedTl = tl; }
+      if (main) main.addEventListener('scroll', onScroll, { passive: true });
+
+      // Watch for the timeline element appearing/changing
+      const mo = new MutationObserver(() => {
+        const nextTl = document.querySelector('.tracklane-timeline');
+        if (nextTl && nextTl !== observedTl) {
+          try { if (observedTl) ro.unobserve(observedTl); } catch {}
+          try { ro.observe(nextTl); observedTl = nextTl; } catch {}
+        }
+        compute();
+      });
+      mo.observe(main || document.body, { childList: true, subtree: true, attributes: true });
+      // Stash on window for cleanup access
+      window.__timelineRulerMO = mo;
     } catch {}
     return () => {
       window.removeEventListener('resize', onResize);
+      try {
+        const main = document.querySelector('.maincontent');
+        if (main) main.removeEventListener('scroll', onScroll);
+      } catch {}
       try { ro.disconnect(); } catch {}
+      try { window.__timelineRulerMO && window.__timelineRulerMO.disconnect(); } catch {}
     };
   }, []);
 

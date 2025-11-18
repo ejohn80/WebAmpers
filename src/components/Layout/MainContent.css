@@ -3,7 +3,7 @@
 .maincontent {
   flex: 1;
   overflow-y: auto;
-  overflow-x: hidden;
+  overflow-x: auto; /* allow horizontal scroll for long timelines */
   padding: 48px 16px 16px 16px; /* extra top padding to accommodate ruler */
   position: relative; /* allow global playhead to span entire area */
   /* left offset = track lane padding (8px) + side width (120px) + gap (12px) */
@@ -113,4 +113,18 @@
 
 .maincontent::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.3);
+}
+
+/* Keep the left-side controls visible while horizontally scrolling */
+.tracklane-side {
+  position: sticky;
+  left: 0;
+  z-index: 4;
+  background: #2f2f2f; /* match root background to mask scrolled content underneath */
+}
+
+/* Timeline grows wider than viewport when content exceeds default length */
+.tracklane-timeline {
+  width: var(--timeline-content-width, 100%);
+  min-width: 100%;
 }
