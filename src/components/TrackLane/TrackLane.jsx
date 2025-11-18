@@ -14,7 +14,9 @@ function TrackLane({
   onDelete,
   trackIndex = 0,
   totalTracks = 1,
-  totalLengthMs = 0 // Total timeline length for proportional sizing
+  totalLengthMs = 0, // Total timeline length for proportional sizing
+  timelineWidth = 0,
+  rowWidthPx = 0
 }) {
   if (!track) return null;
 
@@ -81,8 +83,29 @@ function TrackLane({
     }
   };
 
+  const parsedTimelineWidth = typeof timelineWidth === "number"
+    ? timelineWidth
+    : Number.parseFloat(timelineWidth ?? "");
+  const numericTimelineWidth = Number.isFinite(parsedTimelineWidth)
+    ? Math.max(0, parsedTimelineWidth)
+    : 0;
+  const pxPerMs = totalLengthMs > 0 && numericTimelineWidth > 0
+    ? numericTimelineWidth / totalLengthMs
+    : null;
+
+  const tracklaneMainStyle = numericTimelineWidth > 0
+    ? {width: `${numericTimelineWidth}px`, minWidth: `${numericTimelineWidth}px`}
+    : undefined;
+  const tracklaneTimelineStyle = numericTimelineWidth > 0
+    ? {width: `${numericTimelineWidth}px`}
+    : undefined;
+
+  const rowWidthStyle = rowWidthPx > 0
+    ? {minWidth: `${rowWidthPx}px`, width: `${rowWidthPx}px`}
+    : undefined;
+
   return (
-    <div className="tracklane-root">
+    <div className="tracklane-root" style={rowWidthStyle}>
       <div className="tracklane-side">
         {showTitle && (
           <div className="tracklane-header">
@@ -128,9 +151,9 @@ function TrackLane({
         </div>
       </div>
 
-      <div className="tracklane-main">
+      <div className="tracklane-main" style={tracklaneMainStyle}>
         {/* Timeline ruler - shows full timeline length */}
-        <div className="tracklane-timeline">
+        <div className="tracklane-timeline" style={tracklaneTimelineStyle}>
           {segments.length === 0 && (
             <div className="tracklane-empty">
               No segments — import audio to add one.
@@ -139,18 +162,30 @@ function TrackLane({
 
           {segments.map((seg) => {
             const audioBuffer = seg.buffer ?? seg.fileBuffer ?? null;
-            
-            // Calculate positioning and sizing
-            const startOnTimelineMs = seg.startOnTimelineMs || 0;
-            const durationMs = seg.durationMs || 0;
-            
-            // Calculate percentage positions relative to total timeline
-            const leftPercent = totalLengthMs > 0 
-              ? (startOnTimelineMs / totalLengthMs) * 100 
-              : 0;
-            const widthPercent = totalLengthMs > 0 
-              ? (durationMs / totalLengthMs) * 100 
-              : 100;
+
+            const startOnTimelineMs = Math.max(0, seg.startOnTimelineMs || 0);
+            const durationMs = Math.max(0, seg.durationMs || 0);
+
+            let positionStyle;
+            if (pxPerMs) {
+              const leftPx = Math.round(startOnTimelineMs * pxPerMs);
+              const widthPx = Math.max(2, Math.round(durationMs * pxPerMs));
+              positionStyle = {
+                left: `${leftPx}px`,
+                width: `${widthPx}px`
+              };
+            } else {
+              const leftPercent = totalLengthMs > 0 
+                ? (startOnTimelineMs / totalLengthMs) * 100 
+                : 0;
+              const widthPercent = totalLengthMs > 0 
+                ? (durationMs / totalLengthMs) * 100 
+                : 100;
+              positionStyle = {
+                left: `${leftPercent}%`,
+                width: `${widthPercent}%`
+              };
+            }
 
             return (
               <div
@@ -158,9 +193,8 @@ function TrackLane({
                 key={seg.id || seg.fileUrl || Math.random()}
                 style={{
                   position: 'absolute',
-                  left: `${leftPercent}%`,
-                  width: `${widthPercent}%`,
-                  height: '100%'
+                  height: '100%',
+                  ...positionStyle
                 }}
               >
                 <div className="tracklane-segment">

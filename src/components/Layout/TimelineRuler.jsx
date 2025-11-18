@@ -4,7 +4,7 @@ import React, {useMemo} from "react";
  * TimelineRuler
  * Draws a time ruler with tick marks aligned to the start of the waveform area.
  */
-export default function TimelineRuler({totalLengthMs = 0, timelineWidth = 0}) {
+export default function TimelineRuler({totalLengthMs = 0, timelineWidth = 0, timelineLeftOffsetPx = 0}) {
   const {majorTicks, minorTicks, preMajorTicks, preMinorTicks, preHighlightWidthPx} = useMemo(() => {
     const majors = [];
     const minors = [];
@@ -90,8 +90,13 @@ export default function TimelineRuler({totalLengthMs = 0, timelineWidth = 0}) {
 
   if (!totalLengthMs || timelineWidth <= 0) return null;
 
+  const rulerStyle = {
+    marginLeft: `${timelineLeftOffsetPx}px`,
+    width: `${Math.max(0, Math.round(timelineWidth))}px`
+  };
+
   return (
-    <div className="timeline-ruler-bar">
+    <div className="timeline-ruler-bar" style={rulerStyle}>
       {preHighlightWidthPx > 0 && (
         <div
           className="timeline-pre-highlight"

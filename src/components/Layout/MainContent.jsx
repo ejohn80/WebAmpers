@@ -15,6 +15,9 @@ import "./MainContent.css";
  * @param {Function} props.onDelete - Callback for track deletion
  * @param {number} props.totalLengthMs - Global timeline length in milliseconds for proportional sizing
  */
+const TRACK_CONTROLS_WIDTH = 180;
+const TRACK_CONTROLS_GAP = 12;
+
 function MainContent({ tracks = [], onMute, onSolo, onDelete, totalLengthMs = 0 }) {
   // Default visible window length (in ms) before horizontal scrolling is needed
   // Timeline scale is driven by pixels-per-second instead of a fixed window length
@@ -41,6 +44,13 @@ function MainContent({ tracks = [], onMute, onSolo, onDelete, totalLengthMs = 0 
     "--track-height": `${Math.round(96 * verticalScale)}px`
   }), [timelineContentWidth, verticalScale]);
 
+  const timelineMetrics = useMemo(() => {
+    const widthPx = Math.max(1, Math.round(timelineContentWidth));
+    const leftOffsetPx = TRACK_CONTROLS_WIDTH + TRACK_CONTROLS_GAP;
+    const rowWidthPx = widthPx + leftOffsetPx;
+    return { widthPx, leftOffsetPx, rowWidthPx };
+  }, [timelineContentWidth]);
+
   const zoomIn = () => setZoom((z) => Math.min(MAX_ZOOM, Number((z + 0.25).toFixed(2))));
   const zoomOut = () => setZoom((z) => Math.max(MIN_ZOOM, Number((z - 0.25).toFixed(2))));
   const resetZoom = () => setZoom(1);
@@ -50,18 +60,37 @@ function MainContent({ tracks = [], onMute, onSolo, onDelete, totalLengthMs = 0 
       <div className="timeline-scroll-area">
         <TimelineRuler
           totalLengthMs={totalLengthMs}
-          timelineWidth={timelineContentWidth}
+          timelineWidth={timelineMetrics.widthPx}
+          timelineLeftOffsetPx={timelineMetrics.leftOffsetPx}
         />
-        <div className="timeline-scroll-content">
-          <div className="global-playhead-rail">
+        <div
+          className="timeline-scroll-content"
+          style={{
+            minWidth: `${timelineMetrics.rowWidthPx}px`,
+            width: `${timelineMetrics.rowWidthPx}px`
+          }}
+        >
+          <div
+            className="global-playhead-rail"
+            style={{
+              left: `${timelineMetrics.leftOffsetPx}px`,
+              width: `${timelineMetrics.widthPx}px`
+            }}
+          >
             <GlobalPlayhead
               totalLengthMs={totalLengthMs}
-              timelineWidth={timelineContentWidth}
+              timelineWidth={timelineMetrics.widthPx}
             />
           </div>
           {tracks && tracks.length > 0 ? (
-            <div className="tracks-relative">
-              <div className="tracks-container">
+            <div
+              className="tracks-relative"
+              style={{ width: `${timelineMetrics.rowWidthPx}px` }}
+            >
+              <div
+                className="tracks-container"
+                style={{ width: `${timelineMetrics.rowWidthPx}px` }}
+              >
                 {tracks.map((track, index) => (
                   <div key={track.id} className="track-wrapper">
                     <TrackLane
@@ -73,6 +102,8 @@ function MainContent({ tracks = [], onMute, onSolo, onDelete, totalLengthMs = 0 
                       onSolo={onSolo}
                       onDelete={onDelete}
                       totalLengthMs={totalLengthMs}
+                      timelineWidth={timelineMetrics.widthPx}
+                      rowWidthPx={timelineMetrics.rowWidthPx}
                     />
                   </div>
                 ))}
