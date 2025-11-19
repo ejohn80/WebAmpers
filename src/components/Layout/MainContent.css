@@ -194,6 +194,20 @@
   padding-bottom: 0;
 }
 
+.empty-state {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 320px;
+  text-align: center;
+  font-size: 1.5rem;
+  color: rgba(255, 255, 255, 0.8);
+  letter-spacing: 0.02em;
+  padding: 32px 16px;
+}
+
 /* Ensure smooth scrolling */
 .timeline-scroll-area::-webkit-scrollbar {
   width: 8px; /* vertical */

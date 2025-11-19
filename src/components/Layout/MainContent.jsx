@@ -61,6 +61,8 @@ function MainContent({
     return {widthPx, leftOffsetPx, rowWidthPx};
   }, [timelineContentWidth]);
 
+  const hasTracks = Array.isArray(tracks) && tracks.length > 0;
+
   const zoomIn = () =>
     setZoom((z) => Math.min(MAX_ZOOM, Number((z + 0.25).toFixed(2))));
   const zoomOut = () =>
@@ -70,64 +72,65 @@ function MainContent({
   return (
     <DraggableDiv className="maincontent" style={timelineStyle}>
       <div className="timeline-scroll-area">
-        <TimelineRuler
-          totalLengthMs={totalLengthMs}
-          timelineWidth={timelineMetrics.widthPx}
-          timelineLeftOffsetPx={timelineMetrics.leftOffsetPx}
-        />
-        <div
-          className="timeline-scroll-content"
-          style={{
-            minWidth: `${timelineMetrics.rowWidthPx}px`,
-            width: `${timelineMetrics.rowWidthPx}px`,
-          }}
-        >
-          <div
-            className="global-playhead-rail"
-            style={{
-              left: `${timelineMetrics.leftOffsetPx}px`,
-              width: `${timelineMetrics.widthPx}px`,
-            }}
-          >
-            <GlobalPlayhead
+        {hasTracks ? (
+          <>
+            <TimelineRuler
               totalLengthMs={totalLengthMs}
               timelineWidth={timelineMetrics.widthPx}
+              timelineLeftOffsetPx={timelineMetrics.leftOffsetPx}
             />
-          </div>
-          {tracks && tracks.length > 0 ? (
             <div
-              className="tracks-relative"
-              style={{width: `${timelineMetrics.rowWidthPx}px`}}
+              className="timeline-scroll-content"
+              style={{
+                minWidth: `${timelineMetrics.rowWidthPx}px`,
+                width: `${timelineMetrics.rowWidthPx}px`,
+              }}
             >
               <div
-                className="tracks-container"
+                className="global-playhead-rail"
+                style={{
+                  left: `${timelineMetrics.leftOffsetPx}px`,
+                  width: `${timelineMetrics.widthPx}px`,
+                }}
+              >
+                <GlobalPlayhead
+                  totalLengthMs={totalLengthMs}
+                  timelineWidth={timelineMetrics.widthPx}
+                />
+              </div>
+              <div
+                className="tracks-relative"
                 style={{width: `${timelineMetrics.rowWidthPx}px`}}
               >
-                {tracks.map((track, index) => (
-                  <div key={track.id} className="track-wrapper">
-                    <TrackLane
-                      track={track}
-                      trackIndex={index}
-                      totalTracks={tracks.length}
-                      showTitle={true}
-                      onMute={onMute}
-                      onSolo={onSolo}
-                      onDelete={onDelete}
-                      totalLengthMs={totalLengthMs}
-                      timelineWidth={timelineMetrics.widthPx}
-                      rowWidthPx={timelineMetrics.rowWidthPx}
-                    />
-                  </div>
-                ))}
+                <div
+                  className="tracks-container"
+                  style={{width: `${timelineMetrics.rowWidthPx}px`}}
+                >
+                  {tracks.map((track, index) => (
+                    <div key={track.id} className="track-wrapper">
+                      <TrackLane
+                        track={track}
+                        trackIndex={index}
+                        totalTracks={tracks.length}
+                        showTitle={true}
+                        onMute={onMute}
+                        onSolo={onSolo}
+                        onDelete={onDelete}
+                        totalLengthMs={totalLengthMs}
+                        timelineWidth={timelineMetrics.widthPx}
+                        rowWidthPx={timelineMetrics.rowWidthPx}
+                      />
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
-          ) : (
-            <div className="empty-state">
-              <h2>No Tracks Yet</h2>
-              <p>Import an audio file or start recording to add tracks.</p>
-            </div>
-          )}
-        </div>
+          </>
+        ) : (
+          <div className="empty-state" role="status" aria-live="polite">
+            Import an audio file
+          </div>
+        )}
       </div>
       <div className="zoom-controls-bar">
         <div
