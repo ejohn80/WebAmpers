@@ -20,16 +20,64 @@ const Waveform = ({
 }) => {
   const canvasRef = useRef(null);
   const draggingRef = useRef(false);
+  const [canvasSize, setCanvasSize] = useState({width: 0, height: 0});
+
+  // Track container resize so we can redraw with accurate resolution when zooming
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const container = canvas.parentElement;
+    if (!container) return;
+
+    const updateSize = () => {
+      const rect = container.getBoundingClientRect();
+      setCanvasSize({
+        width: Math.max(1, Math.round(rect.width)),
+        height: Math.max(1, Math.round(rect.height)),
+      });
+    };
+
+    updateSize();
+
+    if (typeof ResizeObserver !== "undefined") {
+      const observer = new ResizeObserver(updateSize);
+      observer.observe(container);
+      return () => observer.disconnect();
+    }
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("resize", updateSize);
+      return () => window.removeEventListener("resize", updateSize);
+    }
+    return undefined;
+  }, []);
 
   useEffect(() => {
     if (!audioBuffer || !canvasRef.current) return;
+    if (!canvasSize.width || !canvasSize.height) return;
 
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
 
-    // Use layout size for crisp rendering
-    canvas.width = canvas.clientWidth;
-    canvas.height = canvas.clientHeight;
+    const dpr =
+      typeof window !== "undefined" && window.devicePixelRatio
+        ? window.devicePixelRatio
+        : 1;
+    const cssWidth = canvasSize.width;
+    const cssHeight = canvasSize.height;
+    const pixelWidth = Math.max(1, Math.floor(cssWidth * dpr));
+    const pixelHeight = Math.max(1, Math.floor(cssHeight * dpr));
+
+    if (canvas.width !== pixelWidth || canvas.height !== pixelHeight) {
+      canvas.width = pixelWidth;
+      canvas.height = pixelHeight;
+      canvas.style.width = `${cssWidth}px`;
+      canvas.style.height = `${cssHeight}px`;
+    }
+
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.scale(dpr, dpr);
 
     // 🔧 Unwrap Tone.ToneAudioBuffer -> native AudioBuffer robustly
     let native = null;
@@ -46,16 +94,18 @@ const Waveform = ({
     if (!native) return; // still nothing to draw
 
     const data = native.getChannelData(0);
-    const step = Math.ceil(data.length / canvas.width);
-    const amp = canvas.height / 2;
+    const visibleWidth = Math.max(1, cssWidth);
+    const step = Math.max(1, Math.floor(data.length / visibleWidth));
+    const amp = cssHeight / 2;
 
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
     // allow caller to specify the stroke color (track color) with a sensible default
     ctx.strokeStyle = color || "#ffffff";
-    ctx.lineWidth = 1;
+    ctx.lineWidth = dpr >= 2 ? 0.75 : 1;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
     ctx.beginPath();
 
-    for (let i = 0; i < canvas.width; i++) {
+    for (let i = 0; i < visibleWidth; i++) {
       let min = 1.0,
         max = -1.0;
       for (let j = 0; j < step; j++) {
@@ -65,11 +115,12 @@ const Waveform = ({
         if (v < min) min = v;
         if (v > max) max = v;
       }
-      ctx.moveTo(i, (1 + min) * amp);
-      ctx.lineTo(i, (1 + max) * amp);
+      const x = i + 0.5; // center lines on pixel for crispness
+      ctx.moveTo(x, (1 + min) * amp);
+      ctx.lineTo(x, (1 + max) * amp);
     }
     ctx.stroke();
-  }, [audioBuffer, color]); // Redraw when the audioBuffer or color prop changes
+  }, [audioBuffer, canvasSize.height, canvasSize.width, color]);
 
   const [{ms, lengthMs}, setProgress] = useState(progressStore.getState());
 

@@ -104,7 +104,11 @@ function MainContent({
   const resetZoom = () => setZoom(1);
 
   return (
-    <DraggableDiv className="maincontent" style={timelineStyle}>
+    <DraggableDiv
+      className="maincontent"
+      style={timelineStyle}
+      disableSectionPadding
+    >
       <div className="timeline-scroll-area" ref={scrollAreaRef}>
         {hasTracks ? (
           <>
