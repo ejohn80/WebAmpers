@@ -25,6 +25,8 @@ import {
   GuestIcon,
 } from "./Svgs";
 
+import {BsArrowsFullscreen, BsArrowsAngleContract} from "react-icons/bs";
+
 function DropdownPortal({
   side,
   audioBuffer,
@@ -37,6 +39,8 @@ function DropdownPortal({
 
   const [activeDropdown, setActiveDropdown] = useState(null);
   const [position, setPosition] = useState({top: 0, left: 0});
+
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const fileButtonRef = useRef(null);
   const editButtonRef = useRef(null);
@@ -51,8 +55,6 @@ function DropdownPortal({
   const guestDropdownRef = useRef(null);
 
   const handleMenuItemClick = (action) => {
-    console.log(`Selected: ${action}`);
-
     // Handle navigation for guest dropdown
     if (action === "Login") {
       navigate("/login");
@@ -80,10 +82,10 @@ function DropdownPortal({
 
   // Handle mouse leave from dropdown
   const handleDropdownMouseLeave = (event) => {
-    const relatedTarget = event.relatedTarget;
+    const related = event.relatedTarget;
     const dropdown = event.currentTarget;
 
-    if (!dropdown.contains(relatedTarget)) {
+    if (!(related instanceof Node) || !dropdown.contains(related)) {
       setActiveDropdown(null);
     }
   };
@@ -131,6 +133,79 @@ function DropdownPortal({
   const getButtonClass = (buttonType, dropdownName) => {
     const baseClass = `dropdown-btn${buttonType ? `-${buttonType}` : ""}`;
     return activeDropdown === dropdownName ? `${baseClass} active` : baseClass;
+  };
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(checkFullscreen());
+    };
+
+    // Fullscreen
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
+    document.addEventListener("mozfullscreenchange", handleFullscreenChange);
+    document.addEventListener("MSFullscreenChange", handleFullscreenChange);
+
+    return () => {
+      // Fullscreen
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+      document.removeEventListener(
+        "webkitfullscreenchange",
+        handleFullscreenChange
+      );
+      document.removeEventListener(
+        "mozfullscreenchange",
+        handleFullscreenChange
+      );
+      document.removeEventListener(
+        "MSFullscreenChange",
+        handleFullscreenChange
+      );
+    };
+  }, []);
+
+  const enterFullScreen = () => {
+    let element = document.documentElement;
+    setIsFullscreen(true);
+
+    if (element.requestFullscreen) {
+      element.requestFullscreen();
+    } else if (element.mozRequestFullScreen) {
+      // Firefox
+      element.mozRequestFullScreen();
+    } else if (element.webkitRequestFullscreen) {
+      // Chrome, Safari, and Opera
+      element.webkitRequestFullscreen();
+    } else if (element.msRequestFullscreen) {
+      // IE/Edge
+      element.msRequestFullscreen();
+    }
+  };
+
+  const exitFullscreen = () => {
+    setIsFullscreen(false);
+    if (document.exitFullscreen) {
+      // General
+      document.exitFullscreen();
+    } else if (document.webkitExitFullscreen) {
+      // Safari
+      document.webkitExitFullscreen();
+    } else if (document.msExitFullscreen) {
+      // IE11
+      document.msExitFullscreen();
+    } else if (document.mozCancelFullScreen) {
+      // Firefox
+      document.mozCancelFullScreen();
+    }
+  };
+
+  const checkFullscreen = () => {
+    return Boolean(
+      document.fullscreenElement || // Standard
+        document.webkitFullscreenElement || // Chrome and Opera
+        document.mozFullScreenElement || // Firefox
+        document.msFullscreenElement // IE/Edge
+    );
   };
 
   // Dropdown content for each menu with individual styling
@@ -477,6 +552,24 @@ function DropdownPortal({
           >
             <ColorAccessibilityIcon />
             <span>Color Accessibility</span>
+          </span>
+        </a>
+        <a
+          href="#"
+          onClick={() =>
+            checkFullscreen() ? exitFullscreen() : enterFullScreen()
+          }
+        >
+          <span
+            style={{
+              display: "flex",
+              alignItems: "center",
+              width: "100%",
+              gap: "8px",
+            }}
+          >
+            {isFullscreen ? <BsArrowsAngleContract /> : <BsArrowsFullscreen />}
+            <span>{isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}</span>
           </span>
         </a>
         <a
