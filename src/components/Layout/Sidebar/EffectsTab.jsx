@@ -46,6 +46,36 @@ function EffectsTab() {
       unit: "%",
       description: "Add room ambience",
     },
+    {
+      name: "delay",
+      label: "Delay",
+      min: 0,
+      max: 100,
+      step: 1,
+      default: 0,
+      unit: "%",
+      description: "Add echo effect",
+    },
+    {
+      name: "bass",
+      label: "Bass Boost",
+      min: -12,
+      max: 12,
+      step: 1,
+      default: 0,
+      unit: " dB",
+      description: "Boost or cut low frequencies",
+    },
+    {
+      name: "distortion",
+      label: "Distortion",
+      min: 0,
+      max: 100,
+      step: 1,
+      default: 0,
+      unit: "%",
+      description: "Add grit and crunch",
+    },
   ];
 
   // Update local state immediately for smooth UI

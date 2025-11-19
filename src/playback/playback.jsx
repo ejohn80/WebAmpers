@@ -220,7 +220,10 @@ class PlaybackEngine {
     const hasEffects =
       (effects?.pitch && effects.pitch !== 0) ||
       (effects?.reverb && effects.reverb > 0) ||
-      (effects?.volume !== undefined && effects.volume !== 100);
+      (effects?.volume && effects.volume !== 100) ||
+      (effects?.delay && effects.delay > 0) ||
+      (effects?.bass && effects.bass !== 0) ||
+      (effects?.distortion && effects.distortion > 0);
 
     // No effects --> don't do anything
     if (!hasEffects) {
@@ -292,8 +295,54 @@ class PlaybackEngine {
       }
     }
 
+    // Delay
+    if (effects?.delay && effects.delay > 0) {
+      try {
+        const wet = Math.max(0, Math.min(1, effects.delay / 100));
+        const delay = new Tone.FeedbackDelay({
+          delayTime: "8n", // eighth note delay
+          feedback: 0.3 + 0.4 * wet, // more feedback = more repeats
+          wet: wet,
+          context: context,
+        });
+        chain.push(delay);
+      } catch (e) {
+        console.warn("Failed to create delay effect:", e);
+      }
+    }
+
+    // Bass Boost
+    if (effects?.bass && effects.bass !== 0) {
+      try {
+        const eq = new Tone.EQ3({
+          low: effects.bass, // boost/cut in dB
+          mid: 0,
+          high: 0,
+          context: context,
+        });
+        chain.push(eq);
+      } catch (e) {
+        console.warn("Failed to create bass boost effect:", e);
+      }
+    }
+
+    // Distortion
+    if (effects?.distortion && effects.distortion > 0) {
+      try {
+        const amount = Math.max(0, Math.min(1, effects.distortion / 100));
+        const distortion = new Tone.Distortion({
+          distortion: amount,
+          wet: amount * 0.8,
+          context: context,
+        });
+        chain.push(distortion);
+      } catch (e) {
+        console.warn("Failed to create distortion effect:", e);
+      }
+    }
+
     // Volume/Gain
-    if (effects?.volume !== undefined && effects.volume !== 100) {
+    if (effects?.volume && effects.volume !== 100) {
       try {
         const gain = Math.max(0, Math.min(2, effects.volume / 100));
         const gainNode = new Tone.Gain({
@@ -361,6 +410,29 @@ class PlaybackEngine {
       const wet = Math.max(0, Math.min(1, effects.reverb / 100));
       const roomSize = 0.1 + 0.85 * wet;
       chain.push({type: "freeverb", wet, roomSize});
+    }
+    // Effect volume (0-200% -> 0.0-2.0 linear)
+    if (typeof effects?.volume === "number" && effects.volume !== 100) {
+      const linear = Math.max(0, Math.min(2, effects.volume / 100));
+      chain.push({type: "gain", gain: linear});
+    }
+    // Delay
+    if (typeof effects?.delay === "number" && effects.delay > 0) {
+      const wet = Math.max(0, Math.min(1, effects.delay / 100));
+      chain.push({
+        type: "delay",
+        wet,
+        feedback: 0.3 + 0.4 * wet,
+      });
+    }
+    // Bass Boost
+    if (typeof effects?.bass === "number" && effects.bass !== 0) {
+      chain.push({type: "eq3", low: effects.bass});
+    }
+    // Distortion
+    if (typeof effects?.distortion === "number" && effects.distortion > 0) {
+      const amount = Math.max(0, Math.min(1, effects.distortion / 100));
+      chain.push({type: "distortion", amount});
     }
     // Effect volume (0-200% -> 0.0-2.0 linear)
     if (typeof effects?.volume === "number" && effects.volume !== 100) {
@@ -467,6 +539,33 @@ class PlaybackEngine {
                 wet: Math.max(0, Math.min(1, cfg.wet ?? 0.5)),
               });
               nodes.push(fv);
+              break;
+            }
+            case "delay": {
+              const delay = new Tone.FeedbackDelay({
+                delayTime: "8n",
+                feedback: cfg.feedback ?? 0.5,
+                wet: cfg.wet ?? 0.5,
+              });
+              nodes.push(delay);
+              break;
+            }
+            case "eq3": {
+              const eq = new Tone.EQ3({
+                // THIS IS AN EQUALIZER --> (just for base)
+                low: cfg.low ?? 0,
+                mid: 0,
+                high: 0,
+              });
+              nodes.push(eq);
+              break;
+            }
+            case "distortion": {
+              const dist = new Tone.Distortion({
+                distortion: cfg.amount ?? 0.5,
+                wet: (cfg.amount ?? 0.5) * 0.8,
+              });
+              nodes.push(dist);
               break;
             }
             case "gain": {
