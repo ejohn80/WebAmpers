@@ -74,7 +74,7 @@ class DBManager {
     return new Promise((resolve, reject) => {
       const transaction = db.transaction([TRACKS_STORE_NAME], "readwrite");
       const store = transaction.objectStore(TRACKS_STORE_NAME);
-      
+
       // Prefer to use a `toJSON()` serializer if the object provides one
       const base =
         typeof trackData?.toJSON === "function"
@@ -168,7 +168,7 @@ class DBManager {
         hasId &&
         typeof storableTrack.id === "string" &&
         /^track_/.test(storableTrack.id);
-      
+
       let request;
       if (isClientGeneratedString || !hasId) {
         // Remove the client-generated ID so IndexedDB assigns a numeric one
@@ -219,11 +219,11 @@ class DBManager {
    */
   async deleteTrack(trackId) {
     const db = await this.openDB();
-    
+
     return new Promise((resolve, reject) => {
       const transaction = db.transaction([TRACKS_STORE_NAME], "readwrite");
       const store = transaction.objectStore(TRACKS_STORE_NAME);
-      
+
       const deleteRequest = store.delete(trackId);
 
       deleteRequest.onsuccess = () => {
@@ -243,7 +243,6 @@ class DBManager {
     });
   }
 
-
   /**
    * Update an existing track in IndexedDB
    * @param {AudioTrack} track - The track to update
@@ -255,18 +254,20 @@ class DBManager {
     return new Promise((resolve, reject) => {
       const transaction = db.transaction([TRACKS_STORE_NAME], "readwrite");
       const store = transaction.objectStore(TRACKS_STORE_NAME);
-        
+
       // Serialize the track before storing
       const trackData = this.serializeTrack(track);
-      
-      // FIX: Ensure we're using a numeric ID for updates
-      // If the track has a client-generated string ID, we have a problem
+
       if (typeof trackData.id === "string" && /^track_/.test(trackData.id)) {
-        console.error(`Cannot update track with client-generated ID: ${trackData.id}`);
-        reject(new Error("Track must have a numeric DB-assigned ID for updates"));
+        console.error(
+          `Cannot update track with client-generated ID: ${trackData.id}`
+        );
+        reject(
+          new Error("Track must have a numeric DB-assigned ID for updates")
+        );
         return;
       }
-        
+
       const updateRequest = store.put(trackData);
 
       updateRequest.onsuccess = () => {
@@ -274,7 +275,10 @@ class DBManager {
       };
 
       updateRequest.onerror = (event) => {
-        console.error(`Failed to update track ${track.id}:`, event.target.error);
+        console.error(
+          `Failed to update track ${track.id}:`,
+          event.target.error
+        );
         reject(new Error("Failed to update track"));
       };
 

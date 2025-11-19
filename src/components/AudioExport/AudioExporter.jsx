@@ -1,8 +1,13 @@
-import React, { useState, useMemo, useContext } from "react";
+import React, {useState, useMemo, useContext} from "react";
 import ExportManager from "./ExportManager.js";
-import { AppContext } from "../../context/AppContext";
+import {AppContext} from "../../context/AppContext";
 
-const AudioExporter = ({ tracks, totalLengthMs, onExportComplete, audioBuffer }) => {
+const AudioExporter = ({
+  tracks,
+  totalLengthMs,
+  onExportComplete,
+  audioBuffer,
+}) => {
   // Make context optional so tests that don't mount AppContextProvider don't crash
   const appCtx = useContext(AppContext) || {};
   const effects = appCtx.effects || [];
@@ -14,9 +19,9 @@ const AudioExporter = ({ tracks, totalLengthMs, onExportComplete, audioBuffer })
   const [error, setError] = useState(null);
 
   const formats = [
-    { value: "mp3", label: "MP3" },
-    { value: "wav", label: "WAV" },
-    { value: "ogg", label: "OGG" },
+    {value: "mp3", label: "MP3"},
+    {value: "wav", label: "WAV"},
+    {value: "ogg", label: "OGG"},
   ];
 
   const getQualityOptions = (currentFormat) => {
@@ -57,7 +62,8 @@ const AudioExporter = ({ tracks, totalLengthMs, onExportComplete, audioBuffer })
   const handleExport = async (e) => {
     e.preventDefault();
     setError(null);
-    const exportBitrate = (format === "mp3" || format === "ogg") ? qualitySetting : undefined;
+    const exportBitrate =
+      format === "mp3" || format === "ogg" ? qualitySetting : undefined;
 
     // Compatibility: support legacy prop `audioBuffer` used in tests
     if (typeof audioBuffer !== "undefined") {
@@ -75,7 +81,12 @@ const AudioExporter = ({ tracks, totalLengthMs, onExportComplete, audioBuffer })
         if (result && onExportComplete) onExportComplete(result);
       } catch (err) {
         console.error("Export Error:", err);
-        setError((err?.message || "Export failed").split("Command:")[0].replace(/^Error:\s*/, "").trim());
+        setError(
+          (err?.message || "Export failed")
+            .split("Command:")[0]
+            .replace(/^Error:\s*/, "")
+            .trim()
+        );
       } finally {
         setIsLoading(false);
       }
@@ -90,15 +101,26 @@ const AudioExporter = ({ tracks, totalLengthMs, onExportComplete, audioBuffer })
 
     setIsLoading(true);
     try {
-      const result = await exportManager.exportAudio(tracks, totalLengthMs, effects, {
-        format,
-        filename,
-        bitrate: exportBitrate,
-      });
-      if (result && result.success && onExportComplete) onExportComplete(result);
+      const result = await exportManager.exportAudio(
+        tracks,
+        totalLengthMs,
+        effects,
+        {
+          format,
+          filename,
+          bitrate: exportBitrate,
+        }
+      );
+      if (result && result.success && onExportComplete)
+        onExportComplete(result);
     } catch (err) {
       console.error("Export Error:", err);
-      setError((err?.message || "Export failed").split("Command:")[0].replace(/^Error:\s*/, "").trim());
+      setError(
+        (err?.message || "Export failed")
+          .split("Command:")[0]
+          .replace(/^Error:\s*/, "")
+          .trim()
+      );
     } finally {
       setIsLoading(false);
     }
@@ -112,13 +134,13 @@ const AudioExporter = ({ tracks, totalLengthMs, onExportComplete, audioBuffer })
 
       <form
         onSubmit={handleExport}
-        style={{ display: "flex", flexDirection: "column", gap: "15px" }}
+        style={{display: "flex", flexDirection: "column", gap: "15px"}}
       >
-        <div style={{ display: "flex", alignItems: "center" }}>
+        <div style={{display: "flex", alignItems: "center"}}>
           <label
             htmlFor="format"
             className="block text-sm font-medium text-gray-700"
-            style={{ width: "120px", minWidth: "120px", marginRight: "15px" }}
+            style={{width: "120px", minWidth: "120px", marginRight: "15px"}}
           >
             Output Format
           </label>
@@ -129,7 +151,7 @@ const AudioExporter = ({ tracks, totalLengthMs, onExportComplete, audioBuffer })
             onChange={(e) => handleFormatChange(e.target.value)}
             className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md shadow-sm"
             aria-label="Output Format"
-            style={{ flexGrow: 1 }}
+            style={{flexGrow: 1}}
           >
             {formats.map((f) => (
               <option key={f.value} value={f.value}>
@@ -140,11 +162,11 @@ const AudioExporter = ({ tracks, totalLengthMs, onExportComplete, audioBuffer })
         </div>
 
         {showQualitySetting && (
-          <div style={{ display: "flex", alignItems: "center" }}>
+          <div style={{display: "flex", alignItems: "center"}}>
             <label
               htmlFor="qualitySetting"
               className="block text-sm font-medium text-gray-700"
-              style={{ width: "120px", minWidth: "120px", marginRight: "15px" }}
+              style={{width: "120px", minWidth: "120px", marginRight: "15px"}}
             >
               {format === "mp3" ? "MP3 Bitrate" : "OGG Quality"}
             </label>
@@ -155,7 +177,7 @@ const AudioExporter = ({ tracks, totalLengthMs, onExportComplete, audioBuffer })
               onChange={(e) => setQualitySetting(e.target.value)}
               className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md shadow-sm"
               aria-label={format === "mp3" ? "MP3 Bitrate" : "OGG Quality"}
-              style={{ flexGrow: 1 }}
+              style={{flexGrow: 1}}
             >
               {getQualityOptions(format).map((opt) => (
                 <option key={opt.value} value={opt.value}>
@@ -166,11 +188,11 @@ const AudioExporter = ({ tracks, totalLengthMs, onExportComplete, audioBuffer })
           </div>
         )}
 
-        <div style={{ display: "flex", alignItems: "center" }}>
+        <div style={{display: "flex", alignItems: "center"}}>
           <label
             htmlFor="filename"
             className="block text-sm font-medium text-gray-700"
-            style={{ width: "120px", minWidth: "120px", marginRight: "15px" }}
+            style={{width: "120px", minWidth: "120px", marginRight: "15px"}}
           >
             Filename
           </label>
@@ -181,7 +203,7 @@ const AudioExporter = ({ tracks, totalLengthMs, onExportComplete, audioBuffer })
             value={filename}
             onChange={(e) => setFilename(e.target.value)}
             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2"
-            style={{ flexGrow: 1 }}
+            style={{flexGrow: 1}}
           />
         </div>
 

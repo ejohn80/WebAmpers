@@ -10,7 +10,9 @@
   position: relative;
   --track-controls-width: 180px;
   --track-controls-gap: 12px;
-  --timeline-left-offset: calc(var(--track-controls-width) + var(--track-controls-gap));
+  --timeline-left-offset: calc(
+    var(--track-controls-width) + var(--track-controls-gap)
+  );
 }
 
 .timeline-scroll-area {
@@ -22,7 +24,9 @@
 
 .timeline-scroll-content {
   position: relative;
-  min-width: calc(var(--timeline-left-offset) + var(--timeline-content-width, 100%));
+  min-width: calc(
+    var(--timeline-left-offset) + var(--timeline-content-width, 100%)
+  );
   padding-bottom: 24px;
 }
 
@@ -36,7 +40,9 @@
 /* Wrapper to position global playhead across all tracks */
 .tracks-relative {
   position: relative;
-  min-width: calc(var(--timeline-left-offset) + var(--timeline-content-width, 100%));
+  min-width: calc(
+    var(--timeline-left-offset) + var(--timeline-content-width, 100%)
+  );
 }
 
 .global-playhead {
@@ -80,7 +86,11 @@
   position: absolute;
   top: 0;
   bottom: 0;
-  background: linear-gradient(90deg, rgba(234, 41, 41, 0.18), rgba(234, 41, 41, 0));
+  background: linear-gradient(
+    90deg,
+    rgba(234, 41, 41, 0.18),
+    rgba(234, 41, 41, 0)
+  );
   border-right: 1px solid rgba(234, 41, 41, 0.35);
   pointer-events: none;
 }
@@ -88,7 +98,9 @@
 .timeline-tick {
   position: absolute;
   top: 0;
-  transform: translateX(-1px); /* center the 2px line on the computed position */
+  transform: translateX(
+    -1px
+  ); /* center the 2px line on the computed position */
 }
 
 .timeline-tick-line {
@@ -100,7 +112,7 @@
 .timeline-tick-label {
   margin-top: 2px;
   font-size: 11px;
-  color: rgba(255,255,255,0.75);
+  color: rgba(255, 255, 255, 0.75);
   white-space: nowrap;
 }
 
@@ -132,15 +144,15 @@
   display: inline-flex;
   gap: 6px;
   align-items: center;
-  background: rgba(0,0,0,0.7);
-  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(0, 0, 0, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 6px;
   padding: 4px 6px;
 }
 
 .zoom-btn {
-  background: rgba(255,255,255,0.08);
-  border: 1px solid rgba(255,255,255,0.15);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
   color: #eee;
   font-size: 12px;
   padding: 2px 6px;
@@ -148,9 +160,18 @@
   cursor: pointer;
 }
 
-.zoom-btn:hover { background: rgba(255,255,255,0.15); }
-.zoom-btn.reset { opacity: 0.85; }
-.zoom-label { font-size: 12px; color: #ddd; min-width: 40px; text-align: center; }
+.zoom-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+.zoom-btn.reset {
+  opacity: 0.85;
+}
+.zoom-label {
+  font-size: 12px;
+  color: #ddd;
+  min-width: 40px;
+  text-align: center;
+}
 
 /* Shorter in-between (minor) ticks */
 .timeline-tick.minor .timeline-tick-line {
@@ -175,7 +196,7 @@
 
 /* Ensure smooth scrolling */
 .timeline-scroll-area::-webkit-scrollbar {
-  width: 8px;   /* vertical */
+  width: 8px; /* vertical */
   height: 12px; /* horizontal */
 }
 

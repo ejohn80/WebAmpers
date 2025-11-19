@@ -1,5 +1,5 @@
-import { AudioTrack } from "../models/AudioTrack";
-import { AudioSegment } from "../models/AudioSegment";
+import {AudioTrack} from "../models/AudioTrack";
+import {AudioSegment} from "../models/AudioSegment";
 import * as Tone from "tone";
 
 /**
@@ -34,9 +34,14 @@ class AudioManager {
         const b = seg0?.buffer;
         if (b && b.channels && b.sampleRate && b.length && b.numberOfChannels) {
           // Reconstruct native AudioBuffer then wrap in Tone.ToneAudioBuffer
-          const native = (typeof Tone?.context?.createBuffer === "function")
-            ? Tone.context.createBuffer(b.numberOfChannels, b.length, b.sampleRate)
-            : null;
+          const native =
+            typeof Tone?.context?.createBuffer === "function"
+              ? Tone.context.createBuffer(
+                  b.numberOfChannels,
+                  b.length,
+                  b.sampleRate
+                )
+              : null;
           if (native) {
             for (let i = 0; i < b.numberOfChannels; i++) {
               // If channels[i] is a typed array, copy directly; else coerce
@@ -49,7 +54,10 @@ class AudioManager {
           }
         }
       } catch (e) {
-        console.warn("Failed to reconstruct ToneAudioBuffer from serialized data:", e);
+        console.warn(
+          "Failed to reconstruct ToneAudioBuffer from serialized data:",
+          e
+        );
       }
     }
 
@@ -59,15 +67,23 @@ class AudioManager {
     }
 
     // Check if this track already exists by ID to prevent duplicates
-    if (audioData.id && this.tracks.some(t => t.id === audioData.id)) {
-      console.warn(`Track with ID ${audioData.id} already exists, skipping duplicate`);
-      return this.tracks.find(t => t.id === audioData.id);
+    if (audioData.id && this.tracks.some((t) => t.id === audioData.id)) {
+      console.warn(
+        `Track with ID ${audioData.id} already exists, skipping duplicate`
+      );
+      return this.tracks.find((t) => t.id === audioData.id);
     }
 
     // Generate a unique color for this track
     const colors = [
-      "#FF6B6B", "#4ECDC4", "#45B7D1", "#FFA07A", 
-      "#98D8C8", "#F7DC6F", "#BB8FCE", "#85C1E2"
+      "#FF6B6B",
+      "#4ECDC4",
+      "#45B7D1",
+      "#FFA07A",
+      "#98D8C8",
+      "#F7DC6F",
+      "#BB8FCE",
+      "#85C1E2",
     ];
     const color = colors[this.tracks.length % colors.length];
 
@@ -79,8 +95,18 @@ class AudioManager {
         let segToneBuf = toneBuffer;
         try {
           const b = s?.buffer;
-          if (b && b.channels && b.sampleRate && b.length && b.numberOfChannels) {
-            const native = Tone.context.createBuffer(b.numberOfChannels, b.length, b.sampleRate);
+          if (
+            b &&
+            b.channels &&
+            b.sampleRate &&
+            b.length &&
+            b.numberOfChannels
+          ) {
+            const native = Tone.context.createBuffer(
+              b.numberOfChannels,
+              b.length,
+              b.sampleRate
+            );
             for (let i = 0; i < b.numberOfChannels; i++) {
               native.copyToChannel(b.channels[i], i);
             }
@@ -90,12 +116,18 @@ class AudioManager {
           // fallback to main toneBuffer
         }
 
-        const offsetSec = typeof s.offset === "number"
-          ? s.offset
-          : (typeof s.startInFileMs === "number" ? s.startInFileMs / 1000 : 0);
-        const durationSec = typeof s.duration === "number"
-          ? s.duration
-          : (typeof s.durationMs === "number" ? s.durationMs / 1000 : undefined);
+        const offsetSec =
+          typeof s.offset === "number"
+            ? s.offset
+            : typeof s.startInFileMs === "number"
+              ? s.startInFileMs / 1000
+              : 0;
+        const durationSec =
+          typeof s.duration === "number"
+            ? s.duration
+            : typeof s.durationMs === "number"
+              ? s.durationMs / 1000
+              : undefined;
 
         try {
           const seg = new AudioSegment({
@@ -105,8 +137,10 @@ class AudioManager {
           });
           // Preserve metadata used by UI/engine
           if (typeof s.durationMs === "number") seg.durationMs = s.durationMs;
-          if (typeof s.startOnTimelineMs === "number") seg.startOnTimelineMs = s.startOnTimelineMs;
-          if (typeof s.startInFileMs === "number") seg.startInFileMs = s.startInFileMs;
+          if (typeof s.startOnTimelineMs === "number")
+            seg.startOnTimelineMs = s.startOnTimelineMs;
+          if (typeof s.startInFileMs === "number")
+            seg.startInFileMs = s.startInFileMs;
           if (s.id) seg.id = s.id;
           builtSegments.push(seg);
         } catch (e) {
@@ -130,7 +164,10 @@ class AudioManager {
     // Create the new track
     const track = new AudioTrack({
       id: audioData.id, // Preserve existing ID
-      name: audioData.name || audioData.metadata?.name || `Track ${this.tracks.length + 1}`,
+      name:
+        audioData.name ||
+        audioData.metadata?.name ||
+        `Track ${this.tracks.length + 1}`,
       color: audioData.color || color,
       segments: builtSegments,
       volume: audioData.volume ?? 0,
@@ -140,7 +177,7 @@ class AudioManager {
     });
 
     // Add buffer reference at track level for compatibility
-  track.buffer = builtSegments[0]?.buffer || toneBuffer;
+    track.buffer = builtSegments[0]?.buffer || toneBuffer;
 
     // Add to tracks array
     this.tracks.push(track);
@@ -155,14 +192,14 @@ class AudioManager {
    * @returns {boolean} True if deleted, false if not found
    */
   deleteTrack(trackId) {
-    const index = this.tracks.findIndex(t => t.id === trackId);
+    const index = this.tracks.findIndex((t) => t.id === trackId);
     if (index === -1) {
       console.warn(`Track ${trackId} not found`);
       return false;
     }
 
     const track = this.tracks[index];
-    
+
     // Dispose of Tone.js resources
     try {
       track.dispose();
@@ -172,7 +209,7 @@ class AudioManager {
 
     // Remove from array
     this.tracks.splice(index, 1);
-    
+
     console.log(`Deleted track: ${track.name} (ID: ${trackId})`);
     return true;
   }
@@ -183,14 +220,14 @@ class AudioManager {
    * @returns {AudioTrack|null}
    */
   getTrack(trackId) {
-    return this.tracks.find(t => t.id === trackId) || null;
+    return this.tracks.find((t) => t.id === trackId) || null;
   }
 
   /**
    * Clear all tracks
    */
   clearAllTracks() {
-    this.tracks.forEach(track => {
+    this.tracks.forEach((track) => {
       try {
         track.dispose();
       } catch (e) {

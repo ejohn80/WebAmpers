@@ -71,9 +71,6 @@ class PlaybackEngine {
     Tone.Transport.cancel(0);
     this._cancelRaf();
     this._disposeAll();
-
-    // FIX: Add this line to synchronize the React state with the transport stop.
-    // This will set the 'playing' state to false and update the Play/Pause button UI.
     this._emitTransport(false);
 
     // Save the version reference
@@ -280,9 +277,11 @@ class PlaybackEngine {
   async _prepareSegments(version) {
     // Preload only string URLs; skip objects (AudioBuffer/ToneAudioBuffer)
     const urls = Array.from(
-      new Set((version.segments || [])
-        .map((s) => s.fileUrl)
-        .filter((u) => typeof u === "string" && u.length > 0))
+      new Set(
+        (version.segments || [])
+          .map((s) => s.fileUrl)
+          .filter((u) => typeof u === "string" && u.length > 0)
+      )
     );
     urls.forEach((u) => this._preload(u));
 
@@ -293,7 +292,11 @@ class PlaybackEngine {
         if (src && typeof src.get === "function") {
           // Tone.ToneAudioBuffer -> native AudioBuffer
           src = src.get();
-        } else if (src && src._buffer && typeof src._buffer.getChannelData === "function") {
+        } else if (
+          src &&
+          src._buffer &&
+          typeof src._buffer.getChannelData === "function"
+        ) {
           // Some Tone versions expose native buffer under _buffer
           src = src._buffer;
         }
@@ -801,7 +804,11 @@ export default function WebAmpPlayback({version, onEngineReady}) {
     progressStore.setMs(ms);
   }, [ms]);
 
-  const hasNoTracks = !version || !version.tracks || version.tracks.length === 0 || version.lengthMs === 0;
+  const hasNoTracks =
+    !version ||
+    !version.tracks ||
+    version.tracks.length === 0 ||
+    version.lengthMs === 0;
 
   // Global keyboard shortcuts for playback control
   useEffect(() => {
@@ -898,7 +905,15 @@ export default function WebAmpPlayback({version, onEngineReady}) {
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [onTogglePlay, skipBack10, skipFwd10, masterVol, muted, engine, hasNoTracks]);
+  }, [
+    onTogglePlay,
+    skipBack10,
+    skipFwd10,
+    masterVol,
+    muted,
+    engine,
+    hasNoTracks,
+  ]);
 
   // Toggle mute while preserving slider value
   const onToggleMute = () => {
@@ -973,41 +988,41 @@ export default function WebAmpPlayback({version, onEngineReady}) {
         </div>
 
         <div className="transport-section">
-          <button 
-            onClick={goToStart} 
+          <button
+            onClick={goToStart}
             className="transport-button"
             disabled={hasNoTracks}
             title={hasNoTracks ? "No tracks loaded" : "Go to start"}
           >
             <GoToStartIcon />
           </button>
-          
-          <button 
-            onClick={skipBack10} 
+
+          <button
+            onClick={skipBack10}
             className="transport-button"
             disabled={hasNoTracks}
             title={hasNoTracks ? "No tracks loaded" : "Skip backward 10s"}
           >
             <RewindIcon />
           </button>
-          
-          <PlayPauseButton 
-            isPlaying={playing} 
+
+          <PlayPauseButton
+            isPlaying={playing}
             onToggle={onTogglePlay}
             disabled={hasNoTracks}
           />
 
-          <button 
-            onClick={skipFwd10} 
+          <button
+            onClick={skipFwd10}
             className="transport-button"
             disabled={hasNoTracks}
             title={hasNoTracks ? "No tracks loaded" : "Skip forward 10s"}
           >
             <ForwardIcon />
           </button>
-          
-          <button 
-            onClick={goToEnd} 
+
+          <button
+            onClick={goToEnd}
             className="transport-button"
             disabled={hasNoTracks}
             title={hasNoTracks ? "No tracks loaded" : "Go to end"}

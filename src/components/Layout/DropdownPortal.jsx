@@ -238,7 +238,9 @@ function DropdownPortal({
             onClick={(e) => {
               e.preventDefault();
               if (!hasTracksForExport) {
-                alert("Please import audio or create a recording before exporting");
+                alert(
+                  "Please import audio or create a recording before exporting"
+                );
                 return;
               }
               handleMenuItemClick("Export");

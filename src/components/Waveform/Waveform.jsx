@@ -11,7 +11,13 @@ import {progressStore} from "../../playback/progressStore";
  * @param {number} [props.durationMs] - Segment duration on the global timeline (ms).
  * @param {boolean} [props.showProgress] - Whether to render the progress bar within this waveform (default true).
  */
-const Waveform = ({audioBuffer, color = "#ffffff", startOnTimelineMs = 0, durationMs = null, showProgress = true}) => {
+const Waveform = ({
+  audioBuffer,
+  color = "#ffffff",
+  startOnTimelineMs = 0,
+  durationMs = null,
+  showProgress = true,
+}) => {
   const canvasRef = useRef(null);
   const draggingRef = useRef(false);
 

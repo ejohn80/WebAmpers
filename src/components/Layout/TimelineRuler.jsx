@@ -4,15 +4,31 @@ import React, {useMemo} from "react";
  * TimelineRuler
  * Draws a time ruler with tick marks aligned to the start of the waveform area.
  */
-export default function TimelineRuler({totalLengthMs = 0, timelineWidth = 0, timelineLeftOffsetPx = 0}) {
-  const {majorTicks, minorTicks, preMajorTicks, preMinorTicks, preHighlightWidthPx} = useMemo(() => {
+export default function TimelineRuler({
+  totalLengthMs = 0,
+  timelineWidth = 0,
+  timelineLeftOffsetPx = 0,
+}) {
+  const {
+    majorTicks,
+    minorTicks,
+    preMajorTicks,
+    preMinorTicks,
+    preHighlightWidthPx,
+  } = useMemo(() => {
     const majors = [];
     const minors = [];
     const preMajors = [];
     const preMinors = [];
     let preHighlightWidthPx = 0;
     if (!totalLengthMs || timelineWidth <= 0) {
-      return {majorTicks: majors, minorTicks: minors, preMajorTicks: preMajors, preMinorTicks: preMinors, preHighlightWidthPx};
+      return {
+        majorTicks: majors,
+        minorTicks: minors,
+        preMajorTicks: preMajors,
+        preMinorTicks: preMinors,
+        preHighlightWidthPx,
+      };
     }
 
     const totalSec = totalLengthMs / 1000;
@@ -24,7 +40,10 @@ export default function TimelineRuler({totalLengthMs = 0, timelineWidth = 0, tim
     const target = 80;
     let stepSec = candidates[0];
     for (const c of candidates) {
-      if (pxPerSec * c >= target) { stepSec = c; break; }
+      if (pxPerSec * c >= target) {
+        stepSec = c;
+        break;
+      }
       stepSec = c; // last candidate if none large enough
     }
 
@@ -78,13 +97,19 @@ export default function TimelineRuler({totalLengthMs = 0, timelineWidth = 0, tim
       }
     }
 
-    return {majorTicks: majors, minorTicks: minors, preMajorTicks: preMajors, preMinorTicks: preMinors, preHighlightWidthPx};
+    return {
+      majorTicks: majors,
+      minorTicks: minors,
+      preMajorTicks: preMajors,
+      preMinorTicks: preMinors,
+      preHighlightWidthPx,
+    };
   }, [totalLengthMs, timelineWidth]);
 
   const fmt = (ms) => {
     const s = Math.floor(ms / 1000);
     const m = Math.floor(s / 60);
-    const ss = String(s % 60).padStart(2, '0');
+    const ss = String(s % 60).padStart(2, "0");
     return `${m}:${ss}`;
   };
 
@@ -92,7 +117,7 @@ export default function TimelineRuler({totalLengthMs = 0, timelineWidth = 0, tim
 
   const rulerStyle = {
     marginLeft: `${timelineLeftOffsetPx}px`,
-    width: `${Math.max(0, Math.round(timelineWidth))}px`
+    width: `${Math.max(0, Math.round(timelineWidth))}px`,
   };
 
   return (
@@ -100,26 +125,45 @@ export default function TimelineRuler({totalLengthMs = 0, timelineWidth = 0, tim
       {preHighlightWidthPx > 0 && (
         <div
           className="timeline-pre-highlight"
-          style={{width: `${preHighlightWidthPx}px`, left: `${-preHighlightWidthPx}px`}}
+          style={{
+            width: `${preHighlightWidthPx}px`,
+            left: `${-preHighlightWidthPx}px`,
+          }}
         />
       )}
       {preMinorTicks.map(({t, left}) => (
-        <div key={`pre-mi-${t}-${left}`} className="timeline-tick minor pre" style={{left: `${left}px`}}>
+        <div
+          key={`pre-mi-${t}-${left}`}
+          className="timeline-tick minor pre"
+          style={{left: `${left}px`}}
+        >
           <div className="timeline-tick-line" />
         </div>
       ))}
       {preMajorTicks.map(({t, left}) => (
-        <div key={`pre-ma-${t}`} className="timeline-tick pre" style={{left: `${left}px`}}>
+        <div
+          key={`pre-ma-${t}`}
+          className="timeline-tick pre"
+          style={{left: `${left}px`}}
+        >
           <div className="timeline-tick-line" />
         </div>
       ))}
       {minorTicks.map(({t, left}) => (
-        <div key={`mi-${t}-${left}`} className="timeline-tick minor" style={{left: `${left}px`}}>
+        <div
+          key={`mi-${t}-${left}`}
+          className="timeline-tick minor"
+          style={{left: `${left}px`}}
+        >
           <div className="timeline-tick-line" />
         </div>
       ))}
       {majorTicks.map(({t, left}) => (
-        <div key={`ma-${t}`} className="timeline-tick" style={{left: `${left}px`}}>
+        <div
+          key={`ma-${t}`}
+          className="timeline-tick"
+          style={{left: `${left}px`}}
+        >
           <div className="timeline-tick-line" />
           <div className="timeline-tick-label">{fmt(t)}</div>
         </div>

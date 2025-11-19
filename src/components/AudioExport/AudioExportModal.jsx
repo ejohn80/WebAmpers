@@ -5,7 +5,13 @@ import "../AudioExport/AudioExportButton.css";
 /**
  * A modal wrapper for the AudioExporter component.
  */
-const AudioExportModal = ({ tracks, totalLengthMs, onExportComplete, isOpen, onClose }) => {
+const AudioExportModal = ({
+  tracks,
+  totalLengthMs,
+  onExportComplete,
+  isOpen,
+  onClose,
+}) => {
   if (!isOpen) return null;
 
   const handleExportComplete = (result) => {

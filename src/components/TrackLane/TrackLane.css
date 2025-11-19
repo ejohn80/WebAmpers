@@ -22,7 +22,9 @@
   color: #eaeaea;
   padding: 8px;
   border-radius: 6px;
-  min-width: calc(var(--timeline-left-offset) + var(--timeline-content-width, 100%));
+  min-width: calc(
+    var(--timeline-left-offset) + var(--timeline-content-width, 100%)
+  );
   position: relative;
 }
 

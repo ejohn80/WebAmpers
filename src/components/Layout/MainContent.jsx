@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, {useEffect, useMemo, useState} from "react";
 import DraggableDiv from "../Generic/DraggableDiv";
 import GlobalPlayhead from "../Generic/GlobalPlayhead";
 import TimelineRuler from "./TimelineRuler";
@@ -18,12 +18,18 @@ import "./MainContent.css";
 const TRACK_CONTROLS_WIDTH = 180;
 const TRACK_CONTROLS_GAP = 12;
 
-function MainContent({ tracks = [], onMute, onSolo, onDelete, totalLengthMs = 0 }) {
+function MainContent({
+  tracks = [],
+  onMute,
+  onSolo,
+  onDelete,
+  totalLengthMs = 0,
+}) {
   // Default visible window length (in ms) before horizontal scrolling is needed
   // Timeline scale is driven by pixels-per-second instead of a fixed window length
   const BASE_PX_PER_SEC = 100; // default density: 100px per second at 100% zoom
   const MIN_ZOOM = 0.25; // 25% (zoom out)
-  const MAX_ZOOM = 8;    // 800% (zoom in)
+  const MAX_ZOOM = 8; // 800% (zoom in)
   const [zoom, setZoom] = useState(1);
 
   const [timelineContentWidth, setTimelineContentWidth] = useState(0);
@@ -35,24 +41,30 @@ function MainContent({ tracks = [], onMute, onSolo, onDelete, totalLengthMs = 0 
     setTimelineContentWidth(desiredWidth);
   }, [totalLengthMs, zoom]);
 
-  const verticalScale = useMemo(() => (
-    Math.min(2.25, Math.max(0.6, Math.pow(Math.max(zoom, 0.01), 0.5)))
-  ), [zoom]);
+  const verticalScale = useMemo(
+    () => Math.min(2.25, Math.max(0.6, Math.pow(Math.max(zoom, 0.01), 0.5))),
+    [zoom]
+  );
 
-  const timelineStyle = useMemo(() => ({
-    "--timeline-content-width": `${Math.max(1, timelineContentWidth)}px`,
-    "--track-height": `${Math.round(96 * verticalScale)}px`
-  }), [timelineContentWidth, verticalScale]);
+  const timelineStyle = useMemo(
+    () => ({
+      "--timeline-content-width": `${Math.max(1, timelineContentWidth)}px`,
+      "--track-height": `${Math.round(96 * verticalScale)}px`,
+    }),
+    [timelineContentWidth, verticalScale]
+  );
 
   const timelineMetrics = useMemo(() => {
     const widthPx = Math.max(1, Math.round(timelineContentWidth));
     const leftOffsetPx = TRACK_CONTROLS_WIDTH + TRACK_CONTROLS_GAP;
     const rowWidthPx = widthPx + leftOffsetPx;
-    return { widthPx, leftOffsetPx, rowWidthPx };
+    return {widthPx, leftOffsetPx, rowWidthPx};
   }, [timelineContentWidth]);
 
-  const zoomIn = () => setZoom((z) => Math.min(MAX_ZOOM, Number((z + 0.25).toFixed(2))));
-  const zoomOut = () => setZoom((z) => Math.max(MIN_ZOOM, Number((z - 0.25).toFixed(2))));
+  const zoomIn = () =>
+    setZoom((z) => Math.min(MAX_ZOOM, Number((z + 0.25).toFixed(2))));
+  const zoomOut = () =>
+    setZoom((z) => Math.max(MIN_ZOOM, Number((z - 0.25).toFixed(2))));
   const resetZoom = () => setZoom(1);
 
   return (
@@ -67,14 +79,14 @@ function MainContent({ tracks = [], onMute, onSolo, onDelete, totalLengthMs = 0 
           className="timeline-scroll-content"
           style={{
             minWidth: `${timelineMetrics.rowWidthPx}px`,
-            width: `${timelineMetrics.rowWidthPx}px`
+            width: `${timelineMetrics.rowWidthPx}px`,
           }}
         >
           <div
             className="global-playhead-rail"
             style={{
               left: `${timelineMetrics.leftOffsetPx}px`,
-              width: `${timelineMetrics.widthPx}px`
+              width: `${timelineMetrics.widthPx}px`,
             }}
           >
             <GlobalPlayhead
@@ -85,11 +97,11 @@ function MainContent({ tracks = [], onMute, onSolo, onDelete, totalLengthMs = 0 
           {tracks && tracks.length > 0 ? (
             <div
               className="tracks-relative"
-              style={{ width: `${timelineMetrics.rowWidthPx}px` }}
+              style={{width: `${timelineMetrics.rowWidthPx}px`}}
             >
               <div
                 className="tracks-container"
-                style={{ width: `${timelineMetrics.rowWidthPx}px` }}
+                style={{width: `${timelineMetrics.rowWidthPx}px`}}
               >
                 {tracks.map((track, index) => (
                   <div key={track.id} className="track-wrapper">
@@ -118,11 +130,25 @@ function MainContent({ tracks = [], onMute, onSolo, onDelete, totalLengthMs = 0 
         </div>
       </div>
       <div className="zoom-controls-bar">
-        <div className="zoom-controls" role="toolbar" aria-label="Timeline zoom controls">
-          <button className="zoom-btn" onClick={zoomOut} title="Zoom out (−)">−</button>
+        <div
+          className="zoom-controls"
+          role="toolbar"
+          aria-label="Timeline zoom controls"
+        >
+          <button className="zoom-btn" onClick={zoomOut} title="Zoom out (−)">
+            −
+          </button>
           <span className="zoom-label">{Math.round(zoom * 100)}%</span>
-          <button className="zoom-btn" onClick={zoomIn} title="Zoom in (+)">+</button>
-          <button className="zoom-btn reset" onClick={resetZoom} title="Reset zoom">Reset</button>
+          <button className="zoom-btn" onClick={zoomIn} title="Zoom in (+)">
+            +
+          </button>
+          <button
+            className="zoom-btn reset"
+            onClick={resetZoom}
+            title="Reset zoom"
+          >
+            Reset
+          </button>
         </div>
       </div>
     </DraggableDiv>

@@ -1,13 +1,18 @@
 import {PlayIcon, PauseIcon} from "../components/Layout/Svgs.jsx";
 
-const PlayPauseButton = ({isPlaying, onToggle, className = "", disabled = false}) => {
+const PlayPauseButton = ({
+  isPlaying,
+  onToggle,
+  className = "",
+  disabled = false,
+}) => {
   return (
     <button
       className={`transport-button play-pause-button ${className}`}
       onClick={onToggle}
       disabled={disabled}
-      title={disabled ? "No tracks loaded" : (isPlaying ? "Pause" : "Play")}
-      aria-label={disabled ? "No tracks loaded" : (isPlaying ? "Pause" : "Play")}
+      title={disabled ? "No tracks loaded" : isPlaying ? "Pause" : "Play"}
+      aria-label={disabled ? "No tracks loaded" : isPlaying ? "Pause" : "Play"}
     >
       <div className="play-pause-container">
         {/* Play Icon */}

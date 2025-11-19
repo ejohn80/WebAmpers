@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, {useState, useEffect} from "react";
 import Waveform from "../Waveform/Waveform";
 import "./TrackLane.css";
 
@@ -6,17 +6,17 @@ import "./TrackLane.css";
  * TrackLane
  * Renders a single track container with proportional waveform sizing
  */
-function TrackLane({ 
-  track, 
-  showTitle = true, 
-  onMute, 
-  onSolo, 
+function TrackLane({
+  track,
+  showTitle = true,
+  onMute,
+  onSolo,
   onDelete,
   trackIndex = 0,
   totalTracks = 1,
   totalLengthMs = 0, // Total timeline length for proportional sizing
   timelineWidth = 0,
-  rowWidthPx = 0
+  rowWidthPx = 0,
 }) {
   if (!track) return null;
 
@@ -27,9 +27,9 @@ function TrackLane({
       const saved = localStorage.getItem(`webamp.track.${track.id}`);
       return saved
         ? JSON.parse(saved)
-        : { muted: !!track.mute, soloed: !!track.solo };
+        : {muted: !!track.mute, soloed: !!track.solo};
     } catch (e) {
-      return { muted: !!track.mute, soloed: !!track.solo };
+      return {muted: !!track.mute, soloed: !!track.solo};
     }
   };
 
@@ -40,7 +40,7 @@ function TrackLane({
     try {
       localStorage.setItem(
         `webamp.track.${track.id}`,
-        JSON.stringify({ muted, soloed })
+        JSON.stringify({muted, soloed})
       );
     } catch (e) {
       console.warn("Failed to persist track state:", e);
@@ -83,26 +83,32 @@ function TrackLane({
     }
   };
 
-  const parsedTimelineWidth = typeof timelineWidth === "number"
-    ? timelineWidth
-    : Number.parseFloat(timelineWidth ?? "");
+  const parsedTimelineWidth =
+    typeof timelineWidth === "number"
+      ? timelineWidth
+      : Number.parseFloat(timelineWidth ?? "");
   const numericTimelineWidth = Number.isFinite(parsedTimelineWidth)
     ? Math.max(0, parsedTimelineWidth)
     : 0;
-  const pxPerMs = totalLengthMs > 0 && numericTimelineWidth > 0
-    ? numericTimelineWidth / totalLengthMs
-    : null;
+  const pxPerMs =
+    totalLengthMs > 0 && numericTimelineWidth > 0
+      ? numericTimelineWidth / totalLengthMs
+      : null;
 
-  const tracklaneMainStyle = numericTimelineWidth > 0
-    ? {width: `${numericTimelineWidth}px`, minWidth: `${numericTimelineWidth}px`}
-    : undefined;
-  const tracklaneTimelineStyle = numericTimelineWidth > 0
-    ? {width: `${numericTimelineWidth}px`}
-    : undefined;
+  const tracklaneMainStyle =
+    numericTimelineWidth > 0
+      ? {
+          width: `${numericTimelineWidth}px`,
+          minWidth: `${numericTimelineWidth}px`,
+        }
+      : undefined;
+  const tracklaneTimelineStyle =
+    numericTimelineWidth > 0 ? {width: `${numericTimelineWidth}px`} : undefined;
 
-  const rowWidthStyle = rowWidthPx > 0
-    ? {minWidth: `${rowWidthPx}px`, width: `${rowWidthPx}px`}
-    : undefined;
+  const rowWidthStyle =
+    rowWidthPx > 0
+      ? {minWidth: `${rowWidthPx}px`, width: `${rowWidthPx}px`}
+      : undefined;
 
   return (
     <div className="tracklane-root" style={rowWidthStyle}>
@@ -172,18 +178,18 @@ function TrackLane({
               const widthPx = Math.max(2, Math.round(durationMs * pxPerMs));
               positionStyle = {
                 left: `${leftPx}px`,
-                width: `${widthPx}px`
+                width: `${widthPx}px`,
               };
             } else {
-              const leftPercent = totalLengthMs > 0 
-                ? (startOnTimelineMs / totalLengthMs) * 100 
-                : 0;
-              const widthPercent = totalLengthMs > 0 
-                ? (durationMs / totalLengthMs) * 100 
-                : 100;
+              const leftPercent =
+                totalLengthMs > 0
+                  ? (startOnTimelineMs / totalLengthMs) * 100
+                  : 0;
+              const widthPercent =
+                totalLengthMs > 0 ? (durationMs / totalLengthMs) * 100 : 100;
               positionStyle = {
                 left: `${leftPercent}%`,
-                width: `${widthPercent}%`
+                width: `${widthPercent}%`,
               };
             }
 
@@ -192,9 +198,9 @@ function TrackLane({
                 className="tracklane-segment-positioned"
                 key={seg.id || seg.fileUrl || Math.random()}
                 style={{
-                  position: 'absolute',
-                  height: '100%',
-                  ...positionStyle
+                  position: "absolute",
+                  height: "100%",
+                  ...positionStyle,
                 }}
               >
                 <div className="tracklane-segment">
