@@ -135,78 +135,81 @@ function EffectsTab() {
 
   return (
     <div className={styles.container}>
-      {effectConfigs.map((config) => {
-        const currentValue = getCurrentValue(config);
-        const fillPercentage = getSliderFillPercentage(config, currentValue);
-        const isDefault = isAtDefaultValue(config);
+      <div className={styles.effectsList}>
+        {effectConfigs.map((config) => {
+          const currentValue = getCurrentValue(config);
+          const fillPercentage = getSliderFillPercentage(config, currentValue);
+          const isDefault = isAtDefaultValue(config);
 
-        return (
-          <div key={config.name} className={styles.effectItem}>
-            <div className={styles.header}>
-              <span className={styles.label}>{config.label}</span>
-              <span className={styles.value}>
-                {currentValue}
-                {config.unit}
-              </span>
-            </div>
-            <div className={styles.description}>{config.description}</div>
-
-            {/* Custom Slider */}
-            <div
-              className={`${styles.sliderContainer} ${
-                draggingSlider === config.name ? styles.dragging : ""
-              }`}
-            >
-              <div className={styles.sliderTrack}></div>
-              <div
-                className={`${styles.sliderFill} ${
-                  isDefault ? styles.default : styles.changed
-                }`}
-                style={{width: `${fillPercentage}%`}}
-              ></div>
-              <div
-                className={`${styles.sliderKnobWrapper} ${
-                  draggingSlider === config.name
-                    ? styles.sliderKnobWrapperDragging
-                    : ""
-                }`}
-                style={{left: `${fillPercentage}%`}}
-              >
-                <EffectsSliderKnob />
+          return (
+            <div key={config.name} className={styles.effectItem}>
+              <div className={styles.header}>
+                <span className={styles.label}>{config.label}</span>
+                <span className={styles.value}>
+                  {currentValue}
+                  {config.unit}
+                </span>
               </div>
-              <input
-                type="range"
-                min={config.min}
-                max={config.max}
-                step={config.step}
-                value={currentValue}
-                onChange={handleChange(config.name)}
-                onMouseDown={() => setDraggingSlider(config.name)}
-                onMouseUp={handleSliderEnd(config.name)}
-                onTouchStart={() => setDraggingSlider(config.name)}
-                onTouchEnd={handleSliderEnd(config.name)}
-                className={styles.sliderInput}
-              />
-            </div>
+              <div className={styles.description}>{config.description}</div>
 
-            <div className={styles.controls}>
-              <button
-                className={`${styles.button} ${
-                  isDefault ? styles.buttonDisabled : ""
+              {/* Custom Slider */}
+              <div
+                className={`${styles.sliderContainer} ${
+                  draggingSlider === config.name ? styles.dragging : ""
                 }`}
-                onClick={
-                  isDefault
-                    ? undefined
-                    : () => resetEffect(config.name, config.default)
-                }
-                disabled={isDefault}
               >
-                Reset
-              </button>
+                <div className={styles.sliderTrack}></div>
+                <div
+                  className={`${styles.sliderFill} ${
+                    isDefault ? styles.default : styles.changed
+                  }`}
+                  style={{width: `${fillPercentage}%`}}
+                ></div>
+                <div
+                  className={`${styles.sliderKnobWrapper} ${
+                    draggingSlider === config.name
+                      ? styles.sliderKnobWrapperDragging
+                      : ""
+                  }`}
+                  style={{left: `${fillPercentage}%`}}
+                >
+                  <EffectsSliderKnob />
+                </div>
+                <input
+                  type="range"
+                  min={config.min}
+                  max={config.max}
+                  step={config.step}
+                  value={currentValue}
+                  onChange={handleChange(config.name)}
+                  onMouseDown={() => setDraggingSlider(config.name)}
+                  onMouseUp={handleSliderEnd(config.name)}
+                  onTouchStart={() => setDraggingSlider(config.name)}
+                  onTouchEnd={handleSliderEnd(config.name)}
+                  className={styles.sliderInput}
+                />
+              </div>
+
+              <div className={styles.controls}>
+                <button
+                  className={`${styles.button} ${
+                    isDefault ? styles.buttonDisabled : ""
+                  }`}
+                  onClick={
+                    isDefault
+                      ? undefined
+                      : () => resetEffect(config.name, config.default)
+                  }
+                  disabled={isDefault}
+                >
+                  Reset
+                </button>
+              </div>
             </div>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
+
       <button
         className={`${styles.resetAllButton} ${
           areAllEffectsAtDefault() ? styles.resetAllButtonDisabled : ""
