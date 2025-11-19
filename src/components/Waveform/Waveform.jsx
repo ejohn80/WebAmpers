@@ -19,6 +19,7 @@ const Waveform = ({
   showProgress = true,
 }) => {
   const canvasRef = useRef(null);
+  const containerRef = useRef(null);
   const draggingRef = useRef(false);
   const [canvasSize, setCanvasSize] = useState({width: 0, height: 0});
 
@@ -57,6 +58,7 @@ const Waveform = ({
     if (!canvasSize.width || !canvasSize.height) return;
 
     const canvas = canvasRef.current;
+    const container = containerRef.current;
     const ctx = canvas.getContext("2d");
 
     const dpr =
@@ -109,7 +111,7 @@ const Waveform = ({
       let min = 1.0,
         max = -1.0;
       for (let j = 0; j < step; j++) {
-        const idx = i * step + j;
+        const idx = base + j;
         if (idx >= data.length) break;
         const v = data[idx];
         if (v < min) min = v;
@@ -144,6 +146,8 @@ const Waveform = ({
     const el = canvasRef.current?.parentElement; // container div
     if (!el) return;
     const rect = el.getBoundingClientRect();
+
+    // X within the visible area of the container
     const rel = Math.max(0, Math.min(rect.width, clientX - rect.left));
     const p = rect.width > 0 ? rel / rect.width : 0;
     // If segment timing provided, map within this segment; else map across global length
@@ -154,17 +158,20 @@ const Waveform = ({
     return p * lengthMs;
   };
 
+  // Scrubbing handlers
   const onMouseDown = (e) => {
+    if (e.button !== 0) return; // left button only
     draggingRef.current = true;
     progressStore.beginScrub();
     const target = msAtClientX(e.clientX);
     if (typeof target === "number") {
       // preview only: move the playhead visually without seeking audio
-      progressStore.setMs(target);
+      progressStore.setMs(target); // visual move
     }
     window.addEventListener("mousemove", onMouseMove);
     window.addEventListener("mouseup", onMouseUp);
   };
+
   const onMouseMove = (e) => {
     if (!draggingRef.current) return;
     const target = msAtClientX(e.clientX);
@@ -172,17 +179,30 @@ const Waveform = ({
       progressStore.setMs(target);
     }
   };
+
   const onMouseUp = (e) => {
     if (!draggingRef.current) return;
     draggingRef.current = false;
     const target = msAtClientX(e.clientX);
     if (typeof target === "number") {
-      // finalize seek in the engine and progress store
-      progressStore.requestSeek(target);
+      progressStore.requestSeek(target); // commit seek to engine
     }
     progressStore.endScrub();
     window.removeEventListener("mousemove", onMouseMove);
     window.removeEventListener("mouseup", onMouseUp);
+  };
+
+  const onWheel = (e) => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    // Use whichever axis has the stronger signal so normal mouse wheels work
+    const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+
+    if (delta === 0) return;
+
+    e.preventDefault(); // don't vertical-scroll the page
+    el.scrollLeft += delta;
   };
 
   useEffect(
@@ -203,6 +223,7 @@ const Waveform = ({
       progressStore.setMs(target);
     }
   };
+
   const onTouchMove = (e) => {
     if (!draggingRef.current || !e.touches || e.touches.length === 0) return;
     const target = msAtClientX(e.touches[0].clientX);
@@ -210,6 +231,7 @@ const Waveform = ({
       progressStore.setMs(target);
     }
   };
+
   const onTouchEnd = () => {
     if (!draggingRef.current) return;
     draggingRef.current = false;
@@ -221,6 +243,7 @@ const Waveform = ({
 
   return (
     <div
+      ref={containerRef}
       className="waveform-container"
       onMouseDown={onMouseDown}
       onTouchStart={onTouchStart}
