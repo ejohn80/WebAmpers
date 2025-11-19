@@ -1,6 +1,5 @@
-import React, {useState, useContext} from "react";
+import React, {useState} from "react";
 import AudioExportModal from "./AudioExportModal";
-import {AppContext} from "../../context/AppContext";
 import "./AudioExportButton.css";
 
 /**
@@ -14,9 +13,6 @@ const AudioExportButton = ({
   disabled: propDisabled,
 }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
-
-  const {effects, engineRef} = useContext(AppContext);
 
   // Button is disabled if propDisabled is true OR if no tracks exist
   const isDisabled = propDisabled || !tracks || tracks.length === 0;

@@ -8,11 +8,7 @@ const DraggableDiv = ({
   disableSectionPadding = false,
   ...props
 }) => {
-  const classes = [
-    disableSectionPadding ? null : "section",
-    color,
-    className,
-  ]
+  const classes = [disableSectionPadding ? null : "section", color, className]
     .filter(Boolean)
     .join(" ");
 

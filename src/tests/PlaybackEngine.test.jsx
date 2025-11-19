@@ -222,9 +222,6 @@ describe("PlaybackEngine transport controls", () => {
     expect(Tone.Transport.seconds).toBeCloseTo(engine.jogLatencySec, 5);
 
     engine.seekMs(2500);
-    expect(Tone.Transport.seconds).toBeCloseTo(
-      2.5 + engine.jogLatencySec,
-      5
-    );
+    expect(Tone.Transport.seconds).toBeCloseTo(2.5 + engine.jogLatencySec, 5);
   });
 });

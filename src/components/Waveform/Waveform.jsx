@@ -110,6 +110,8 @@ const Waveform = ({
     for (let i = 0; i < visibleWidth; i++) {
       let min = 1.0,
         max = -1.0;
+
+      const base = i * step;
       for (let j = 0; j < step; j++) {
         const idx = base + j;
         if (idx >= data.length) break;

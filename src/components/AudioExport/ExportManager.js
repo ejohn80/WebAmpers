@@ -18,6 +18,9 @@ class ExportManager {
   /**
    * Apply master effects to the mixed buffer using Tone.Offline rendering
    */
+  /**
+   * Apply master effects to the mixed buffer using Tone.Offline rendering
+   */
   async applyMasterEffects(buffer, effects = {}) {
     if (!effects || Object.keys(effects).length === 0) {
       return buffer;
@@ -27,7 +30,10 @@ class ExportManager {
     const hasEffects =
       (effects?.pitch && effects.pitch !== 0) ||
       (effects?.reverb && effects.reverb > 0) ||
-      (effects?.volume && effects.volume !== 100);
+      (effects?.volume && effects.volume !== 100) ||
+      (effects?.delay && effects.delay > 0) || // <--- NEW: Delay check
+      (effects?.bass && effects.bass !== 0) || // <--- NEW: Bass check
+      (effects?.distortion && effects.distortion > 0); // <--- NEW: Distortion check
 
     if (!hasEffects) {
       return buffer;
@@ -73,7 +79,45 @@ class ExportManager {
           effectsChain.push(reverb);
         }
 
-        // Volume/Gain
+        // Distortion (NEW)
+        if (typeof effects.distortion === "number" && effects.distortion > 0) {
+          const distortionAmount = Math.max(
+            0,
+            Math.min(1, effects.distortion / 100)
+          );
+          const distortion = new Tone.Distortion({
+            distortion: distortionAmount,
+            wet: 1, // Full wet blend for distortion
+            context: context,
+          });
+          effectsChain.push(distortion);
+        }
+
+        // Delay (NEW)
+        if (typeof effects.delay === "number" && effects.delay > 0) {
+          const wet = Math.max(0, Math.min(1, effects.delay / 100));
+          const delay = new Tone.PingPongDelay({
+            delayTime: "8n", // 8th note delay time
+            feedback: 0.2 + 0.6 * wet, // Increase feedback with wet level
+            wet: wet,
+            context: context,
+          });
+          effectsChain.push(delay);
+        }
+
+        // Bass Boost (NEW)
+        // Since 'bass' is typically a +/- 12 dB control:
+        if (typeof effects.bass === "number" && effects.bass !== 0) {
+          const bassFilter = new Tone.Filter({
+            type: "lowshelf", // Shelving filter for boosting/cutting a band
+            frequency: 250, // Common low-frequency shelf point
+            gain: effects.bass, // The value in dB
+            context: context,
+          });
+          effectsChain.push(bassFilter);
+        }
+
+        // Volume/Gain - Should always be the last effect before the destination
         if (typeof effects.volume === "number" && effects.volume !== 100) {
           const gain = Math.max(0, Math.min(2, effects.volume / 100));
           const gainNode = new Tone.Gain({
