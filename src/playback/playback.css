@@ -233,3 +233,23 @@
   z-index: 4;
   touch-action: pan-y;
 }
+
+/* Disabled button styles - Audacity-like appearance */
+.transport-button:disabled,
+.play-pause-button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  pointer-events: none;
+  filter: grayscale(0.5);
+}
+
+.transport-button:disabled svg,
+.play-pause-button:disabled svg {
+  opacity: 0.4;
+}
+
+/* Ensure disabled state overrides hover effects */
+.transport-button:disabled:hover {
+  background-color: transparent;
+  transform: none;
+}

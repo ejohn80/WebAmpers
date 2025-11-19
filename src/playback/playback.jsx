@@ -801,6 +801,8 @@ export default function WebAmpPlayback({version, onEngineReady}) {
     progressStore.setMs(ms);
   }, [ms]);
 
+  const hasNoTracks = !version || !version.tracks || version.tracks.length === 0 || version.lengthMs === 0;
+
   // Global keyboard shortcuts for playback control
   useEffect(() => {
     const isEditableTarget = (el) => {
@@ -843,6 +845,11 @@ export default function WebAmpPlayback({version, onEngineReady}) {
       const isUp = e.code === "ArrowUp" || e.key === "ArrowUp";
       const isDown = e.code === "ArrowDown" || e.key === "ArrowDown";
 
+      if (hasNoTracks && (isSpace || isLeft || isRight)) {
+        e.preventDefault();
+        return;
+      }
+
       if (isSpace) {
         e.preventDefault();
         onTogglePlay();
@@ -855,8 +862,8 @@ export default function WebAmpPlayback({version, onEngineReady}) {
       } else if (isUp || isDown) {
         e.preventDefault();
 
-        // Volume control: Up increases, Down decreases
-        const volumeStep = 5; // Change volume by 5% per keypress
+        // Volume controls remain functional even with no tracks
+        const volumeStep = 5;
         let newVolume = masterVol;
 
         if (isUp) {
@@ -865,27 +872,21 @@ export default function WebAmpPlayback({version, onEngineReady}) {
           newVolume = Math.max(0, masterVol - volumeStep);
         }
 
-        // Update volume state and engine
         setMasterVol(newVolume);
 
         try {
           const linear = Math.max(0, Math.min(1, newVolume / 100));
-
-          // Update refs
           savedVolumeRef.current = linear;
           prevMasterGainRef.current = linear;
 
-          // AUTO-UNMUTE LOGIC: Unmute immediately when increasing volume
           if (muted && newVolume > 0) {
             setMuted(false);
           }
 
-          // AUTO-MUTE LOGIC: Mute when volume reaches 0
           if (newVolume === 0 && !muted) {
             setMuted(true);
           }
 
-          // Apply volume to engine (respect mute state)
           if (engine.master) {
             engine.master.gain.gain.value = muted ? 0 : linear;
           }
@@ -897,7 +898,7 @@ export default function WebAmpPlayback({version, onEngineReady}) {
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [onTogglePlay, skipBack10, skipFwd10, masterVol, muted, engine]);
+  }, [onTogglePlay, skipBack10, skipFwd10, masterVol, muted, engine, hasNoTracks]);
 
   // Toggle mute while preserving slider value
   const onToggleMute = () => {
@@ -959,10 +960,8 @@ export default function WebAmpPlayback({version, onEngineReady}) {
     return `${m}:${s.toString().padStart(2, "0")}`;
   };
 
-  // Render player UI with CSS classes
   return (
     <div className="playback-container">
-      {/* Combined transport + time section */}
       <div className="transport-time-container">
         <div className="time-section">
           <code className="time-display">
@@ -974,23 +973,51 @@ export default function WebAmpPlayback({version, onEngineReady}) {
         </div>
 
         <div className="transport-section">
-          <button onClick={goToStart} className="transport-button">
+          <button 
+            onClick={goToStart} 
+            className="transport-button"
+            disabled={hasNoTracks}
+            title={hasNoTracks ? "No tracks loaded" : "Go to start"}
+          >
             <GoToStartIcon />
           </button>
-          <button onClick={skipBack10} className="transport-button">
+          
+          <button 
+            onClick={skipBack10} 
+            className="transport-button"
+            disabled={hasNoTracks}
+            title={hasNoTracks ? "No tracks loaded" : "Skip backward 10s"}
+          >
             <RewindIcon />
           </button>
-          <PlayPauseButton isPlaying={playing} onToggle={onTogglePlay} />
+          
+          <PlayPauseButton 
+            isPlaying={playing} 
+            onToggle={onTogglePlay}
+            disabled={hasNoTracks}
+          />
 
-          <button onClick={skipFwd10} className="transport-button">
+          <button 
+            onClick={skipFwd10} 
+            className="transport-button"
+            disabled={hasNoTracks}
+            title={hasNoTracks ? "No tracks loaded" : "Skip forward 10s"}
+          >
             <ForwardIcon />
           </button>
-          <button onClick={goToEnd} className="transport-button">
+          
+          <button 
+            onClick={goToEnd} 
+            className="transport-button"
+            disabled={hasNoTracks}
+            title={hasNoTracks ? "No tracks loaded" : "Go to end"}
+          >
             <GoToEndIcon />
           </button>
         </div>
       </div>
 
+      {/* Volume section - unchanged, stays enabled */}
       <div className="volume-section">
         <button
           type="button"
@@ -1023,17 +1050,17 @@ export default function WebAmpPlayback({version, onEngineReady}) {
 
               try {
                 const linear = Math.max(0, Math.min(1, v / 100));
-
-                // Update refs
                 savedVolumeRef.current = linear;
                 prevMasterGainRef.current = linear;
 
-                // AUTO-UNMUTE LOGIC: Unmute immediately when slider is adjusted
                 if (muted && v > 0) {
                   setMuted(false);
                 }
 
-                // Apply volume to engine (respect mute state)
+                if (v === 0 && !muted) {
+                  setMuted(true);
+                }
+
                 if (engine.master) {
                   engine.master.gain.gain.value = muted ? 0 : linear;
                 }
@@ -1044,13 +1071,11 @@ export default function WebAmpPlayback({version, onEngineReady}) {
             onMouseDown={() => setDraggingVol(true)}
             onMouseUp={() => {
               setDraggingVol(false);
-              // Persist state when dragging ends
               try {
                 localStorage.setItem("webamp.masterVol", String(masterVol));
                 localStorage.setItem("webamp.muted", muted ? "1" : "0");
               } catch (e) {}
 
-              // Auto-mute if user explicitly sets volume to zero
               if (masterVol === 0 && !muted) {
                 setMuted(true);
                 if (engine.master) {
@@ -1062,13 +1087,11 @@ export default function WebAmpPlayback({version, onEngineReady}) {
             onTouchStart={() => setDraggingVol(true)}
             onTouchEnd={() => {
               setDraggingVol(false);
-              // Persist state when touch ends
               try {
                 localStorage.setItem("webamp.masterVol", String(masterVol));
                 localStorage.setItem("webamp.muted", muted ? "1" : "0");
               } catch (e) {}
 
-              // Same auto-mute logic for touch devices
               if (masterVol === 0 && !muted) {
                 setMuted(true);
               }
