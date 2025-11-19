@@ -94,8 +94,6 @@ function AudioPage() {
           console.log("Loading tracks from IndexedDB:", savedTracks);
 
           audioManager.clearAllTracks();
-
-          // FIX: Use a Map to track unique tracks by ID to prevent duplicates
           const uniqueTracks = new Map();
 
           for (const savedTrack of savedTracks) {
@@ -176,7 +174,6 @@ function AudioPage() {
 
     try {
       if (createdTrack) {
-        // FIX: Capture the DB-assigned ID and update the track object
         const assignedId = await dbManager.addTrack(createdTrack);
 
         // Update the track's ID to match what's in IndexedDB
@@ -209,59 +206,118 @@ function AudioPage() {
     try {
       console.log(`Deleting track ${trackId}...`);
 
+      try {
+        Tone.Transport.stop();
+        Tone.Transport.cancel(0);
+        Tone.Transport.seconds = 0;
+        console.log("Tone.Transport stopped and reset");
+      } catch (e) {
+        console.error("Failed to stop Tone.Transport:", e);
+      }
+
+      // Dispose engine resources
       if (engineRef.current) {
         try {
-          engineRef.current.stop();
+          // Unsync and dispose all players
+          if (engineRef.current.playersBySegment) {
+            engineRef.current.playersBySegment.forEach((playerObj) => {
+              try {
+                // Unsync from transport
+                if (
+                  playerObj.player &&
+                  typeof playerObj.player.unsync === "function"
+                ) {
+                  playerObj.player.unsync();
+                }
+                // Stop the player immediately
+                if (
+                  playerObj.player &&
+                  typeof playerObj.player.stop === "function"
+                ) {
+                  playerObj.player.stop();
+                }
+              } catch (e) {
+                console.warn("Failed to unsync/stop player:", e);
+              }
+            });
+          }
+
+          // Now dispose all resources
+          engineRef.current._disposeAll();
+          console.log("All engine resources disposed");
         } catch (e) {
-          console.warn("Failed to stop playback:", e);
+          console.warn("Failed to dispose engine:", e);
         }
       }
 
+      // Delete from audioManager
       const deleted = audioManager.deleteTrack(trackId);
 
       if (deleted) {
+        // Clean up database
         try {
           await dbManager.deleteTrack(trackId);
-
-          try {
-            localStorage.removeItem(`webamp.track.${trackId}`);
-          } catch (e) {
-            console.warn("Failed to remove track state from localStorage:", e);
-          }
         } catch (e) {
           console.warn("Failed to delete track from DB:", e);
         }
 
+        // Clean up localStorage track state
+        try {
+          localStorage.removeItem(`webamp.track.${trackId}`);
+        } catch (e) {
+          console.warn("Failed to remove track state from localStorage:", e);
+        }
+
+        // Update React state to trigger re-render
         setTracks([...audioManager.tracks]);
 
-        // If no tracks left, dispose engine completely
+        // Reset progress store immediately
+        try {
+          progressStore.setMs(0);
+          progressStore.setLengthMs(0);
+        } catch (e) {
+          console.warn("Failed to reset progress store:", e);
+        }
+
+        // Now reload the engine with remaining tracks (or empty state)
         if (audioManager.tracks.length === 0) {
-          try {
-            if (engineRef.current) {
-              engineRef.current.dispose();
-              // Create a new empty engine to prevent ghost playback
-              const emptyVersion = {
-                bpm: 120,
-                timeSig: [4, 4],
-                lengthMs: 0,
-                tracks: [],
-                segments: [],
-                loop: {enabled: false},
-                masterChain: [],
-              };
+          console.log("No tracks remaining - loading empty version");
+
+          // Create empty version
+          const emptyVersion = {
+            bpm: 120,
+            timeSig: [4, 4],
+            lengthMs: 0,
+            tracks: [],
+            segments: [],
+            loop: {enabled: false},
+            masterChain: [],
+          };
+
+          // Force reload with empty version
+          if (engineRef.current) {
+            try {
               await engineRef.current.load(emptyVersion);
+              console.log("Engine loaded with empty version");
+            } catch (e) {
+              console.error("Failed to load empty version:", e);
             }
-          } catch (e) {
-            console.warn("Failed to dispose engine:", e);
           }
         } else {
-          // Reload engine with remaining tracks
+          console.log(
+            `Reloading engine with ${audioManager.tracks.length} remaining track(s)`
+          );
+
+          // Build new version from remaining tracks
           const newVersion = buildVersionFromTracks(audioManager.tracks);
+
           if (newVersion && engineRef.current) {
             try {
+              // Force complete reload
               await engineRef.current.load(newVersion);
+              console.log("Engine reloaded successfully");
             } catch (e) {
-              console.warn("Failed to reload engine:", e);
+              console.error("Failed to reload engine after track deletion:", e);
             }
           }
         }
