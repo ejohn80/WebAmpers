@@ -1,4 +1,4 @@
-import React, {useEffect, useMemo, useState} from "react";
+import React, {useEffect, useMemo, useRef, useState} from "react";
 import DraggableDiv from "../Generic/DraggableDiv";
 import GlobalPlayhead from "../Generic/GlobalPlayhead";
 import TimelineRuler from "./TimelineRuler";
@@ -33,6 +33,8 @@ function MainContent({
   const [zoom, setZoom] = useState(1);
 
   const [timelineContentWidth, setTimelineContentWidth] = useState(0);
+  const [scrollAreaWidth, setScrollAreaWidth] = useState(0);
+  const scrollAreaRef = useRef(null);
 
   useEffect(() => {
     const lengthMs = Math.max(1, totalLengthMs || 0);
@@ -40,6 +42,30 @@ function MainContent({
     const desiredWidth = Math.max(1, Math.round(pxPerMs * lengthMs));
     setTimelineContentWidth(desiredWidth);
   }, [totalLengthMs, zoom]);
+
+  useEffect(() => {
+    const node = scrollAreaRef.current;
+    if (!node) return;
+
+    const updateWidth = () => {
+      setScrollAreaWidth(node.clientWidth);
+    };
+
+    updateWidth();
+
+    if (typeof ResizeObserver !== "undefined") {
+      const observer = new ResizeObserver(updateWidth);
+      observer.observe(node);
+      return () => observer.disconnect();
+    }
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("resize", updateWidth);
+      return () => window.removeEventListener("resize", updateWidth);
+    }
+
+    return undefined;
+  }, []);
 
   const verticalScale = useMemo(
     () => Math.min(2.25, Math.max(0.6, Math.pow(Math.max(zoom, 0.01), 0.5))),
@@ -55,11 +81,19 @@ function MainContent({
   );
 
   const timelineMetrics = useMemo(() => {
-    const widthPx = Math.max(1, Math.round(timelineContentWidth));
     const leftOffsetPx = TRACK_CONTROLS_WIDTH + TRACK_CONTROLS_GAP;
+    const minimumTimelineWidth = Math.max(
+      1,
+      Math.round(scrollAreaWidth - leftOffsetPx)
+    );
+    const widthPx = Math.max(
+      1,
+      Math.round(timelineContentWidth),
+      minimumTimelineWidth
+    );
     const rowWidthPx = widthPx + leftOffsetPx;
     return {widthPx, leftOffsetPx, rowWidthPx};
-  }, [timelineContentWidth]);
+  }, [timelineContentWidth, scrollAreaWidth]);
 
   const hasTracks = Array.isArray(tracks) && tracks.length > 0;
 
@@ -71,7 +105,7 @@ function MainContent({
 
   return (
     <DraggableDiv className="maincontent" style={timelineStyle}>
-      <div className="timeline-scroll-area">
+      <div className="timeline-scroll-area" ref={scrollAreaRef}>
         {hasTracks ? (
           <>
             <TimelineRuler
