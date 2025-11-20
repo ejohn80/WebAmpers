@@ -71,6 +71,7 @@ class PlaybackEngine {
     Tone.Transport.cancel(0);
     this._cancelRaf();
     this._disposeAll();
+    this._emitTransport(false);
 
     // Save the version reference
     this.version = version;
@@ -220,7 +221,10 @@ class PlaybackEngine {
     const hasEffects =
       (effects?.pitch && effects.pitch !== 0) ||
       (effects?.reverb && effects.reverb > 0) ||
-      (effects?.volume !== undefined && effects.volume !== 100);
+      (effects?.volume && effects.volume !== 100) ||
+      (effects?.delay && effects.delay > 0) ||
+      (effects?.bass && effects.bass !== 0) ||
+      (effects?.distortion && effects.distortion > 0);
 
     // No effects --> don't do anything
     if (!hasEffects) {
@@ -292,8 +296,54 @@ class PlaybackEngine {
       }
     }
 
+    // Delay
+    if (effects?.delay && effects.delay > 0) {
+      try {
+        const wet = Math.max(0, Math.min(1, effects.delay / 100));
+        const delay = new Tone.FeedbackDelay({
+          delayTime: "8n", // eighth note delay
+          feedback: 0.3 + 0.4 * wet, // more feedback = more repeats
+          wet: wet,
+          context: context,
+        });
+        chain.push(delay);
+      } catch (e) {
+        console.warn("Failed to create delay effect:", e);
+      }
+    }
+
+    // Bass Boost
+    if (effects?.bass && effects.bass !== 0) {
+      try {
+        const eq = new Tone.EQ3({
+          low: effects.bass, // boost/cut in dB
+          mid: 0,
+          high: 0,
+          context: context,
+        });
+        chain.push(eq);
+      } catch (e) {
+        console.warn("Failed to create bass boost effect:", e);
+      }
+    }
+
+    // Distortion
+    if (effects?.distortion && effects.distortion > 0) {
+      try {
+        const amount = Math.max(0, Math.min(1, effects.distortion / 100));
+        const distortion = new Tone.Distortion({
+          distortion: amount,
+          wet: amount * 0.8,
+          context: context,
+        });
+        chain.push(distortion);
+      } catch (e) {
+        console.warn("Failed to create distortion effect:", e);
+      }
+    }
+
     // Volume/Gain
-    if (effects?.volume !== undefined && effects.volume !== 100) {
+    if (effects?.volume && effects.volume !== 100) {
       try {
         const gain = Math.max(0, Math.min(2, effects.volume / 100));
         const gainNode = new Tone.Gain({
@@ -367,6 +417,29 @@ class PlaybackEngine {
       const linear = Math.max(0, Math.min(2, effects.volume / 100));
       chain.push({type: "gain", gain: linear});
     }
+    // Delay
+    if (typeof effects?.delay === "number" && effects.delay > 0) {
+      const wet = Math.max(0, Math.min(1, effects.delay / 100));
+      chain.push({
+        type: "delay",
+        wet,
+        feedback: 0.3 + 0.4 * wet,
+      });
+    }
+    // Bass Boost
+    if (typeof effects?.bass === "number" && effects.bass !== 0) {
+      chain.push({type: "eq3", low: effects.bass});
+    }
+    // Distortion
+    if (typeof effects?.distortion === "number" && effects.distortion > 0) {
+      const amount = Math.max(0, Math.min(1, effects.distortion / 100));
+      chain.push({type: "distortion", amount});
+    }
+    // Effect volume (0-200% -> 0.0-2.0 linear)
+    if (typeof effects?.volume === "number" && effects.volume !== 100) {
+      const linear = Math.max(0, Math.min(2, effects.volume / 100));
+      chain.push({type: "gain", gain: linear});
+    }
     this.replaceMasterChain(chain);
   }
 
@@ -380,15 +453,36 @@ class PlaybackEngine {
 
   /** Prepare all segments (audio clips) and schedule them for playback */
   async _prepareSegments(version) {
+    // Preload only string URLs; skip objects (AudioBuffer/ToneAudioBuffer)
     const urls = Array.from(
-      new Set((version.segments || []).map((s) => s.fileUrl))
+      new Set(
+        (version.segments || [])
+          .map((s) => s.fileUrl)
+          .filter((u) => typeof u === "string" && u.length > 0)
+      )
     );
     urls.forEach((u) => this._preload(u));
 
     for (const seg of version.segments || []) {
+      // Normalize file source: allow string URL, AudioBuffer, or Tone.ToneAudioBuffer
+      let src = seg.fileUrl;
+      try {
+        if (src && typeof src.get === "function") {
+          // Tone.ToneAudioBuffer -> native AudioBuffer
+          src = src.get();
+        } else if (
+          src &&
+          src._buffer &&
+          typeof src._buffer.getChannelData === "function"
+        ) {
+          // Some Tone versions expose native buffer under _buffer
+          src = src._buffer;
+        }
+      } catch {}
+
       // Create a Tone.Player for each segment
       const player = new Tone.Player({
-        url: seg.fileUrl,
+        url: src,
         autostart: false,
         loop: false,
         fadeIn: (seg.fades?.inMs ?? this.defaultFadeMs) / 1000,
@@ -469,6 +563,33 @@ class PlaybackEngine {
               nodes.push(fv);
               break;
             }
+            case "delay": {
+              const delay = new Tone.FeedbackDelay({
+                delayTime: "8n",
+                feedback: cfg.feedback ?? 0.5,
+                wet: cfg.wet ?? 0.5,
+              });
+              nodes.push(delay);
+              break;
+            }
+            case "eq3": {
+              const eq = new Tone.EQ3({
+                // THIS IS AN EQUALIZER --> (just for base)
+                low: cfg.low ?? 0,
+                mid: 0,
+                high: 0,
+              });
+              nodes.push(eq);
+              break;
+            }
+            case "distortion": {
+              const dist = new Tone.Distortion({
+                distortion: cfg.amount ?? 0.5,
+                wet: (cfg.amount ?? 0.5) * 0.8,
+              });
+              nodes.push(dist);
+              break;
+            }
             case "gain": {
               const g = new Tone.Gain(Math.max(0, Math.min(2, cfg.gain ?? 1)));
               nodes.push(g);
@@ -526,6 +647,7 @@ class PlaybackEngine {
 
   /** Preload an audio file asynchronously */
   _preload(url) {
+    if (typeof url !== "string") return; // only preload network/Blob URLs
     if (this.preloaded.has(url)) return;
     this.preloaded.add(url);
     Tone.ToneAudioBuffer.load(url)
@@ -887,6 +1009,12 @@ export default function WebAmpPlayback({version, onEngineReady}) {
     progressStore.setMs(ms);
   }, [ms]);
 
+  const hasNoTracks =
+    !version ||
+    !version.tracks ||
+    version.tracks.length === 0 ||
+    version.lengthMs === 0;
+
   // Global keyboard shortcuts for playback control
   useEffect(() => {
     const isEditableTarget = (el) => {
@@ -929,6 +1057,11 @@ export default function WebAmpPlayback({version, onEngineReady}) {
       const isUp = e.code === "ArrowUp" || e.key === "ArrowUp";
       const isDown = e.code === "ArrowDown" || e.key === "ArrowDown";
 
+      if (hasNoTracks && (isSpace || isLeft || isRight)) {
+        e.preventDefault();
+        return;
+      }
+
       if (isSpace) {
         e.preventDefault();
         onTogglePlay();
@@ -941,8 +1074,8 @@ export default function WebAmpPlayback({version, onEngineReady}) {
       } else if (isUp || isDown) {
         e.preventDefault();
 
-        // Volume control: Up increases, Down decreases
-        const volumeStep = 5; // Change volume by 5% per keypress
+        // Volume controls remain functional even with no tracks
+        const volumeStep = 5;
         let newVolume = masterVol;
 
         if (isUp) {
@@ -951,27 +1084,21 @@ export default function WebAmpPlayback({version, onEngineReady}) {
           newVolume = Math.max(0, masterVol - volumeStep);
         }
 
-        // Update volume state and engine
         setMasterVol(newVolume);
 
         try {
           const linear = Math.max(0, Math.min(1, newVolume / 100));
-
-          // Update refs
           savedVolumeRef.current = linear;
           prevMasterGainRef.current = linear;
 
-          // AUTO-UNMUTE LOGIC: Unmute immediately when increasing volume
           if (muted && newVolume > 0) {
             setMuted(false);
           }
 
-          // AUTO-MUTE LOGIC: Mute when volume reaches 0
           if (newVolume === 0 && !muted) {
             setMuted(true);
           }
 
-          // Apply volume to engine (respect mute state)
           if (engine.master) {
             engine.master.gain.gain.value = muted ? 0 : linear;
           }
@@ -983,7 +1110,15 @@ export default function WebAmpPlayback({version, onEngineReady}) {
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [onTogglePlay, skipBack10, skipFwd10, masterVol, muted, engine]);
+  }, [
+    onTogglePlay,
+    skipBack10,
+    skipFwd10,
+    masterVol,
+    muted,
+    engine,
+    hasNoTracks,
+  ]);
 
   // Toggle mute while preserving slider value
   const onToggleMute = () => {
@@ -1045,10 +1180,8 @@ export default function WebAmpPlayback({version, onEngineReady}) {
     return `${m}:${s.toString().padStart(2, "0")}`;
   };
 
-  // Render player UI with CSS classes
   return (
     <div className="playback-container">
-      {/* Combined transport + time section */}
       <div className="transport-time-container">
         <div className="time-section">
           <code className="time-display">
@@ -1060,23 +1193,51 @@ export default function WebAmpPlayback({version, onEngineReady}) {
         </div>
 
         <div className="transport-section">
-          <button onClick={goToStart} className="transport-button">
+          <button
+            onClick={goToStart}
+            className="transport-button"
+            disabled={hasNoTracks}
+            title={hasNoTracks ? "No tracks loaded" : "Go to start"}
+          >
             <GoToStartIcon />
           </button>
-          <button onClick={skipBack10} className="transport-button">
+
+          <button
+            onClick={skipBack10}
+            className="transport-button"
+            disabled={hasNoTracks}
+            title={hasNoTracks ? "No tracks loaded" : "Skip backward 10s"}
+          >
             <RewindIcon />
           </button>
-          <PlayPauseButton isPlaying={playing} onToggle={onTogglePlay} />
 
-          <button onClick={skipFwd10} className="transport-button">
+          <PlayPauseButton
+            isPlaying={playing}
+            onToggle={onTogglePlay}
+            disabled={hasNoTracks}
+          />
+
+          <button
+            onClick={skipFwd10}
+            className="transport-button"
+            disabled={hasNoTracks}
+            title={hasNoTracks ? "No tracks loaded" : "Skip forward 10s"}
+          >
             <ForwardIcon />
           </button>
-          <button onClick={goToEnd} className="transport-button">
+
+          <button
+            onClick={goToEnd}
+            className="transport-button"
+            disabled={hasNoTracks}
+            title={hasNoTracks ? "No tracks loaded" : "Go to end"}
+          >
             <GoToEndIcon />
           </button>
         </div>
       </div>
 
+      {/* Volume section - unchanged, stays enabled */}
       <div className="volume-section">
         <button
           type="button"
@@ -1109,17 +1270,17 @@ export default function WebAmpPlayback({version, onEngineReady}) {
 
               try {
                 const linear = Math.max(0, Math.min(1, v / 100));
-
-                // Update refs
                 savedVolumeRef.current = linear;
                 prevMasterGainRef.current = linear;
 
-                // AUTO-UNMUTE LOGIC: Unmute immediately when slider is adjusted
                 if (muted && v > 0) {
                   setMuted(false);
                 }
 
-                // Apply volume to engine (respect mute state)
+                if (v === 0 && !muted) {
+                  setMuted(true);
+                }
+
                 if (engine.master) {
                   engine.master.gain.gain.value = muted ? 0 : linear;
                 }
@@ -1130,13 +1291,11 @@ export default function WebAmpPlayback({version, onEngineReady}) {
             onMouseDown={() => setDraggingVol(true)}
             onMouseUp={() => {
               setDraggingVol(false);
-              // Persist state when dragging ends
               try {
                 localStorage.setItem("webamp.masterVol", String(masterVol));
                 localStorage.setItem("webamp.muted", muted ? "1" : "0");
               } catch (e) {}
 
-              // Auto-mute if user explicitly sets volume to zero
               if (masterVol === 0 && !muted) {
                 setMuted(true);
                 if (engine.master) {
@@ -1148,13 +1307,11 @@ export default function WebAmpPlayback({version, onEngineReady}) {
             onTouchStart={() => setDraggingVol(true)}
             onTouchEnd={() => {
               setDraggingVol(false);
-              // Persist state when touch ends
               try {
                 localStorage.setItem("webamp.masterVol", String(masterVol));
                 localStorage.setItem("webamp.muted", muted ? "1" : "0");
               } catch (e) {}
 
-              // Same auto-mute logic for touch devices
               if (masterVol === 0 && !muted) {
                 setMuted(true);
               }

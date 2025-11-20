@@ -6,13 +6,13 @@ import "../AudioExport/AudioExportButton.css";
  * A modal wrapper for the AudioExporter component.
  */
 const AudioExportModal = ({
-  audioBuffer,
+  tracks,
+  totalLengthMs,
   onExportComplete,
-  getProcessedBuffer,
   isOpen,
   onClose,
 }) => {
-  if (!isOpen) return null; // Only render if open
+  if (!isOpen) return null;
 
   const handleExportComplete = (result) => {
     onClose();
@@ -43,7 +43,6 @@ const AudioExportModal = ({
       }}
       onClick={handleOverlayClick}
     >
-      {/* Modal Content */}
       <div
         style={{
           background: "#333",
@@ -71,8 +70,8 @@ const AudioExportModal = ({
           &times;
         </button>
         <AudioExporter
-          audioBuffer={audioBuffer}
-          getProcessedBuffer={getProcessedBuffer}
+          tracks={tracks}
+          totalLengthMs={totalLengthMs}
           onExportComplete={handleExportComplete}
         />
       </div>

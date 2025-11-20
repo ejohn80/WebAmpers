@@ -37,13 +37,45 @@ class DBManager {
     });
   }
 
+  /**
+   * Remove all tracks from the database (used by tests and reset flows)
+   */
+  async clearAllTracks() {
+    const db = await this.openDB();
+    return new Promise((resolve, reject) => {
+      try {
+        const tx = db.transaction([TRACKS_STORE_NAME], "readwrite");
+        const store = tx.objectStore(TRACKS_STORE_NAME);
+        const req = store.clear();
+
+        req.onsuccess = () => {
+          resolve();
+        };
+        req.onerror = (event) => {
+          console.error("Error clearing tracks:", event.target.error);
+          reject(new Error("Could not clear tracks from the database."));
+        };
+
+        tx.oncomplete = () => {
+          // no-op; resolution handled in req.onsuccess
+        };
+        tx.onerror = (event) => {
+          console.error("Transaction failed during clear:", event.target.error);
+          // If store.clear() already errored, req.onerror has handled reject
+        };
+      } catch (e) {
+        reject(e);
+      }
+    });
+  }
+
   async addTrack(trackData) {
     const db = await this.openDB();
     return new Promise((resolve, reject) => {
       const transaction = db.transaction([TRACKS_STORE_NAME], "readwrite");
       const store = transaction.objectStore(TRACKS_STORE_NAME);
+
       // Prefer to use a `toJSON()` serializer if the object provides one
-      // (e.g. AudioTrack.toJSON). Otherwise shallow-copy properties.
       const base =
         typeof trackData?.toJSON === "function"
           ? trackData.toJSON()
@@ -128,36 +160,33 @@ class DBManager {
         });
       }
 
-      // If the provided track already has an id, use put() so we upsert
-      // instead of failing with add() on duplicate keys. However, when the
-      // id looks like a client-generated string (e.g. 'track_xxx') prefer to
-      // let IndexedDB assign a numeric key (via add) so stored keys remain
-      // monotonic and ordering by key reflects insertion order.
-      let request;
+      // FIX: Always let IndexedDB assign the ID for new tracks
+      // Remove any client-generated string ID so IndexedDB assigns a numeric one
       const hasId =
         typeof storableTrack.id !== "undefined" && storableTrack.id !== null;
       const isClientGeneratedString =
         hasId &&
         typeof storableTrack.id === "string" &&
         /^track_/.test(storableTrack.id);
-      if (!hasId || isClientGeneratedString) {
-        // Remove id if it's a client-generated string so add() assigns a numeric id
-        if (isClientGeneratedString) {
-          // shallow copy without id
-          const {id, ...withoutId} = storableTrack;
-          request = store.add(withoutId);
-        } else {
-          request = store.add(storableTrack);
-        }
+
+      let request;
+      if (isClientGeneratedString || !hasId) {
+        // Remove the client-generated ID so IndexedDB assigns a numeric one
+        const {id, ...withoutId} = storableTrack;
+        request = store.add(withoutId);
+      } else if (typeof storableTrack.id === "number") {
+        // Numeric ID: try to update existing record, or add if it doesn't exist
+        request = store.put(storableTrack);
       } else {
-        // has a numeric or externally-managed id: upsert with put()
+        // String ID that's not client-generated: use put
         request = store.put(storableTrack);
       }
 
       request.onsuccess = (event) => {
-        // Return the key (either provided or generated). Callers may want to
-        // update their in-memory object to match the DB-assigned key.
-        resolve(event.target.result);
+        // Return the key (either provided or generated)
+        const assignedId = event.target.result;
+        console.log(`Track saved to IndexedDB with ID: ${assignedId}`);
+        resolve(assignedId);
       };
 
       request.onerror = (event) => {
@@ -185,140 +214,133 @@ class DBManager {
     });
   }
 
+  /**
+   * Delete a track from IndexedDB
+   */
   async deleteTrack(trackId) {
     const db = await this.openDB();
+
     return new Promise((resolve, reject) => {
       const transaction = db.transaction([TRACKS_STORE_NAME], "readwrite");
       const store = transaction.objectStore(TRACKS_STORE_NAME);
-      const request = store.delete(trackId);
 
-      request.onsuccess = () => {
-        resolve();
+      const deleteRequest = store.delete(trackId);
+
+      deleteRequest.onsuccess = () => {
+        console.log(`Track ${trackId} deleted from IndexedDB`);
+        resolve(true);
       };
 
-      request.onerror = (event) => {
-        console.error("Error deleting track:", event.target.error);
-        reject(new Error("Could not delete track from the database."));
+      deleteRequest.onerror = () => {
+        console.error(`Failed to delete track ${trackId}`);
+        reject(new Error("Failed to delete track"));
       };
-    });
-  }
 
-  async clearAllTracks() {
-    const db = await this.openDB();
-    return new Promise((resolve, reject) => {
-      const transaction = db.transaction([TRACKS_STORE_NAME], "readwrite");
-      const store = transaction.objectStore(TRACKS_STORE_NAME);
-      const request = store.clear();
-
-      request.onsuccess = () => resolve();
-      request.onerror = (event) => {
-        reject(new Error("Could not clear tracks from the database."));
+      transaction.oncomplete = () => resolve(true);
+      transaction.onerror = () => {
+        reject(new Error("Transaction failed"));
       };
     });
   }
 
   /**
-   * Update an existing track record in the database. If the track does not
-   * have an `id` it will be added as a new record.
-   * @param {object} trackData
+   * Update an existing track in IndexedDB
+   * @param {AudioTrack} track - The track to update
+   * @returns {Promise<void>}
    */
-  async updateTrack(trackData) {
+  async updateTrack(track) {
     const db = await this.openDB();
+
     return new Promise((resolve, reject) => {
       const transaction = db.transaction([TRACKS_STORE_NAME], "readwrite");
       const store = transaction.objectStore(TRACKS_STORE_NAME);
 
-      // Normalize object using toJSON() if available, and convert buffers
-      // similarly to addTrack so the stored shape is consistent.
-      const base =
-        typeof trackData?.toJSON === "function"
-          ? trackData.toJSON()
-          : {...trackData};
+      // Serialize the track before storing
+      const trackData = this.serializeTrack(track);
 
-      const storable = {
-        ...base,
-        id: base.id ?? trackData.id,
-        volume: base.volume ?? trackData.volume ?? base._volumeDb ?? undefined,
-        pan: base.pan ?? trackData.pan ?? base._pan ?? undefined,
-        mute:
-          typeof base.mute !== "undefined"
-            ? base.mute
-            : typeof trackData.mute !== "undefined"
-              ? trackData.mute
-              : base._mute,
-        solo:
-          typeof base.solo !== "undefined"
-            ? base.solo
-            : typeof trackData.solo !== "undefined"
-              ? trackData.solo
-              : base._solo,
-      };
-
-      // Serialize segments similarly to addTrack
-      const segments = Array.isArray(base.segments)
-        ? base.segments
-        : Array.isArray(trackData.segments)
-          ? trackData.segments
-          : [];
-      if (segments.length > 0) {
-        storable.segments = segments.map((s) => {
-          const seg = {...s};
-          let audioBuffer = null;
-          try {
-            const candidate =
-              s.buffer ||
-              (trackData.segments &&
-                trackData.segments.find((ss) => ss.id === s.id)?.buffer);
-            if (candidate) {
-              if (typeof candidate.get === "function")
-                audioBuffer = candidate.get();
-              else if (candidate instanceof AudioBuffer)
-                audioBuffer = candidate;
-              else if (
-                candidate._buffer &&
-                candidate._buffer instanceof AudioBuffer
-              )
-                audioBuffer = candidate._buffer;
-            }
-          } catch (e) {
-            console.warn(
-              "Failed to extract segment AudioBuffer for updateTrack:",
-              e
-            );
-          }
-
-          if (audioBuffer) {
-            const channels = [];
-            for (let i = 0; i < audioBuffer.numberOfChannels; i++)
-              channels.push(audioBuffer.getChannelData(i));
-            seg.buffer = {
-              channels,
-              sampleRate: audioBuffer.sampleRate,
-              length: audioBuffer.length,
-              duration: audioBuffer.duration,
-              numberOfChannels: audioBuffer.numberOfChannels,
-            };
-          } else {
-            if (
-              seg.buffer &&
-              typeof seg.buffer === "object" &&
-              !seg.buffer.channels
-            )
-              delete seg.buffer;
-          }
-
-          return seg;
-        });
+      if (typeof trackData.id === "string" && /^track_/.test(trackData.id)) {
+        console.error(
+          `Cannot update track with client-generated ID: ${trackData.id}`
+        );
+        reject(
+          new Error("Track must have a numeric DB-assigned ID for updates")
+        );
+        return;
       }
 
-      const request = store.put(storable);
+      const updateRequest = store.put(trackData);
 
-      request.onsuccess = (event) => resolve(event.target.result);
-      request.onerror = (event) => {
-        console.error("Error updating track:", event.target.error);
-        reject(new Error("Could not update track in the database."));
+      updateRequest.onsuccess = () => {
+        console.log(`Track ${track.id} updated in IndexedDB`);
+      };
+
+      updateRequest.onerror = (event) => {
+        console.error(
+          `Failed to update track ${track.id}:`,
+          event.target.error
+        );
+        reject(new Error("Failed to update track"));
+      };
+
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = (event) => {
+        console.error("Transaction failed during update:", event.target.error);
+        reject(new Error("Transaction failed"));
       };
     });
+  }
+
+  /**
+   * Helper to serialize a track for storage
+   * @param {AudioTrack} track
+   * @returns {Object} Serializable track data
+   */
+  serializeTrack(track) {
+    const serialized = {
+      id: track.id,
+      name: track.name,
+      color: track.color,
+      volume: track.volume,
+      pan: track.pan,
+      mute: track.mute,
+      solo: track.solo,
+      order: track.order ?? 0,
+      segments: [],
+    };
+
+    // Serialize segments with buffer data
+    (track.segments || []).forEach((seg) => {
+      const segData = {
+        id: seg.id,
+        offset: seg.offset,
+        duration: seg.duration,
+        durationMs: seg.durationMs,
+        startOnTimelineMs: seg.startOnTimelineMs,
+        startInFileMs: seg.startInFileMs,
+      };
+
+      // Serialize the audio buffer
+      if (seg.buffer) {
+        const buffer = seg.buffer.get ? seg.buffer.get() : seg.buffer;
+        if (buffer) {
+          const channels = [];
+          for (let i = 0; i < buffer.numberOfChannels; i++) {
+            channels.push(buffer.getChannelData(i));
+          }
+
+          segData.buffer = {
+            numberOfChannels: buffer.numberOfChannels,
+            length: buffer.length,
+            sampleRate: buffer.sampleRate,
+            channels: channels,
+          };
+        }
+      }
+
+      serialized.segments.push(segData);
+    });
+
+    return serialized;
   }
 }
 

@@ -1,6 +1,7 @@
 import {describe, it, expect, vi, beforeEach} from "vitest";
 import {render, waitFor} from "@testing-library/react";
-import WebAmpPlayback from "../playback/playback.jsx";
+import * as Tone from "tone";
+import WebAmpPlayback, {PlaybackEngine} from "../playback/playback.jsx";
 
 // Provide a mock implementation of Tone used by playback.jsx. This mock is
 // deliberately minimal and focused on the Gain/panning/mute/solo behavior we
@@ -187,5 +188,40 @@ describe("PlaybackEngine mute/solo behavior (via WebAmpPlayback)", () => {
     // Now solo 'b' as well, but b has explicit mute true — mute should take precedence
     engineInstance.setTrackSolo("b", true);
     expect(b.gain.gain.value).toBeCloseTo(0.0001); // still muted despite being soloed
+  });
+});
+
+describe("PlaybackEngine transport controls", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Tone.Transport.seconds = 0;
+  });
+
+  it("restarts from the beginning when play is invoked at the end of the timeline", async () => {
+    const events = {onProgress: vi.fn(), onTransport: vi.fn()};
+    const engine = new PlaybackEngine(events);
+    await engine.load(makeVersion([{id: "multi"}]));
+
+    Tone.Transport.seconds = engine.version.lengthMs / 1000;
+    const seekSpy = vi.spyOn(engine, "seekMs");
+
+    await engine.play();
+
+    expect(seekSpy).toHaveBeenCalledWith(0);
+    expect(Tone.Transport.start).toHaveBeenCalledWith("+0.2");
+    expect(events.onTransport).toHaveBeenCalledWith(
+      expect.objectContaining({playing: true})
+    );
+  });
+
+  it("applies jog latency and clamps positions when seeking", () => {
+    const engine = new PlaybackEngine({});
+    engine.version = makeVersion([{id: "mx"}]);
+
+    engine.seekMs(-500);
+    expect(Tone.Transport.seconds).toBeCloseTo(engine.jogLatencySec, 5);
+
+    engine.seekMs(2500);
+    expect(Tone.Transport.seconds).toBeCloseTo(2.5 + engine.jogLatencySec, 5);
   });
 });
