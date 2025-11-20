@@ -29,7 +29,8 @@ import {BsArrowsFullscreen, BsArrowsAngleContract} from "react-icons/bs";
 
 function DropdownPortal({
   side,
-  audioBuffer,
+  tracks,
+  totalLengthMs,
   onExportComplete,
   onImportSuccess,
   onImportError,
@@ -54,8 +55,12 @@ function DropdownPortal({
   const settingsDropdownRef = useRef(null);
   const guestDropdownRef = useRef(null);
 
+  // Check if there are any tracks available for export
+  const hasTracksForExport = tracks && tracks.length > 0;
+
   const handleMenuItemClick = (action) => {
-    // Handle navigation for guest dropdown
+    console.log(`Selected: ${action}`);
+
     if (action === "Login") {
       navigate("/login");
     } else if (action === "Register") {
@@ -80,7 +85,6 @@ function DropdownPortal({
     setActiveDropdown(activeDropdown === dropdownName ? null : dropdownName);
   };
 
-  // Handle mouse leave from dropdown
   const handleDropdownMouseLeave = (event) => {
     const related = event.relatedTarget;
     const dropdown = event.currentTarget;
@@ -129,7 +133,6 @@ function DropdownPortal({
     };
   }, [activeDropdown]);
 
-  // Helper function to get button class with active state
   const getButtonClass = (buttonType, dropdownName) => {
     const baseClass = `dropdown-btn${buttonType ? `-${buttonType}` : ""}`;
     return activeDropdown === dropdownName ? `${baseClass} active` : baseClass;
@@ -208,7 +211,6 @@ function DropdownPortal({
     );
   };
 
-  // Dropdown content for each menu with individual styling
   const dropdownContent = {
     file: (
       <div
@@ -301,19 +303,21 @@ function DropdownPortal({
           </a>
         </AudioImportButton>
 
-        {/* ENABLED/DISABLED - Export (conditional) */}
+        {/* ENABLED/DISABLED - Export (conditional based on tracks) */}
         <AudioExportButton
-          audioBuffer={audioBuffer}
+          tracks={tracks}
+          totalLengthMs={totalLengthMs}
           onExportComplete={onExportComplete}
-          disabled={!audioBuffer} // This prop is now ignored by AudioExportButton, but is harmless
         >
           <a
             href="#"
-            className={!audioBuffer ? "dropdown-item-disabled" : ""} // APPLIES GREY-OUT
+            className={!hasTracksForExport ? "dropdown-item-disabled" : ""}
             onClick={(e) => {
               e.preventDefault();
-              if (!audioBuffer) {
-                alert("Please import audio before exporting"); // PRESERVES ALERT
+              if (!hasTracksForExport) {
+                alert(
+                  "Please import audio or create a recording before exporting"
+                );
                 return;
               }
               handleMenuItemClick("Export");

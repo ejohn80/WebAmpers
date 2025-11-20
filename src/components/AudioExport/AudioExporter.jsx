@@ -1,16 +1,23 @@
-import React, {useState, useMemo} from "react";
+import React, {useState, useMemo, useContext} from "react";
 import ExportManager from "./ExportManager.js";
+import {AppContext} from "../../context/AppContext";
 
-const AudioExporter = ({audioBuffer, getProcessedBuffer, onExportComplete}) => {
+const AudioExporter = ({
+  tracks,
+  totalLengthMs,
+  onExportComplete,
+  audioBuffer,
+}) => {
+  // Make context optional so tests that don't mount AppContextProvider don't crash
+  const appCtx = useContext(AppContext) || {};
+  const effects = appCtx.effects || [];
   const exportManager = useMemo(() => new ExportManager(), []);
-  // State for form inputs
   const [format, setFormat] = useState("mp3");
   const [qualitySetting, setQualitySetting] = useState("320k");
   const [filename, setFilename] = useState("export.mp3");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Supported formats for the dropdown
   const formats = [
     {value: "mp3", label: "MP3"},
     {value: "wav", label: "WAV"},
@@ -18,8 +25,6 @@ const AudioExporter = ({audioBuffer, getProcessedBuffer, onExportComplete}) => {
   ];
 
   const getQualityOptions = (currentFormat) => {
-    // Using bitrate labels for OGG as well to avoid the FFmpeg crash,
-    // assuming the backend expects a 'k' suffix if a quality option is passed.
     const isCompressed = currentFormat !== "wav";
     if (!isCompressed) return [];
 
@@ -50,52 +55,70 @@ const AudioExporter = ({audioBuffer, getProcessedBuffer, onExportComplete}) => {
 
   const handleFormatChange = (newFormat) => {
     setFormat(newFormat);
-    // Update default filename extension when format changes
     setFilename((fn) => fn.replace(/\.(mp3|wav|ogg)$/i, `.${newFormat}`));
-    // Reset to a safe default
     setQualitySetting("320k");
   };
 
   const handleExport = async (e) => {
     e.preventDefault();
     setError(null);
+    const exportBitrate =
+      format === "mp3" || format === "ogg" ? qualitySetting : undefined;
 
-    if (!audioBuffer) {
-      setError("Please load or generate an audio track before exporting.");
+    // Compatibility: support legacy prop `audioBuffer` used in tests
+    if (typeof audioBuffer !== "undefined") {
+      if (!audioBuffer) {
+        setError("Please load or generate an audio track before exporting");
+        return;
+      }
+      setIsLoading(true);
+      try {
+        const result = await exportManager.exportAudio(audioBuffer, {
+          format,
+          filename,
+          bitrate: exportBitrate,
+        });
+        if (result && onExportComplete) onExportComplete(result);
+      } catch (err) {
+        console.error("Export Error:", err);
+        setError(
+          (err?.message || "Export failed")
+            .split("Command:")[0]
+            .replace(/^Error:\s*/, "")
+            .trim()
+        );
+      } finally {
+        setIsLoading(false);
+      }
+      return;
+    }
+
+    // New API expects tracks + totalLengthMs
+    if (!tracks || tracks.length === 0) {
+      setError("No tracks available to export.");
       return;
     }
 
     setIsLoading(true);
-    const exportBitrate =
-      format === "mp3" || format === "ogg" ? qualitySetting : undefined;
-
     try {
-      // Get processed buffer with effects if available
-      let bufferToExport = audioBuffer;
-
-      if (getProcessedBuffer) {
-        bufferToExport = await getProcessedBuffer();
-      }
-
-      const result = await exportManager.exportAudio(bufferToExport, {
-        format,
-        filename,
-        bitrate: exportBitrate, // Pass the selected quality/bitrate
-      });
-
-      if (result.success) {
-        console.log(`Exported successfully: ${result.format}`);
-        if (onExportComplete) {
-          onExportComplete(result);
+      const result = await exportManager.exportAudio(
+        tracks,
+        totalLengthMs,
+        effects,
+        {
+          format,
+          filename,
+          bitrate: exportBitrate,
         }
-      }
+      );
+      if (result && result.success && onExportComplete)
+        onExportComplete(result);
     } catch (err) {
       console.error("Export Error:", err);
-      // Ensure the message is clean if it's the FFmpeg error
       setError(
-        err.message
-          .replace(/^Error:\s*/, "")
+        (err?.message || "Export failed")
           .split("Command:")[0]
+          .replace(/^Error:\s*/, "")
           .trim()
       );
     } finally {
@@ -113,7 +136,6 @@ const AudioExporter = ({audioBuffer, getProcessedBuffer, onExportComplete}) => {
         onSubmit={handleExport}
         style={{display: "flex", flexDirection: "column", gap: "15px"}}
       >
-        {/* Output Format Dropdown */}
         <div style={{display: "flex", alignItems: "center"}}>
           <label
             htmlFor="format"
@@ -129,7 +151,7 @@ const AudioExporter = ({audioBuffer, getProcessedBuffer, onExportComplete}) => {
             onChange={(e) => handleFormatChange(e.target.value)}
             className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md shadow-sm"
             aria-label="Output Format"
-            style={{flexGrow: 1}} // Input takes remaining space
+            style={{flexGrow: 1}}
           >
             {formats.map((f) => (
               <option key={f.value} value={f.value}>
@@ -139,7 +161,6 @@ const AudioExporter = ({audioBuffer, getProcessedBuffer, onExportComplete}) => {
           </select>
         </div>
 
-        {/* Quality/Bitrate Input (MP3 and OGG) */}
         {showQualitySetting && (
           <div style={{display: "flex", alignItems: "center"}}>
             <label
@@ -156,7 +177,7 @@ const AudioExporter = ({audioBuffer, getProcessedBuffer, onExportComplete}) => {
               onChange={(e) => setQualitySetting(e.target.value)}
               className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md shadow-sm"
               aria-label={format === "mp3" ? "MP3 Bitrate" : "OGG Quality"}
-              style={{flexGrow: 1}} // Input takes remaining space
+              style={{flexGrow: 1}}
             >
               {getQualityOptions(format).map((opt) => (
                 <option key={opt.value} value={opt.value}>
@@ -167,7 +188,6 @@ const AudioExporter = ({audioBuffer, getProcessedBuffer, onExportComplete}) => {
           </div>
         )}
 
-        {/* Filename Input */}
         <div style={{display: "flex", alignItems: "center"}}>
           <label
             htmlFor="filename"
@@ -183,18 +203,16 @@ const AudioExporter = ({audioBuffer, getProcessedBuffer, onExportComplete}) => {
             value={filename}
             onChange={(e) => setFilename(e.target.value)}
             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2"
-            style={{flexGrow: 1}} // Input takes remaining space
+            style={{flexGrow: 1}}
           />
         </div>
 
-        {/* Error Display */}
         {error && (
           <p className="text-sm font-medium text-red-600 p-2 border border-red-200 bg-red-50 rounded-md">
             Error: {error}
           </p>
         )}
 
-        {/* Submit Button */}
         <button
           type="submit"
           disabled={isLoading}

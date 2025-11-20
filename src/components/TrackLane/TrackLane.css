@@ -1,36 +1,56 @@
 .tracklane-side {
-  width: 100px; /* reduced width so box sits further left */
-  min-width: 80px;
+  width: var(--track-controls-width);
+  min-width: var(--track-controls-width);
+  flex: 0 0 var(--track-controls-width);
   display: flex;
   flex-direction: column;
   gap: 6px;
-  /* Allow the side column to stretch to match the height of the main area */
   align-self: stretch;
   padding-right: 6px;
+  background: #2f2f2f;
+  box-shadow: 6px 0 12px rgba(0, 0, 0, 0.45);
+  position: sticky;
+  left: 0;
+  z-index: 5;
 }
 
 .tracklane-root {
   display: flex;
-  flex-direction: row;
-  gap: 12px;
-  width: 100%;
+  gap: var(--track-controls-gap);
   align-items: stretch;
-}
-
-.tracklane-main {
-  flex: 1 1 auto;
-}
-
-.tracklane-root {
-  background: #2f2f2f; /* lighter grey */
+  background: #2f2f2f;
   color: #eaeaea;
   padding: 8px;
   border-radius: 6px;
+  min-width: calc(
+    var(--timeline-left-offset) + var(--timeline-content-width, 100%)
+  );
+  position: relative;
+}
+
+.tracklane-main {
+  min-height: var(--track-height, 96px);
+  width: var(--timeline-content-width, 100%);
+  flex: 1 1 auto;
+}
+
+.tracklane-header {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 4px;
 }
 
 .tracklane-title {
   font-weight: 600;
   color: #eee;
+  font-size: 14px;
+}
+
+.tracklane-track-number {
+  font-size: 10px;
+  color: #999;
+  font-weight: 400;
 }
 
 .tracklane-controls-box {
@@ -41,24 +61,16 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  /* Fill remaining vertical space so height matches the waveform area */
   flex: 1 1 auto;
 }
 
-/* Ensure the controls area centers its buttons vertically */
 .tracklane-controls-box .tracklane-controls {
   width: 100%;
   display: flex;
-  flex-direction: column; /* stack buttons vertically */
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
   justify-content: center;
-  gap: 8px;
-}
-
-.tracklane-controls-box .tl-btn {
-  width: 100%;
-  padding: 6px 6px;
-  font-size: 12px;
+  gap: 6px;
 }
 
 .tracklane-controls {
@@ -71,16 +83,61 @@
   background: rgba(255, 255, 255, 0.03);
   color: #ddd;
   border: 1px solid rgba(255, 255, 255, 0.06);
-  padding: 4px 8px;
+  padding: 6px 8px;
   border-radius: 4px;
-  font-size: 12px;
+  font-size: 11px;
   cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.tl-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.tl-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
 }
 
 .tl-btn--active {
   background: rgba(255, 255, 255, 0.12);
   color: #fff;
   border-color: rgba(255, 255, 255, 0.12);
+}
+
+.tl-btn-delete {
+  background: rgba(220, 53, 69, 0.15);
+  color: #ff6b6b;
+  border-color: rgba(220, 53, 69, 0.3);
+}
+
+.tl-btn-delete:hover {
+  background: rgba(220, 53, 69, 0.25);
+  border-color: rgba(220, 53, 69, 0.5);
+}
+
+.tracklane-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.05);
+  margin: 4px 0;
+}
+
+/* Timeline container for positioned segments */
+.tracklane-timeline {
+  position: relative;
+  width: 100%;
+  min-height: var(--track-height, 96px);
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+}
+
+.tracklane-segment-positioned {
+  /* Positioned absolutely within timeline */
+  position: absolute;
+  top: 0;
+  bottom: 0;
 }
 
 .tracklane-segments {
@@ -94,6 +151,9 @@
   border: 1px solid rgba(255, 255, 255, 0.03);
   padding: 8px;
   border-radius: 6px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .segment-meta {
@@ -101,21 +161,28 @@
   justify-content: space-between;
   align-items: center;
   width: 100%;
+  margin-bottom: 8px;
+  flex-shrink: 0;
 }
 
 .segment-name {
-  font-size: 11px; /* smaller name text */
+  font-size: 11px;
   color: #9a9a9a;
   font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .segment-duration {
   font-size: 11px;
   color: #a9a9a9;
+  white-space: nowrap;
 }
 
 .segment-waveform {
-  height: 64px; /* default waveform height */
+  flex: 1;
+  min-height: calc(var(--track-height, 96px) - 32px);
   width: 100%;
 }
 
@@ -132,4 +199,9 @@
   color: #9b9b9b;
   padding: 12px;
   text-align: center;
+  font-size: 13px;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
 }
