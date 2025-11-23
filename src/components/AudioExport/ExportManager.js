@@ -31,9 +31,15 @@ class ExportManager {
       (effects?.pitch && effects.pitch !== 0) ||
       (effects?.reverb && effects.reverb > 0) ||
       (effects?.volume && effects.volume !== 100) ||
-      (effects?.delay && effects.delay > 0) || // <--- NEW: Delay check
-      (effects?.bass && effects.bass !== 0) || // <--- NEW: Bass check
-      (effects?.distortion && effects.distortion > 0); // <--- NEW: Distortion check
+      (effects?.delay && effects.delay > 0) ||
+      (effects?.bass && effects.bass !== 0) ||
+      (effects?.distortion && effects.distortion > 0) ||
+      (effects?.pan && effects.pan !== 0) ||
+      (effects?.tremolo && effects.tremolo > 0) ||
+      (effects?.vibrato && effects.vibrato > 0) ||
+      (effects?.chorus && effects.chorus > 0) ||
+      (effects?.highpass && effects.highpass > 20) ||
+      (effects?.lowpass && effects.lowpass < 20000);
 
     if (!hasEffects) {
       return buffer;
@@ -79,7 +85,7 @@ class ExportManager {
           effectsChain.push(reverb);
         }
 
-        // Distortion (NEW)
+        // Distortion
         if (typeof effects.distortion === "number" && effects.distortion > 0) {
           const distortionAmount = Math.max(
             0,
@@ -93,7 +99,7 @@ class ExportManager {
           effectsChain.push(distortion);
         }
 
-        // Delay (NEW)
+        // Delay
         if (typeof effects.delay === "number" && effects.delay > 0) {
           const wet = Math.max(0, Math.min(1, effects.delay / 100));
           const delay = new Tone.PingPongDelay({
@@ -105,16 +111,83 @@ class ExportManager {
           effectsChain.push(delay);
         }
 
-        // Bass Boost (NEW)
-        // Since 'bass' is typically a +/- 12 dB control:
+        // Bass Boost
         if (typeof effects.bass === "number" && effects.bass !== 0) {
           const bassFilter = new Tone.Filter({
-            type: "lowshelf", // Shelving filter for boosting/cutting a band
-            frequency: 250, // Common low-frequency shelf point
-            gain: effects.bass, // The value in dB
+            type: "lowshelf",
+            frequency: 250,
+            gain: effects.bass,
             context: context,
           });
           effectsChain.push(bassFilter);
+        }
+
+        // Pan
+        if (typeof effects.pan === "number" && effects.pan !== 0) {
+          const panValue = Math.max(-1, Math.min(1, effects.pan / 100));
+          const panner = new Tone.Panner({
+            pan: panValue,
+            context: context,
+          });
+          effectsChain.push(panner);
+        }
+        
+        // Tremolo
+        if (typeof effects.tremolo === "number" && effects.tremolo > 0) {
+          const wet = Math.max(0, Math.min(1, effects.tremolo / 100));
+          const tremolo = new Tone.Tremolo({
+            frequency: 0.1 + (wet * 19.9),
+            depth: wet,
+            wet: wet,
+            context: context,
+          }).start();
+          effectsChain.push(tremolo);
+        }
+        
+        // Vibrato
+        if (typeof effects.vibrato === "number" && effects.vibrato > 0) {
+          const wet = Math.max(0, Math.min(1, effects.vibrato / 100));
+          const vibrato = new Tone.Vibrato({
+            frequency: 0.1 + (wet * 19.9),
+            depth: wet,
+            context: context,
+          });
+          effectsChain.push(vibrato);
+        }
+        
+        // Chorus
+        if (typeof effects.chorus === "number" && effects.chorus > 0) {
+          const wet = Math.max(0, Math.min(1, effects.chorus / 100));
+          const chorus = new Tone.Chorus({
+            frequency: 1.5,
+            delayTime: 3.5,
+            depth: 0.7,
+            type: "sine",
+            spread: 180,
+            wet: wet,
+            context: context,
+          }).start();
+          effectsChain.push(chorus);
+        }
+
+        // High-pass Filter
+        if (typeof effects.highpass === "number" && effects.highpass > 20) {
+          const highpass = new Tone.Filter({
+            frequency: effects.highpass,
+            type: "highpass",
+            context: context,
+          });
+          effectsChain.push(highpass);
+        }
+        
+        // Low-pass Filter
+        if (typeof effects.lowpass === "number" && effects.lowpass < 20000) {
+          const lowpass = new Tone.Filter({
+            frequency: effects.lowpass,
+            type: "lowpass",
+            context: context,
+          });
+          effectsChain.push(lowpass);
         }
 
         // Volume/Gain - Should always be the last effect before the destination
