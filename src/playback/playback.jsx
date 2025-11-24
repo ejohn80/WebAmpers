@@ -224,7 +224,13 @@ class PlaybackEngine {
       (effects?.volume && effects.volume !== 100) ||
       (effects?.delay && effects.delay > 0) ||
       (effects?.bass && effects.bass !== 0) ||
-      (effects?.distortion && effects.distortion > 0);
+      (effects?.distortion && effects.distortion > 0) ||
+      (effects?.pan && effects.pan !== 0) ||
+      (effects?.tremolo && effects.tremolo > 0) ||
+      (effects?.vibrato && effects.vibrato > 0) ||
+      (effects?.chorus && effects.chorus > 0) ||
+      (effects?.highpass && effects.highpass > 20) ||
+      (effects?.lowpass && effects.lowpass < 20000);
 
     // No effects --> don't do anything
     if (!hasEffects) {
@@ -355,6 +361,92 @@ class PlaybackEngine {
         console.warn("Failed to create gain effect:", e);
       }
     }
+    // Pan
+    if (effects?.pan !== undefined && effects.pan !== 0) {
+      try {
+        const panValue = Math.max(-1, Math.min(1, effects.pan));
+        const panner = new Tone.Panner({
+          pan: panValue,
+          context: context,
+        });
+        chain.push(panner);
+      } catch (e) {
+        console.warn("Failed to create pan effect:", e);
+      }
+    }
+    // Tremolo
+    if (effects?.tremolo && effects.tremolo > 0) {
+      try {
+        const wet = Math.max(0, Math.min(1, effects.tremolo / 100));
+        const tremolo = new Tone.Tremolo({
+          frequency: 0.1 + wet * 19.9,
+          depth: wet,
+          wet: wet,
+          context: context,
+        }).start();
+        chain.push(tremolo);
+      } catch (e) {
+        console.warn("Failed to create tremolo effect:", e);
+      }
+    }
+    // Vibrato
+    if (effects?.vibrato && effects.vibrato > 0) {
+      try {
+        const wet = Math.max(0, Math.min(1, effects.vibrato / 100));
+        const vibrato = new Tone.Vibrato({
+          frequency: 0.1 + wet * 19.9,
+          depth: wet,
+          context: context,
+        });
+        chain.push(vibrato);
+      } catch (e) {
+        console.warn("Failed to create vibrato effect:", e);
+      }
+    }
+    // High-pass Filter
+    if (effects?.highpass && effects.highpass > 20) {
+      try {
+        const highpass = new Tone.Filter({
+          frequency: effects.highpass,
+          type: "highpass",
+          context: context,
+        });
+        chain.push(highpass);
+      } catch (e) {
+        console.warn("Failed to create highpass filter:", e);
+      }
+    }
+    // Low-pass Filter
+    if (effects?.lowpass && effects.lowpass < 20000) {
+      try {
+        const lowpass = new Tone.Filter({
+          frequency: effects.lowpass,
+          type: "lowpass",
+          context: context,
+        });
+        chain.push(lowpass);
+      } catch (e) {
+        console.warn("Failed to create lowpass filter:", e);
+      }
+    }
+    // Chorus
+    if (effects?.chorus && effects.chorus > 0) {
+      try {
+        const wet = Math.max(0, Math.min(1, effects.chorus / 100));
+        const chorus = new Tone.Chorus({
+          frequency: 1.5,
+          delayTime: 3.5,
+          depth: 0.7,
+          type: "sine",
+          spread: 180,
+          wet: wet,
+          context: context,
+        }).start();
+        chain.push(chorus);
+      } catch (e) {
+        console.warn("Failed to create chorus effect:", e);
+      }
+    }
 
     return chain;
   }
@@ -439,6 +531,55 @@ class PlaybackEngine {
     if (typeof effects?.volume === "number" && effects.volume !== 100) {
       const linear = Math.max(0, Math.min(2, effects.volume / 100));
       chain.push({type: "gain", gain: linear});
+    }
+    // Pan
+    if (typeof effects?.pan === "number" && effects.pan !== 0) {
+      const panValue = Math.max(-1, Math.min(1, effects.pan));
+      chain.push({type: "pan", pan: panValue});
+    }
+    // Tremolo
+    if (typeof effects?.tremolo === "number" && effects.tremolo > 0) {
+      const wet = Math.max(0, Math.min(1, effects.tremolo / 100));
+      chain.push({
+        type: "tremolo",
+        frequency: 0.1 + wet * 19.9,
+        depth: wet,
+        wet: wet,
+      });
+    }
+    // Vibrato
+    if (typeof effects?.vibrato === "number" && effects.vibrato > 0) {
+      const wet = Math.max(0, Math.min(1, effects.vibrato / 100));
+      chain.push({
+        type: "vibrato",
+        frequency: 0.1 + wet * 19.9,
+        depth: wet,
+      });
+    }
+    // High-pass Filter
+    if (typeof effects?.highpass === "number" && effects.highpass > 20) {
+      chain.push({
+        type: "highpass",
+        frequency: effects.highpass,
+      });
+    }
+    // Low-pass Filter
+    if (typeof effects?.lowpass === "number" && effects.lowpass < 20000) {
+      chain.push({
+        type: "lowpass",
+        frequency: effects.lowpass,
+      });
+    }
+    // Chorus
+    if (typeof effects?.chorus === "number" && effects.chorus > 0) {
+      const wet = Math.max(0, Math.min(1, effects.chorus / 100));
+      chain.push({
+        type: "chorus",
+        frequency: 1.5,
+        delayTime: 3.5,
+        depth: 0.7,
+        wet: wet,
+      });
     }
     this.replaceMasterChain(chain);
   }
@@ -593,6 +734,57 @@ class PlaybackEngine {
             case "gain": {
               const g = new Tone.Gain(Math.max(0, Math.min(2, cfg.gain ?? 1)));
               nodes.push(g);
+              break;
+            }
+
+            case "pan": {
+              const panner = new Tone.Panner(cfg.pan ?? 0);
+              nodes.push(panner);
+              break;
+            }
+            case "tremolo": {
+              const tremolo = new Tone.Tremolo({
+                frequency: cfg.frequency ?? 10,
+                depth: cfg.depth ?? 0.5,
+                wet: cfg.wet ?? 1,
+              }).start();
+              nodes.push(tremolo);
+              break;
+            }
+            case "vibrato": {
+              const vibrato = new Tone.Vibrato({
+                frequency: cfg.frequency ?? 5,
+                depth: cfg.depth ?? 0.1,
+              });
+              nodes.push(vibrato);
+              break;
+            }
+            case "highpass": {
+              const highpass = new Tone.Filter({
+                frequency: cfg.frequency ?? 20,
+                type: "highpass",
+              });
+              nodes.push(highpass);
+              break;
+            }
+            case "lowpass": {
+              const lowpass = new Tone.Filter({
+                frequency: cfg.frequency ?? 20000,
+                type: "lowpass",
+              });
+              nodes.push(lowpass);
+              break;
+            }
+            case "chorus": {
+              const chorus = new Tone.Chorus({
+                frequency: cfg.frequency ?? 1.5,
+                delayTime: cfg.delayTime ?? 3.5,
+                depth: cfg.depth ?? 0.7,
+                type: "sine",
+                spread: 180,
+                wet: cfg.wet ?? 0.5,
+              }).start(); // IMPORTANT: Must call .start()
+              nodes.push(chorus);
               break;
             }
             default:
