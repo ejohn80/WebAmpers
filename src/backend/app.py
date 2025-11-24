@@ -9,7 +9,7 @@ from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
 
-from backend.AudioProcessor import AudioProcessor
+from AudioProcessor import AudioProcessor
 
 app = Flask(__name__)
 CORS(app)
@@ -262,3 +262,7 @@ def get_metadata():
                 os.remove(filepath)
             except OSError:
                 pass
+
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 8080))
+    app.run(host='0.0.0.0', port=port)
