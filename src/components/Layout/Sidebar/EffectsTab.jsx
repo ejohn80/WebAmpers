@@ -9,7 +9,7 @@ import {
 } from "../Svgs.jsx";
 
 function EffectsTab() {
-  const {effects, updateEffect, resetEffect, resetAllEffects, openEffectsMenu} =
+  const {effects, updateEffect, resetEffect, resetAllEffects, openEffectsMenu, closeEffectsMenu, isEffectsMenuOpen} =
     useContext(AppContext);
 
   const [draggingSlider, setDraggingSlider] = useState(null);
@@ -48,6 +48,15 @@ function EffectsTab() {
       description: "Add room ambience",
     },
   ];
+
+  // Toggle effects menu
+  const toggleEffectsMenu = () => {
+    if (isEffectsMenuOpen) {
+      closeEffectsMenu();
+    } else {
+      openEffectsMenu();
+    }
+  };
 
   // Update local state immediately for smooth UI
   const handleChange = useCallback(
@@ -106,11 +115,14 @@ function EffectsTab() {
 
   return (
     <div className={styles.container}>
-      {/* Add Effects Button */}
-      <button className={styles.addEffectsButton} onClick={openEffectsMenu}>
+      {/* Add Effects Button - now toggles the menu */}
+      <button 
+        className={`${styles.addEffectsButton} ${isEffectsMenuOpen ? styles.addEffectsButtonActive : ''}`}
+        onClick={toggleEffectsMenu}
+      >
         <span className={styles.addEffectsButtonContent}>
           <PlusSignIcon />
-          <span>Add Effects</span>
+          <span>{isEffectsMenuOpen ? 'Close Effects' : 'Add Effects'}</span>
         </span>
       </button>
 

@@ -772,7 +772,7 @@ export function PlusSignIcon() {
       <path
         d="M1 6H6.5M6.5 6H12M6.5 6V11M6.5 6V1"
         stroke="#17E1FF"
-        stroke-width="2"
+        stroke-width="2.5"
         stroke-linecap="round"
         stroke-linejoin="round"
       />
