@@ -230,7 +230,9 @@
   border-radius: 6px;
   font-size: 13px;
   cursor: pointer;
-  transition: background 0.12s ease, color 0.12s ease;
+  transition:
+    background 0.12s ease,
+    color 0.12s ease;
 }
 
 .context-menu-item:hover {
