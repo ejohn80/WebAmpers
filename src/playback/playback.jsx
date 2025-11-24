@@ -379,7 +379,7 @@ class PlaybackEngine {
       try {
         const wet = Math.max(0, Math.min(1, effects.tremolo / 100));
         const tremolo = new Tone.Tremolo({
-          frequency: 0.1 + (wet * 19.9),
+          frequency: 0.1 + wet * 19.9,
           depth: wet,
           wet: wet,
           context: context,
@@ -394,7 +394,7 @@ class PlaybackEngine {
       try {
         const wet = Math.max(0, Math.min(1, effects.vibrato / 100));
         const vibrato = new Tone.Vibrato({
-          frequency: 0.1 + (wet * 19.9),
+          frequency: 0.1 + wet * 19.9,
           depth: wet,
           context: context,
         });
@@ -542,9 +542,9 @@ class PlaybackEngine {
       const wet = Math.max(0, Math.min(1, effects.tremolo / 100));
       chain.push({
         type: "tremolo",
-        frequency: 0.1 + (wet * 19.9),
+        frequency: 0.1 + wet * 19.9,
         depth: wet,
-        wet: wet
+        wet: wet,
       });
     }
     // Vibrato
@@ -552,22 +552,22 @@ class PlaybackEngine {
       const wet = Math.max(0, Math.min(1, effects.vibrato / 100));
       chain.push({
         type: "vibrato",
-        frequency: 0.1 + (wet * 19.9),
-        depth: wet
+        frequency: 0.1 + wet * 19.9,
+        depth: wet,
       });
     }
     // High-pass Filter
     if (typeof effects?.highpass === "number" && effects.highpass > 20) {
       chain.push({
         type: "highpass",
-        frequency: effects.highpass
+        frequency: effects.highpass,
       });
     }
     // Low-pass Filter
     if (typeof effects?.lowpass === "number" && effects.lowpass < 20000) {
       chain.push({
         type: "lowpass",
-        frequency: effects.lowpass
+        frequency: effects.lowpass,
       });
     }
     // Chorus
@@ -578,7 +578,7 @@ class PlaybackEngine {
         frequency: 1.5,
         delayTime: 3.5,
         depth: 0.7,
-        wet: wet
+        wet: wet,
       });
     }
     this.replaceMasterChain(chain);

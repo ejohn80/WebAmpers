@@ -131,30 +131,30 @@ class ExportManager {
           });
           effectsChain.push(panner);
         }
-        
+
         // Tremolo
         if (typeof effects.tremolo === "number" && effects.tremolo > 0) {
           const wet = Math.max(0, Math.min(1, effects.tremolo / 100));
           const tremolo = new Tone.Tremolo({
-            frequency: 0.1 + (wet * 19.9),
+            frequency: 0.1 + wet * 19.9,
             depth: wet,
             wet: wet,
             context: context,
           }).start();
           effectsChain.push(tremolo);
         }
-        
+
         // Vibrato
         if (typeof effects.vibrato === "number" && effects.vibrato > 0) {
           const wet = Math.max(0, Math.min(1, effects.vibrato / 100));
           const vibrato = new Tone.Vibrato({
-            frequency: 0.1 + (wet * 19.9),
+            frequency: 0.1 + wet * 19.9,
             depth: wet,
             context: context,
           });
           effectsChain.push(vibrato);
         }
-        
+
         // Chorus
         if (typeof effects.chorus === "number" && effects.chorus > 0) {
           const wet = Math.max(0, Math.min(1, effects.chorus / 100));
@@ -179,7 +179,7 @@ class ExportManager {
           });
           effectsChain.push(highpass);
         }
-        
+
         // Low-pass Filter
         if (typeof effects.lowpass === "number" && effects.lowpass < 20000) {
           const lowpass = new Tone.Filter({

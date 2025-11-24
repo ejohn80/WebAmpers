@@ -88,7 +88,7 @@ function DropdownPortal({
   const handleDropdownMouseLeave = (event) => {
     const relatedTarget = event.relatedTarget;
     const dropdown = event.currentTarget;
-  
+
     if (!dropdown.contains(relatedTarget)) {
       setActiveDropdown(null);
     }
