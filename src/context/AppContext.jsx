@@ -1,4 +1,4 @@
-import {createContext, useState, useEffect} from "react";
+import {createContext, useState, useEffect, useCallback, useMemo} from "react";
 import {useUserData} from "../hooks/useUserData";
 export const AppContext = createContext();
 
@@ -55,44 +55,51 @@ const AppContextProvider = ({children}) => {
   };
 
   // Utility function to apply effects to engine (no unlock requirement)
-  const applyEffectsToEngine = (effectsToApply = effects) => {
-    if (engineRef?.current) {
-      try {
-        engineRef.current.setMasterEffects(effectsToApply);
-      } catch (error) {
-        console.warn("Failed to apply effects to engine:", error);
+  const applyEffectsToEngine = useCallback(
+    (effectsToApply = effects) => {
+      if (engineRef?.current) {
+        try {
+          engineRef.current.setMasterEffects(effectsToApply);
+        } catch (error) {
+          console.warn("Failed to apply effects to engine:", error);
+        }
       }
-    }
-  };
+    },
+    [engineRef, effects] // Dependency array ensures stable function reference
+  );
 
-  // Function to update effects and apply them to the engine
-  const updateEffect = async (effectName, value) => {
-    const newEffects = {
-      ...effects,
-      [effectName]: parseFloat(value),
-    };
-    setEffects(newEffects);
+  // Function to update effects
+  const updateEffect = useCallback(
+    async (effectName, value) => {
+      const newEffects = {
+        ...effects,
+        [effectName]: parseFloat(value),
+      };
+      setEffects(newEffects);
 
-    // Persist to localStorage
-    try {
-      localStorage.setItem("webamp.effects", JSON.stringify(newEffects));
-    } catch (e) {
-      console.warn("Failed to persist effects to localStorage:", e);
-    }
+      // Persist to localStorage
+      try {
+        localStorage.setItem("webamp.effects", JSON.stringify(newEffects));
+      } catch (e) {
+        console.warn("Failed to persist effects to localStorage:", e);
+      }
 
-    // Attempt to unlock audio context (runs inside user gesture from slider)
-    try {
-      await engineRef?.current?.ensureAudioUnlocked?.();
-    } catch {}
-    // Apply effects to engine if available
-    applyEffectsToEngine(newEffects);
-  };
+      // Attempt to unlock audio context (runs inside user gesture from slider)
+      try {
+        await engineRef?.current?.ensureAudioUnlocked?.();
+      } catch {}
+    },
+    [effects, engineRef] // Dependency array ensures stable function reference
+  );
 
-  const resetEffect = (effectName, defaultValue) => {
-    updateEffect(effectName, defaultValue);
-  };
+  const resetEffect = useCallback(
+    (effectName, defaultValue) => {
+      updateEffect(effectName, defaultValue);
+    },
+    [updateEffect]
+  );
 
-  const resetAllEffects = () => {
+  const resetAllEffects = useCallback(() => {
     const defaultEffects = {
       pitch: 0,
       volume: 100,
@@ -106,22 +113,18 @@ const AppContextProvider = ({children}) => {
     } catch (e) {
       console.warn("Failed to persist effects reset to localStorage:", e);
     }
-
-    // Apply effects to engine if available
-    applyEffectsToEngine(defaultEffects);
-  };
+  }, []);
 
   // Apply current effects when engine becomes available
   useEffect(() => {
     applyEffectsToEngine();
-  }, [engineRef]);
+  }, [engineRef, applyEffectsToEngine]);
 
-  // Attempt to adopt an engineRef from a global if available (debug fallback)
+  // Attempt to adopt an engineRef from a global if available
   useEffect(() => {
     try {
       if (!engineRef && window.__WebAmpEngineRef) {
         setEngineRef(window.__WebAmpEngineRef);
-        // eslint-disable-next-line no-console
         console.log(
           "[AppContext] adopted engineRef from window.__WebAmpEngineRef"
         );
@@ -146,29 +149,47 @@ const AppContextProvider = ({children}) => {
     } catch {}
   }, []);
 
+  const contextValue = useMemo(
+    () => ({
+      userData,
+      loading,
+      activeProject,
+      setActiveProject,
+      effects,
+      updateEffect,
+      resetEffect,
+      resetAllEffects,
+      engineRef,
+      setEngineRef,
+      applyEffectsToEngine,
+      // Effects Menu State
+      isEffectsMenuOpen,
+      openEffectsMenu,
+      closeEffectsMenu,
+      addEffect,
+    }),
+    [
+      userData,
+      loading,
+      activeProject,
+      setActiveProject,
+      effects,
+      updateEffect,
+      resetEffect,
+      resetAllEffects,
+      engineRef,
+      setEngineRef,
+      applyEffectsToEngine,
+      // Effects Menu State dependencies
+      isEffectsMenuOpen,
+      openEffectsMenu,
+      closeEffectsMenu,
+      addEffect,
+    ]
+  );
+
   return (
-    <AppContext.Provider
-      value={{
-        userData,
-        loading,
-        activeProject,
-        setActiveProject,
-        effects,
-        updateEffect,
-        resetEffect,
-        resetAllEffects,
-        engineRef,
-        setEngineRef,
-        applyEffectsToEngine,
-        // Effects Menu State
-        isEffectsMenuOpen,
-        openEffectsMenu,
-        closeEffectsMenu,
-        addEffect,
-      }}
-    >
-      {children}
-    </AppContext.Provider>
+    <AppContext.Provider value={contextValue}>{children}</AppContext.Provider>
   );
 };
 

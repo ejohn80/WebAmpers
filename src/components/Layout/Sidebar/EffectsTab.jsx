@@ -47,6 +47,96 @@ function EffectsTab() {
       unit: "%",
       description: "Add room ambience",
     },
+    {
+      name: "delay",
+      label: "Delay",
+      min: 0,
+      max: 100,
+      step: 1,
+      default: 0,
+      unit: "%",
+      description: "Add echo effect",
+    },
+    {
+      name: "bass",
+      label: "Bass Boost",
+      min: -12,
+      max: 12,
+      step: 1,
+      default: 0,
+      unit: " dB",
+      description: "Boost or cut low frequencies",
+    },
+    {
+      name: "distortion",
+      label: "Distortion",
+      min: 0,
+      max: 100,
+      step: 1,
+      default: 0,
+      unit: "%",
+      description: "Add grit and crunch",
+    },
+    {
+      name: "pan",
+      label: "Pan",
+      min: -100,
+      max: 100,
+      step: 1,
+      default: 0,
+      unit: "",
+      description: "Left/right stereo position",
+    },
+    {
+      name: "tremolo",
+      label: "Tremolo",
+      min: 0,
+      max: 100,
+      step: 1,
+      default: 0,
+      unit: "%",
+      description: "Volume oscillation",
+    },
+    {
+      name: "vibrato",
+      label: "Vibrato",
+      min: 0,
+      max: 100,
+      step: 1,
+      default: 0,
+      unit: "%",
+      description: "Pitch oscillation",
+    },
+    {
+      name: "highpass",
+      label: "High-pass Filter",
+      min: 20,
+      max: 2000,
+      step: 10,
+      default: 20,
+      unit: " Hz",
+      description: "Remove low frequencies",
+    },
+    {
+      name: "lowpass",
+      label: "Low-pass Filter",
+      min: 1000,
+      max: 20000,
+      step: 100,
+      default: 20000,
+      unit: " Hz",
+      description: "Remove high frequencies",
+    },
+    {
+      name: "chorus",
+      label: "Chorus",
+      min: 0,
+      max: 100,
+      step: 1,
+      default: 0,
+      unit: "%",
+      description: "Add shimmer and width",
+    },
   ];
 
   // Toggle effects menu
@@ -127,80 +217,81 @@ function EffectsTab() {
       </button>
 
       {/* Effect sliders */}
-      {effectConfigs.map((config) => {
-        const currentValue = getCurrentValue(config);
-        const fillPercentage = getSliderFillPercentage(config, currentValue);
-        const isDefault = isAtDefaultValue(config);
+      <div className={styles.effectsList}>
+        {effectConfigs.map((config) => {
+          const currentValue = getCurrentValue(config);
+          const fillPercentage = getSliderFillPercentage(config, currentValue);
+          const isDefault = isAtDefaultValue(config);
 
-        return (
-          <div key={config.name} className={styles.effectItem}>
-            <div className={styles.header}>
-              <span className={styles.label}>{config.label}</span>
-              <span className={styles.value}>
-                {currentValue}
-                {config.unit}
-              </span>
-            </div>
-            <div className={styles.description}>{config.description}</div>
-
-            {/* Custom Slider */}
-            <div
-              className={`${styles.sliderContainer} ${
-                draggingSlider === config.name ? styles.dragging : ""
-              }`}
-            >
-              <div className={styles.sliderTrack}></div>
-              <div
-                className={`${styles.sliderFill} ${
-                  isDefault ? styles.default : styles.changed
-                }`}
-                style={{width: `${fillPercentage}%`}}
-              ></div>
-              <div
-                className={`${styles.sliderKnobWrapper} ${
-                  draggingSlider === config.name
-                    ? styles.sliderKnobWrapperDragging
-                    : ""
-                }`}
-                style={{left: `${fillPercentage}%`}}
-              >
-                <EffectsSliderKnob />
+          return (
+            <div key={config.name} className={styles.effectItem}>
+              <div className={styles.header}>
+                <span className={styles.label}>{config.label}</span>
+                <span className={styles.value}>
+                  {currentValue}
+                  {config.unit}
+                </span>
               </div>
-              <input
-                type="range"
-                min={config.min}
-                max={config.max}
-                step={config.step}
-                value={currentValue}
-                onChange={handleChange(config.name)}
-                onMouseDown={() => setDraggingSlider(config.name)}
-                onMouseUp={handleSliderEnd(config.name)}
-                onTouchStart={() => setDraggingSlider(config.name)}
-                onTouchEnd={handleSliderEnd(config.name)}
-                className={styles.sliderInput}
-              />
-            </div>
+              <div className={styles.description}>{config.description}</div>
 
-            <div className={styles.controls}>
-              <button
-                className={`${styles.button} ${
-                  isDefault ? styles.buttonDisabled : ""
+              {/* Custom Slider */}
+              <div
+                className={`${styles.sliderContainer} ${
+                  draggingSlider === config.name ? styles.dragging : ""
                 }`}
-                onClick={
-                  isDefault
-                    ? undefined
-                    : () => resetEffect(config.name, config.default)
-                }
-                disabled={isDefault}
               >
-                Reset
-              </button>
-            </div>
-          </div>
-        );
-      })}
+                <div className={styles.sliderTrack}></div>
+                <div
+                  className={`${styles.sliderFill} ${
+                    isDefault ? styles.default : styles.changed
+                  }`}
+                  style={{width: `${fillPercentage}%`}}
+                ></div>
+                <div
+                  className={`${styles.sliderKnobWrapper} ${
+                    draggingSlider === config.name
+                      ? styles.sliderKnobWrapperDragging
+                      : ""
+                  }`}
+                  style={{left: `${fillPercentage}%`}}
+                >
+                  <EffectsSliderKnob />
+                </div>
+                <input
+                  type="range"
+                  min={config.min}
+                  max={config.max}
+                  step={config.step}
+                  value={currentValue}
+                  onChange={handleChange(config.name)}
+                  onMouseDown={() => setDraggingSlider(config.name)}
+                  onMouseUp={handleSliderEnd(config.name)}
+                  onTouchStart={() => setDraggingSlider(config.name)}
+                  onTouchEnd={handleSliderEnd(config.name)}
+                  className={styles.sliderInput}
+                />
+              </div>
 
-      {/* Reset All Effects Button */}
+              <div className={styles.controls}>
+                <button
+                  className={`${styles.button} ${
+                    isDefault ? styles.buttonDisabled : ""
+                  }`}
+                  onClick={
+                    isDefault
+                      ? undefined
+                      : () => resetEffect(config.name, config.default)
+                  }
+                  disabled={isDefault}
+                >
+                  Reset
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
       <button
         className={`${styles.resetAllButton} ${
           areAllEffectsAtDefault() ? styles.resetAllButtonDisabled : ""

@@ -1,8 +1,7 @@
-import React, {useState, useEffect, useContext} from "react";
+import React, {useState, useEffect, useContext, useRef} from "react";
 import "./AudioPage.css";
 import * as Tone from "tone";
 
-// Import the newly created layout components
 import Header from "../components/Layout/Header";
 import Sidebar from "../components/Layout/Sidebar";
 import MainContent from "../components/Layout/MainContent";
@@ -12,41 +11,106 @@ import WebAmpPlayback from "../playback/playback.jsx";
 import {dbManager} from "../managers/DBManager";
 import {AppContext} from "../context/AppContext";
 
-const MIN_WIDTH = 0; // Minimum allowed width for the sidebar in pixels
-const MAX_WIDTH = 300; // Maximum allowed width for the sidebar in pixels
+const MIN_WIDTH = 0;
+const MAX_WIDTH = 300;
 
-/**
- * AudioPage component provides a resizable layout with a sidebar and main content area.
- */
 function AudioPage() {
   const {setEngineRef, applyEffectsToEngine} = useContext(AppContext);
   const [sidebarWidth, setSidebarWidth] = useState(MAX_WIDTH);
   const [tracks, setTracks] = useState(audioManager.tracks);
-  // --- STATE FOR AUDIO DATA --- (Kept from main/old approach for backward compatibility)
   const [audioData, setAudioData] = useState(null);
-  // Live recording state for preview (Kept from main/old approach)
   const [recording, setRecording] = useState({stream: null, startTs: 0});
 
-  // Keep a reference to the playback engine so we can call control methods
+  const hasLoadedFromDB = useRef(false);
   const engineRef = React.useRef(null);
 
+  // Helper function to build version from tracks
+  const buildVersionFromTracks = (tracksArray) => {
+    if (!tracksArray || tracksArray.length === 0) return null;
+
+    const vs = {
+      bpm: 120,
+      timeSig: [4, 4],
+      lengthMs: 60000,
+      tracks: [],
+      segments: [],
+      loop: {enabled: false},
+      masterChain: [],
+    };
+
+    let maxEndMs = 0;
+
+    tracksArray.forEach((track) => {
+      vs.tracks.push({
+        id: track.id,
+        name: track.name ?? "Untitled",
+        gainDb: typeof track.volume === "number" ? track.volume : 0,
+        pan: typeof track.pan === "number" ? track.pan : 0,
+        mute: !!track.mute,
+        solo: !!track.solo,
+        color: track.color || "#888",
+      });
+
+      (track.segments || []).forEach((s) => {
+        const fileUrl = s.buffer ?? s.fileUrl ?? null;
+        const startOnTimelineMs =
+          s.startOnTimelineMs ??
+          (s.startOnTimeline ? Math.round(s.startOnTimeline * 1000) : 0);
+        const startInFileMs = s.offset
+          ? Math.round(s.offset * 1000)
+          : (s.startInFileMs ?? 0);
+        const durationMs = s.duration
+          ? Math.round(s.duration * 1000)
+          : (s.durationMs ?? 0);
+
+        vs.segments.push({
+          id: s.id ?? `seg_${Math.random().toString(36).slice(2, 8)}`,
+          trackId: track.id,
+          fileUrl,
+          startOnTimelineMs,
+          startInFileMs,
+          durationMs,
+          gainDb: s.gainDb ?? 0,
+          fades: s.fades ?? {inMs: 5, outMs: 5},
+        });
+
+        const endMs = startOnTimelineMs + (durationMs || 0);
+        if (endMs > maxEndMs) maxEndMs = endMs;
+      });
+    });
+
+    vs.lengthMs = maxEndMs || 60000;
+    return vs;
+  };
+
+  // Load tracks from IndexedDB on mount - ONLY ONCE
   useEffect(() => {
+    if (hasLoadedFromDB.current) return;
+
     const loadTracksFromDB = async () => {
       try {
         const savedTracks = await dbManager.getAllTracks();
         if (savedTracks && savedTracks.length > 0) {
           console.log("Loading tracks from IndexedDB:", savedTracks);
-          let needsStateUpdate = false;
+
+          audioManager.clearAllTracks();
+          const uniqueTracks = new Map();
 
           for (const savedTrack of savedTracks) {
-            // Reconstruct the Tone.ToneAudioBuffer from the stored raw data.
-            // Support both older (track.buffer) and newer (track.segments[0].buffer) shapes.
+            // Skip if we've already processed this track ID
+            if (uniqueTracks.has(savedTrack.id)) {
+              console.warn(`Skipping duplicate track ${savedTrack.id}`);
+              continue;
+            }
+
+            uniqueTracks.set(savedTrack.id, savedTrack);
+          }
+
+          // Now process the unique tracks
+          for (const savedTrack of uniqueTracks.values()) {
             const maybeBufferData = savedTrack.buffer?.channels
               ? savedTrack.buffer
-              : savedTrack.segments &&
-                  savedTrack.segments[0] &&
-                  savedTrack.segments[0].buffer &&
-                  savedTrack.segments[0].buffer.channels
+              : savedTrack.segments?.[0]?.buffer?.channels
                 ? savedTrack.segments[0].buffer
                 : null;
 
@@ -62,22 +126,27 @@ function AudioPage() {
                 audioBuffer.copyToChannel(bufferData.channels[i], i);
               }
 
-              // Attach a Tone.ToneAudioBuffer at the track-level so existing
-              // restore path (addTrackFromBuffer) can find it.
-              savedTrack.buffer = new Tone.ToneAudioBuffer(audioBuffer);
-              audioManager.addTrackFromBuffer(savedTrack);
-              needsStateUpdate = true;
+              // Pass ALL properties to preserve state
+              const trackData = {
+                ...savedTrack,
+                buffer: new Tone.ToneAudioBuffer(audioBuffer),
+              };
 
-              // Set the audioData for the first loaded track to initialize the player
-              if (!audioData) setAudioData(savedTrack);
+              audioManager.addTrackFromBuffer(trackData);
             }
           }
-          if (needsStateUpdate) {
-            setTracks([...audioManager.tracks]);
+
+          setTracks([...audioManager.tracks]);
+
+          if (audioManager.tracks.length > 0 && !audioData) {
+            setAudioData(audioManager.tracks[0]);
           }
         }
+
+        hasLoadedFromDB.current = true;
       } catch (error) {
         console.error("Failed to load tracks from IndexedDB:", error);
+        hasLoadedFromDB.current = true;
       }
     };
 
@@ -92,33 +161,33 @@ function AudioPage() {
 
   const handleImportSuccess = async (importedAudioData) => {
     console.log(
-      "Audio imported successfully, creating track:",
+      "Audio imported successfully, creating NEW track:",
       importedAudioData
     );
-    setAudioData(importedAudioData); // Update raw data for immediate player setup
 
-    // Use the AudioManager to create a new track and capture the created track object
     const createdTrack = audioManager.addTrackFromBuffer(importedAudioData);
-
-    // Update the component's state to re-render with the new track list.
     setTracks([...audioManager.tracks]);
 
+    if (audioManager.tracks.length === 1) {
+      setAudioData(importedAudioData);
+    }
+
     try {
-      // Persist the created AudioTrack (so it includes the generated id)
       if (createdTrack) {
-        const savedId = await dbManager.addTrack(createdTrack);
-        // Ensure in-memory track uses the same id as stored in DB.
-        // If IndexedDB generated a numeric id, sync it back onto the
-        // AudioTrack so future updates use the same key.
-        if (savedId && createdTrack.id !== savedId) {
-          createdTrack.id = savedId;
+        const assignedId = await dbManager.addTrack(createdTrack);
+
+        // Update the track's ID to match what's in IndexedDB
+        if (assignedId !== undefined && assignedId !== createdTrack.id) {
+          console.log(
+            `Updating track ID from ${createdTrack.id} to ${assignedId}`
+          );
+          createdTrack.id = assignedId;
+          // Force a re-render with the updated ID
           setTracks([...audioManager.tracks]);
         }
-      } else {
-        // Fallback for older data shape (from main)
-        await dbManager.addTrack(importedAudioData);
+
+        console.log("Track saved to IndexedDB with ID:", assignedId);
       }
-      console.log("Track saved to IndexedDB");
     } catch (error) {
       console.error("Failed to save track to IndexedDB:", error);
     }
@@ -126,125 +195,186 @@ function AudioPage() {
 
   const handleImportError = (error) => {
     alert(`Import failed: ${error.message}`);
-    // TODO: Show a more user-friendly error message in the UI
   };
 
   const handleExportComplete = () => {
     console.log("Export process complete.");
   };
 
-  // ---- Helpers used to build a minimal "version" object for the player ----
-  // const parseDurationMs = (d) => { /* ... (full function code from main) ... */ };
-  // const srcFromImport = (ad) => { /* ... (full function code from main) ... */ };
-  // const durationMsOf = (ad) => { /* ... (full function code from main) ... */ };
+  // Handle track deletion with proper cleanup
+  const handleDeleteTrack = async (trackId) => {
+    try {
+      console.log(`Deleting track ${trackId}...`);
 
-  const active = tracks && tracks.length > 0 ? tracks[tracks.length - 1] : null;
-  const version = active
-    ? (() => {
-        const vs = {
-          bpm: 120,
-          timeSig: [4, 4],
-          lengthMs: 60000,
-          tracks: [],
-          segments: [],
-          loop: {enabled: false},
-          masterChain: [],
-        };
+      try {
+        Tone.Transport.stop();
+        Tone.Transport.cancel(0);
+        Tone.Transport.seconds = 0;
+        console.log("Tone.Transport stopped and reset");
+      } catch (e) {
+        console.error("Failed to stop Tone.Transport:", e);
+      }
 
-        vs.tracks.push({
-          id: active.id,
-          name: active.name ?? "Imported",
-          gainDb: typeof active.volume === "number" ? active.volume : 0,
-          pan: typeof active.pan === "number" ? active.pan : 0,
-          mute: !!active.mute,
-          solo: !!active.solo,
-          color: active.color || "#888",
-        });
+      // Dispose engine resources
+      if (engineRef.current) {
+        try {
+          // Unsync and dispose all players
+          if (engineRef.current.playersBySegment) {
+            engineRef.current.playersBySegment.forEach((playerObj) => {
+              try {
+                // Unsync from transport
+                if (
+                  playerObj.player &&
+                  typeof playerObj.player.unsync === "function"
+                ) {
+                  playerObj.player.unsync();
+                }
+                // Stop the player immediately
+                if (
+                  playerObj.player &&
+                  typeof playerObj.player.stop === "function"
+                ) {
+                  playerObj.player.stop();
+                }
+              } catch (e) {
+                console.warn("Failed to unsync/stop player:", e);
+              }
+            });
+          }
 
-        let maxEndMs = 0;
-        (active.segments || []).forEach((s) => {
-          const fileUrl = s.buffer ?? s.fileUrl ?? null;
-          const startOnTimelineMs =
-            s.startOnTimelineMs ??
-            (s.startOnTimeline ? Math.round(s.startOnTimeline * 1000) : 0);
-          const startInFileMs = s.offset
-            ? Math.round(s.offset * 1000)
-            : (s.startInFileMs ?? 0);
-          const durationMs = s.duration
-            ? Math.round(s.duration * 1000)
-            : (s.durationMs ?? 0);
+          // Now dispose all resources
+          engineRef.current._disposeAll();
+          console.log("All engine resources disposed");
+        } catch (e) {
+          console.warn("Failed to dispose engine:", e);
+        }
+      }
 
-          vs.segments.push({
-            id: s.id ?? `seg_${Math.random().toString(36).slice(2, 8)}`,
-            trackId: active.id,
-            fileUrl,
-            startOnTimelineMs,
-            startInFileMs,
-            durationMs,
-            gainDb: s.gainDb ?? 0,
-            fades: s.fades ?? {inMs: 5, outMs: 5},
-          });
+      // Delete from audioManager
+      const deleted = audioManager.deleteTrack(trackId);
 
-          const endMs = startOnTimelineMs + (durationMs || 0);
-          if (endMs > maxEndMs) maxEndMs = endMs;
-        });
+      if (deleted) {
+        // Clean up database
+        try {
+          await dbManager.deleteTrack(trackId);
+        } catch (e) {
+          console.warn("Failed to delete track from DB:", e);
+        }
 
-        vs.lengthMs = maxEndMs || 60000;
-        return vs;
-      })()
-    : null;
+        // Clean up localStorage track state
+        try {
+          localStorage.removeItem(`webamp.track.${trackId}`);
+        } catch (e) {
+          console.warn("Failed to remove track state from localStorage:", e);
+        }
 
-  // --- RENDERING ---
+        // Update React state to trigger re-render
+        setTracks([...audioManager.tracks]);
+
+        // Reset progress store immediately
+        try {
+          progressStore.setMs(0);
+          progressStore.setLengthMs(0);
+        } catch (e) {
+          console.warn("Failed to reset progress store:", e);
+        }
+
+        // Now reload the engine with remaining tracks (or empty state)
+        if (audioManager.tracks.length === 0) {
+          console.log("No tracks remaining - loading empty version");
+
+          // Create empty version
+          const emptyVersion = {
+            bpm: 120,
+            timeSig: [4, 4],
+            lengthMs: 0,
+            tracks: [],
+            segments: [],
+            loop: {enabled: false},
+            masterChain: [],
+          };
+
+          // Force reload with empty version
+          if (engineRef.current) {
+            try {
+              await engineRef.current.load(emptyVersion);
+              console.log("Engine loaded with empty version");
+            } catch (e) {
+              console.error("Failed to load empty version:", e);
+            }
+          }
+        } else {
+          console.log(
+            `Reloading engine with ${audioManager.tracks.length} remaining track(s)`
+          );
+
+          // Build new version from remaining tracks
+          const newVersion = buildVersionFromTracks(audioManager.tracks);
+
+          if (newVersion && engineRef.current) {
+            try {
+              // Force complete reload
+              await engineRef.current.load(newVersion);
+              console.log("Engine reloaded successfully");
+            } catch (e) {
+              console.error("Failed to reload engine after track deletion:", e);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Failed to delete track:", error);
+    }
+  };
+
+  // Build version object for playback engine
+  const version = buildVersionFromTracks(tracks);
+
+  const audioBuffer =
+    tracks.length > 0
+      ? tracks[0].buffer || tracks[0].segments?.[0]?.buffer
+      : null;
+
+  const handleEngineReady = (engine) => {
+    engineRef.current = engine;
+    setEngineRef(engineRef);
+
+    setTimeout(() => {
+      applyEffectsToEngine();
+    }, 100);
+  };
 
   const mainContentStyle = {
     "--sidebar-width": `${sidebarWidth}px`,
   };
-  const activeTrack = tracks.length > 0 ? tracks[tracks.length - 1] : null;
-  const audioBuffer = activeTrack
-    ? activeTrack.buffer || activeTrack.segments?.[0]?.buffer
-    : null;
-
-  const handleEngineReady = (engine) => {
-    engineRef.current = engine;
-    setEngineRef(engineRef); // Provide engine ref to context
-
-    // Apply effects immediately after engine is ready
-    setTimeout(() => {
-      applyEffectsToEngine();
-    }, 100); // Small delay to ensure context is updated
-  };
 
   return (
     <div className="app-container">
-      {/* 1. Header Section - Add back import props (from main) */}
       <Header
+        tracks={tracks}
+        totalLengthMs={version?.lengthMs || 0}
         onImportSuccess={handleImportSuccess}
         onImportError={handleImportError}
-        audioBuffer={audioBuffer}
         onExportComplete={handleExportComplete}
       />
 
-      {/* 2. Middle Area (Sidebar/Main Content Split) */}
       <div className="main-content-area" style={mainContentStyle}>
-        {/* Sidebar - Add back import props (from main) */}
         <Sidebar
           width={sidebarWidth}
           onImportSuccess={handleImportSuccess}
           onImportError={handleImportError}
         />
 
-        {/* Movable Divider Line */}
         <div
           className="divider"
           onClick={toggleSidebar}
           title="Toggle sidebar"
         />
 
-        {/* */}
         <MainContent
-          track={activeTrack}
+          tracks={tracks}
           recording={recording}
-          audioData={audioData}
+          totalLengthMs={version?.lengthMs || 0}
           onMute={async (trackId, muted) => {
             try {
               engineRef.current?.setTrackMute(trackId, muted);
@@ -279,14 +409,24 @@ function AudioPage() {
               setTracks([...audioManager.tracks]);
             }
           }}
+          onDelete={handleDeleteTrack}
         />
       </div>
 
-      {/* 3. Footer Section - MERGED */}
       <Footer
-        version={version} // Passed from main, but using TrackLane's 'version' structure
+        version={version}
         onRecordComplete={handleImportSuccess}
-        onRecordStart={({stream, startTs}) => setRecording({stream, startTs})}
+        onRecordStart={({stream, startTs}) => {
+          // STOP PLAYBACK when recording starts
+          if (engineRef.current) {
+            try {
+              engineRef.current.stop();
+            } catch (e) {
+              console.warn("Failed to stop playback:", e);
+            }
+          }
+          setRecording({stream, startTs});
+        }}
         onRecordStop={() => setRecording({stream: null, startTs: 0})}
       />
     </div>

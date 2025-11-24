@@ -25,9 +25,12 @@ import {
   GuestIcon,
 } from "./Svgs";
 
+import {BsArrowsFullscreen, BsArrowsAngleContract} from "react-icons/bs";
+
 function DropdownPortal({
   side,
-  audioBuffer,
+  tracks,
+  totalLengthMs,
   onExportComplete,
   onImportSuccess,
   onImportError,
@@ -37,6 +40,8 @@ function DropdownPortal({
 
   const [activeDropdown, setActiveDropdown] = useState(null);
   const [position, setPosition] = useState({top: 0, left: 0});
+
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const fileButtonRef = useRef(null);
   const editButtonRef = useRef(null);
@@ -50,10 +55,12 @@ function DropdownPortal({
   const settingsDropdownRef = useRef(null);
   const guestDropdownRef = useRef(null);
 
+  // Check if there are any tracks available for export
+  const hasTracksForExport = tracks && tracks.length > 0;
+
   const handleMenuItemClick = (action) => {
     console.log(`Selected: ${action}`);
 
-    // Handle navigation for guest dropdown
     if (action === "Login") {
       navigate("/login");
     } else if (action === "Register") {
@@ -78,7 +85,6 @@ function DropdownPortal({
     setActiveDropdown(activeDropdown === dropdownName ? null : dropdownName);
   };
 
-  // Handle mouse leave from dropdown
   const handleDropdownMouseLeave = (event) => {
     const relatedTarget = event.relatedTarget;
     const dropdown = event.currentTarget;
@@ -127,13 +133,84 @@ function DropdownPortal({
     };
   }, [activeDropdown]);
 
-  // Helper function to get button class with active state
   const getButtonClass = (buttonType, dropdownName) => {
     const baseClass = `dropdown-btn${buttonType ? `-${buttonType}` : ""}`;
     return activeDropdown === dropdownName ? `${baseClass} active` : baseClass;
   };
 
-  // Dropdown content for each menu with individual styling
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(checkFullscreen());
+    };
+
+    // Fullscreen
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
+    document.addEventListener("mozfullscreenchange", handleFullscreenChange);
+    document.addEventListener("MSFullscreenChange", handleFullscreenChange);
+
+    return () => {
+      // Fullscreen
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+      document.removeEventListener(
+        "webkitfullscreenchange",
+        handleFullscreenChange
+      );
+      document.removeEventListener(
+        "mozfullscreenchange",
+        handleFullscreenChange
+      );
+      document.removeEventListener(
+        "MSFullscreenChange",
+        handleFullscreenChange
+      );
+    };
+  }, []);
+
+  const enterFullScreen = () => {
+    let element = document.documentElement;
+    setIsFullscreen(true);
+
+    if (element.requestFullscreen) {
+      element.requestFullscreen();
+    } else if (element.mozRequestFullScreen) {
+      // Firefox
+      element.mozRequestFullScreen();
+    } else if (element.webkitRequestFullscreen) {
+      // Chrome, Safari, and Opera
+      element.webkitRequestFullscreen();
+    } else if (element.msRequestFullscreen) {
+      // IE/Edge
+      element.msRequestFullscreen();
+    }
+  };
+
+  const exitFullscreen = () => {
+    setIsFullscreen(false);
+    if (document.exitFullscreen) {
+      // General
+      document.exitFullscreen();
+    } else if (document.webkitExitFullscreen) {
+      // Safari
+      document.webkitExitFullscreen();
+    } else if (document.msExitFullscreen) {
+      // IE11
+      document.msExitFullscreen();
+    } else if (document.mozCancelFullScreen) {
+      // Firefox
+      document.mozCancelFullScreen();
+    }
+  };
+
+  const checkFullscreen = () => {
+    return Boolean(
+      document.fullscreenElement || // Standard
+        document.webkitFullscreenElement || // Chrome and Opera
+        document.mozFullScreenElement || // Firefox
+        document.msFullscreenElement // IE/Edge
+    );
+  };
+
   const dropdownContent = {
     file: (
       <div
@@ -226,19 +303,21 @@ function DropdownPortal({
           </a>
         </AudioImportButton>
 
-        {/* ENABLED/DISABLED - Export (conditional) */}
+        {/* ENABLED/DISABLED - Export (conditional based on tracks) */}
         <AudioExportButton
-          audioBuffer={audioBuffer}
+          tracks={tracks}
+          totalLengthMs={totalLengthMs}
           onExportComplete={onExportComplete}
-          disabled={!audioBuffer} // This prop is now ignored by AudioExportButton, but is harmless
         >
           <a
             href="#"
-            className={!audioBuffer ? "dropdown-item-disabled" : ""} // APPLIES GREY-OUT
+            className={!hasTracksForExport ? "dropdown-item-disabled" : ""}
             onClick={(e) => {
               e.preventDefault();
-              if (!audioBuffer) {
-                alert("Please import audio before exporting"); // PRESERVES ALERT
+              if (!hasTracksForExport) {
+                alert(
+                  "Please import audio or create a recording before exporting"
+                );
                 return;
               }
               handleMenuItemClick("Export");
@@ -477,6 +556,24 @@ function DropdownPortal({
           >
             <ColorAccessibilityIcon />
             <span>Color Accessibility</span>
+          </span>
+        </a>
+        <a
+          href="#"
+          onClick={() =>
+            checkFullscreen() ? exitFullscreen() : enterFullScreen()
+          }
+        >
+          <span
+            style={{
+              display: "flex",
+              alignItems: "center",
+              width: "100%",
+              gap: "8px",
+            }}
+          >
+            {isFullscreen ? <BsArrowsAngleContract /> : <BsArrowsFullscreen />}
+            <span>{isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}</span>
           </span>
         </a>
         <a

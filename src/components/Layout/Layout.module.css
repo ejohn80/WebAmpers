@@ -22,6 +22,7 @@
   display: flex;
   flex-direction: column;
   flex: 1;
+  min-height: 0;
 }
 
 .searchBar {
@@ -138,6 +139,15 @@
   overflow: visible;
 }
 
+.effectsList {
+  flex: 1;
+  flex-grow: 1;
+  overflow-y: auto;
+  margin-bottom: 15px;
+  padding-right: 8px;
+  min-height: 0;
+}
+
 .header {
   display: flex;
   justify-content: space-between;
@@ -210,6 +220,7 @@
   width: 100%;
   transition: all 0.2s;
   line-height: 1;
+  flex-shrink: 0;
 }
 
 .resetAllButtonContent {

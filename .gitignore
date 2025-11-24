@@ -22,3 +22,15 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Python virtual environments and cache
+venv/
+.venv/
+__pycache__/
+.pytest_cache/
+
+# File uploads
+uploads/
+
+# Python compiled files
+*.pyc

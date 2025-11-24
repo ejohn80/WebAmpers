@@ -1,0 +1,233 @@
+/* MainContent.css - Styles for multi-track display */
+
+.maincontent {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+  width: 100%;
+  padding: 0;
+  position: relative;
+  --track-controls-width: 180px;
+  --track-controls-gap: 12px;
+  --timeline-left-offset: calc(
+    var(--track-controls-width) + var(--track-controls-gap)
+  );
+}
+
+.timeline-scroll-area {
+  flex: 1 1 auto;
+  overflow: auto;
+  padding-bottom: 32px;
+  scrollbar-gutter: stable both-edges;
+}
+
+.timeline-scroll-content {
+  position: relative;
+  min-width: calc(
+    var(--timeline-left-offset) + var(--timeline-content-width, 100%)
+  );
+  padding-bottom: 24px;
+}
+
+.tracks-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+
+/* Wrapper to position global playhead across all tracks */
+.tracks-relative {
+  position: relative;
+  min-width: calc(
+    var(--timeline-left-offset) + var(--timeline-content-width, 100%)
+  );
+}
+
+.global-playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: red;
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* Rail that matches the timeline area (to the right of track controls) */
+.global-playhead-rail {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--timeline-left-offset);
+  width: var(--timeline-content-width, 100%);
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* Timeline ruler overlay */
+.timeline-ruler-bar {
+  position: sticky;
+  top: 0;
+  margin-left: var(--timeline-left-offset);
+  width: var(--timeline-content-width, 100%);
+  height: 32px;
+  background: #2c2c2f;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+  z-index: 11;
+  margin-bottom: 12px;
+  overflow: visible;
+}
+
+.timeline-pre-highlight {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: linear-gradient(
+    90deg,
+    rgba(234, 41, 41, 0.18),
+    rgba(234, 41, 41, 0)
+  );
+  border-right: 1px solid rgba(234, 41, 41, 0.35);
+  pointer-events: none;
+}
+
+.timeline-tick {
+  position: absolute;
+  top: 0;
+  transform: translateX(
+    -1px
+  ); /* center the 2px line on the computed position */
+}
+
+.timeline-tick-line {
+  width: 2px;
+  height: 18px;
+  background: rgba(234, 41, 41, 0.35);
+}
+
+.timeline-tick-label {
+  margin-top: 2px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.75);
+  white-space: nowrap;
+}
+
+.timeline-tick.pre .timeline-tick-line {
+  height: 14px;
+  opacity: 0.3;
+}
+
+.timeline-tick.pre .timeline-tick-label {
+  display: none;
+}
+
+/* Zoom controls bar at bottom */
+.zoom-controls-bar {
+  position: sticky;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: flex-end;
+  padding: 2px 8px;
+  background: transparent;
+  z-index: 12;
+  pointer-events: none;
+}
+
+.zoom-controls {
+  pointer-events: auto;
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  padding: 4px 6px;
+}
+
+.zoom-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #eee;
+  font-size: 12px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.zoom-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+.zoom-btn.reset {
+  opacity: 0.85;
+}
+.zoom-label {
+  font-size: 12px;
+  color: #ddd;
+  min-width: 40px;
+  text-align: center;
+}
+
+/* Shorter in-between (minor) ticks */
+.timeline-tick.minor .timeline-tick-line {
+  height: 10px;
+  background: rgba(234, 41, 41, 0.25);
+}
+
+.timeline-tick.minor .timeline-tick-label {
+  display: none;
+}
+
+.track-wrapper {
+  /* Add a subtle separator between tracks */
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  padding-bottom: 16px;
+}
+
+.track-wrapper:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.empty-state {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 320px;
+  text-align: center;
+  font-size: 1.5rem;
+  color: rgba(255, 255, 255, 0.8);
+  letter-spacing: 0.02em;
+  padding: 32px 16px;
+}
+
+/* Ensure smooth scrolling */
+.timeline-scroll-area::-webkit-scrollbar {
+  width: 8px; /* vertical */
+  height: 12px; /* horizontal */
+}
+
+.timeline-scroll-area::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.timeline-scroll-area::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+}
+
+.timeline-scroll-area::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* Timeline width is driven by global CSS var; can be < or > viewport based on zoom */
+.tracklane-timeline {
+  width: var(--timeline-content-width, 100%);
+}

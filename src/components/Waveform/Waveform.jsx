@@ -6,60 +6,80 @@ import {progressStore} from "../../playback/progressStore";
  * A component that renders an audio buffer as a waveform on a canvas.
  * @param {object} props
  * @param {Tone.ToneAudioBuffer} props.audioBuffer - The audio buffer to visualize.
+ * @param {string} [props.color] - Stroke color for the waveform.
+ * @param {number} [props.startOnTimelineMs] - Segment start time on the global timeline (ms).
+ * @param {number} [props.durationMs] - Segment duration on the global timeline (ms).
+ * @param {boolean} [props.showProgress] - Whether to render the progress bar within this waveform (default true).
  */
 const Waveform = ({
   audioBuffer,
   color = "#ffffff",
-  pixelsPerSecond = 120, // tweak this for more/less horizontal zoom
+  startOnTimelineMs = 0,
+  durationMs = null,
+  showProgress = true,
 }) => {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
   const draggingRef = useRef(false);
+  const [canvasSize, setCanvasSize] = useState({width: 0, height: 0});
 
-  const [canvasWidth, setCanvasWidth] = useState(0);
-  const [containerWidth, setContainerWidth] = useState(0);
-  const [scrollLeft, setScrollLeft] = useState(0);
-  const [durationMs, setDurationMs] = useState(0);
-  const [{ms, lengthMs}, setProgress] = useState(progressStore.getState());
-
-  // Subscribe to global playback progress
-  useEffect(() => progressStore.subscribe(setProgress), []);
-
-  // Track container size (for correct playhead positioning)
+  // Track container resize so we can redraw with accurate resolution when zooming
   useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const container = canvas.parentElement;
+    if (!container) return;
 
-    const handleResize = () => {
-      setContainerWidth(el.clientWidth || 0);
+    const updateSize = () => {
+      const rect = container.getBoundingClientRect();
+      setCanvasSize({
+        width: Math.max(1, Math.round(rect.width)),
+        height: Math.max(1, Math.round(rect.height)),
+      });
     };
 
-    handleResize();
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
+    updateSize();
+
+    if (typeof ResizeObserver !== "undefined") {
+      const observer = new ResizeObserver(updateSize);
+      observer.observe(container);
+      return () => observer.disconnect();
+    }
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("resize", updateSize);
+      return () => window.removeEventListener("resize", updateSize);
+    }
+    return undefined;
   }, []);
 
-  // Track horizontal scroll so playhead follows when user slides
   useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-
-    const onScroll = () => setScrollLeft(el.scrollLeft || 0);
-    el.addEventListener("scroll", onScroll);
-    return () => el.removeEventListener("scroll", onScroll);
-  }, []);
-
-  // Draw waveform whenever buffer changes
-  useEffect(() => {
-    if (!audioBuffer || !canvasRef.current || !containerRef.current) return;
+    if (!audioBuffer || !canvasRef.current) return;
+    if (!canvasSize.width || !canvasSize.height) return;
 
     const canvas = canvasRef.current;
     const container = containerRef.current;
     const ctx = canvas.getContext("2d");
 
-    // Use layout size for crisp rendering
-    canvas.width = canvas.clientWidth;
-    canvas.height = canvas.clientHeight;
+    const dpr =
+      typeof window !== "undefined" && window.devicePixelRatio
+        ? window.devicePixelRatio
+        : 1;
+    const cssWidth = canvasSize.width;
+    const cssHeight = canvasSize.height;
+    const pixelWidth = Math.max(1, Math.floor(cssWidth * dpr));
+    const pixelHeight = Math.max(1, Math.floor(cssHeight * dpr));
+
+    if (canvas.width !== pixelWidth || canvas.height !== pixelHeight) {
+      canvas.width = pixelWidth;
+      canvas.height = pixelHeight;
+      canvas.style.width = `${cssWidth}px`;
+      canvas.style.height = `${cssHeight}px`;
+    }
+
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.scale(dpr, dpr);
 
     // 🔧 Unwrap Tone.ToneAudioBuffer -> native AudioBuffer robustly
     let native = null;
@@ -76,36 +96,21 @@ const Waveform = ({
     if (!native) return; // still nothing to draw
 
     const data = native.getChannelData(0);
+    const visibleWidth = Math.max(1, cssWidth);
+    const step = Math.max(1, Math.floor(data.length / visibleWidth));
+    const amp = cssHeight / 2;
 
-    // Always base horizontal scale on the actual buffer duration
-    const durationSec =
-      typeof native.duration === "number" && native.duration > 0
-        ? native.duration
-        : data.length / (native.sampleRate || 44100);
-
-    const bufferDurationMs = durationSec * 1000;
-    setDurationMs(bufferDurationMs);
-
-    const baseWidth = container.clientWidth || 1;
-    const fullWidth = Math.max(baseWidth, durationSec * pixelsPerSecond);
-
-    canvas.width = fullWidth;
-    canvas.height = container.clientHeight || 80;
-    setCanvasWidth(fullWidth);
-
-    // Draw waveform
-    const step = Math.max(1, Math.floor(data.length / fullWidth));
-    const amp = canvas.height / 2;
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
     // allow caller to specify the stroke color (track color) with a sensible default
     ctx.strokeStyle = color || "#ffffff";
-    ctx.lineWidth = 1;
+    ctx.lineWidth = dpr >= 2 ? 0.75 : 1;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
     ctx.beginPath();
 
-    for (let i = 0; i < fullWidth; i++) {
-      let min = 1.0;
-      let max = -1.0;
+    for (let i = 0; i < visibleWidth; i++) {
+      let min = 1.0,
+        max = -1.0;
+
       const base = i * step;
       for (let j = 0; j < step; j++) {
         const idx = base + j;
@@ -114,48 +119,45 @@ const Waveform = ({
         if (v < min) min = v;
         if (v > max) max = v;
       }
-      ctx.moveTo(i, (1 + min) * amp);
-      ctx.lineTo(i, (1 + max) * amp);
+      const x = i + 0.5; // center lines on pixel for crispness
+      ctx.moveTo(x, (1 + min) * amp);
+      ctx.lineTo(x, (1 + max) * amp);
     }
     ctx.stroke();
-  }, [audioBuffer, color, pixelsPerSecond]); // Redraw when the audioBuffer or color prop changes
+  }, [audioBuffer, canvasSize.height, canvasSize.width, color]);
 
-  // const pct =
-  //   lengthMs > 0 ? Math.max(0, Math.min(100, (ms / lengthMs) * 100)) : 0;
+  const [{ms, lengthMs}, setProgress] = useState(progressStore.getState());
 
-  // Use the same total timeline length for everything
-  const maxMs = lengthMs || durationMs || 0;
+  useEffect(() => {
+    return progressStore.subscribe(setProgress);
+  }, []);
 
-  let playheadLeftPx = 0;
-  if (maxMs > 0 && canvasWidth > 0) {
-    // Single source of truth: world position on the canvas.
-    playheadLeftPx = (ms / maxMs) * canvasWidth;
-
-    // Optional: clamp to canvas bounds so the line never renders off-canvas.
-    if (playheadLeftPx < 0) playheadLeftPx = 0;
-    if (playheadLeftPx > canvasWidth) playheadLeftPx = canvasWidth;
+  // Compute playhead position within this segment if we have segment timing,
+  // otherwise fall back to global percentage (legacy behavior)
+  let pct = 0;
+  if (durationMs && durationMs > 0) {
+    const rel = (ms - (startOnTimelineMs || 0)) / durationMs;
+    const clamped = Math.max(0, Math.min(1, rel));
+    pct = clamped * 100;
+  } else {
+    pct = lengthMs > 0 ? Math.max(0, Math.min(100, (ms / lengthMs) * 100)) : 0;
   }
 
   // Scrub helpers
   const msAtClientX = (clientX) => {
-    const el = containerRef.current; // the scrollable waveform container
-    if (!el || !canvasWidth) return;
-
-    const maxMs = lengthMs || durationMs;
-    if (!maxMs) return;
-
+    const el = canvasRef.current?.parentElement; // container div
+    if (!el) return;
     const rect = el.getBoundingClientRect();
 
     // X within the visible area of the container
     const rel = Math.max(0, Math.min(rect.width, clientX - rect.left));
-
-    // Map visible X + scroll offset → absolute X on the full canvas
-    const xOnCanvas = rel + el.scrollLeft;
-
-    const p = xOnCanvas / canvasWidth;
-    const target = p * maxMs;
-
-    return Math.max(0, Math.min(maxMs, target));
+    const p = rect.width > 0 ? rel / rect.width : 0;
+    // If segment timing provided, map within this segment; else map across global length
+    if (durationMs && durationMs > 0) {
+      return (startOnTimelineMs || 0) + p * durationMs;
+    }
+    if (!lengthMs) return;
+    return p * lengthMs;
   };
 
   // Scrubbing handlers
@@ -245,20 +247,15 @@ const Waveform = ({
     <div
       ref={containerRef}
       className="waveform-container"
-      onWheel={onWheel} // wheel = scroll only
+      onMouseDown={onMouseDown}
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
     >
-      <canvas
-        ref={canvasRef}
-        className="waveform-canvas"
-        onMouseDown={onMouseDown}
-        onTouchStart={onTouchStart}
-        onTouchMove={onTouchMove}
-        onTouchEnd={onTouchEnd}
-      />
-      <div
-        className="waveform-progress"
-        style={{left: `${playheadLeftPx}px`}}
-      />
+      <canvas ref={canvasRef} className="waveform-canvas" />
+      {showProgress && (
+        <div className="waveform-progress" style={{left: `${pct}%`}} />
+      )}
     </div>
   );
 };
