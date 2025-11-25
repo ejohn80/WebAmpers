@@ -1,107 +1,89 @@
-import {useState, useEffect, useContext} from "react";
+import {useState, useEffect} from "react";
 import {IoSearch} from "react-icons/io5";
-import {FaPlay} from "react-icons/fa";
+import {FaPlay, FaTrash} from "react-icons/fa";
 import {MoonLoader} from "react-spinners";
-import {AppContext} from "../../../context/AppContext";
-import {db} from "../../../firebase/firebase";
-import {
-  collection,
-  query,
-  addDoc,
-  serverTimestamp,
-  orderBy,
-  onSnapshot,
-} from "firebase/firestore";
+import {dbManager} from "../../../managers/DBManager";
+import {saveAsset} from "../../../utils/assetUtils";
 import AudioImportButton from "../../AudioImport/AudioImportButton2";
 import styles from "../Layout.module.css";
 
-const AssetsTab = ({onImportSuccess, onImportError}) => {
-  const {
-    userData,
-    loading: userLoading,
-    activeProject,
-  } = useContext(AppContext);
-
+const AssetsTab = ({
+  onImportSuccess,
+  onImportError,
+  onAssetDelete,
+  refreshTrigger,
+  assetBufferCache,
+}) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [assets, setAssets] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [editingAssetId, setEditingAssetId] = useState(null);
+  const [editingName, setEditingName] = useState("");
+
+  // Load assets from IndexedDB
+  const loadAssets = async () => {
+    try {
+      setIsLoading(true);
+      const allAssets = await dbManager.getAllAssets();
+      setAssets(allAssets);
+    } catch (err) {
+      console.error("Error fetching assets:", err);
+      setError("Failed to load assets");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    if (!userData || !activeProject) {
-      setAssets([]);
-      return;
+    loadAssets();
+  }, []);
+
+  // Reload when refreshTrigger changes (triggered by external imports)
+  useEffect(() => {
+    if (refreshTrigger) {
+      loadAssets();
     }
-
-    setIsLoading(true);
-    const q = query(
-      collection(db, "users", userData.uid, "assets"),
-      orderBy("createdAt", "desc")
-    );
-
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        const assetsData = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
-        // Filter by active project
-        setAssets(
-          assetsData.filter((asset) => asset.projectName === activeProject)
-        );
-        setIsLoading(false);
-      },
-      (err) => {
-        console.error("Error fetching assets:", err);
-        setError("Failed to load assets");
-        setIsLoading(false);
-      }
-    );
-
-    return unsubscribe;
-  }, [userData, activeProject]);
+  }, [refreshTrigger]);
 
   const handleImportSuccess = async (importResult) => {
-    console.log("Import result:", importResult);
-
-    if (!userData || !activeProject) {
-      if (onImportError) {
-        onImportError("Please select a project first");
-      }
-      return;
-    }
+    console.log("[AssetsTab] Import result:", importResult);
 
     try {
-      const {metadata} = importResult;
+      const {buffer} = importResult;
+      
+      // Use shared utility to save asset
+      const assetId = await saveAsset(importResult, dbManager);
 
-      // Convert duration from "3m 45.23s" to "03:45"
-      const formatDuration = (durationStr) => {
-        const match = durationStr.match(/(\d+)m\s+([\d.]+)s/);
-        if (match) {
-          const minutes = match[1].padStart(2, "0");
-          const seconds = Math.floor(parseFloat(match[2]))
-            .toString()
-            .padStart(2, "0");
-          return `${minutes}:${seconds}`;
-        }
-        return "00:00";
+      // Get the saved asset to retrieve the potentially renamed name
+      const savedAsset = await dbManager.getAsset(assetId);
+      if (!savedAsset) {
+        console.error("[AssetsTab] Failed to retrieve saved asset");
+        setError("Failed to save asset");
+        return;
+      }
+
+      // Update importResult with the actual saved name (may have been renamed for duplicates)
+      const updatedImportResult = {
+        ...importResult,
+        name: savedAsset.name, // Use the name from DB which may include (2), (3), etc.
       };
 
-      // Save asset to Firestore
-      await addDoc(collection(db, "users", userData.uid, "assets"), {
-        name: metadata.name || "Untitled",
-        duration: formatDuration(metadata.duration),
-        bitrate: "N/A", // AudioImporter doesn't provide bitrate
-        size: metadata.size,
-        sampleRate: metadata.sampleRate,
-        channels: metadata.numberOfChannels,
-        projectName: activeProject,
-        createdAt: serverTimestamp(),
-      });
+      // Cache the buffer with the asset ID for buffer sharing
+      if (assetBufferCache && buffer) {
+        // Import provides native AudioBuffer, convert to Tone.ToneAudioBuffer
+        const Tone = await import("tone");
+        const toneBuffer = new Tone.ToneAudioBuffer(buffer);
+        assetBufferCache.set(assetId, toneBuffer);
+        console.log(`[AssetsTab] Cached buffer for asset ${assetId}`);
+      }
 
+      // Reload assets
+      await loadAssets();
+
+      // Call parent's onImportSuccess to create a track with the updated name
       if (onImportSuccess) {
-        onImportSuccess(importResult);
+        onImportSuccess(updatedImportResult, assetId);
       }
     } catch (err) {
       console.error("Error saving asset:", err);
@@ -112,6 +94,78 @@ const AssetsTab = ({onImportSuccess, onImportError}) => {
     }
   };
 
+  const handleDeleteAsset = async (assetId, event) => {
+    event.stopPropagation();
+
+    try {
+      // Check if asset is being used by any tracks
+      const isInUse = await dbManager.isAssetInUse(assetId);
+      
+      if (isInUse) {
+        alert("Cannot delete this asset because it is being used by one or more tracks. Please delete those tracks first.");
+        return;
+      }
+
+      if (!window.confirm("Are you sure you want to delete this asset?")) {
+        return;
+      }
+
+      await dbManager.deleteAsset(assetId);
+      await loadAssets();
+      
+      // Notify parent to clear buffer cache
+      if (onAssetDelete) {
+        onAssetDelete(assetId);
+      }
+    } catch (err) {
+      console.error("Failed to delete asset:", err);
+      setError("Failed to delete asset");
+    }
+  };
+
+  const handleDragStart = (event, asset) => {
+    // Store asset data in drag event
+    event.dataTransfer.setData("application/json", JSON.stringify({
+      type: "asset",
+      assetId: asset.id,
+      name: asset.name,
+    }));
+    event.dataTransfer.effectAllowed = "copy";
+  };
+
+  const handleDoubleClick = (asset) => {
+    setEditingAssetId(asset.id);
+    setEditingName(asset.name);
+  };
+
+  const handleRenameSubmit = async (assetId) => {
+    if (!editingName.trim()) {
+      alert("Asset name cannot be empty");
+      setEditingAssetId(null);
+      return;
+    }
+
+    try {
+      await dbManager.updateAsset(assetId, { name: editingName.trim() });
+      await loadAssets();
+      setEditingAssetId(null);
+      setEditingName("");
+    } catch (err) {
+      console.error("Failed to rename asset:", err);
+      setError("Failed to rename asset");
+      setEditingAssetId(null);
+    }
+  };
+
+  const handleRenameKeyDown = (e, assetId) => {
+    if (e.key === "Enter") {
+      handleRenameSubmit(assetId);
+    } else if (e.key === "Escape") {
+      setEditingAssetId(null);
+      setEditingName("");
+    }
+  };
+
   const filteredAssets = assets.filter((asset) =>
     asset.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -119,68 +173,96 @@ const AssetsTab = ({onImportSuccess, onImportError}) => {
   return (
     <div className={styles.container}>
       <div className={styles.wrapper}>
-        {!activeProject ? (
-          <p className={styles.emptyMessage}>
-            Please select a project to view assets.
-          </p>
+        <div className={styles.searchBar}>
+          <IoSearch size={18} color="#888" />
+          <input
+            type="text"
+            placeholder="Search"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className={styles.searchInput}
+          />
+        </div>
+
+        <div className={styles.tableHeader}>
+          <div>Name</div>
+          <div>Duration</div>
+          <div>Actions</div>
+        </div>
+
+        {isLoading ? (
+          <div className={styles.spinner}>
+            <MoonLoader color="white" size={30} />
+          </div>
         ) : (
-          <>
-            <div className={styles.searchBar}>
-              <IoSearch size={18} color="#888" />
-              <input
-                type="text"
-                placeholder="Search"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className={styles.searchInput}
-              />
-            </div>
-
-            <div className={styles.tableHeader}>
-              <div>Name</div>
-              <div>Duration</div>
-              <div>Bitrate</div>
-            </div>
-
-            {isLoading || userLoading ? (
-              <div className={styles.spinner}>
-                <MoonLoader color="white" size={30} />
+          <div className={styles.songList}>
+            {filteredAssets.length === 0 ? (
+              <div className={styles.emptyMessage}>
+                {searchTerm
+                  ? "No results"
+                  : "No assets yet. Import some audio files!"}
               </div>
             ) : (
-              <div className={styles.songList}>
-                {filteredAssets.length === 0 ? (
-                  <div className={styles.emptyMessage}>
-                    {searchTerm
-                      ? "No results"
-                      : "No assets yet. Import some audio files!"}
+              filteredAssets.map((asset) => (
+                <div
+                  key={asset.id}
+                  className={styles.songRow}
+                  draggable={editingAssetId !== asset.id}
+                  onDragStart={(e) => handleDragStart(e, asset)}
+                  onDoubleClick={() => handleDoubleClick(asset)}
+                  style={{cursor: editingAssetId === asset.id ? "text" : "grab"}}
+                >
+                  <div className={styles.songName}>
+                    <FaPlay size={10} color="#fff" />
+                    {editingAssetId === asset.id ? (
+                      <input
+                        type="text"
+                        value={editingName}
+                        onChange={(e) => setEditingName(e.target.value)}
+                        onBlur={() => handleRenameSubmit(asset.id)}
+                        onKeyDown={(e) => handleRenameKeyDown(e, asset.id)}
+                        autoFocus
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                          background: "#333",
+                          border: "1px solid #555",
+                          color: "#fff",
+                          padding: "2px 4px",
+                          borderRadius: "3px",
+                          width: "100%",
+                          maxWidth: "200px",
+                        }}
+                      />
+                    ) : (
+                      <span>{asset.name}</span>
+                    )}
                   </div>
-                ) : (
-                  filteredAssets.map((asset) => (
-                    <div key={asset.id} className={styles.songRow}>
-                      <div className={styles.songName}>
-                        <FaPlay size={10} color="#fff" />
-                        <span>{asset.name}</span>
-                      </div>
-                      <div className={styles.songDuration}>
-                        {asset.duration}
-                      </div>
-                      <div className={styles.songBitrate}>{asset.bitrate}</div>
-                    </div>
-                  ))
-                )}
-              </div>
+                  <div className={styles.songDuration}>
+                    {asset.duration}
+                  </div>
+                  <div className={styles.songBitrate}>
+                    <button
+                      onClick={(e) => handleDeleteAsset(asset.id, e)}
+                      className={styles.deleteButton}
+                      aria-label="Delete asset"
+                    >
+                      <FaTrash size={12} />
+                    </button>
+                  </div>
+                </div>
+              ))
             )}
-
-            {error && <p className={styles.error}>{error}</p>}
-
-            <div className={styles.importButtonWrapper}>
-              <AudioImportButton
-                onImportSuccess={handleImportSuccess}
-                onImportError={onImportError}
-              />
-            </div>
-          </>
+          </div>
         )}
+
+        {error && <p className={styles.error}>{error}</p>}
+
+        <div className={styles.importButtonWrapper}>
+          <AudioImportButton
+            onImportSuccess={handleImportSuccess}
+            onImportError={onImportError}
+          />
+        </div>
       </div>
     </div>
   );

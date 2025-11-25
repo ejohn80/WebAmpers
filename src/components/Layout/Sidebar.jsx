@@ -12,17 +12,19 @@ import SessionsTab from "./Sidebar/SessionsTab";
  * @param {number} props.width - The current width of the sidebar.
  * @param {function} props.onImportSuccess - Callback for successful audio import.
  * @param {function} props.onImportError - Callback for failed audio import.
+ * @param {function} props.onAssetDelete - Callback for asset deletion.
+ * @param {number} props.assetsRefreshTrigger - Counter to trigger assets reload.
+ * @param {Map} props.assetBufferCache - Cache for shared audio buffers.
  */
-function Sidebar({width, onImportSuccess, onImportError}) {
-  const {userData} = useContext(AppContext);
+function Sidebar({
+  width,
+  onImportSuccess,
+  onImportError,
+  onAssetDelete,
+  assetsRefreshTrigger,
+  assetBufferCache,
+}) {
   const [currentTab, setCurrentTab] = useState("sessions");
-
-  // If logged out, only redirect away from Assets (Effects/Sessions stay allowed)
-  useEffect(() => {
-    if (!userData && currentTab === "assets") {
-      setCurrentTab("effects");
-    }
-  }, [userData, currentTab]);
 
   const tabs = {
     sessions: {
@@ -39,16 +41,16 @@ function Sidebar({width, onImportSuccess, onImportError}) {
         <AssetsTab
           onImportSuccess={onImportSuccess}
           onImportError={onImportError}
+          onAssetDelete={onAssetDelete}
+          refreshTrigger={assetsRefreshTrigger}
+          assetBufferCache={assetBufferCache}
         />
       ),
     },
   };
 
   const handleTabClick = (key) => {
-    // Allow Effects and Sessions even when not logged in; keep Assets gated
-    if (userData || key !== "assets") {
-      setCurrentTab(key);
-    }
+    setCurrentTab(key);
   };
 
   return (
@@ -58,7 +60,6 @@ function Sidebar({width, onImportSuccess, onImportError}) {
           <button
             key={key}
             onClick={() => handleTabClick(key)}
-            disabled={!userData && key === "assets"}
             style={{
               flex: 1,
               padding: "10px 0",
@@ -66,9 +67,8 @@ function Sidebar({width, onImportSuccess, onImportError}) {
               background: currentTab === key ? "#17E1FF" : "#193338",
               color: currentTab === key ? "#193338" : "#17E1FF",
               fontWeight: currentTab === key ? "bold" : "bold",
-              cursor: userData || key !== "assets" ? "pointer" : "not-allowed",
-              opacity: !userData && key === "assets" ? 0.5 : 1,
-              transition: "background 0.2s, color 0.2s, opacity 0.2s",
+              cursor: "pointer",
+              transition: "background 0.2s, color 0.2s",
             }}
           >
             {tab.label}

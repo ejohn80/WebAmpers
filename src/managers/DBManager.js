@@ -1,7 +1,8 @@
 const DB_NAME = "WebAmpDB";
-const DB_VERSION = 2; // Increment version to add sessions support
+const DB_VERSION = 3; // Increment version to add assets support
 const TRACKS_STORE_NAME = "tracks";
 const SESSIONS_STORE_NAME = "sessions";
+const ASSETS_STORE_NAME = "assets";
 
 class DBManager {
   constructor() {
@@ -42,6 +43,15 @@ class DBManager {
             keyPath: "id",
             autoIncrement: true,
           });
+        }
+        
+        // Create assets store (v3)
+        if (!db.objectStoreNames.contains(ASSETS_STORE_NAME)) {
+          const assetsStore = db.createObjectStore(ASSETS_STORE_NAME, {
+            keyPath: "id",
+            autoIncrement: true,
+          });
+          assetsStore.createIndex("name", "name", {unique: false});
         }
       };
 
@@ -129,6 +139,7 @@ class DBManager {
         ...base,
         id: base.id ?? trackData.id,
         sessionId: sessionId, // Add sessionId to track
+        assetId: trackData.assetId || null, // Add assetId to track for reference
         volume: base.volume ?? trackData.volume ?? base._volumeDb ?? undefined,
         pan: base.pan ?? trackData.pan ?? base._pan ?? undefined,
         mute:
@@ -563,6 +574,214 @@ class DBManager {
   async sessionExists(name) {
     const sessions = await this.getAllSessions();
     return sessions.some(s => s.name.trim() === name.trim());
+  }
+
+  // ============= ASSET MANAGEMENT =============
+
+  /**
+   * Add an asset (imported audio file) to the database
+   * @param {Object} assetData - Asset metadata and buffer
+   * @returns {Promise<number>} - Asset ID
+   */
+  async addAsset(assetData) {
+    const db = await this.openDB();
+    
+    // Get all existing assets to check for duplicates
+    const existingAssets = await this.getAllAssets();
+    let baseName = assetData.name || "Untitled";
+    let finalName = baseName;
+    
+    // Check if name already exists and add number suffix if needed
+    const existingNames = new Set(existingAssets.map(a => a.name));
+    if (existingNames.has(finalName)) {
+      // Extract base name and extension
+      const lastDotIndex = baseName.lastIndexOf('.');
+      const nameWithoutExt = lastDotIndex > 0 ? baseName.substring(0, lastDotIndex) : baseName;
+      const extension = lastDotIndex > 0 ? baseName.substring(lastDotIndex) : '';
+      
+      // Find next available number
+      let counter = 2;
+      do {
+        finalName = `${nameWithoutExt} (${counter})${extension}`;
+        counter++;
+      } while (existingNames.has(finalName));
+      
+      console.log(`Duplicate name detected. Renaming "${baseName}" to "${finalName}"`);
+    }
+    
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([ASSETS_STORE_NAME], "readwrite");
+      const store = transaction.objectStore(ASSETS_STORE_NAME);
+      
+      const asset = {
+        name: finalName,
+        duration: assetData.duration,
+        size: assetData.size,
+        sampleRate: assetData.sampleRate,
+        channels: assetData.channels,
+        buffer: assetData.buffer, // Store the serialized buffer
+        createdAt: new Date().toISOString(),
+      };
+      
+      const request = store.add(asset);
+      
+      request.onsuccess = (event) => {
+        const assetId = event.target.result;
+        console.log(`Asset created with ID: ${assetId}, name: ${finalName}`);
+        resolve(assetId);
+      };
+      
+      request.onerror = (event) => {
+        console.error("Error creating asset:", event.target.error);
+        reject(new Error("Could not create asset"));
+      };
+    });
+  }
+
+  /**
+   * Get all assets
+   * @returns {Promise<Array>}
+   */
+  async getAllAssets() {
+    const db = await this.openDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([ASSETS_STORE_NAME], "readonly");
+      const store = transaction.objectStore(ASSETS_STORE_NAME);
+      const request = store.getAll();
+      
+      request.onsuccess = (event) => {
+        resolve(event.target.result);
+      };
+      
+      request.onerror = (event) => {
+        console.error("Error getting assets:", event.target.error);
+        reject(new Error("Could not retrieve assets"));
+      };
+    });
+  }
+
+  /**
+   * Get a single asset by ID
+   * @param {number} assetId
+   * @returns {Promise<Object|null>}
+   */
+  async getAsset(assetId) {
+    const db = await this.openDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([ASSETS_STORE_NAME], "readonly");
+      const store = transaction.objectStore(ASSETS_STORE_NAME);
+      const request = store.get(assetId);
+      
+      request.onsuccess = (event) => {
+        resolve(event.target.result || null);
+      };
+      
+      request.onerror = (event) => {
+        console.error("Error getting asset:", event.target.error);
+        reject(new Error("Could not retrieve asset"));
+      };
+    });
+  }
+
+  /**
+   * Check if an asset is being used by any tracks
+   * @param {number} assetId
+   * @returns {Promise<boolean>}
+   */
+  async isAssetInUse(assetId) {
+    const db = await this.openDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([TRACKS_STORE_NAME], "readonly");
+      const store = transaction.objectStore(TRACKS_STORE_NAME);
+      
+      // Get all tracks
+      const request = store.getAll();
+      
+      request.onsuccess = (event) => {
+        const tracks = event.target.result;
+        
+        // Check if any track references this assetId
+        const isInUse = tracks.some(track => track.assetId === assetId);
+        
+        resolve(isInUse);
+      };
+      
+      request.onerror = (event) => {
+        console.error("Error checking if asset is in use:", event.target.error);
+        reject(new Error("Could not check if asset is in use"));
+      };
+    });
+  }
+
+  /**
+   * Update an asset's metadata (e.g., name)
+   * @param {number} assetId
+   * @param {Object} updates - Object containing fields to update
+   * @returns {Promise<void>}
+   */
+  async updateAsset(assetId, updates) {
+    const db = await this.openDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([ASSETS_STORE_NAME], "readwrite");
+      const store = transaction.objectStore(ASSETS_STORE_NAME);
+      
+      // First get the existing asset
+      const getRequest = store.get(assetId);
+      
+      getRequest.onsuccess = (event) => {
+        const asset = event.target.result;
+        
+        if (!asset) {
+          reject(new Error(`Asset ${assetId} not found`));
+          return;
+        }
+        
+        // Merge updates into the asset
+        const updatedAsset = { ...asset, ...updates, id: assetId };
+        
+        // Put the updated asset back
+        const putRequest = store.put(updatedAsset);
+        
+        putRequest.onsuccess = () => {
+          console.log(`Asset ${assetId} updated successfully`);
+          resolve();
+        };
+        
+        putRequest.onerror = (event) => {
+          console.error("Error updating asset:", event.target.error);
+          reject(new Error("Could not update asset"));
+        };
+      };
+      
+      getRequest.onerror = (event) => {
+        console.error("Error getting asset for update:", event.target.error);
+        reject(new Error("Could not get asset for update"));
+      };
+    });
+  }
+
+  /**
+   * Delete an asset
+   * @param {number} assetId
+   * @returns {Promise<void>}
+   */
+  async deleteAsset(assetId) {
+    const db = await this.openDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([ASSETS_STORE_NAME], "readwrite");
+      const store = transaction.objectStore(ASSETS_STORE_NAME);
+      const request = store.delete(assetId);
+      
+      request.onsuccess = () => {
+        console.log(`Asset ${assetId} deleted`);
+        resolve();
+      };
+      
+      request.onerror = (event) => {
+        console.error("Error deleting asset:", event.target.error);
+        reject(new Error("Could not delete asset"));
+      };
+    });
   }
 }
 

@@ -14,6 +14,7 @@ import "./MainContent.css";
  * @param {Function} props.onMute - Callback for mute toggle
  * @param {Function} props.onSolo - Callback for solo toggle
  * @param {Function} props.onDelete - Callback for track deletion
+ * @param {Function} props.onAssetDrop - Callback for dropping an asset to create a track
  * @param {number} props.totalLengthMs - Global timeline length in milliseconds for proportional sizing
  */
 const TRACK_CONTROLS_WIDTH = 180;
@@ -24,6 +25,7 @@ function MainContent({
   onMute,
   onSolo,
   onDelete,
+  onAssetDrop,
   totalLengthMs = 0,
 }) {
   // Default visible window length (in ms) before horizontal scrolling is needed
@@ -116,6 +118,29 @@ function MainContent({
   const resetZoom = () => setZoom(1);
   const toggleFollow = () => setFollowPlayhead((v) => !v);
 
+  // Handle asset drop
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    try {
+      const data = e.dataTransfer.getData("application/json");
+      if (!data) return;
+      
+      const dropData = JSON.parse(data);
+      if (dropData.type === "asset" && onAssetDrop) {
+        onAssetDrop(dropData.assetId);
+      }
+    } catch (err) {
+      console.error("Error handling drop:", err);
+    }
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+  };
+
   // Auto-scroll to keep the red playhead centered when follow mode is on
   useEffect(() => {
     if (!followPlayhead) return;
@@ -155,7 +180,12 @@ function MainContent({
       style={timelineStyle}
       disableSectionPadding
     >
-      <div className="timeline-scroll-area" ref={scrollAreaRef}>
+      <div
+        className="timeline-scroll-area"
+        ref={scrollAreaRef}
+        onDrop={handleDrop}
+        onDragOver={handleDragOver}
+      >
         {hasTracks ? (
           <>
             <TimelineRuler
