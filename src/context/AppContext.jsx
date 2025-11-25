@@ -70,8 +70,41 @@ const AppContextProvider = ({children}) => {
     closeEffectsMenu();
   }, []);
 
-  // Function to remove effects
+  // Function to remove effects - also resets the effect value
   const removeEffect = useCallback((effectId) => {
+    // First reset the effect value to its default
+    const defaultValues = {
+      pitch: 0,
+      volume: 100,
+      reverb: 0,
+      delay: 0,
+      bass: 0,
+      distortion: 0,
+      pan: 0,
+      tremolo: 0,
+      vibrato: 0,
+      highpass: 20,
+      lowpass: 20000,
+      chorus: 0,
+    };
+
+    setEffects(prev => {
+      const newEffects = {
+        ...prev,
+        [effectId]: defaultValues[effectId] || 0 // Use default value or 0 if not found
+      };
+      
+      // Persist to localStorage
+      try {
+        localStorage.setItem("webamp.effects", JSON.stringify(newEffects));
+      } catch (e) {
+        console.warn("Failed to persist effects to localStorage:", e);
+      }
+      
+      return newEffects;
+    });
+
+    // Then remove from active effects
     setActiveEffects(prev => {
       const newActiveEffects = prev.filter(id => id !== effectId);
       
@@ -136,6 +169,15 @@ const AppContextProvider = ({children}) => {
       pitch: 0,
       volume: 100,
       reverb: 0,
+      delay: 0,
+      bass: 0,
+      distortion: 0,
+      pan: 0,
+      tremolo: 0,
+      vibrato: 0,
+      highpass: 20,
+      lowpass: 20000,
+      chorus: 0,
     };
     setEffects(defaultEffects);
 
