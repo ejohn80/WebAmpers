@@ -29,6 +29,16 @@ const AppContextProvider = ({children}) => {
     }
   });
 
+  // Active effects state - tracks which effects are visible/added
+  const [activeEffects, setActiveEffects] = useState(() => {
+    try {
+      const saved = localStorage.getItem("webamp.activeEffects");
+      return saved ? JSON.parse(saved) : ["volume"]; // Default to volume being active
+    } catch (e) {
+      return ["volume"];
+    }
+  });
+
   // Effects Menu State
   const [isEffectsMenuOpen, setIsEffectsMenuOpen] = useState(false);
 
@@ -39,20 +49,42 @@ const AppContextProvider = ({children}) => {
   const openEffectsMenu = () => setIsEffectsMenuOpen(true);
   const closeEffectsMenu = () => setIsEffectsMenuOpen(false);
 
-  // Function to add new effects (for the menu)
-  const addEffect = (effectId) => {
-    // For now, this just closes the menu
-    // Later you can implement logic to add new effects to the UI
-    console.log("Adding effect:", effectId);
+  // Function to add new effects
+  const addEffect = useCallback((effectId) => {
+    if (effectId) {
+      setActiveEffects(prev => {
+        // Avoid duplicates
+        if (prev.includes(effectId)) return prev;
+        const newActiveEffects = [...prev, effectId];
+        
+        // Persist to localStorage
+        try {
+          localStorage.setItem("webamp.activeEffects", JSON.stringify(newActiveEffects));
+        } catch (e) {
+          console.warn("Failed to persist active effects to localStorage:", e);
+        }
+        
+        return newActiveEffects;
+      });
+    }
     closeEffectsMenu();
+  }, []);
 
-    // Example of how you might handle adding new effects:
-    // const newEffects = {
-    //   ...effects,
-    //   [effectId]: getDefaultValueForEffect(effectId)
-    // };
-    // setEffects(newEffects);
-  };
+  // Function to remove effects
+  const removeEffect = useCallback((effectId) => {
+    setActiveEffects(prev => {
+      const newActiveEffects = prev.filter(id => id !== effectId);
+      
+      // Persist to localStorage
+      try {
+        localStorage.setItem("webamp.activeEffects", JSON.stringify(newActiveEffects));
+      } catch (e) {
+        console.warn("Failed to persist active effects to localStorage:", e);
+      }
+      
+      return newActiveEffects;
+    });
+  }, []);
 
   // Utility function to apply effects to engine (no unlock requirement)
   const applyEffectsToEngine = useCallback(
@@ -65,7 +97,7 @@ const AppContextProvider = ({children}) => {
         }
       }
     },
-    [engineRef, effects] // Dependency array ensures stable function reference
+    [engineRef, effects]
   );
 
   // Function to update effects
@@ -84,12 +116,12 @@ const AppContextProvider = ({children}) => {
         console.warn("Failed to persist effects to localStorage:", e);
       }
 
-      // Attempt to unlock audio context (runs inside user gesture from slider)
+      // Attempt to unlock audio context
       try {
         await engineRef?.current?.ensureAudioUnlocked?.();
       } catch {}
     },
-    [effects, engineRef] // Dependency array ensures stable function reference
+    [effects, engineRef]
   );
 
   const resetEffect = useCallback(
@@ -120,34 +152,19 @@ const AppContextProvider = ({children}) => {
     applyEffectsToEngine();
   }, [engineRef, applyEffectsToEngine]);
 
-  // Attempt to adopt an engineRef from a global if available
-  useEffect(() => {
-    try {
-      if (!engineRef && window.__WebAmpEngineRef) {
-        setEngineRef(window.__WebAmpEngineRef);
-        console.log(
-          "[AppContext] adopted engineRef from window.__WebAmpEngineRef"
-        );
-      }
-    } catch {}
-  }, [engineRef]);
-
-  // Fallback: persist whenever effects state changes (guards against any missed writes)
+  // Fallback: persist whenever effects state changes
   useEffect(() => {
     try {
       localStorage.setItem("webamp.effects", JSON.stringify(effects));
     } catch {}
   }, [effects]);
 
-  // On mount: optionally initialize localStorage key (no logs)
+  // Persist active effects when they change
   useEffect(() => {
     try {
-      const existing = localStorage.getItem("webamp.effects");
-      if (!existing) {
-        localStorage.setItem("webamp.effects", JSON.stringify(effects));
-      }
+      localStorage.setItem("webamp.activeEffects", JSON.stringify(activeEffects));
     } catch {}
-  }, []);
+  }, [activeEffects]);
 
   const contextValue = useMemo(
     () => ({
@@ -167,24 +184,23 @@ const AppContextProvider = ({children}) => {
       openEffectsMenu,
       closeEffectsMenu,
       addEffect,
+      removeEffect,
+      activeEffects,
     }),
     [
       userData,
       loading,
       activeProject,
-      setActiveProject,
       effects,
       updateEffect,
       resetEffect,
       resetAllEffects,
       engineRef,
-      setEngineRef,
       applyEffectsToEngine,
-      // Effects Menu State dependencies
       isEffectsMenuOpen,
-      openEffectsMenu,
-      closeEffectsMenu,
       addEffect,
+      removeEffect,
+      activeEffects,
     ]
   );
 

@@ -27,7 +27,7 @@ function EffectsMenu() {
       description: "Add echo effect",
     },
     {
-      id: "bass boost",
+      id: "bass",
       name: "BASS BOOST",
       description: "Boost or cut low frequencies",
     },
@@ -52,12 +52,12 @@ function EffectsMenu() {
       description: "Pitch oscillation",
     },
     {
-      id: "high-pass filter",
+      id: "highpass",
       name: "HIGH-PASS FILTER",
       description: "Remove low frequencies",
     },
     {
-      id: "low-pass filter",
+      id: "lowpass",
       name: "LOW-PASS FILTER",
       description: "Remove high frequencies",
     },

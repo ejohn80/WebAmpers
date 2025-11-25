@@ -124,6 +124,14 @@
 
 /* Effects */
 
+.noEffectsMessage {
+  text-align: center;
+  color: #888;
+  font-size: 15px;
+  padding: 40px 20px;
+  font-style: italic;
+}
+
 .title {
   margin-top: 10px;
   margin-bottom: 15px;
