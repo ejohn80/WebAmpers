@@ -1,6 +1,5 @@
-import {useState, useEffect, useContext} from "react";
+import {useState, useEffect} from "react";
 import DraggableDiv from "../Generic/DraggableDiv";
-import {AppContext} from "../../context/AppContext";
 import AssetsTab from "./Sidebar/AssetsTab";
 import EffectsTab from "./Sidebar/EffectsTab";
 import SessionsTab from "./Sidebar/SessionsTab";
@@ -17,6 +16,21 @@ import React from "react";
  * @param {number} props.assetsRefreshTrigger - Counter to trigger assets reload.
  * @param {Map} props.assetBufferCache - Cache for shared audio buffers.
  */
+const SIDEBAR_TAB_KEY = "webamp.sidebarTab";
+
+const getInitialTab = () => {
+  if (typeof window === "undefined" || typeof window.localStorage === "undefined") {
+    return "assets";
+  }
+
+  try {
+    const stored = window.localStorage.getItem(SIDEBAR_TAB_KEY);
+    return stored || "assets";
+  } catch {
+    return "assets";
+  }
+};
+
 function Sidebar({
   width,
   onImportSuccess,
@@ -25,21 +39,9 @@ function Sidebar({
   assetsRefreshTrigger,
   assetBufferCache,
 }) {
-  const [currentTab, setCurrentTab] = useState("sessions");
+  const [currentTab, setCurrentTab] = useState(getInitialTab);
 
   const tabs = [
-    {
-      key: "sessions",
-      label: "Sessions",
-      Component: SessionsTab,
-      props: {},
-    },
-    {
-      key: "effects",
-      label: "Effects",
-      Component: EffectsTab,
-      props: {},
-    },
     {
       key: "assets",
       label: "Assets",
@@ -52,11 +54,33 @@ function Sidebar({
         assetBufferCache,
       },
     },
+    {
+      key: "effects",
+      label: "Effects",
+      Component: EffectsTab,
+      props: {},
+    },
+    {
+      key: "sessions",
+      label: "Sessions",
+      Component: SessionsTab,
+      props: {},
+    },
   ];
 
   const handleTabClick = (key) => {
     setCurrentTab(key);
   };
+
+  useEffect(() => {
+    try {
+      if (typeof window !== "undefined" && window.localStorage) {
+        window.localStorage.setItem(SIDEBAR_TAB_KEY, currentTab);
+      }
+    } catch (error) {
+      console.warn("Failed to persist sidebar tab selection:", error);
+    }
+  }, [currentTab]);
 
   return (
     <DraggableDiv color="1E1D20" className="sidebar-container">
