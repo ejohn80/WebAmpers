@@ -19,7 +19,10 @@ import React from "react";
 const SIDEBAR_TAB_KEY = "webamp.sidebarTab";
 
 const getInitialTab = () => {
-  if (typeof window === "undefined" || typeof window.localStorage === "undefined") {
+  if (
+    typeof window === "undefined" ||
+    typeof window.localStorage === "undefined"
+  ) {
     return "assets";
   }
 
