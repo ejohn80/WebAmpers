@@ -7,12 +7,8 @@ import {dbManager} from "../../../managers/DBManager";
 import styles from "../Layout.module.css";
 
 function SessionsTab() {
-  const {
-    activeSession,
-    setActiveSession,
-    effects,
-    setEffects,
-  } = useContext(AppContext);
+  const {activeSession, setActiveSession, effects, setEffects} =
+    useContext(AppContext);
 
   const [isLoading, setIsLoading] = useState(true);
   const [sessions, setSessions] = useState([]);
@@ -64,7 +60,10 @@ function SessionsTab() {
         }
       } else if (!activeSession) {
         // If sessions exist but none is active, activate the first one
-        console.log("Setting active session to first available:", allSessions[0].id);
+        console.log(
+          "Setting active session to first available:",
+          allSessions[0].id
+        );
         setActiveSession(allSessions[0].id);
       } else {
         // Active session exists, load its effects
@@ -95,10 +94,13 @@ function SessionsTab() {
         if (session && session.effects) {
           console.log("Loading effects for session", activeSession);
           setEffects(session.effects);
-          
+
           // Persist to localStorage for the effects system
           try {
-            localStorage.setItem("webamp.effects", JSON.stringify(session.effects));
+            localStorage.setItem(
+              "webamp.effects",
+              JSON.stringify(session.effects)
+            );
           } catch (e) {
             console.warn("Failed to persist effects to localStorage:", e);
           }
@@ -129,7 +131,7 @@ function SessionsTab() {
 
   const createSession = async () => {
     setError(null);
-    
+
     try {
       // Auto-generate session name based on count
       const sessionNumber = sessions.length + 1;
@@ -158,8 +160,8 @@ function SessionsTab() {
     try {
       // Check for duplicate
       const exists = await dbManager.sessionExists(newName);
-      const session = sessions.find(s => s.id === sessionId);
-      
+      const session = sessions.find((s) => s.id === sessionId);
+
       if (exists && session.name !== newName.trim()) {
         setError("A session with that name already exists.");
         return;
@@ -190,7 +192,11 @@ function SessionsTab() {
       return;
     }
 
-    if (!window.confirm("Are you sure you want to delete this session? All tracks will be deleted.")) {
+    if (
+      !window.confirm(
+        "Are you sure you want to delete this session? All tracks will be deleted."
+      )
+    ) {
       return;
     }
 
@@ -278,10 +284,7 @@ function SessionsTab() {
 
       {error && <p className={styles.error}>{error}</p>}
 
-      <button
-        className={styles.createButton}
-        onClick={() => createSession()}
-      >
+      <button className={styles.createButton} onClick={() => createSession()}>
         Create a session
       </button>
     </div>

@@ -122,11 +122,11 @@ function MainContent({
   const handleDrop = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
     try {
       const data = e.dataTransfer.getData("application/json");
       if (!data) return;
-      
+
       const dropData = JSON.parse(data);
       if (dropData.type === "asset" && onAssetDrop) {
         onAssetDrop(dropData.assetId);

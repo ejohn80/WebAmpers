@@ -51,7 +51,7 @@ const AssetsTab = ({
 
     try {
       const {buffer} = importResult;
-      
+
       // Use shared utility to save asset
       const assetId = await saveAsset(importResult, dbManager);
 
@@ -100,9 +100,11 @@ const AssetsTab = ({
     try {
       // Check if asset is being used by any tracks
       const isInUse = await dbManager.isAssetInUse(assetId);
-      
+
       if (isInUse) {
-        alert("Cannot delete this asset because it is being used by one or more tracks. Please delete those tracks first.");
+        alert(
+          "Cannot delete this asset because it is being used by one or more tracks. Please delete those tracks first."
+        );
         return;
       }
 
@@ -112,7 +114,7 @@ const AssetsTab = ({
 
       await dbManager.deleteAsset(assetId);
       await loadAssets();
-      
+
       // Notify parent to clear buffer cache
       if (onAssetDelete) {
         onAssetDelete(assetId);
@@ -125,11 +127,14 @@ const AssetsTab = ({
 
   const handleDragStart = (event, asset) => {
     // Store asset data in drag event
-    event.dataTransfer.setData("application/json", JSON.stringify({
-      type: "asset",
-      assetId: asset.id,
-      name: asset.name,
-    }));
+    event.dataTransfer.setData(
+      "application/json",
+      JSON.stringify({
+        type: "asset",
+        assetId: asset.id,
+        name: asset.name,
+      })
+    );
     event.dataTransfer.effectAllowed = "copy";
   };
 
@@ -146,7 +151,7 @@ const AssetsTab = ({
     }
 
     try {
-      await dbManager.updateAsset(assetId, { name: editingName.trim() });
+      await dbManager.updateAsset(assetId, {name: editingName.trim()});
       await loadAssets();
       setEditingAssetId(null);
       setEditingName("");
@@ -210,7 +215,9 @@ const AssetsTab = ({
                   draggable={editingAssetId !== asset.id}
                   onDragStart={(e) => handleDragStart(e, asset)}
                   onDoubleClick={() => handleDoubleClick(asset)}
-                  style={{cursor: editingAssetId === asset.id ? "text" : "grab"}}
+                  style={{
+                    cursor: editingAssetId === asset.id ? "text" : "grab",
+                  }}
                 >
                   <div className={styles.songName}>
                     <FaPlay size={10} color="#fff" />
@@ -237,9 +244,7 @@ const AssetsTab = ({
                       <span>{asset.name}</span>
                     )}
                   </div>
-                  <div className={styles.songDuration}>
-                    {asset.duration}
-                  </div>
+                  <div className={styles.songDuration}>{asset.duration}</div>
                   <div className={styles.songBitrate}>
                     <button
                       onClick={(e) => handleDeleteAsset(asset.id, e)}

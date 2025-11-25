@@ -19,7 +19,7 @@ class DBManager {
 
       request.onupgradeneeded = (event) => {
         const db = event.target.result;
-        
+
         // Create tracks store if doesn't exist
         if (!db.objectStoreNames.contains(TRACKS_STORE_NAME)) {
           const tracksStore = db.createObjectStore(TRACKS_STORE_NAME, {
@@ -36,7 +36,7 @@ class DBManager {
             tracksStore.createIndex("sessionId", "sessionId", {unique: false});
           }
         }
-        
+
         // Create sessions store
         if (!db.objectStoreNames.contains(SESSIONS_STORE_NAME)) {
           db.createObjectStore(SESSIONS_STORE_NAME, {
@@ -44,7 +44,7 @@ class DBManager {
             autoIncrement: true,
           });
         }
-        
+
         // Create assets store (v3)
         if (!db.objectStoreNames.contains(ASSETS_STORE_NAME)) {
           const assetsStore = db.createObjectStore(ASSETS_STORE_NAME, {
@@ -77,12 +77,12 @@ class DBManager {
       try {
         const tx = db.transaction([TRACKS_STORE_NAME], "readwrite");
         const store = tx.objectStore(TRACKS_STORE_NAME);
-        
+
         if (sessionId !== null) {
           // Clear only tracks for this session
           const index = store.index("sessionId");
           const request = index.openCursor(IDBKeyRange.only(sessionId));
-          
+
           request.onsuccess = (event) => {
             const cursor = event.target.result;
             if (cursor) {
@@ -92,15 +92,17 @@ class DBManager {
               resolve();
             }
           };
-          
+
           request.onerror = (event) => {
             console.error("Error clearing session tracks:", event.target.error);
-            reject(new Error("Could not clear session tracks from the database."));
+            reject(
+              new Error("Could not clear session tracks from the database.")
+            );
           };
         } else {
           // Clear all tracks
           const req = store.clear();
-          
+
           req.onsuccess = () => {
             resolve();
           };
@@ -256,7 +258,7 @@ class DBManager {
     return new Promise((resolve, reject) => {
       const transaction = db.transaction([TRACKS_STORE_NAME], "readonly");
       const store = transaction.objectStore(TRACKS_STORE_NAME);
-      
+
       let request;
       if (sessionId !== null) {
         // Get tracks for specific session
@@ -420,22 +422,22 @@ class DBManager {
     return new Promise((resolve, reject) => {
       const transaction = db.transaction([SESSIONS_STORE_NAME], "readwrite");
       const store = transaction.objectStore(SESSIONS_STORE_NAME);
-      
+
       const session = {
         name: name.trim(),
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         effects: data.effects || {pitch: 0, volume: 100, reverb: 0},
       };
-      
+
       const request = store.add(session);
-      
+
       request.onsuccess = (event) => {
         const sessionId = event.target.result;
         console.log(`Session created with ID: ${sessionId}`);
         resolve(sessionId);
       };
-      
+
       request.onerror = (event) => {
         console.error("Error creating session:", event.target.error);
         reject(new Error("Could not create session"));
@@ -453,11 +455,11 @@ class DBManager {
       const transaction = db.transaction([SESSIONS_STORE_NAME], "readonly");
       const store = transaction.objectStore(SESSIONS_STORE_NAME);
       const request = store.getAll();
-      
+
       request.onsuccess = (event) => {
         resolve(event.target.result);
       };
-      
+
       request.onerror = (event) => {
         console.error("Error getting sessions:", event.target.error);
         reject(new Error("Could not retrieve sessions"));
@@ -476,11 +478,11 @@ class DBManager {
       const transaction = db.transaction([SESSIONS_STORE_NAME], "readonly");
       const store = transaction.objectStore(SESSIONS_STORE_NAME);
       const request = store.get(sessionId);
-      
+
       request.onsuccess = (event) => {
         resolve(event.target.result || null);
       };
-      
+
       request.onerror = (event) => {
         console.error("Error getting session:", event.target.error);
         reject(new Error("Could not retrieve session"));
@@ -499,34 +501,34 @@ class DBManager {
     return new Promise((resolve, reject) => {
       const transaction = db.transaction([SESSIONS_STORE_NAME], "readwrite");
       const store = transaction.objectStore(SESSIONS_STORE_NAME);
-      
+
       const getRequest = store.get(sessionId);
-      
+
       getRequest.onsuccess = (event) => {
         const session = event.target.result;
         if (!session) {
           reject(new Error("Session not found"));
           return;
         }
-        
+
         const updatedSession = {
           ...session,
           ...updates,
           updatedAt: new Date().toISOString(),
         };
-        
+
         const putRequest = store.put(updatedSession);
-        
+
         putRequest.onsuccess = () => {
           resolve();
         };
-        
+
         putRequest.onerror = (event) => {
           console.error("Error updating session:", event.target.error);
           reject(new Error("Could not update session"));
         };
       };
-      
+
       getRequest.onerror = (event) => {
         console.error("Error getting session for update:", event.target.error);
         reject(new Error("Could not retrieve session for update"));
@@ -545,17 +547,17 @@ class DBManager {
       try {
         // First delete all tracks for this session
         await this.clearAllTracks(sessionId);
-        
+
         // Then delete the session itself
         const transaction = db.transaction([SESSIONS_STORE_NAME], "readwrite");
         const store = transaction.objectStore(SESSIONS_STORE_NAME);
         const request = store.delete(sessionId);
-        
+
         request.onsuccess = () => {
           console.log(`Session ${sessionId} deleted`);
           resolve();
         };
-        
+
         request.onerror = (event) => {
           console.error("Error deleting session:", event.target.error);
           reject(new Error("Could not delete session"));
@@ -573,7 +575,7 @@ class DBManager {
    */
   async sessionExists(name) {
     const sessions = await this.getAllSessions();
-    return sessions.some(s => s.name.trim() === name.trim());
+    return sessions.some((s) => s.name.trim() === name.trim());
   }
 
   // ============= ASSET MANAGEMENT =============
@@ -585,34 +587,38 @@ class DBManager {
    */
   async addAsset(assetData) {
     const db = await this.openDB();
-    
+
     // Get all existing assets to check for duplicates
     const existingAssets = await this.getAllAssets();
     let baseName = assetData.name || "Untitled";
     let finalName = baseName;
-    
+
     // Check if name already exists and add number suffix if needed
-    const existingNames = new Set(existingAssets.map(a => a.name));
+    const existingNames = new Set(existingAssets.map((a) => a.name));
     if (existingNames.has(finalName)) {
       // Extract base name and extension
-      const lastDotIndex = baseName.lastIndexOf('.');
-      const nameWithoutExt = lastDotIndex > 0 ? baseName.substring(0, lastDotIndex) : baseName;
-      const extension = lastDotIndex > 0 ? baseName.substring(lastDotIndex) : '';
-      
+      const lastDotIndex = baseName.lastIndexOf(".");
+      const nameWithoutExt =
+        lastDotIndex > 0 ? baseName.substring(0, lastDotIndex) : baseName;
+      const extension =
+        lastDotIndex > 0 ? baseName.substring(lastDotIndex) : "";
+
       // Find next available number
       let counter = 2;
       do {
         finalName = `${nameWithoutExt} (${counter})${extension}`;
         counter++;
       } while (existingNames.has(finalName));
-      
-      console.log(`Duplicate name detected. Renaming "${baseName}" to "${finalName}"`);
+
+      console.log(
+        `Duplicate name detected. Renaming "${baseName}" to "${finalName}"`
+      );
     }
-    
+
     return new Promise((resolve, reject) => {
       const transaction = db.transaction([ASSETS_STORE_NAME], "readwrite");
       const store = transaction.objectStore(ASSETS_STORE_NAME);
-      
+
       const asset = {
         name: finalName,
         duration: assetData.duration,
@@ -622,15 +628,15 @@ class DBManager {
         buffer: assetData.buffer, // Store the serialized buffer
         createdAt: new Date().toISOString(),
       };
-      
+
       const request = store.add(asset);
-      
+
       request.onsuccess = (event) => {
         const assetId = event.target.result;
         console.log(`Asset created with ID: ${assetId}, name: ${finalName}`);
         resolve(assetId);
       };
-      
+
       request.onerror = (event) => {
         console.error("Error creating asset:", event.target.error);
         reject(new Error("Could not create asset"));
@@ -648,11 +654,11 @@ class DBManager {
       const transaction = db.transaction([ASSETS_STORE_NAME], "readonly");
       const store = transaction.objectStore(ASSETS_STORE_NAME);
       const request = store.getAll();
-      
+
       request.onsuccess = (event) => {
         resolve(event.target.result);
       };
-      
+
       request.onerror = (event) => {
         console.error("Error getting assets:", event.target.error);
         reject(new Error("Could not retrieve assets"));
@@ -671,11 +677,11 @@ class DBManager {
       const transaction = db.transaction([ASSETS_STORE_NAME], "readonly");
       const store = transaction.objectStore(ASSETS_STORE_NAME);
       const request = store.get(assetId);
-      
+
       request.onsuccess = (event) => {
         resolve(event.target.result || null);
       };
-      
+
       request.onerror = (event) => {
         console.error("Error getting asset:", event.target.error);
         reject(new Error("Could not retrieve asset"));
@@ -693,19 +699,19 @@ class DBManager {
     return new Promise((resolve, reject) => {
       const transaction = db.transaction([TRACKS_STORE_NAME], "readonly");
       const store = transaction.objectStore(TRACKS_STORE_NAME);
-      
+
       // Get all tracks
       const request = store.getAll();
-      
+
       request.onsuccess = (event) => {
         const tracks = event.target.result;
-        
+
         // Check if any track references this assetId
-        const isInUse = tracks.some(track => track.assetId === assetId);
-        
+        const isInUse = tracks.some((track) => track.assetId === assetId);
+
         resolve(isInUse);
       };
-      
+
       request.onerror = (event) => {
         console.error("Error checking if asset is in use:", event.target.error);
         reject(new Error("Could not check if asset is in use"));
@@ -724,35 +730,35 @@ class DBManager {
     return new Promise((resolve, reject) => {
       const transaction = db.transaction([ASSETS_STORE_NAME], "readwrite");
       const store = transaction.objectStore(ASSETS_STORE_NAME);
-      
+
       // First get the existing asset
       const getRequest = store.get(assetId);
-      
+
       getRequest.onsuccess = (event) => {
         const asset = event.target.result;
-        
+
         if (!asset) {
           reject(new Error(`Asset ${assetId} not found`));
           return;
         }
-        
+
         // Merge updates into the asset
-        const updatedAsset = { ...asset, ...updates, id: assetId };
-        
+        const updatedAsset = {...asset, ...updates, id: assetId};
+
         // Put the updated asset back
         const putRequest = store.put(updatedAsset);
-        
+
         putRequest.onsuccess = () => {
           console.log(`Asset ${assetId} updated successfully`);
           resolve();
         };
-        
+
         putRequest.onerror = (event) => {
           console.error("Error updating asset:", event.target.error);
           reject(new Error("Could not update asset"));
         };
       };
-      
+
       getRequest.onerror = (event) => {
         console.error("Error getting asset for update:", event.target.error);
         reject(new Error("Could not get asset for update"));
@@ -771,12 +777,12 @@ class DBManager {
       const transaction = db.transaction([ASSETS_STORE_NAME], "readwrite");
       const store = transaction.objectStore(ASSETS_STORE_NAME);
       const request = store.delete(assetId);
-      
+
       request.onsuccess = () => {
         console.log(`Asset ${assetId} deleted`);
         resolve();
       };
-      
+
       request.onerror = (event) => {
         console.error("Error deleting asset:", event.target.error);
         reject(new Error("Could not delete asset"));

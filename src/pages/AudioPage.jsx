@@ -31,11 +31,8 @@ const EMPTY_VERSION = {
 };
 
 function AudioPage() {
-  const {
-    setEngineRef,
-    applyEffectsToEngine,
-    activeSession,
-  } = useContext(AppContext);
+  const {setEngineRef, applyEffectsToEngine, activeSession} =
+    useContext(AppContext);
   const [sidebarWidth, setSidebarWidth] = useState(MAX_WIDTH);
   const [tracks, setTracks] = useState(audioManager.tracks);
   const [audioData, setAudioData] = useState(null);
@@ -55,9 +52,10 @@ function AudioPage() {
 
     for (let i = 0; i < serializedBuffer.numberOfChannels; i++) {
       const channelData = serializedBuffer.channels[i];
-      const float32Array = channelData instanceof Float32Array 
-        ? channelData 
-        : new Float32Array(channelData);
+      const float32Array =
+        channelData instanceof Float32Array
+          ? channelData
+          : new Float32Array(channelData);
       audioBuffer.copyToChannel(float32Array, i);
     }
 
@@ -126,17 +124,19 @@ function AudioPage() {
   // Load tracks for active session
   useEffect(() => {
     if (!activeSession) return;
-    
+
     // Skip if session hasn't changed
     if (lastSessionRef.current === activeSession) return;
-    
+
     console.log(`[AudioPage] Loading session ${activeSession}`);
     lastSessionRef.current = activeSession;
 
     const loadSessionTracks = async () => {
       try {
         const savedTracks = await dbManager.getAllTracks(activeSession);
-        console.log(`[AudioPage] Found ${savedTracks.length} tracks for session ${activeSession}`);
+        console.log(
+          `[AudioPage] Found ${savedTracks.length} tracks for session ${activeSession}`
+        );
 
         // Clear current tracks
         audioManager.clearAllTracks();
@@ -193,11 +193,13 @@ function AudioPage() {
       return;
     }
 
-    console.log(`[AudioPage] Creating track from asset ${assetId} in session ${activeSession}`);
+    console.log(
+      `[AudioPage] Creating track from asset ${assetId} in session ${activeSession}`
+    );
 
     // Get the cached buffer if available (should be cached by AssetsTab)
     let toneBuffer = assetId ? assetBufferCache.get(assetId) : null;
-    
+
     if (!toneBuffer && importedAudioData.buffer) {
       // Fallback: create ToneBuffer from imported buffer if not cached
       console.log("[AudioPage] Buffer not cached, creating new ToneBuffer");
@@ -223,10 +225,15 @@ function AudioPage() {
       if (createdTrack) {
         // Add assetId to the track before saving
         createdTrack.assetId = assetId;
-        
-        const assignedId = await dbManager.addTrack(createdTrack, activeSession);
-        console.log(`Track saved to session ${activeSession} with ID: ${assignedId}, assetId: ${assetId}`);
-        
+
+        const assignedId = await dbManager.addTrack(
+          createdTrack,
+          activeSession
+        );
+        console.log(
+          `Track saved to session ${activeSession} with ID: ${assignedId}, assetId: ${assetId}`
+        );
+
         // Update track ID
         if (assignedId !== undefined && assignedId !== createdTrack.id) {
           createdTrack.id = assignedId;
@@ -242,35 +249,35 @@ function AudioPage() {
   const handleFileDropdownImport = async (importResult) => {
     try {
       console.log("[AudioPage] File dropdown import - saving to assets first");
-      
+
       const {buffer} = importResult;
-      
+
       // Save asset to DB (this will handle duplicate names)
       const assetId = await saveAsset(importResult, dbManager);
-      
+
       // Get the saved asset to retrieve the potentially renamed name
       const savedAsset = await dbManager.getAsset(assetId);
       if (!savedAsset) {
         console.error("Failed to retrieve saved asset");
         return;
       }
-      
+
       // Update importResult with the actual saved name (may have been renamed for duplicates)
       const updatedImportResult = {
         ...importResult,
         name: savedAsset.name, // Use the name from DB which may include (2), (3), etc.
       };
-      
+
       // Cache the buffer
       if (buffer) {
         const toneBuffer = new Tone.ToneAudioBuffer(buffer);
         assetBufferCache.set(assetId, toneBuffer);
         console.log(`[AudioPage] Cached buffer for asset ${assetId}`);
       }
-      
+
       // Trigger assets refresh in sidebar
-      setAssetsRefreshTrigger(prev => prev + 1);
-      
+      setAssetsRefreshTrigger((prev) => prev + 1);
+
       // Now create the track with the assetId and updated name
       await handleImportSuccess(updatedImportResult, assetId);
     } catch (error) {
@@ -291,7 +298,7 @@ function AudioPage() {
   const handleAssetDrop = async (assetId) => {
     try {
       console.log(`Dropping asset ${assetId} to create track`);
-      
+
       // Get the asset from the database first
       const asset = await dbManager.getAsset(assetId);
       if (!asset) {
@@ -307,9 +314,9 @@ function AudioPage() {
         console.log(`Using cached buffer for asset ${assetId}`);
       } else {
         console.log(`Creating new buffer for asset ${assetId}`);
-        
+
         const {buffer: serializedBuffer} = asset;
-        
+
         if (!serializedBuffer || !serializedBuffer.channels) {
           console.error("Asset has no valid buffer data");
           alert("Asset has no valid audio buffer data");
@@ -329,7 +336,9 @@ function AudioPage() {
         // Create a Tone.js buffer from the AudioBuffer and cache it
         toneBuffer = new Tone.ToneAudioBuffer(audioBuffer);
         assetBufferCache.set(assetId, toneBuffer);
-        console.log(`Cached buffer for asset ${assetId}, cache size: ${assetBufferCache.size}`);
+        console.log(
+          `Cached buffer for asset ${assetId}, cache size: ${assetBufferCache.size}`
+        );
       }
 
       // Get the serialized buffer for DB storage
@@ -554,7 +563,12 @@ function AudioPage() {
   };
 
   // Generic handler for track property updates (mute, solo, volume, etc.)
-  const handleTrackPropertyUpdate = async (trackId, property, value, engineMethod) => {
+  const handleTrackPropertyUpdate = async (
+    trackId,
+    property,
+    value,
+    engineMethod
+  ) => {
     try {
       // Update engine if method provided
       if (engineMethod && engineRef.current) {
@@ -570,7 +584,7 @@ function AudioPage() {
       if (track) {
         track[property] = value;
         setTracks([...audioManager.tracks]);
-        
+
         // Persist to database
         try {
           await dbManager.updateTrack(track);
@@ -618,11 +632,11 @@ function AudioPage() {
           recording={recording}
           totalLengthMs={version?.lengthMs || 0}
           onAssetDrop={handleAssetDrop}
-          onMute={(trackId, muted) => 
-            handleTrackPropertyUpdate(trackId, 'mute', muted, 'setTrackMute')
+          onMute={(trackId, muted) =>
+            handleTrackPropertyUpdate(trackId, "mute", muted, "setTrackMute")
           }
-          onSolo={(trackId, soloed) => 
-            handleTrackPropertyUpdate(trackId, 'solo', soloed, 'setTrackSolo')
+          onSolo={(trackId, soloed) =>
+            handleTrackPropertyUpdate(trackId, "solo", soloed, "setTrackSolo")
           }
           onDelete={handleDeleteTrack}
         />
