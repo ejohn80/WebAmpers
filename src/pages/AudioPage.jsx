@@ -10,19 +10,24 @@ import {audioManager} from "../managers/AudioManager";
 import WebAmpPlayback from "../playback/playback.jsx";
 import {dbManager} from "../managers/DBManager";
 import {AppContext} from "../context/AppContext";
+import {progressStore} from "../playback/progressStore";
 
 const MIN_WIDTH = 0;
 const MAX_WIDTH = 300;
 
 function AudioPage() {
-  const {setEngineRef, applyEffectsToEngine} = useContext(AppContext);
+  const {
+    setEngineRef,
+    applyEffectsToEngine,
+    activeSession,
+  } = useContext(AppContext);
   const [sidebarWidth, setSidebarWidth] = useState(MAX_WIDTH);
   const [tracks, setTracks] = useState(audioManager.tracks);
   const [audioData, setAudioData] = useState(null);
   const [recording, setRecording] = useState({stream: null, startTs: 0});
 
-  const hasLoadedFromDB = useRef(false);
   const engineRef = React.useRef(null);
+  const lastSessionRef = useRef(null);
 
   // Helper function to build version from tracks
   const buildVersionFromTracks = (tracksArray) => {
@@ -83,75 +88,80 @@ function AudioPage() {
     return vs;
   };
 
-  // Load tracks from IndexedDB on mount - ONLY ONCE
+  // Load tracks for active session
   useEffect(() => {
-    if (hasLoadedFromDB.current) return;
+    if (!activeSession) return;
+    
+    // Skip if session hasn't changed
+    if (lastSessionRef.current === activeSession) return;
+    
+    console.log(`[AudioPage] Loading session ${activeSession}`);
+    lastSessionRef.current = activeSession;
 
-    const loadTracksFromDB = async () => {
+    const loadSessionTracks = async () => {
       try {
-        const savedTracks = await dbManager.getAllTracks();
-        if (savedTracks && savedTracks.length > 0) {
-          console.log("Loading tracks from IndexedDB:", savedTracks);
+        const savedTracks = await dbManager.getAllTracks(activeSession);
+        console.log(`[AudioPage] Found ${savedTracks.length} tracks for session ${activeSession}`);
 
-          audioManager.clearAllTracks();
-          const uniqueTracks = new Map();
+        // Clear current tracks
+        audioManager.clearAllTracks();
 
-          for (const savedTrack of savedTracks) {
-            // Skip if we've already processed this track ID
-            if (uniqueTracks.has(savedTrack.id)) {
-              console.warn(`Skipping duplicate track ${savedTrack.id}`);
-              continue;
+        // Reconstruct tracks from DB
+        for (const savedTrack of savedTracks) {
+          const maybeBufferData = savedTrack.segments?.[0]?.buffer;
+
+          if (maybeBufferData && maybeBufferData.channels) {
+            const bufferData = maybeBufferData;
+            const audioBuffer = Tone.context.createBuffer(
+              bufferData.numberOfChannels,
+              bufferData.length,
+              bufferData.sampleRate
+            );
+
+            for (let i = 0; i < bufferData.numberOfChannels; i++) {
+              audioBuffer.copyToChannel(bufferData.channels[i], i);
             }
 
-            uniqueTracks.set(savedTrack.id, savedTrack);
-          }
+            const trackData = {
+              ...savedTrack,
+              buffer: new Tone.ToneAudioBuffer(audioBuffer),
+            };
 
-          // Now process the unique tracks
-          for (const savedTrack of uniqueTracks.values()) {
-            const maybeBufferData = savedTrack.buffer?.channels
-              ? savedTrack.buffer
-              : savedTrack.segments?.[0]?.buffer?.channels
-                ? savedTrack.segments[0].buffer
-                : null;
-
-            if (maybeBufferData) {
-              const bufferData = maybeBufferData;
-              const audioBuffer = Tone.context.createBuffer(
-                bufferData.numberOfChannels,
-                bufferData.length,
-                bufferData.sampleRate
-              );
-
-              for (let i = 0; i < bufferData.numberOfChannels; i++) {
-                audioBuffer.copyToChannel(bufferData.channels[i], i);
-              }
-
-              // Pass ALL properties to preserve state
-              const trackData = {
-                ...savedTrack,
-                buffer: new Tone.ToneAudioBuffer(audioBuffer),
-              };
-
-              audioManager.addTrackFromBuffer(trackData);
-            }
-          }
-
-          setTracks([...audioManager.tracks]);
-
-          if (audioManager.tracks.length > 0 && !audioData) {
-            setAudioData(audioManager.tracks[0]);
+            audioManager.addTrackFromBuffer(trackData);
           }
         }
 
-        hasLoadedFromDB.current = true;
+        setTracks([...audioManager.tracks]);
+
+        // Reload engine
+        const newVersion = buildVersionFromTracks(audioManager.tracks);
+        if (engineRef.current) {
+          try {
+            if (newVersion) {
+              await engineRef.current.load(newVersion);
+            } else {
+              await engineRef.current.load({
+                bpm: 120,
+                timeSig: [4, 4],
+                lengthMs: 0,
+                tracks: [],
+                segments: [],
+                loop: {enabled: false},
+                masterChain: [],
+              });
+            }
+            console.log("[AudioPage] Engine reloaded");
+          } catch (e) {
+            console.error("Failed to reload engine:", e);
+          }
+        }
       } catch (error) {
-        console.error("Failed to load tracks from IndexedDB:", error);
-        hasLoadedFromDB.current = true;
+        console.error("Failed to load session tracks:", error);
       }
     };
 
-    loadTracksFromDB();
-  }, []);
+    loadSessionTracks();
+  }, [activeSession]);
 
   const toggleSidebar = () => {
     setSidebarWidth((prevWidth) =>
@@ -160,10 +170,12 @@ function AudioPage() {
   };
 
   const handleImportSuccess = async (importedAudioData) => {
-    console.log(
-      "Audio imported successfully, creating NEW track:",
-      importedAudioData
-    );
+    if (!activeSession) {
+      console.error("No active session!");
+      return;
+    }
+
+    console.log(`[AudioPage] Importing track into session ${activeSession}`);
 
     const createdTrack = audioManager.addTrackFromBuffer(importedAudioData);
     setTracks([...audioManager.tracks]);
@@ -172,24 +184,20 @@ function AudioPage() {
       setAudioData(importedAudioData);
     }
 
+    // Save to DB with sessionId
     try {
       if (createdTrack) {
-        const assignedId = await dbManager.addTrack(createdTrack);
-
-        // Update the track's ID to match what's in IndexedDB
+        const assignedId = await dbManager.addTrack(createdTrack, activeSession);
+        console.log(`Track saved to session ${activeSession} with ID: ${assignedId}`);
+        
+        // Update track ID
         if (assignedId !== undefined && assignedId !== createdTrack.id) {
-          console.log(
-            `Updating track ID from ${createdTrack.id} to ${assignedId}`
-          );
           createdTrack.id = assignedId;
-          // Force a re-render with the updated ID
           setTracks([...audioManager.tracks]);
         }
-
-        console.log("Track saved to IndexedDB with ID:", assignedId);
       }
     } catch (error) {
-      console.error("Failed to save track to IndexedDB:", error);
+      console.error("Failed to save track:", error);
     }
   };
 
@@ -254,18 +262,12 @@ function AudioPage() {
       const deleted = audioManager.deleteTrack(trackId);
 
       if (deleted) {
-        // Clean up database
+        // Delete from database
         try {
           await dbManager.deleteTrack(trackId);
+          console.log(`Track ${trackId} deleted from database`);
         } catch (e) {
           console.warn("Failed to delete track from DB:", e);
-        }
-
-        // Clean up localStorage track state
-        try {
-          localStorage.removeItem(`webamp.track.${trackId}`);
-        } catch (e) {
-          console.warn("Failed to remove track state from localStorage:", e);
         }
 
         // Update React state to trigger re-render
@@ -383,13 +385,14 @@ function AudioPage() {
             }
             const t = audioManager.tracks.find((x) => x.id === trackId);
             if (t) {
+              t.mute = muted;
+              setTracks([...audioManager.tracks]);
+              // Save to DB
               try {
-                t.mute = muted;
-                if (dbManager.updateTrack) await dbManager.updateTrack(t);
+                await dbManager.updateTrack(t);
               } catch (e) {
                 console.warn("Failed to persist mute change", e);
               }
-              setTracks([...audioManager.tracks]);
             }
           }}
           onSolo={async (trackId, soloed) => {
@@ -400,13 +403,14 @@ function AudioPage() {
             }
             const t = audioManager.tracks.find((x) => x.id === trackId);
             if (t) {
+              t.solo = soloed;
+              setTracks([...audioManager.tracks]);
+              // Save to DB
               try {
-                t.solo = soloed;
-                if (dbManager.updateTrack) await dbManager.updateTrack(t);
+                await dbManager.updateTrack(t);
               } catch (e) {
                 console.warn("Failed to persist solo change", e);
               }
-              setTracks([...audioManager.tracks]);
             }
           }}
           onDelete={handleDeleteTrack}

@@ -3,7 +3,7 @@ import DraggableDiv from "../Generic/DraggableDiv";
 import {AppContext} from "../../context/AppContext";
 import AssetsTab from "./Sidebar/AssetsTab";
 import EffectsTab from "./Sidebar/EffectsTab";
-import ProjectsTab from "./Sidebar/ProjectsTab";
+import SessionsTab from "./Sidebar/SessionsTab";
 // import styles from './Layout.module.css';
 
 /**
@@ -15,9 +15,9 @@ import ProjectsTab from "./Sidebar/ProjectsTab";
  */
 function Sidebar({width, onImportSuccess, onImportError}) {
   const {userData} = useContext(AppContext);
-  const [currentTab, setCurrentTab] = useState("projects");
+  const [currentTab, setCurrentTab] = useState("sessions");
 
-  // If logged out, only redirect away from Assets (Effects/Projects stay allowed)
+  // If logged out, only redirect away from Assets (Effects/Sessions stay allowed)
   useEffect(() => {
     if (!userData && currentTab === "assets") {
       setCurrentTab("effects");
@@ -25,9 +25,9 @@ function Sidebar({width, onImportSuccess, onImportError}) {
   }, [userData, currentTab]);
 
   const tabs = {
-    projects: {
-      label: "Projects",
-      component: <ProjectsTab />,
+    sessions: {
+      label: "Sessions",
+      component: <SessionsTab />,
     },
     effects: {
       label: "Effects",
@@ -45,7 +45,7 @@ function Sidebar({width, onImportSuccess, onImportError}) {
   };
 
   const handleTabClick = (key) => {
-    // Allow Effects and Projects even when not logged in; keep Assets gated
+    // Allow Effects and Sessions even when not logged in; keep Assets gated
     if (userData || key !== "assets") {
       setCurrentTab(key);
     }

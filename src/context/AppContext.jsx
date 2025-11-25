@@ -9,6 +9,29 @@ const AppContextProvider = ({children}) => {
 
   const [activeProject, setActiveProject] = useState();
 
+  // Active session state with localStorage persistence
+  const [activeSession, setActiveSession] = useState(() => {
+    try {
+      const saved = localStorage.getItem("webamp.activeSession");
+      return saved ? parseInt(saved, 10) : null;
+    } catch (e) {
+      return null;
+    }
+  });
+
+  // Persist active session to localStorage
+  useEffect(() => {
+    try {
+      if (activeSession !== null) {
+        localStorage.setItem("webamp.activeSession", activeSession.toString());
+      } else {
+        localStorage.removeItem("webamp.activeSession");
+      }
+    } catch (e) {
+      console.warn("Failed to persist active session:", e);
+    }
+  }, [activeSession]);
+
   // Effects state with localStorage persistence
   const [effects, setEffects] = useState(() => {
     try {
@@ -133,7 +156,10 @@ const AppContextProvider = ({children}) => {
       loading,
       activeProject,
       setActiveProject,
+      activeSession,
+      setActiveSession,
       effects,
+      setEffects,
       updateEffect,
       resetEffect,
       resetAllEffects,
@@ -146,7 +172,10 @@ const AppContextProvider = ({children}) => {
       loading,
       activeProject,
       setActiveProject,
+      activeSession,
+      setActiveSession,
       effects,
+      setEffects,
       updateEffect,
       resetEffect,
       resetAllEffects,

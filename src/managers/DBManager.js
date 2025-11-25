@@ -1,6 +1,7 @@
 const DB_NAME = "WebAmpDB";
-const DB_VERSION = 1;
+const DB_VERSION = 2; // Increment version to add sessions support
 const TRACKS_STORE_NAME = "tracks";
+const SESSIONS_STORE_NAME = "sessions";
 
 class DBManager {
   constructor() {
@@ -17,8 +18,27 @@ class DBManager {
 
       request.onupgradeneeded = (event) => {
         const db = event.target.result;
+        
+        // Create tracks store if doesn't exist
         if (!db.objectStoreNames.contains(TRACKS_STORE_NAME)) {
-          db.createObjectStore(TRACKS_STORE_NAME, {
+          const tracksStore = db.createObjectStore(TRACKS_STORE_NAME, {
+            keyPath: "id",
+            autoIncrement: true,
+          });
+          // Add index for sessionId to efficiently query tracks by session
+          tracksStore.createIndex("sessionId", "sessionId", {unique: false});
+        } else if (event.oldVersion < 2) {
+          // Upgrade existing store to add sessionId index
+          const transaction = event.target.transaction;
+          const tracksStore = transaction.objectStore(TRACKS_STORE_NAME);
+          if (!tracksStore.indexNames.contains("sessionId")) {
+            tracksStore.createIndex("sessionId", "sessionId", {unique: false});
+          }
+        }
+        
+        // Create sessions store
+        if (!db.objectStoreNames.contains(SESSIONS_STORE_NAME)) {
+          db.createObjectStore(SESSIONS_STORE_NAME, {
             keyPath: "id",
             autoIncrement: true,
           });
@@ -39,29 +59,52 @@ class DBManager {
 
   /**
    * Remove all tracks from the database (used by tests and reset flows)
+   * @param {number} sessionId - Optional: only clear tracks for a specific session
    */
-  async clearAllTracks() {
+  async clearAllTracks(sessionId = null) {
     const db = await this.openDB();
     return new Promise((resolve, reject) => {
       try {
         const tx = db.transaction([TRACKS_STORE_NAME], "readwrite");
         const store = tx.objectStore(TRACKS_STORE_NAME);
-        const req = store.clear();
-
-        req.onsuccess = () => {
-          resolve();
-        };
-        req.onerror = (event) => {
-          console.error("Error clearing tracks:", event.target.error);
-          reject(new Error("Could not clear tracks from the database."));
-        };
+        
+        if (sessionId !== null) {
+          // Clear only tracks for this session
+          const index = store.index("sessionId");
+          const request = index.openCursor(IDBKeyRange.only(sessionId));
+          
+          request.onsuccess = (event) => {
+            const cursor = event.target.result;
+            if (cursor) {
+              cursor.delete();
+              cursor.continue();
+            } else {
+              resolve();
+            }
+          };
+          
+          request.onerror = (event) => {
+            console.error("Error clearing session tracks:", event.target.error);
+            reject(new Error("Could not clear session tracks from the database."));
+          };
+        } else {
+          // Clear all tracks
+          const req = store.clear();
+          
+          req.onsuccess = () => {
+            resolve();
+          };
+          req.onerror = (event) => {
+            console.error("Error clearing tracks:", event.target.error);
+            reject(new Error("Could not clear tracks from the database."));
+          };
+        }
 
         tx.oncomplete = () => {
           // no-op; resolution handled in req.onsuccess
         };
         tx.onerror = (event) => {
           console.error("Transaction failed during clear:", event.target.error);
-          // If store.clear() already errored, req.onerror has handled reject
         };
       } catch (e) {
         reject(e);
@@ -69,7 +112,7 @@ class DBManager {
     });
   }
 
-  async addTrack(trackData) {
+  async addTrack(trackData, sessionId = null) {
     const db = await this.openDB();
     return new Promise((resolve, reject) => {
       const transaction = db.transaction([TRACKS_STORE_NAME], "readwrite");
@@ -85,6 +128,7 @@ class DBManager {
       const storableTrack = {
         ...base,
         id: base.id ?? trackData.id,
+        sessionId: sessionId, // Add sessionId to track
         volume: base.volume ?? trackData.volume ?? base._volumeDb ?? undefined,
         pan: base.pan ?? trackData.pan ?? base._pan ?? undefined,
         mute:
@@ -196,19 +240,28 @@ class DBManager {
     });
   }
 
-  async getAllTracks() {
+  async getAllTracks(sessionId = null) {
     const db = await this.openDB();
     return new Promise((resolve, reject) => {
       const transaction = db.transaction([TRACKS_STORE_NAME], "readonly");
       const store = transaction.objectStore(TRACKS_STORE_NAME);
-      const request = store.getAll();
+      
+      let request;
+      if (sessionId !== null) {
+        // Get tracks for specific session
+        const index = store.index("sessionId");
+        request = index.getAll(sessionId);
+      } else {
+        // Get all tracks
+        request = store.getAll();
+      }
 
       request.onsuccess = (event) => {
         resolve(event.target.result);
       };
 
       request.onerror = (event) => {
-        console.error("Error getting all tracks:", event.target.error);
+        console.error("Error getting tracks:", event.target.error);
         reject(new Error("Could not retrieve tracks from the database."));
       };
     });
@@ -341,6 +394,175 @@ class DBManager {
     });
 
     return serialized;
+  }
+
+  // ============= SESSION MANAGEMENT =============
+
+  /**
+   * Create a new session
+   * @param {string} name - Session name
+   * @param {Object} data - Optional session data (effects, etc.)
+   * @returns {Promise<number>} - Session ID
+   */
+  async createSession(name, data = {}) {
+    const db = await this.openDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([SESSIONS_STORE_NAME], "readwrite");
+      const store = transaction.objectStore(SESSIONS_STORE_NAME);
+      
+      const session = {
+        name: name.trim(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        effects: data.effects || {pitch: 0, volume: 100, reverb: 0},
+      };
+      
+      const request = store.add(session);
+      
+      request.onsuccess = (event) => {
+        const sessionId = event.target.result;
+        console.log(`Session created with ID: ${sessionId}`);
+        resolve(sessionId);
+      };
+      
+      request.onerror = (event) => {
+        console.error("Error creating session:", event.target.error);
+        reject(new Error("Could not create session"));
+      };
+    });
+  }
+
+  /**
+   * Get all sessions
+   * @returns {Promise<Array>}
+   */
+  async getAllSessions() {
+    const db = await this.openDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([SESSIONS_STORE_NAME], "readonly");
+      const store = transaction.objectStore(SESSIONS_STORE_NAME);
+      const request = store.getAll();
+      
+      request.onsuccess = (event) => {
+        resolve(event.target.result);
+      };
+      
+      request.onerror = (event) => {
+        console.error("Error getting sessions:", event.target.error);
+        reject(new Error("Could not retrieve sessions"));
+      };
+    });
+  }
+
+  /**
+   * Get a single session by ID
+   * @param {number} sessionId
+   * @returns {Promise<Object|null>}
+   */
+  async getSession(sessionId) {
+    const db = await this.openDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([SESSIONS_STORE_NAME], "readonly");
+      const store = transaction.objectStore(SESSIONS_STORE_NAME);
+      const request = store.get(sessionId);
+      
+      request.onsuccess = (event) => {
+        resolve(event.target.result || null);
+      };
+      
+      request.onerror = (event) => {
+        console.error("Error getting session:", event.target.error);
+        reject(new Error("Could not retrieve session"));
+      };
+    });
+  }
+
+  /**
+   * Update a session
+   * @param {number} sessionId
+   * @param {Object} updates - Fields to update
+   * @returns {Promise<void>}
+   */
+  async updateSession(sessionId, updates) {
+    const db = await this.openDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([SESSIONS_STORE_NAME], "readwrite");
+      const store = transaction.objectStore(SESSIONS_STORE_NAME);
+      
+      const getRequest = store.get(sessionId);
+      
+      getRequest.onsuccess = (event) => {
+        const session = event.target.result;
+        if (!session) {
+          reject(new Error("Session not found"));
+          return;
+        }
+        
+        const updatedSession = {
+          ...session,
+          ...updates,
+          updatedAt: new Date().toISOString(),
+        };
+        
+        const putRequest = store.put(updatedSession);
+        
+        putRequest.onsuccess = () => {
+          resolve();
+        };
+        
+        putRequest.onerror = (event) => {
+          console.error("Error updating session:", event.target.error);
+          reject(new Error("Could not update session"));
+        };
+      };
+      
+      getRequest.onerror = (event) => {
+        console.error("Error getting session for update:", event.target.error);
+        reject(new Error("Could not retrieve session for update"));
+      };
+    });
+  }
+
+  /**
+   * Delete a session and all its tracks
+   * @param {number} sessionId
+   * @returns {Promise<void>}
+   */
+  async deleteSession(sessionId) {
+    const db = await this.openDB();
+    return new Promise(async (resolve, reject) => {
+      try {
+        // First delete all tracks for this session
+        await this.clearAllTracks(sessionId);
+        
+        // Then delete the session itself
+        const transaction = db.transaction([SESSIONS_STORE_NAME], "readwrite");
+        const store = transaction.objectStore(SESSIONS_STORE_NAME);
+        const request = store.delete(sessionId);
+        
+        request.onsuccess = () => {
+          console.log(`Session ${sessionId} deleted`);
+          resolve();
+        };
+        
+        request.onerror = (event) => {
+          console.error("Error deleting session:", event.target.error);
+          reject(new Error("Could not delete session"));
+        };
+      } catch (e) {
+        reject(e);
+      }
+    });
+  }
+
+  /**
+   * Check if a session with given name exists
+   * @param {string} name
+   * @returns {Promise<boolean>}
+   */
+  async sessionExists(name) {
+    const sessions = await this.getAllSessions();
+    return sessions.some(s => s.name.trim() === name.trim());
   }
 }
 
