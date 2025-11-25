@@ -4,6 +4,7 @@ import {AppContext} from "../../context/AppContext";
 import AssetsTab from "./Sidebar/AssetsTab";
 import EffectsTab from "./Sidebar/EffectsTab";
 import SessionsTab from "./Sidebar/SessionsTab";
+import React from "react";
 // import styles from './Layout.module.css';
 
 /**
@@ -26,28 +27,32 @@ function Sidebar({
 }) {
   const [currentTab, setCurrentTab] = useState("sessions");
 
-  const tabs = {
-    sessions: {
+  const tabs = [
+    {
+      key: "sessions",
       label: "Sessions",
-      component: <SessionsTab />,
+      Component: SessionsTab,
+      props: {},
     },
-    effects: {
+    {
+      key: "effects",
       label: "Effects",
-      component: <EffectsTab />,
+      Component: EffectsTab,
+      props: {},
     },
-    assets: {
+    {
+      key: "assets",
       label: "Assets",
-      component: (
-        <AssetsTab
-          onImportSuccess={onImportSuccess}
-          onImportError={onImportError}
-          onAssetDelete={onAssetDelete}
-          refreshTrigger={assetsRefreshTrigger}
-          assetBufferCache={assetBufferCache}
-        />
-      ),
+      Component: AssetsTab,
+      props: {
+        onImportSuccess,
+        onImportError,
+        onAssetDelete,
+        refreshTrigger: assetsRefreshTrigger,
+        assetBufferCache,
+      },
     },
-  };
+  ];
 
   const handleTabClick = (key) => {
     setCurrentTab(key);
@@ -56,7 +61,7 @@ function Sidebar({
   return (
     <DraggableDiv color="1E1D20" className="sidebar-container">
       <div style={{display: "flex", marginBottom: "10px", borderRadius: "8px"}}>
-        {Object.entries(tabs).map(([key, tab]) => (
+        {tabs.map(({key, label}) => (
           <button
             key={key}
             onClick={() => handleTabClick(key)}
@@ -71,12 +76,21 @@ function Sidebar({
               transition: "background 0.2s, color 0.2s",
             }}
           >
-            {tab.label}
+            {label}
           </button>
         ))}
       </div>
 
-      <div>{tabs[currentTab].component}</div>
+      <div>
+        {tabs.map(({key, Component, props}) => (
+          <div
+            key={key}
+            style={{display: currentTab === key ? "block" : "none"}}
+          >
+            <Component {...props} />
+          </div>
+        ))}
+      </div>
     </DraggableDiv>
   );
 }

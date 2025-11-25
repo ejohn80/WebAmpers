@@ -3,6 +3,7 @@ import {MoonLoader} from "react-spinners";
 import {RxCross2} from "react-icons/rx";
 import {FaTrash} from "react-icons/fa";
 import {AppContext} from "../../../context/AppContext";
+import {createDefaultEffects} from "../../../context/effectsStorage";
 import {dbManager} from "../../../managers/DBManager";
 import styles from "../Layout.module.css";
 
@@ -50,7 +51,7 @@ function SessionsTab() {
       if (allSessions.length === 0) {
         try {
           const defaultSessionId = await dbManager.createSession("Session 1", {
-            effects: {pitch: 0, volume: 100, reverb: 0},
+            effects: createDefaultEffects(),
           });
           console.log("Created default session:", defaultSessionId);
           setActiveSession(defaultSessionId);
@@ -94,16 +95,6 @@ function SessionsTab() {
         if (session && session.effects) {
           console.log("Loading effects for session", activeSession);
           setEffects(session.effects);
-
-          // Persist to localStorage for the effects system
-          try {
-            localStorage.setItem(
-              "webamp.effects",
-              JSON.stringify(session.effects)
-            );
-          } catch (e) {
-            console.warn("Failed to persist effects to localStorage:", e);
-          }
         }
       } catch (e) {
         console.error("Failed to load session effects:", e);
@@ -139,7 +130,7 @@ function SessionsTab() {
 
       // Create new session with auto-generated name
       const newSessionId = await dbManager.createSession(newSessionName, {
-        effects: effects || {pitch: 0, volume: 100, reverb: 0},
+        effects: effects || createDefaultEffects(),
       });
       await loadSessions();
 

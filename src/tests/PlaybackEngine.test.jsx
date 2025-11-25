@@ -189,6 +189,44 @@ describe("PlaybackEngine mute/solo behavior (via WebAmpPlayback)", () => {
     engineInstance.setTrackSolo("b", true);
     expect(b.gain.gain.value).toBeCloseTo(0.0001); // still muted despite being soloed
   });
+
+  it("loads an empty timeline and stops playback when version becomes empty", async () => {
+    let engineInstance = null;
+    const utils = render(
+      <WebAmpPlayback
+        version={makeVersion([{id: "seed"}])}
+        onEngineReady={(eng) => (engineInstance = eng)}
+      />
+    );
+
+    await waitFor(() => {
+      if (!engineInstance) throw new Error("no engine yet");
+      if (!engineInstance.trackBuses || engineInstance.trackBuses.size === 0)
+        throw new Error("buses not ready");
+    });
+
+    const loadSpy = vi.spyOn(engineInstance, "load");
+    Tone.Transport.stop.mockClear();
+
+    utils.rerender(
+      <WebAmpPlayback
+        version={null}
+        onEngineReady={(eng) => (engineInstance = eng)}
+      />
+    );
+
+    await waitFor(() => {
+      expect(loadSpy).toHaveBeenCalledTimes(1);
+    });
+
+    const [emptyVersionArg] = loadSpy.mock.calls[0];
+    expect(emptyVersionArg.tracks).toHaveLength(0);
+    expect(emptyVersionArg.lengthMs).toBe(0);
+
+    await waitFor(() => {
+      expect(Tone.Transport.stop).toHaveBeenCalled();
+    });
+  });
 });
 
 describe("PlaybackEngine transport controls", () => {

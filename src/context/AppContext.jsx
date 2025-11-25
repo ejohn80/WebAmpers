@@ -1,6 +1,39 @@
 import {createContext, useState, useEffect, useCallback, useMemo} from "react";
 import {useUserData} from "../hooks/useUserData";
+import {
+  createDefaultEffects,
+  loadEffectsForSession,
+  persistEffectsForSession,
+  mergeWithDefaults,
+} from "./effectsStorage";
 export const AppContext = createContext();
+
+const getInitialActiveSession = () => {
+  if (
+    typeof window === "undefined" ||
+    typeof window.localStorage === "undefined"
+  ) {
+    return null;
+  }
+
+  try {
+    const saved = window.localStorage.getItem("webamp.activeSession");
+    return saved ? parseInt(saved, 10) : null;
+  } catch (error) {
+    console.warn("Failed to read initial active session:", error);
+    return null;
+  }
+};
+
+const shallowEqualEffects = (a = {}, b = {}) => {
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+  for (const key of keys) {
+    if (a[key] !== b[key]) {
+      return false;
+    }
+  }
+  return true;
+};
 
 const AppContextProvider = ({children}) => {
   useEffect(() => {}, []);
@@ -10,14 +43,7 @@ const AppContextProvider = ({children}) => {
   const [activeProject, setActiveProject] = useState();
 
   // Active session state with localStorage persistence
-  const [activeSession, setActiveSession] = useState(() => {
-    try {
-      const saved = localStorage.getItem("webamp.activeSession");
-      return saved ? parseInt(saved, 10) : null;
-    } catch (e) {
-      return null;
-    }
-  });
+  const [activeSession, setActiveSession] = useState(getInitialActiveSession);
 
   // Persist active session to localStorage
   useEffect(() => {
@@ -32,25 +58,32 @@ const AppContextProvider = ({children}) => {
     }
   }, [activeSession]);
 
-  // Effects state with localStorage persistence
-  const [effects, setEffects] = useState(() => {
-    try {
-      const saved = localStorage.getItem("webamp.effects");
-      return saved
-        ? JSON.parse(saved)
-        : {
-            pitch: 0,
-            volume: 100,
-            reverb: 0,
-          };
-    } catch (e) {
-      return {
-        pitch: 0,
-        volume: 100,
-        reverb: 0,
-      };
-    }
-  });
+  // Effects state stored per session
+  const [effects, setEffectsState] = useState(() =>
+    loadEffectsForSession(getInitialActiveSession())
+  );
+
+  const setEffects = useCallback(
+    (valueOrUpdater) => {
+      setEffectsState((prev) => {
+        const raw =
+          typeof valueOrUpdater === "function"
+            ? valueOrUpdater(prev)
+            : valueOrUpdater;
+        const resolved = mergeWithDefaults(raw);
+        persistEffectsForSession(activeSession, resolved);
+        return resolved;
+      });
+    },
+    [activeSession]
+  );
+
+  useEffect(() => {
+    setEffectsState((prev) => {
+      const loaded = loadEffectsForSession(activeSession);
+      return shallowEqualEffects(prev, loaded) ? prev : loaded;
+    });
+  }, [activeSession]);
 
   // Engine reference to apply effects
   const [engineRef, setEngineRef] = useState(null);
@@ -72,25 +105,20 @@ const AppContextProvider = ({children}) => {
   // Function to update effects
   const updateEffect = useCallback(
     async (effectName, value) => {
-      const newEffects = {
-        ...effects,
-        [effectName]: parseFloat(value),
-      };
-      setEffects(newEffects);
-
-      // Persist to localStorage
-      try {
-        localStorage.setItem("webamp.effects", JSON.stringify(newEffects));
-      } catch (e) {
-        console.warn("Failed to persist effects to localStorage:", e);
-      }
+      const numericValue = parseFloat(value);
+      setEffects((prev) => ({
+        ...prev,
+        [effectName]: Number.isFinite(numericValue)
+          ? numericValue
+          : (prev?.[effectName] ?? createDefaultEffects()[effectName]),
+      }));
 
       // Attempt to unlock audio context (runs inside user gesture from slider)
       try {
         await engineRef?.current?.ensureAudioUnlocked?.();
       } catch {}
     },
-    [effects, engineRef] // Dependency array ensures stable function reference
+    [engineRef, setEffects]
   );
 
   const resetEffect = useCallback(
@@ -101,20 +129,8 @@ const AppContextProvider = ({children}) => {
   );
 
   const resetAllEffects = useCallback(() => {
-    const defaultEffects = {
-      pitch: 0,
-      volume: 100,
-      reverb: 0,
-    };
-    setEffects(defaultEffects);
-
-    // Persist to localStorage
-    try {
-      localStorage.setItem("webamp.effects", JSON.stringify(defaultEffects));
-    } catch (e) {
-      console.warn("Failed to persist effects reset to localStorage:", e);
-    }
-  }, []);
+    setEffects(createDefaultEffects());
+  }, [setEffects]);
 
   // Apply current effects when engine becomes available
   useEffect(() => {
@@ -132,23 +148,6 @@ const AppContextProvider = ({children}) => {
       }
     } catch {}
   }, [engineRef]);
-
-  // Fallback: persist whenever effects state changes (guards against any missed writes)
-  useEffect(() => {
-    try {
-      localStorage.setItem("webamp.effects", JSON.stringify(effects));
-    } catch {}
-  }, [effects]);
-
-  // On mount: optionally initialize localStorage key (no logs)
-  useEffect(() => {
-    try {
-      const existing = localStorage.getItem("webamp.effects");
-      if (!existing) {
-        localStorage.setItem("webamp.effects", JSON.stringify(effects));
-      }
-    } catch {}
-  }, []);
 
   const contextValue = useMemo(
     () => ({

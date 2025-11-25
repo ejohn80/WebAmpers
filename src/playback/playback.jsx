@@ -31,6 +31,26 @@ const msToBeats = (ms, bpm) => (ms / 1000) * (bpm / 60);
 // Convert milliseconds to Tone.js "transport time" string format
 const msToToneTime = (ms, bpm) => `${msToBeats(ms, bpm)}i`; // i = immutable numeric time
 
+const EMPTY_TIMELINE_VERSION_TEMPLATE = Object.freeze({
+  bpm: 120,
+  timeSig: [4, 4],
+  lengthMs: 0,
+  tracks: [],
+  segments: [],
+  loop: {enabled: false},
+  masterChain: [],
+});
+
+const createEmptyTimelineVersion = () => ({
+  bpm: EMPTY_TIMELINE_VERSION_TEMPLATE.bpm,
+  timeSig: [...EMPTY_TIMELINE_VERSION_TEMPLATE.timeSig],
+  lengthMs: EMPTY_TIMELINE_VERSION_TEMPLATE.lengthMs,
+  tracks: [],
+  segments: [],
+  loop: {...EMPTY_TIMELINE_VERSION_TEMPLATE.loop},
+  masterChain: [...EMPTY_TIMELINE_VERSION_TEMPLATE.masterChain],
+});
+
 /** ---------- PlaybackEngine----------
  * Core class responsible for handling all playback logic using Tone.js.
  * It manages audio transport, tracks, master bus, and segment playback.
@@ -1007,7 +1027,34 @@ export default function WebAmpPlayback({version, onEngineReady}) {
   // Load engine when version changes (do not reload on play/pause)
   const prevLoadSigRef = React.useRef(null);
   useEffect(() => {
-    if (!version) return;
+    const cleanup = () => {
+      progressStore.setSeeker(null);
+    };
+
+    const versionHasTracks = !!(
+      version &&
+      Array.isArray(version.tracks) &&
+      version.tracks.length > 0
+    );
+
+    if (!versionHasTracks) {
+      progressStore.setLengthMs(0);
+      progressStore.setMs(0);
+      progressStore.setSeeker(null);
+
+      try {
+        engine.stop();
+      } catch (err) {
+        console.warn("Failed to stop engine for empty session:", err);
+      }
+
+      engine
+        .load(createEmptyTimelineVersion())
+        .catch((e) => console.error("[UI] engine.load(empty) failed:", e));
+      prevLoadSigRef.current = null;
+      return cleanup;
+    }
+
     progressStore.setLengthMs(version.lengthMs ?? 0);
     progressStore.setSeeker((absMs) => {
       try {
@@ -1085,9 +1132,7 @@ export default function WebAmpPlayback({version, onEngineReady}) {
       }
     }
 
-    return () => {
-      progressStore.setSeeker(null);
-    };
+    return cleanup;
   }, [engine, version]);
 
   // Keep effects application separate - this doesn't reload the engine
