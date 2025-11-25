@@ -22,24 +22,49 @@ function EffectsMenu() {
       description: "Add room ambience",
     },
     {
-      id: "",
-      name: "Under Construction",
-      description: "Under Construction",
+      id: "delay",
+      name: "DELAY",
+      description: "Add echo effect",
     },
     {
-      id: "",
-      name: "Filler",
-      description: "Filler",
+      id: "bass boost",
+      name: "BASS BOOST",
+      description: "Boost or cut low frequencies",
     },
     {
-      id: "",
-      name: "Filler",
-      description: "Filler",
+      id: "distortion",
+      name: "DISTORTION",
+      description: "Add grit and crunch",
     },
     {
-      id: "",
-      name: "Filler",
-      description: "Filler",
+      id: "pan",
+      name: "PAN",
+      description: "Left/right stereo position",
+    },
+    {
+      id: "tremolo",
+      name: "TREMOLO",
+      description: "Volume oscillation",
+    },
+    {
+      id: "vibrato",
+      name: "VIBRATO",
+      description: "Pitch oscillation",
+    },
+    {
+      id: "high-pass filter",
+      name: "HIGH-PASS FILTER",
+      description: "Remove low frequencies",
+    },
+    {
+      id: "low-pass filter",
+      name: "LOW-PASS FILTER",
+      description: "Remove high frequencies",
+    },
+    {
+      id: "chorus",
+      name: "CHORUS",
+      description: "Add shimmer and width",
     },
   ];
 

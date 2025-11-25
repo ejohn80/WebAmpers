@@ -77,6 +77,7 @@
   transform: none;
   box-shadow: none;
   margin-bottom: 1px;
+  margin-top: 1px;
 }
 
 /* Text gradient sweep animation */
@@ -92,9 +93,9 @@
 .effectCard:hover .effectDescription {
   background: linear-gradient(
     90deg,
-    #17e1ff 0%,      /* start with blue */
-    #ff0080 65%,     /* pink starts at 65% */
-    #17e1ff 100%     /* blue again */
+    #17e1ff 0%,
+    /* start with blue */ #ff0080 65%,
+    /* pink starts at 65% */ #17e1ff 100% /* blue again */
   );
   background-size: 200% 100%;
   background-clip: text;
@@ -118,6 +119,7 @@
   font-size: 14px;
   transition: all 0.3s ease;
   position: relative;
+  margin-top: 5px;
 }
 
 .effectDescription {

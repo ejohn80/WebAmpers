@@ -779,3 +779,23 @@ export function PlusSignIcon() {
     </svg>
   );
 }
+
+export function XIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="9"
+      height="9"
+      viewBox="0 0 9 10"
+      fill="none"
+    >
+      <path
+        d="M1 9L4.50003 5.00003M4.50003 5.00003L8 1M4.50003 5.00003L1 1M4.50003 5.00003L8 9"
+        stroke="white"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      />
+    </svg>
+  );
+}

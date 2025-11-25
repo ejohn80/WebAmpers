@@ -6,11 +6,19 @@ import {
   ResetAllButtonEnabled,
   ResetAllButtonDisabled,
   PlusSignIcon,
+  XIcon,
 } from "../Svgs.jsx";
 
 function EffectsTab() {
-  const {effects, updateEffect, resetEffect, resetAllEffects, openEffectsMenu, closeEffectsMenu, isEffectsMenuOpen} =
-    useContext(AppContext);
+  const {
+    effects,
+    updateEffect,
+    resetEffect,
+    resetAllEffects,
+    openEffectsMenu,
+    closeEffectsMenu,
+    isEffectsMenuOpen,
+  } = useContext(AppContext);
 
   const [draggingSlider, setDraggingSlider] = useState(null);
   const [localValues, setLocalValues] = useState({}); // Store temporary values
@@ -205,14 +213,14 @@ function EffectsTab() {
 
   return (
     <div className={styles.container}>
-      {/* Add Effects Button - now toggles the menu */}
-      <button 
-        className={`${styles.addEffectsButton} ${isEffectsMenuOpen ? styles.addEffectsButtonActive : ''}`}
+      {/* Add Effects Button - toggles the menu */}
+      <button
+        className={`${styles.addEffectsButton} ${isEffectsMenuOpen ? styles.addEffectsButtonActive : ""}`}
         onClick={toggleEffectsMenu}
       >
         <span className={styles.addEffectsButtonContent}>
           <PlusSignIcon />
-          <span>{isEffectsMenuOpen ? 'Close Effects' : 'Add Effects'}</span>
+          <span>{isEffectsMenuOpen ? "Close Effects" : "Add Effects"}</span>
         </span>
       </button>
 
@@ -225,69 +233,80 @@ function EffectsTab() {
 
           return (
             <div key={config.name} className={styles.effectItem}>
-              <div className={styles.header}>
-                <span className={styles.label}>{config.label}</span>
-                <span className={styles.value}>
-                  {currentValue}
-                  {config.unit}
-                </span>
-              </div>
-              <div className={styles.description}>{config.description}</div>
+  {/* Close button in top right */}
+  <button 
+    className={styles.closeEffectButton}
+    onClick={() => console.log('Remove effect:', config.name)} // Add your remove effect logic here
+    aria-label={`Remove ${config.label} effect`}
+  >
+    <XIcon />
+  </button>
+  
+  <div className={styles.header}>
+    <span className={styles.label}>{config.label}</span>
+    <div className={styles.description}>{config.description}</div>
+  </div>
 
-              {/* Custom Slider */}
-              <div
-                className={`${styles.sliderContainer} ${
-                  draggingSlider === config.name ? styles.dragging : ""
-                }`}
-              >
-                <div className={styles.sliderTrack}></div>
-                <div
-                  className={`${styles.sliderFill} ${
-                    isDefault ? styles.default : styles.changed
-                  }`}
-                  style={{width: `${fillPercentage}%`}}
-                ></div>
-                <div
-                  className={`${styles.sliderKnobWrapper} ${
-                    draggingSlider === config.name
-                      ? styles.sliderKnobWrapperDragging
-                      : ""
-                  }`}
-                  style={{left: `${fillPercentage}%`}}
-                >
-                  <EffectsSliderKnob />
-                </div>
-                <input
-                  type="range"
-                  min={config.min}
-                  max={config.max}
-                  step={config.step}
-                  value={currentValue}
-                  onChange={handleChange(config.name)}
-                  onMouseDown={() => setDraggingSlider(config.name)}
-                  onMouseUp={handleSliderEnd(config.name)}
-                  onTouchStart={() => setDraggingSlider(config.name)}
-                  onTouchEnd={handleSliderEnd(config.name)}
-                  className={styles.sliderInput}
-                />
-              </div>
+  {/* Custom Slider */}
+  <div
+    className={`${styles.sliderContainer} ${
+      draggingSlider === config.name ? styles.dragging : ""
+    }`}
+  >
+    <div className={styles.sliderTrack}></div>
+    <div
+      className={`${styles.sliderFill} ${
+        isDefault ? styles.default : styles.changed
+      }`}
+      style={{width: `${fillPercentage}%`}}
+    ></div>
+    <div
+      className={`${styles.sliderKnobWrapper} ${
+        draggingSlider === config.name
+          ? styles.sliderKnobWrapperDragging
+          : ""
+      }`}
+      style={{left: `${fillPercentage}%`}}
+    >
+      <EffectsSliderKnob />
+    </div>
+    <input
+      type="range"
+      min={config.min}
+      max={config.max}
+      step={config.step}
+      value={currentValue}
+      onChange={handleChange(config.name)}
+      onMouseDown={() => setDraggingSlider(config.name)}
+      onMouseUp={handleSliderEnd(config.name)}
+      onTouchStart={() => setDraggingSlider(config.name)}
+      onTouchEnd={handleSliderEnd(config.name)}
+      className={styles.sliderInput}
+    />
+  </div>
 
-              <div className={styles.controls}>
-                <button
-                  className={`${styles.button} ${
-                    isDefault ? styles.buttonDisabled : ""
-                  }`}
-                  onClick={
-                    isDefault
-                      ? undefined
-                      : () => resetEffect(config.name, config.default)
-                  }
-                  disabled={isDefault}
-                >
-                  Reset
-                </button>
-              </div>
-            </div>
+  <div className={styles.bottomRow}>
+    <span className={styles.value}>
+      {currentValue}
+      {config.unit}
+    </span>
+    <div className={styles.controls}>
+      <button
+        className={`${styles.button} ${
+          isDefault ? styles.buttonDisabled : ""
+        }`}
+        onClick={
+          isDefault
+            ? undefined
+            : () => resetEffect(config.name, config.default)
+        }
+        disabled={isDefault}
+      >
+        Reset
+      </button>
+    </div>
+  </div>
+</div>
           );
         })}
       </div>
