@@ -3,6 +3,7 @@ import DraggableDiv from "../Generic/DraggableDiv";
 import GlobalPlayhead from "../Generic/GlobalPlayhead";
 import TimelineRuler from "./TimelineRuler";
 import TrackLane from "../../components/TrackLane/TrackLane";
+import {progressStore} from "../../playback/progressStore";
 import "./MainContent.css";
 
 /**
@@ -32,6 +33,11 @@ function MainContent({
   const MAX_ZOOM = 8; // 800% (zoom in)
   const [zoom, setZoom] = useState(1);
 
+  // Follow-mode toggle to auto-scroll the timeline during playback
+  const [followPlayhead, setFollowPlayhead] = useState(false);
+  const [progressMs, setProgressMs] = useState(
+    progressStore.getState().ms || 0
+  );
   const [timelineContentWidth, setTimelineContentWidth] = useState(0);
   const [scrollAreaWidth, setScrollAreaWidth] = useState(0);
   const scrollAreaRef = useRef(null);
@@ -66,6 +72,12 @@ function MainContent({
 
     return undefined;
   }, []);
+
+  useEffect(
+    // Track global playhead position for follow mode
+    () => progressStore.subscribe(({ms}) => setProgressMs(ms || 0)),
+    []
+  );
 
   const verticalScale = useMemo(
     () => Math.min(2.25, Math.max(0.6, Math.pow(Math.max(zoom, 0.01), 0.5))),
@@ -102,6 +114,40 @@ function MainContent({
   const zoomOut = () =>
     setZoom((z) => Math.max(MIN_ZOOM, Number((z - 0.25).toFixed(2))));
   const resetZoom = () => setZoom(1);
+  const toggleFollow = () => setFollowPlayhead((v) => !v);
+
+  // Auto-scroll to keep the red playhead centered when follow mode is on
+  useEffect(() => {
+    if (!followPlayhead) return;
+    const node = scrollAreaRef.current;
+    if (!node) return;
+
+    const lengthMs = Math.max(0, totalLengthMs || 0);
+    if (lengthMs === 0 || timelineMetrics.widthPx === 0) return;
+
+    const pxPerMs = timelineMetrics.widthPx / lengthMs;
+    const playheadX =
+      timelineMetrics.leftOffsetPx +
+      Math.max(0, Math.min(progressMs, lengthMs)) * pxPerMs;
+
+    const viewportWidth = node.clientWidth || 0;
+    if (viewportWidth === 0) return;
+
+    const desiredScroll = playheadX - viewportWidth / 2;
+    const maxScroll = Math.max(0, timelineMetrics.rowWidthPx - viewportWidth);
+    const nextScroll = Math.min(Math.max(0, desiredScroll), maxScroll);
+
+    if (Number.isFinite(nextScroll)) {
+      node.scrollLeft = nextScroll;
+    }
+  }, [
+    followPlayhead,
+    progressMs,
+    totalLengthMs,
+    timelineMetrics.leftOffsetPx,
+    timelineMetrics.rowWidthPx,
+    timelineMetrics.widthPx,
+  ]);
 
   return (
     <DraggableDiv
@@ -190,6 +236,14 @@ function MainContent({
           >
             Reset
           </button>
+          <label className="follow-toggle" title="Scroll with the playhead">
+            <input
+              type="checkbox"
+              checked={followPlayhead}
+              onChange={toggleFollow}
+            />
+            <span>Follow</span>
+          </label>
         </div>
       </div>
     </DraggableDiv>
