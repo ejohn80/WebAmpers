@@ -149,10 +149,10 @@ function EffectsTab() {
     },
   ];
 
-  // Filter effects to only show active ones
-  const activeEffectConfigs = effectConfigs.filter(config => 
-    activeEffects.includes(config.name)
-  );
+  // Filter effects to only show active ones and maintain addition order
+  const activeEffectConfigs = activeEffects
+    .map((effectId) => effectConfigs.find((config) => config.name === effectId))
+    .filter(Boolean); // Remove any undefined values in case of mismatches
 
   // Toggle effects menu
   const toggleEffectsMenu = () => {
@@ -227,7 +227,7 @@ function EffectsTab() {
         </span>
       </button>
 
-      {/* Effect sliders - only show active effects */}
+      {/* Effect sliders - only show active effects in addition order */}
       <div className={styles.effectsList}>
         {activeEffectConfigs.map((config) => {
           const currentValue = getCurrentValue(config);
@@ -237,14 +237,14 @@ function EffectsTab() {
           return (
             <div key={config.name} className={styles.effectItem}>
               {/* Close button in top right */}
-              <button 
+              <button
                 className={styles.closeEffectButton}
                 onClick={() => removeEffect(config.name)}
                 aria-label={`Remove ${config.label} effect`}
               >
                 <XIcon />
               </button>
-              
+
               <div className={styles.header}>
                 <span className={styles.label}>{config.label}</span>
                 <div className={styles.description}>{config.description}</div>

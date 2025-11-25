@@ -173,13 +173,12 @@
   border: none;
 }
 
-/* Update header to account for close button */
 .header {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   margin-bottom: 8px;
-  padding-right: 30px; /* Make space for the close button */
+  padding-right: 30px;
 }
 
 .effectsList {
@@ -450,6 +449,7 @@
   transform: translateY(-50%);
   outline: 1px solid #787879;
   overflow: visible;
+  /* border: 1px solid red; */
 }
 
 .sliderFill {

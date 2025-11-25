@@ -7,19 +7,14 @@ function EffectsMenu() {
 
   const availableEffects = [
     {
-      id: "pitch",
-      name: "PITCH",
-      description: "Change the pitch of your audio",
+      id: "bass",
+      name: "BASS BOOST",
+      description: "Boost or cut low frequencies",
     },
     {
-      id: "volume",
-      name: "VOLUME",
-      description: "Adjust volume levels",
-    },
-    {
-      id: "reverb",
-      name: "REVERB",
-      description: "Add room ambience",
+      id: "chorus",
+      name: "CHORUS",
+      description: "Add shimmer and width",
     },
     {
       id: "delay",
@@ -27,29 +22,9 @@ function EffectsMenu() {
       description: "Add echo effect",
     },
     {
-      id: "bass",
-      name: "BASS BOOST",
-      description: "Boost or cut low frequencies",
-    },
-    {
       id: "distortion",
       name: "DISTORTION",
       description: "Add grit and crunch",
-    },
-    {
-      id: "pan",
-      name: "PAN",
-      description: "Left/right stereo position",
-    },
-    {
-      id: "tremolo",
-      name: "TREMOLO",
-      description: "Volume oscillation",
-    },
-    {
-      id: "vibrato",
-      name: "VIBRATO",
-      description: "Pitch oscillation",
     },
     {
       id: "highpass",
@@ -62,9 +37,34 @@ function EffectsMenu() {
       description: "Remove high frequencies",
     },
     {
-      id: "chorus",
-      name: "CHORUS",
-      description: "Add shimmer and width",
+      id: "pan",
+      name: "PAN",
+      description: "Left/right stereo position",
+    },
+    {
+      id: "pitch",
+      name: "PITCH",
+      description: "Change the pitch of your audio",
+    },
+    {
+      id: "reverb",
+      name: "REVERB",
+      description: "Add room ambience",
+    },
+    {
+      id: "tremolo",
+      name: "TREMOLO",
+      description: "Volume oscillation",
+    },
+    {
+      id: "vibrato",
+      name: "VIBRATO",
+      description: "Pitch oscillation",
+    },
+    {
+      id: "volume",
+      name: "VOLUME",
+      description: "Adjust volume levels",
     },
   ];
 

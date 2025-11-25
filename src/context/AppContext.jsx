@@ -33,9 +33,9 @@ const AppContextProvider = ({children}) => {
   const [activeEffects, setActiveEffects] = useState(() => {
     try {
       const saved = localStorage.getItem("webamp.activeEffects");
-      return saved ? JSON.parse(saved) : ["volume"]; // Default to volume being active
+      return saved ? JSON.parse(saved) : [];
     } catch (e) {
-      return ["volume"];
+      return [];
     }
   });
 
@@ -52,18 +52,21 @@ const AppContextProvider = ({children}) => {
   // Function to add new effects
   const addEffect = useCallback((effectId) => {
     if (effectId) {
-      setActiveEffects(prev => {
+      setActiveEffects((prev) => {
         // Avoid duplicates
         if (prev.includes(effectId)) return prev;
         const newActiveEffects = [...prev, effectId];
-        
+
         // Persist to localStorage
         try {
-          localStorage.setItem("webamp.activeEffects", JSON.stringify(newActiveEffects));
+          localStorage.setItem(
+            "webamp.activeEffects",
+            JSON.stringify(newActiveEffects)
+          );
         } catch (e) {
           console.warn("Failed to persist active effects to localStorage:", e);
         }
-        
+
         return newActiveEffects;
       });
     }
@@ -88,33 +91,36 @@ const AppContextProvider = ({children}) => {
       chorus: 0,
     };
 
-    setEffects(prev => {
+    setEffects((prev) => {
       const newEffects = {
         ...prev,
-        [effectId]: defaultValues[effectId] || 0 // Use default value or 0 if not found
+        [effectId]: defaultValues[effectId] || 0, // Use default value or 0 if not found
       };
-      
+
       // Persist to localStorage
       try {
         localStorage.setItem("webamp.effects", JSON.stringify(newEffects));
       } catch (e) {
         console.warn("Failed to persist effects to localStorage:", e);
       }
-      
+
       return newEffects;
     });
 
     // Then remove from active effects
-    setActiveEffects(prev => {
-      const newActiveEffects = prev.filter(id => id !== effectId);
-      
+    setActiveEffects((prev) => {
+      const newActiveEffects = prev.filter((id) => id !== effectId);
+
       // Persist to localStorage
       try {
-        localStorage.setItem("webamp.activeEffects", JSON.stringify(newActiveEffects));
+        localStorage.setItem(
+          "webamp.activeEffects",
+          JSON.stringify(newActiveEffects)
+        );
       } catch (e) {
         console.warn("Failed to persist active effects to localStorage:", e);
       }
-      
+
       return newActiveEffects;
     });
   }, []);
@@ -204,7 +210,10 @@ const AppContextProvider = ({children}) => {
   // Persist active effects when they change
   useEffect(() => {
     try {
-      localStorage.setItem("webamp.activeEffects", JSON.stringify(activeEffects));
+      localStorage.setItem(
+        "webamp.activeEffects",
+        JSON.stringify(activeEffects)
+      );
     } catch {}
   }, [activeEffects]);
 
