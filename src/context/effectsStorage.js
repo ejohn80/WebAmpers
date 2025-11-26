@@ -1,8 +1,6 @@
 const EFFECTS_STORAGE_KEY = "webamp.effectsBySession";
 const LEGACY_EFFECTS_KEY = "webamp.effects";
 const GLOBAL_SESSION_KEY = "__global";
-
-// NEW CONSTANT FOR ACTIVE EFFECTS
 const ACTIVE_EFFECTS_STORAGE_KEY = "webamp.activeEffectsBySession";
 
 const DEFAULT_EFFECTS = Object.freeze({
@@ -52,39 +50,56 @@ const writeJSON = (key, value) => {
   }
 };
 
-const normalizeSessionKey = (sessionId) => {
-  return sessionId === null || sessionId === undefined
+const removeKey = (key) => {
+  if (!canUseStorage()) return;
+  try {
+    window.localStorage.removeItem(key);
+  } catch (error) {
+    console.warn(`effectsStorage: failed to remove ${key}`, error);
+  }
+};
+
+const normalizeSessionKey = (sessionId) =>
+  sessionId === null || sessionId === undefined
     ? GLOBAL_SESSION_KEY
     : String(sessionId);
-};
 
-export const mergeWithDefaults = (effects = {}) => {
-  return {
-    ...DEFAULT_EFFECTS,
-    ...effects,
-  };
-};
+const createEmptyStore = () => ({sessions: {}});
 
-// ... (Other functions related to parameter values are kept for API compatibility, 
-// but are no longer used by AppContext for persistence) ...
-
-const readStore = () =>
-  readJSON(EFFECTS_STORAGE_KEY) || {sessions: {}, global: createDefaultEffects()};
-
-const persistEffectsForSessionWithStore = (sessionId, payload, store) => {
-  if (!canUseStorage()) return;
-  const sessionKey = normalizeSessionKey(sessionId);
-
-  if (!store) {
-    store = readStore();
+const readStore = () => {
+  const store = readJSON(EFFECTS_STORAGE_KEY);
+  if (!store || typeof store !== "object" || Array.isArray(store)) {
+    return createEmptyStore();
   }
+  if (!store.sessions || typeof store.sessions !== "object") {
+    store.sessions = {};
+  }
+  return store;
+};
+
+export const mergeWithDefaults = (effects) => ({
+  ...DEFAULT_EFFECTS,
+  ...(effects || {}),
+});
+
+const cloneStore = (store) => ({
+  global: store.global ? {...store.global} : undefined,
+  sessions: {...(store.sessions || {})},
+});
+
+const persistEffectsForSessionWithStore = (
+  sessionId,
+  effects,
+  existingStore
+) => {
+  if (!canUseStorage()) return;
+  const store = cloneStore(existingStore || readStore());
+  const payload = mergeWithDefaults(effects);
+  const sessionKey = normalizeSessionKey(sessionId);
 
   if (sessionKey === GLOBAL_SESSION_KEY) {
     store.global = payload;
   } else {
-    if (!store.sessions) {
-      store.sessions = {};
-    }
     store.sessions[sessionKey] = payload;
   }
 
@@ -119,12 +134,7 @@ export const loadEffectsForSession = (sessionId) => {
   if (legacy) {
     const mergedLegacy = mergeWithDefaults(legacy);
     persistEffectsForSessionWithStore(sessionId, mergedLegacy, store);
-    // Remove legacy key
-    if (canUseStorage()) {
-        try {
-            window.localStorage.removeItem(LEGACY_EFFECTS_KEY);
-        } catch {}
-    }
+    removeKey(LEGACY_EFFECTS_KEY);
     return mergedLegacy;
   }
 
@@ -134,7 +144,7 @@ export const loadEffectsForSession = (sessionId) => {
 };
 
 // ==========================================================
-// ACTIVE EFFECTS LIST FUNCTIONS (Needed for Fix 2)
+// ACTIVE EFFECTS LIST FUNCTIONS (FOR DROPDOWN PERSISTENCE)
 // ==========================================================
 
 export const createDefaultActiveEffects = () => [];
@@ -144,9 +154,13 @@ const persistActiveEffectsForSessionWithStore = (sessionId, payload, store) => {
   const sessionKey = normalizeSessionKey(sessionId);
 
   if (!store) {
-    store = readJSON(ACTIVE_EFFECTS_STORAGE_KEY) || {sessions: {}, global: createDefaultActiveEffects()};
+    // Read the active effects store (different key)
+    store = readJSON(ACTIVE_EFFECTS_STORAGE_KEY) || {
+      sessions: {},
+      global: createDefaultActiveEffects(),
+    };
   }
-  
+
   if (sessionKey === GLOBAL_SESSION_KEY) {
     store.global = payload;
   } else {
@@ -159,17 +173,23 @@ const persistActiveEffectsForSessionWithStore = (sessionId, payload, store) => {
   writeJSON(ACTIVE_EFFECTS_STORAGE_KEY, store);
 };
 
-export const persistActiveEffectsForSession = (sessionId, activeEffectsList) => {
+export const persistActiveEffectsForSession = (
+  sessionId,
+  activeEffectsList
+) => {
   persistActiveEffectsForSessionWithStore(sessionId, activeEffectsList);
 };
 
 export const loadActiveEffectsForSession = (sessionId) => {
   if (!canUseStorage()) return createDefaultActiveEffects();
-  
-  const store = readJSON(ACTIVE_EFFECTS_STORAGE_KEY) || { sessions: {}, global: createDefaultActiveEffects() };
+
+  const store = readJSON(ACTIVE_EFFECTS_STORAGE_KEY) || {
+    sessions: {},
+    global: createDefaultActiveEffects(),
+  };
   const sessionKey = normalizeSessionKey(sessionId);
-  
-  const sessionActiveEffects = 
+
+  const sessionActiveEffects =
     sessionKey === GLOBAL_SESSION_KEY
       ? store.global
       : store.sessions && store.sessions[sessionKey];
@@ -177,10 +197,20 @@ export const loadActiveEffectsForSession = (sessionId) => {
   if (sessionActiveEffects) {
     return sessionActiveEffects;
   }
-  
+
   const defaults = createDefaultActiveEffects();
-  
+
   persistActiveEffectsForSessionWithStore(sessionId, defaults, store);
 
   return defaults;
+};
+
+export const __TESTING__ = {
+  DEFAULT_EFFECTS,
+  mergeWithDefaults,
+  normalizeSessionKey,
+  readStore,
+  persistEffectsForSessionWithStore,
+  EFFECTS_STORAGE_KEY,
+  LEGACY_EFFECTS_KEY,
 };

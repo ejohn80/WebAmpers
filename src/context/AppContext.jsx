@@ -3,7 +3,6 @@ import {useUserData} from "../hooks/useUserData";
 import {
   createDefaultEffects,
   mergeWithDefaults,
-  // NEW IMPORTS
   loadActiveEffectsForSession,
   persistActiveEffectsForSession,
   createDefaultActiveEffects,
@@ -11,6 +10,7 @@ import {
 
 export const AppContext = createContext();
 
+// Function to get the initial active session ID from Local Storage
 const getInitialActiveSession = () => {
   if (
     typeof window === "undefined" ||
@@ -26,6 +26,16 @@ const getInitialActiveSession = () => {
     console.warn("Failed to read initial active session:", error);
     return null;
   }
+};
+
+const getInitialActiveEffects = (activeSessionId) => {
+  // If we don't know the session ID yet, return default.
+  if (typeof activeSessionId !== "number") {
+    return createDefaultActiveEffects();
+  }
+
+  // Load the persisted list for the active session ID.
+  return loadActiveEffectsForSession(activeSessionId);
 };
 
 const shallowEqualEffects = (a = {}, b = {}) => {
@@ -55,9 +65,9 @@ const AppContextProvider = ({children}) => {
   // Effects Menu State
   const [isEffectsMenuOpen, setIsEffectsMenuOpen] = useState(false);
 
-  // Active effects list state (Loaded/Saved via effectsStorage/Local Storage)
-  const [activeEffects, setActiveEffects] = useState(createDefaultActiveEffects());
-
+  const [activeEffects, setActiveEffects] = useState(() =>
+    getInitialActiveEffects(activeSession)
+  );
 
   const updateEffect = useCallback((effectName, value) => {
     setEffects((prevEffects) => {
@@ -99,9 +109,22 @@ const AppContextProvider = ({children}) => {
   }, []);
 
   const removeEffect = useCallback((effectId) => {
+    // 1. Remove the effect from the active list
     setActiveEffects((prev) => prev.filter((id) => id !== effectId));
+
+    // 2. Reset the effect's parameter value to default (turns off the applied effect)
+    setEffects((prevEffects) => {
+      // Get the default value for this effect
+      const allDefaults = createDefaultEffects();
+      const defaultValue = allDefaults[effectId];
+
+      return {
+        ...prevEffects,
+        [effectId]: defaultValue,
+      };
+    });
   }, []);
-  
+
   const applyEffectsToEngine = useCallback(
     (currentEffects) => {
       if (!engineRef) {
@@ -118,7 +141,7 @@ const AppContextProvider = ({children}) => {
     [engineRef]
   );
 
-  // Persist activeSession (ID) and LOAD Active Effects List
+  // Persist activeSession (ID) and LOAD Active Effects List on session change (Session switching)
   useEffect(() => {
     if (activeSession === undefined) return;
     try {
@@ -133,30 +156,24 @@ const AppContextProvider = ({children}) => {
       }
     } catch {}
 
-    // Load ACTIVE EFFECTS LIST whenever activeSession changes
-    if (activeSession !== undefined) {
-      // Parameter values (`effects`) are handled by SessionsTab.jsx
-      
-      // Load and set the active effects list for the new session (Fix 2)
+    // Load active effects list whenever activeSession changes
+    if (typeof activeSession === "number") {
       const loadedActiveEffects = loadActiveEffectsForSession(activeSession);
       setActiveEffects(loadedActiveEffects);
     }
   }, [activeSession]);
 
-  // Persist ACTIVE EFFECTS LIST and Apply Effect Parameter Values to Engine
+  // Persist active effects list and Apply Effect Parameter Values to Engine
   useEffect(() => {
     // Only persist if there's an active session
     if (typeof activeSession === "number" && Object.keys(effects).length > 0) {
-      // The `effects` parameter values are saved to IndexedDB by SessionsTab.jsx
-      // We only save the `activeEffects` list here.
-
-      // Persist the list of active effect IDs per-session (Fix 2)
+      // Persist the list of active effect IDs per-session
       persistActiveEffectsForSession(activeSession, activeEffects);
     }
 
     // Apply effect parameter values to the audio engine
     applyEffectsToEngine(effects);
-  }, [effects, activeSession, applyEffectsToEngine, activeEffects]); 
+  }, [effects, activeSession, applyEffectsToEngine, activeEffects]);
 
   // Engine ref adoption (remains the same)
   useEffect(() => {
@@ -169,7 +186,6 @@ const AppContextProvider = ({children}) => {
       }
     } catch {}
   }, [engineRef]);
-
 
   const contextValue = useMemo(
     () => ({
