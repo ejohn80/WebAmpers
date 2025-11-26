@@ -58,6 +58,9 @@ const AppContextProvider = ({children}) => {
     }
   }, [activeSession]);
 
+  // Engine reference to apply effects
+  const [engineRef, setEngineRef] = useState(null);
+
   // Effects state stored per session
   const [effects, setEffectsState] = useState(() =>
     loadEffectsForSession(getInitialActiveSession())
@@ -79,14 +82,20 @@ const AppContextProvider = ({children}) => {
   );
 
   useEffect(() => {
-    setEffectsState((prev) => {
-      const loaded = loadEffectsForSession(activeSession);
-      return shallowEqualEffects(prev, loaded) ? prev : loaded;
-    });
-  }, [activeSession]);
+    const loaded = loadEffectsForSession(activeSession);
 
-  // Engine reference to apply effects
-  const [engineRef, setEngineRef] = useState(null);
+    setEffectsState((prev) =>
+      shallowEqualEffects(prev, loaded) ? prev : loaded
+    );
+
+    if (engineRef?.current) {
+      try {
+        engineRef.current.setMasterEffects(loaded);
+      } catch (error) {
+        console.warn("Failed to sync engine effects for session change:", error);
+      }
+    }
+  }, [activeSession, engineRef]);
 
   // Utility function to apply effects to engine (no unlock requirement)
   const applyEffectsToEngine = useCallback(
