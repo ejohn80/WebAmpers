@@ -1,9 +1,12 @@
-import React, {useEffect, useMemo, useRef, useState} from "react";
+import React, {useEffect, useMemo, useRef, useState, useContext} from "react";
 import DraggableDiv from "../Generic/DraggableDiv";
 import GlobalPlayhead from "../Generic/GlobalPlayhead";
 import TimelineRuler from "./TimelineRuler";
 import TrackLane from "../../components/TrackLane/TrackLane";
 import {progressStore} from "../../playback/progressStore";
+import {AppContext} from "../../context/AppContext"; // <-- Main
+import EffectsMenu from "./Effects/EffectsMenu"; // <-- Main
+import styles from "./MainContent.module.css"; // <-- Main
 import "./MainContent.css";
 
 /**
@@ -14,7 +17,7 @@ import "./MainContent.css";
  * @param {Function} props.onMute - Callback for mute toggle
  * @param {Function} props.onSolo - Callback for solo toggle
  * @param {Function} props.onDelete - Callback for track deletion
- * @param {Function} props.onAssetDrop - Callback for dropping an asset to create a track
+ * @param {Function} props.onAssetDrop - Callback for dropping an asset to create a track <-- Feature
  * @param {number} props.totalLengthMs - Global timeline length in milliseconds for proportional sizing
  */
 const TRACK_CONTROLS_WIDTH = 180;
@@ -25,9 +28,11 @@ function MainContent({
   onMute,
   onSolo,
   onDelete,
-  onAssetDrop,
+  onAssetDrop, // <-- Feature prop
   totalLengthMs = 0,
 }) {
+  const {isEffectsMenuOpen} = useContext(AppContext); // <-- Main context
+
   // Default visible window length (in ms) before horizontal scrolling is needed
   // Timeline scale is driven by pixels-per-second instead of a fixed window length
   const BASE_PX_PER_SEC = 100; // default density: 100px per second at 100% zoom
@@ -118,7 +123,7 @@ function MainContent({
   const resetZoom = () => setZoom(1);
   const toggleFollow = () => setFollowPlayhead((v) => !v);
 
-  // Handle asset drop
+  // Handle asset drop (Feature Branch Logic)
   const handleDrop = (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -140,8 +145,9 @@ function MainContent({
     e.preventDefault();
     e.dataTransfer.dropEffect = "copy";
   };
+  // End Feature Branch Drop Logic
 
-  // Auto-scroll to keep the red playhead centered when follow mode is on
+  // Auto-scroll to keep the red playhead centered when follow mode is on (Present in both, keep one)
   useEffect(() => {
     if (!followPlayhead) return;
     const node = scrollAreaRef.current;
@@ -176,15 +182,23 @@ function MainContent({
 
   return (
     <DraggableDiv
-      className="maincontent"
+      // Apply conditional blur class from main
+      className={`maincontent ${isEffectsMenuOpen ? styles.blurred : ""}`}
       style={timelineStyle}
       disableSectionPadding
     >
+      {/* Effects Menu (Main Logic) */}
+      {isEffectsMenuOpen && (
+        <div className={styles.effectsMenuContainer}>
+          <EffectsMenu />
+        </div>
+      )}
+
       <div
         className="timeline-scroll-area"
         ref={scrollAreaRef}
-        onDrop={handleDrop}
-        onDragOver={handleDragOver}
+        onDrop={handleDrop} // <-- Feature drop handler
+        onDragOver={handleDragOver} // <-- Feature drag handler
       >
         {hasTracks ? (
           <>
