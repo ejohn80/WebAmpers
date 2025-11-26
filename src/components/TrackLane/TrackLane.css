@@ -1,3 +1,4 @@
+/* Sticky column on the left that holds track title and controls */
 .tracklane-side {
   width: var(--track-controls-width);
   min-width: var(--track-controls-width);
@@ -6,14 +7,15 @@
   flex-direction: column;
   gap: 6px;
   align-self: stretch;
-  padding-right: 6px;
-  background: #2f2f2f;
-  box-shadow: 6px 0 12px rgba(0, 0, 0, 0.45);
+  padding: 6px;
+  background: #303030;
   position: sticky;
   left: 0;
   z-index: 5;
+  border-radius: 10px;
 }
 
+/* Overall wrapper for each track row (title + timeline) */
 .tracklane-root {
   display: flex;
   gap: var(--track-controls-gap);
@@ -21,38 +23,77 @@
   background: #2f2f2f;
   color: #eaeaea;
   padding: 8px;
-  border-radius: 6px;
+  border-radius: 10px;
   min-width: calc(
     var(--timeline-left-offset) + var(--timeline-content-width, 100%)
   );
   position: relative;
 }
 
+/* Right-hand timeline area that stretches with zoom */
 .tracklane-main {
   min-height: var(--track-height, 96px);
   width: var(--timeline-content-width, 100%);
   flex: 1 1 auto;
+  display: flex;
 }
 
+/* Track title block with close button overlay */
 .tracklane-header {
   display: flex;
   flex-direction: column;
   gap: 2px;
   margin-bottom: 4px;
+  position: relative;
+  padding-left: 28px;
 }
 
+/* Primary track name */
 .tracklane-title {
   font-weight: 600;
   color: #eee;
   font-size: 14px;
 }
 
+/* Inline delete button (X) pinned in the upper left */
+.tracklane-close-btn {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.35);
+  color: #f97a7a;
+  font-size: 14px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.tracklane-close-btn:hover {
+  background: rgba(220, 53, 69, 0.2);
+  border-color: rgba(220, 53, 69, 0.45);
+  color: #ff9999;
+}
+
+.tracklane-close-btn:focus-visible {
+  outline: 2px solid #ff9999;
+  outline-offset: 2px;
+}
+
+/* “Track X of Y” secondary label */
 .tracklane-track-number {
   font-size: 10px;
   color: #999;
   font-weight: 400;
 }
 
+/* Container around mute/solo controls */
 .tracklane-controls-box {
   background: rgba(255, 255, 255, 0.02);
   border: 1px solid rgba(255, 255, 255, 0.03);
@@ -64,6 +105,7 @@
   flex: 1 1 auto;
 }
 
+/* Stack the control buttons vertically on narrow layouts */
 .tracklane-controls-box .tracklane-controls {
   width: 100%;
   display: flex;
@@ -73,12 +115,14 @@
   gap: 6px;
 }
 
+/* Button row inside the controls box */
 .tracklane-controls {
   display: flex;
   gap: 8px;
   align-items: center;
 }
 
+/* Shared button styling for mute/solo/etc */
 .tl-btn {
   background: rgba(255, 255, 255, 0.03);
   color: #ddd;
@@ -118,6 +162,7 @@
   border-color: rgba(220, 53, 69, 0.5);
 }
 
+/* Thin divider used within the controls list */
 .tracklane-divider {
   height: 1px;
   background: rgba(255, 255, 255, 0.05);
@@ -131,8 +176,11 @@
   min-height: var(--track-height, 96px);
   background: rgba(0, 0, 0, 0.2);
   border-radius: 4px;
+  flex: 1 1 auto;
+  height: 100%;
 }
 
+/* Each segment wrapper absolutely positioned along the ruler */
 .tracklane-segment-positioned {
   /* Positioned absolutely within timeline */
   position: absolute;
@@ -140,52 +188,34 @@
   bottom: 0;
 }
 
+/* Vertical stack of segments (legacy layout hook) */
 .tracklane-segments {
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
 
+/* Visual box for an individual audio segment */
 .tracklane-segment {
   background: rgba(255, 255, 255, 0.02);
   border: 1px solid rgba(255, 255, 255, 0.03);
-  padding: 8px;
   border-radius: 6px;
   height: 100%;
-  display: flex;
-  flex-direction: column;
-}
-
-.segment-meta {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  width: 100%;
-  margin-bottom: 8px;
-  flex-shrink: 0;
-}
-
-.segment-name {
-  font-size: 11px;
-  color: #9a9a9a;
-  font-weight: 500;
-  white-space: nowrap;
+  position: relative;
   overflow: hidden;
-  text-overflow: ellipsis;
 }
 
-.segment-duration {
-  font-size: 11px;
-  color: #a9a9a9;
-  white-space: nowrap;
-}
-
+/* Container holding the actual waveform render */
 .segment-waveform {
-  flex: 1;
-  min-height: calc(var(--track-height, 96px) - 32px);
   width: 100%;
+  height: 100%;
 }
 
+.segment-waveform .waveform-container {
+  height: 100%;
+}
+
+/* Placeholder text when a buffer is missing */
 .waveform-placeholder {
   display: flex;
   align-items: center;
@@ -195,6 +225,7 @@
   font-size: 12px;
 }
 
+/* “No segments” empty state helper */
 .tracklane-empty {
   color: #9b9b9b;
   padding: 12px;
@@ -206,6 +237,7 @@
   transform: translate(-50%, -50%);
 }
 
+/* Context menu popover for track actions */
 .tracklane-context-menu {
   position: fixed;
   z-index: 50;
@@ -220,6 +252,7 @@
   color: #eaeaea;
 }
 
+/* Base styling for each context menu entry */
 .context-menu-item {
   width: 100%;
   text-align: left;
@@ -247,6 +280,7 @@
   background: rgba(220, 53, 69, 0.2);
 }
 
+/* Separator line within the context menu */
 .context-menu-divider {
   height: 1px;
   margin: 6px 0;

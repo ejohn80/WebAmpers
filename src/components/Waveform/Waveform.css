@@ -3,13 +3,14 @@
   height: 100%;
   position: relative;
   cursor: pointer;
-  overflow-x: auto; /* allows sliding left/right for long tracks */
-  overflow-y: hidden;
+  overflow: hidden;
+  display: flex;
 }
 
 .waveform-canvas {
   height: 100%;
-  width: auto; /* allow it to expand with canvas.width */
+  width: 100%;
+  flex: 1 1 auto;
   display: block;
 }
 

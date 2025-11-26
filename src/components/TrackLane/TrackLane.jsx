@@ -175,6 +175,14 @@ function TrackLane({
       <div className="tracklane-side">
         {showTitle && (
           <div className="tracklane-header">
+            <button
+              className="tracklane-close-btn"
+              onClick={handleDelete}
+              title="Delete track"
+              aria-label={`Delete ${track.name ?? "track"}`}
+            >
+              ×
+            </button>
             <div className="tracklane-title">
               {track.name ?? "Untitled Track"}
             </div>
@@ -204,15 +212,6 @@ function TrackLane({
               {soloed ? "Soloed" : "Solo"}
             </button>
 
-            <div className="tracklane-divider" />
-
-            <button
-              className="tl-btn tl-btn-delete"
-              onClick={handleDelete}
-              title="Delete track"
-            >
-              Delete
-            </button>
           </div>
         </div>
       </div>
@@ -264,15 +263,6 @@ function TrackLane({
                 }}
               >
                 <div className="tracklane-segment">
-                  <div className="segment-meta">
-                    <div className="segment-name">
-                      {seg.id ?? seg.fileUrl ?? "segment"}
-                    </div>
-                    <div className="segment-duration">
-                      {seg.durationMs ? `${Math.round(seg.durationMs)} ms` : ""}
-                    </div>
-                  </div>
-
                   <div className="segment-waveform">
                     {audioBuffer ? (
                       <Waveform

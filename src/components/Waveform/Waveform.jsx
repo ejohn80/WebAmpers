@@ -27,7 +27,7 @@ const Waveform = ({
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const container = canvas.parentElement;
+    const container = containerRef.current || canvas.parentElement;
     if (!container) return;
 
     const updateSize = () => {
@@ -145,7 +145,7 @@ const Waveform = ({
 
   // Scrub helpers
   const msAtClientX = (clientX) => {
-    const el = canvasRef.current?.parentElement; // container div
+    const el = containerRef.current || canvasRef.current?.parentElement; // container div
     if (!el) return;
     const rect = el.getBoundingClientRect();
 
@@ -195,8 +195,10 @@ const Waveform = ({
   };
 
   const onWheel = (e) => {
-    const el = containerRef.current;
-    if (!el) return;
+    const timelineScroll = containerRef.current?.closest(
+      ".timeline-scroll-area"
+    );
+    if (!timelineScroll) return;
 
     // Use whichever axis has the stronger signal so normal mouse wheels work
     const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
@@ -204,7 +206,7 @@ const Waveform = ({
     if (delta === 0) return;
 
     e.preventDefault(); // don't vertical-scroll the page
-    el.scrollLeft += delta;
+    timelineScroll.scrollLeft += delta;
   };
 
   useEffect(

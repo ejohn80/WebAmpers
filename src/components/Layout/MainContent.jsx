@@ -19,6 +19,7 @@ import "./MainContent.css";
  */
 const TRACK_CONTROLS_WIDTH = 180;
 const TRACK_CONTROLS_GAP = 12;
+const TRACK_HEIGHT_PX = 96;
 
 function MainContent({
   tracks = [],
@@ -81,17 +82,12 @@ function MainContent({
     []
   );
 
-  const verticalScale = useMemo(
-    () => Math.min(2.25, Math.max(0.6, Math.pow(Math.max(zoom, 0.01), 0.5))),
-    [zoom]
-  );
-
   const timelineStyle = useMemo(
     () => ({
       "--timeline-content-width": `${Math.max(1, timelineContentWidth)}px`,
-      "--track-height": `${Math.round(96 * verticalScale)}px`,
+      "--track-height": `${TRACK_HEIGHT_PX}px`,
     }),
-    [timelineContentWidth, verticalScale]
+    [timelineContentWidth]
   );
 
   const timelineMetrics = useMemo(() => {
