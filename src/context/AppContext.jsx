@@ -29,8 +29,115 @@ const AppContextProvider = ({children}) => {
     }
   });
 
+  // Active effects state - tracks which effects are visible/added
+  const [activeEffects, setActiveEffects] = useState(() => {
+    try {
+      const saved = localStorage.getItem("webamp.activeEffects");
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+
+  // Effects Menu State
+  const [isEffectsMenuOpen, setIsEffectsMenuOpen] = useState(false);
+
   // Engine reference to apply effects
   const [engineRef, setEngineRef] = useState(null);
+
+  // Effects Menu Functions
+  const openEffectsMenu = () => setIsEffectsMenuOpen(true);
+  const closeEffectsMenu = () => setIsEffectsMenuOpen(false);
+
+  // Function to add new effects
+  const addEffect = useCallback((effectId) => {
+    if (effectId) {
+      setActiveEffects((prev) => {
+        // Avoid duplicates
+        if (prev.includes(effectId)) return prev;
+        const newActiveEffects = [...prev, effectId];
+
+        // Persist to localStorage
+        try {
+          localStorage.setItem(
+            "webamp.activeEffects",
+            JSON.stringify(newActiveEffects)
+          );
+        } catch (e) {
+          console.warn("Failed to persist active effects to localStorage:", e);
+        }
+
+        return newActiveEffects;
+      });
+    }
+    closeEffectsMenu();
+  }, []);
+
+  // Function to remove effects - optimized to avoid unnecessary state updates
+  const removeEffect = useCallback(
+    (effectId) => {
+      // Define default values
+      const defaultValues = {
+        pitch: 0,
+        volume: 100,
+        reverb: 0,
+        delay: 0,
+        bass: 0,
+        distortion: 0,
+        pan: 0,
+        tremolo: 0,
+        vibrato: 0,
+        highpass: 20,
+        lowpass: 20000,
+        chorus: 0,
+      };
+
+      const defaultValue = defaultValues[effectId] || 0;
+      const currentValue = effects[effectId];
+
+      // Only update effects state if:
+      // 1. The effect exists in the current state AND
+      // 2. It's not already at the default value
+      const effectExists = effectId in effects;
+      const needsReset = effectExists && currentValue !== defaultValue;
+
+      if (needsReset) {
+        setEffects((prev) => {
+          const newEffects = {
+            ...prev,
+            [effectId]: defaultValue,
+          };
+
+          // Persist to localStorage
+          try {
+            localStorage.setItem("webamp.effects", JSON.stringify(newEffects));
+          } catch (e) {
+            console.warn("Failed to persist effects to localStorage:", e);
+          }
+
+          return newEffects;
+        });
+      }
+
+      // Always remove from active effects
+      setActiveEffects((prev) => {
+        const newActiveEffects = prev.filter((id) => id !== effectId);
+
+        // Persist to localStorage
+        try {
+          localStorage.setItem(
+            "webamp.activeEffects",
+            JSON.stringify(newActiveEffects)
+          );
+        } catch (e) {
+          console.warn("Failed to persist active effects to localStorage:", e);
+        }
+
+        return newActiveEffects;
+      });
+    },
+    [effects]
+  );
 
   // Utility function to apply effects to engine (no unlock requirement)
   const applyEffectsToEngine = useCallback(
@@ -43,7 +150,7 @@ const AppContextProvider = ({children}) => {
         }
       }
     },
-    [engineRef, effects] // Dependency array ensures stable function reference
+    [engineRef, effects]
   );
 
   // Function to update effects
@@ -62,12 +169,12 @@ const AppContextProvider = ({children}) => {
         console.warn("Failed to persist effects to localStorage:", e);
       }
 
-      // Attempt to unlock audio context (runs inside user gesture from slider)
+      // Attempt to unlock audio context
       try {
         await engineRef?.current?.ensureAudioUnlocked?.();
       } catch {}
     },
-    [effects, engineRef] // Dependency array ensures stable function reference
+    [effects, engineRef]
   );
 
   const resetEffect = useCallback(
@@ -82,6 +189,15 @@ const AppContextProvider = ({children}) => {
       pitch: 0,
       volume: 100,
       reverb: 0,
+      delay: 0,
+      bass: 0,
+      distortion: 0,
+      pan: 0,
+      tremolo: 0,
+      vibrato: 0,
+      highpass: 20,
+      lowpass: 20000,
+      chorus: 0,
     };
     setEffects(defaultEffects);
 
@@ -98,34 +214,22 @@ const AppContextProvider = ({children}) => {
     applyEffectsToEngine();
   }, [engineRef, applyEffectsToEngine]);
 
-  // Attempt to adopt an engineRef from a global if available
-  useEffect(() => {
-    try {
-      if (!engineRef && window.__WebAmpEngineRef) {
-        setEngineRef(window.__WebAmpEngineRef);
-        console.log(
-          "[AppContext] adopted engineRef from window.__WebAmpEngineRef"
-        );
-      }
-    } catch {}
-  }, [engineRef]);
-
-  // Fallback: persist whenever effects state changes (guards against any missed writes)
+  // Fallback: persist whenever effects state changes
   useEffect(() => {
     try {
       localStorage.setItem("webamp.effects", JSON.stringify(effects));
     } catch {}
   }, [effects]);
 
-  // On mount: optionally initialize localStorage key (no logs)
+  // Persist active effects when they change
   useEffect(() => {
     try {
-      const existing = localStorage.getItem("webamp.effects");
-      if (!existing) {
-        localStorage.setItem("webamp.effects", JSON.stringify(effects));
-      }
+      localStorage.setItem(
+        "webamp.activeEffects",
+        JSON.stringify(activeEffects)
+      );
     } catch {}
-  }, []);
+  }, [activeEffects]);
 
   const contextValue = useMemo(
     () => ({
@@ -140,19 +244,28 @@ const AppContextProvider = ({children}) => {
       engineRef,
       setEngineRef,
       applyEffectsToEngine,
+      // Effects Menu State
+      isEffectsMenuOpen,
+      openEffectsMenu,
+      closeEffectsMenu,
+      addEffect,
+      removeEffect,
+      activeEffects,
     }),
     [
       userData,
       loading,
       activeProject,
-      setActiveProject,
       effects,
       updateEffect,
       resetEffect,
       resetAllEffects,
       engineRef,
-      setEngineRef,
       applyEffectsToEngine,
+      isEffectsMenuOpen,
+      addEffect,
+      removeEffect,
+      activeEffects,
     ]
   );
 

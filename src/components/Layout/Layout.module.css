@@ -124,18 +124,61 @@
 
 /* Effects */
 
+.noEffectsMessage {
+  text-align: center;
+  color: #888;
+  font-size: 15px;
+  padding: 40px 20px;
+  font-style: italic;
+}
+
 .title {
   margin-top: 10px;
   margin-bottom: 15px;
   color: #00e5ff;
 }
 
+/* Effect item needs relative positioning for absolute close button */
 .effectItem {
   margin-bottom: 20px;
   padding: 12px;
   background: #1e1d20;
   border-radius: 6px;
   border: 2px solid #333239;
+  overflow: visible;
+  position: relative; /* Important for absolute positioning of close button */
+}
+
+/* Close effect button styles */
+.closeEffectButton {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 17px;
+  height: 17px;
+  background: #1e1d20;
+  border: none;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  z-index: 2;
+  padding: 0;
+}
+
+.closeEffectButton:hover {
+  background: #dd4b4b;
+  border: none;
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  margin-bottom: 8px;
+  padding-right: 30px;
 }
 
 .effectsList {
@@ -147,17 +190,12 @@
   min-height: 0;
 }
 
-.header {
+/* New bottom row for value and reset button */
+.bottomRow {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 8px;
-}
-
-.label {
-  font-size: 14px;
-  font-weight: 600;
-  color: #e5e5e5;
+  margin-top: 8px;
 }
 
 .value {
@@ -166,17 +204,23 @@
   font-family: monospace;
 }
 
-.description {
-  float: left;
-  font-size: 11px;
-  color: #888;
-  margin-bottom: 8px;
-}
-
 .controls {
   display: flex;
   gap: 8px;
-  margin-top: 8px;
+  margin-top: 0;
+}
+
+.description {
+  font-size: 11px;
+  color: #888;
+  margin-top: 2px;
+  float: left;
+}
+
+.label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #e5e5e5;
 }
 
 .button {
@@ -405,6 +449,7 @@
   transform: translateY(-50%);
   outline: 1px solid #787879;
   overflow: visible;
+  /* border: 1px solid red; */
 }
 
 .sliderFill {
@@ -471,4 +516,33 @@
   opacity: 0;
   cursor: pointer;
   z-index: 4;
+}
+
+/* Add effects button */
+.addEffectsButtonContent {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+
+.addEffectsButton {
+  padding: 12px 20px;
+  margin-bottom: 16px;
+  background: #172528;
+  color: #17e1ff;
+  border: 2px solid #23393d;
+  border-radius: 6px;
+  font-weight: bold;
+  cursor: pointer;
+  width: 100%;
+  transition: all 0.2s ease;
+  font-size: 14px;
+  overflow: visible;
+}
+
+.addEffectsButton:hover {
+  background: #1e3135;
+  border-color: #17e1ff;
+  transform: translateY(-1px);
 }

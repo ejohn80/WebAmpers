@@ -1,8 +1,11 @@
-import React, {useEffect, useMemo, useRef, useState} from "react";
+import React, {useEffect, useMemo, useRef, useState, useContext} from "react";
 import DraggableDiv from "../Generic/DraggableDiv";
 import GlobalPlayhead from "../Generic/GlobalPlayhead";
 import TimelineRuler from "./TimelineRuler";
 import TrackLane from "../../components/TrackLane/TrackLane";
+import {AppContext} from "../../context/AppContext";
+import EffectsMenu from "./Effects/EffectsMenu";
+import styles from "./MainContent.module.css";
 import {progressStore} from "../../playback/progressStore";
 import "./MainContent.css";
 
@@ -26,6 +29,8 @@ function MainContent({
   onDelete,
   totalLengthMs = 0,
 }) {
+  const {isEffectsMenuOpen} = useContext(AppContext);
+
   // Default visible window length (in ms) before horizontal scrolling is needed
   // Timeline scale is driven by pixels-per-second instead of a fixed window length
   const BASE_PX_PER_SEC = 100; // default density: 100px per second at 100% zoom
@@ -151,10 +156,17 @@ function MainContent({
 
   return (
     <DraggableDiv
-      className="maincontent"
+      className={`maincontent ${isEffectsMenuOpen ? styles.blurred : ""}`}
       style={timelineStyle}
       disableSectionPadding
     >
+      {/* Effects Menu */}
+      {isEffectsMenuOpen && (
+        <div className={styles.effectsMenuContainer}>
+          <EffectsMenu />
+        </div>
+      )}
+
       <div className="timeline-scroll-area" ref={scrollAreaRef}>
         {hasTracks ? (
           <>

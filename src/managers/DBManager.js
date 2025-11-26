@@ -1,5 +1,5 @@
 const DB_NAME = "WebAmpDB";
-const DB_VERSION = 1;
+const DB_VERSION = 3;
 const TRACKS_STORE_NAME = "tracks";
 
 class DBManager {

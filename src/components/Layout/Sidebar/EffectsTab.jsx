@@ -5,15 +5,26 @@ import {
   EffectsSliderKnob,
   ResetAllButtonEnabled,
   ResetAllButtonDisabled,
+  PlusSignIcon,
+  XIcon,
 } from "../Svgs.jsx";
 
 function EffectsTab() {
-  const {effects, updateEffect, resetEffect, resetAllEffects} =
-    useContext(AppContext);
+  const {
+    effects,
+    updateEffect,
+    resetEffect,
+    resetAllEffects,
+    openEffectsMenu,
+    closeEffectsMenu,
+    isEffectsMenuOpen,
+    removeEffect,
+    activeEffects, // Get active effects from context
+  } = useContext(AppContext);
 
   const [draggingSlider, setDraggingSlider] = useState(null);
-  const [localValues, setLocalValues] = useState({}); // Store temporary values
-  const pendingUpdates = useRef(new Map()); // Track pending effect updates
+  const [localValues, setLocalValues] = useState({});
+  const pendingUpdates = useRef(new Map());
 
   const effectConfigs = [
     {
@@ -138,16 +149,26 @@ function EffectsTab() {
     },
   ];
 
+  // Filter effects to only show active ones and maintain addition order
+  const activeEffectConfigs = activeEffects
+    .map((effectId) => effectConfigs.find((config) => config.name === effectId))
+    .filter(Boolean); // Remove any undefined values in case of mismatches
+
+  // Toggle effects menu
+  const toggleEffectsMenu = () => {
+    if (isEffectsMenuOpen) {
+      closeEffectsMenu();
+    } else {
+      openEffectsMenu();
+    }
+  };
+
   // Update local state immediately for smooth UI
   const handleChange = useCallback(
     (name) => (e) => {
       const raw = e.target.value;
       const num = Number(raw);
-
-      // Update local state for immediate visual feedback
       setLocalValues((prev) => ({...prev, [name]: num}));
-
-      // Store the pending update but don't apply it yet
       pendingUpdates.current.set(name, num);
     },
     []
@@ -190,27 +211,44 @@ function EffectsTab() {
 
   // Check if ALL effects are at their default values
   const areAllEffectsAtDefault = () => {
-    return effectConfigs.every((config) => isAtDefaultValue(config));
+    return activeEffectConfigs.every((config) => isAtDefaultValue(config));
   };
 
   return (
     <div className={styles.container}>
+      {/* Add Effects Button - toggles the menu */}
+      <button
+        className={`${styles.addEffectsButton} ${isEffectsMenuOpen ? styles.addEffectsButtonActive : ""}`}
+        onClick={toggleEffectsMenu}
+      >
+        <span className={styles.addEffectsButtonContent}>
+          <PlusSignIcon />
+          <span>{isEffectsMenuOpen ? "Close Effects" : "Add Effects"}</span>
+        </span>
+      </button>
+
+      {/* Effect sliders - only show active effects in addition order */}
       <div className={styles.effectsList}>
-        {effectConfigs.map((config) => {
+        {activeEffectConfigs.map((config) => {
           const currentValue = getCurrentValue(config);
           const fillPercentage = getSliderFillPercentage(config, currentValue);
           const isDefault = isAtDefaultValue(config);
 
           return (
             <div key={config.name} className={styles.effectItem}>
+              {/* Close button in top right */}
+              <button
+                className={styles.closeEffectButton}
+                onClick={() => removeEffect(config.name)}
+                aria-label={`Remove ${config.label} effect`}
+              >
+                <XIcon />
+              </button>
+
               <div className={styles.header}>
                 <span className={styles.label}>{config.label}</span>
-                <span className={styles.value}>
-                  {currentValue}
-                  {config.unit}
-                </span>
+                <div className={styles.description}>{config.description}</div>
               </div>
-              <div className={styles.description}>{config.description}</div>
 
               {/* Custom Slider */}
               <div
@@ -250,24 +288,37 @@ function EffectsTab() {
                 />
               </div>
 
-              <div className={styles.controls}>
-                <button
-                  className={`${styles.button} ${
-                    isDefault ? styles.buttonDisabled : ""
-                  }`}
-                  onClick={
-                    isDefault
-                      ? undefined
-                      : () => resetEffect(config.name, config.default)
-                  }
-                  disabled={isDefault}
-                >
-                  Reset
-                </button>
+              <div className={styles.bottomRow}>
+                <span className={styles.value}>
+                  {currentValue}
+                  {config.unit}
+                </span>
+                <div className={styles.controls}>
+                  <button
+                    className={`${styles.button} ${
+                      isDefault ? styles.buttonDisabled : ""
+                    }`}
+                    onClick={
+                      isDefault
+                        ? undefined
+                        : () => resetEffect(config.name, config.default)
+                    }
+                    disabled={isDefault}
+                  >
+                    Reset
+                  </button>
+                </div>
               </div>
             </div>
           );
         })}
+
+        {/* Show message when no effects are active */}
+        {activeEffectConfigs.length === 0 && (
+          <div className={styles.noEffectsMessage}>
+            No effects yet. Add one to get started
+          </div>
+        )}
       </div>
 
       <button
