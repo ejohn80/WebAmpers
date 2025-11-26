@@ -174,3 +174,38 @@
 .effectsContent::-webkit-scrollbar-thumb:hover {
   background: #5c5b62;
 }
+
+/* Styling for a disabled (already active) effect card */
+.effectCardDisabled {
+  opacity: 0.4; /* Visually grey out */
+  cursor: not-allowed !important; /* Change cursor */
+  border-color: #333239 !important; /* Subtle border */
+  /* Ensure it doesn't shift position */
+  margin-top: 2px !important;
+  margin-bottom: 0 !important;
+}
+
+/* Remove hover effects on disabled card */
+.effectCardDisabled:hover {
+  border-color: #333239 !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* Remove text gradient sweep animation for disabled cards */
+.effectCardDisabled:hover .effectName,
+.effectCardDisabled:hover .effectDescription {
+  background: none !important;
+  background-clip: none !important;
+  -webkit-background-clip: none !important;
+  -webkit-text-fill-color: inherit !important;
+  animation: none !important;
+}
+
+.effectCardDisabled .effectName {
+  color: #888; /* Ensure name is also greyed */
+}
+
+.effectCardDisabled .effectDescription {
+  color: #666; /* Ensure description is also greyed */
+}

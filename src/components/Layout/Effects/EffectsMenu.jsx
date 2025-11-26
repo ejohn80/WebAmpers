@@ -3,7 +3,7 @@ import {AppContext} from "../../../context/AppContext";
 import styles from "./EffectsMenu.module.css";
 
 function EffectsMenu() {
-  const {closeEffectsMenu, addEffect} = useContext(AppContext);
+  const {closeEffectsMenu, addEffect, activeEffects} = useContext(AppContext);
 
   const availableEffects = [
     {
@@ -75,6 +75,9 @@ function EffectsMenu() {
     }
   };
 
+  // Helper to check if effect is already added
+  const isEffectActive = (effectId) => activeEffects.includes(effectId);
+
   return (
     <div className={styles.effectsMenuOverlay} onClick={handleBackgroundClick}>
       <div className={styles.effectsMenu}>
@@ -87,18 +90,26 @@ function EffectsMenu() {
 
         <div className={styles.effectsContent}>
           <div className={styles.effectsGrid}>
-            {availableEffects.map((effect) => (
-              <button
-                key={effect.id}
-                className={styles.effectCard}
-                onClick={() => addEffect(effect.id)}
-              >
-                <span className={styles.effectName}>{effect.name}</span>
-                <span className={styles.effectDescription}>
-                  {effect.description}
-                </span>
-              </button>
-            ))}
+            {availableEffects.map((effect) => {
+              const isActive = isEffectActive(effect.id);
+              return (
+                <button
+                  key={effect.id}
+                  // 2. Conditionally apply a disabled class
+                  className={`${styles.effectCard} ${
+                    isActive ? styles.effectCardDisabled : ""
+                  }`}
+                  onClick={() => addEffect(effect.id)}
+                  // 3. Disable the button
+                  disabled={isActive}
+                >
+                  <span className={styles.effectName}>{effect.name}</span>
+                  <span className={styles.effectDescription}>
+                    {effect.description}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </div>
 
