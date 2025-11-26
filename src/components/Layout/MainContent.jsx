@@ -20,6 +20,9 @@ import "./MainContent.css";
 const TRACK_CONTROLS_WIDTH = 180;
 const TRACK_CONTROLS_GAP = 12;
 const TRACK_HEIGHT_PX = 96;
+const BASE_PX_PER_SEC = 120;
+const MIN_ZOOM_STEP = -4; // 1/16x
+const MAX_ZOOM_STEP = 8; // 256x
 
 function MainContent({
   tracks = [],
@@ -29,12 +32,13 @@ function MainContent({
   onAssetDrop,
   totalLengthMs = 0,
 }) {
-  // Default visible window length (in ms) before horizontal scrolling is needed
-  // Timeline scale is driven by pixels-per-second instead of a fixed window length
-  const BASE_PX_PER_SEC = 100; // default density: 100px per second at 100% zoom
-  const MIN_ZOOM = 0.25; // 25% (zoom out)
-  const MAX_ZOOM = 8; // 800% (zoom in)
-  const [zoom, setZoom] = useState(1);
+  // Exponential zoom lets us reach detailed waveform views quickly
+  const [zoomStep, setZoomStep] = useState(0); // 0 => 1x, ±n => 2^n scale
+  const zoomScale = useMemo(() => Math.pow(2, zoomStep), [zoomStep]);
+  const pxPerMs = useMemo(
+    () => (BASE_PX_PER_SEC * zoomScale) / 1000,
+    [zoomScale]
+  );
 
   // Follow-mode toggle to auto-scroll the timeline during playback
   const [followPlayhead, setFollowPlayhead] = useState(false);
@@ -44,13 +48,13 @@ function MainContent({
   const [timelineContentWidth, setTimelineContentWidth] = useState(0);
   const [scrollAreaWidth, setScrollAreaWidth] = useState(0);
   const scrollAreaRef = useRef(null);
+  const prevTimelineWidthRef = useRef(0);
 
   useEffect(() => {
     const lengthMs = Math.max(1, totalLengthMs || 0);
-    const pxPerMs = (BASE_PX_PER_SEC * (zoom || 1)) / 1000;
     const desiredWidth = Math.max(1, Math.round(pxPerMs * lengthMs));
     setTimelineContentWidth(desiredWidth);
-  }, [totalLengthMs, zoom]);
+  }, [pxPerMs, totalLengthMs]);
 
   useEffect(() => {
     const node = scrollAreaRef.current;
@@ -75,6 +79,27 @@ function MainContent({
 
     return undefined;
   }, []);
+
+  useEffect(() => {
+    const node = scrollAreaRef.current;
+    if (!node) {
+      prevTimelineWidthRef.current = timelineContentWidth;
+      return;
+    }
+
+    const prevWidth = prevTimelineWidthRef.current || 0;
+    const nextWidth = timelineContentWidth;
+    if (prevWidth === nextWidth) return;
+
+    const viewportWidth = node.clientWidth || 0;
+    const prevScrollable = Math.max(0, prevWidth - viewportWidth);
+    const ratio = prevScrollable > 0 ? node.scrollLeft / prevScrollable : 0;
+
+    const nextScrollable = Math.max(0, nextWidth - viewportWidth);
+    node.scrollLeft = ratio * nextScrollable;
+
+    prevTimelineWidthRef.current = nextWidth;
+  }, [timelineContentWidth]);
 
   useEffect(
     // Track global playhead position for follow mode
@@ -108,10 +133,10 @@ function MainContent({
   const hasTracks = Array.isArray(tracks) && tracks.length > 0;
 
   const zoomIn = () =>
-    setZoom((z) => Math.min(MAX_ZOOM, Number((z + 0.25).toFixed(2))));
+    setZoomStep((z) => Math.min(MAX_ZOOM_STEP, z + 1));
   const zoomOut = () =>
-    setZoom((z) => Math.max(MIN_ZOOM, Number((z - 0.25).toFixed(2))));
-  const resetZoom = () => setZoom(1);
+    setZoomStep((z) => Math.max(MIN_ZOOM_STEP, z - 1));
+  const resetZoom = () => setZoomStep(0);
   const toggleFollow = () => setFollowPlayhead((v) => !v);
 
   // Handle asset drop
@@ -251,7 +276,7 @@ function MainContent({
           <button className="zoom-btn" onClick={zoomOut} title="Zoom out (−)">
             −
           </button>
-          <span className="zoom-label">{Math.round(zoom * 100)}%</span>
+          <span className="zoom-label">{Math.round(zoomScale * 100)}%</span>
           <button className="zoom-btn" onClick={zoomIn} title="Zoom in (+)">
             +
           </button>

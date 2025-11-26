@@ -7,11 +7,17 @@
   display: flex;
 }
 
-.waveform-canvas {
+.waveform-tiles {
+  display: flex;
   height: 100%;
   width: 100%;
   flex: 1 1 auto;
+}
+
+.waveform-canvas {
+  height: 100%;
   display: block;
+  flex: 0 0 auto;
 }
 
 /* Red playhead, now positioned in px (we'll control it in JS) */

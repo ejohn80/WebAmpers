@@ -1,6 +1,8 @@
-import React, {useRef, useEffect, useState} from "react";
+import React, {useRef, useEffect, useState, useMemo} from "react";
 import "./Waveform.css";
 import {progressStore} from "../../playback/progressStore";
+
+const MAX_TILE_CSS_PX = 4096; // keep each canvas safely under browser limits
 
 /**
  * A component that renders an audio buffer as a waveform on a canvas.
@@ -18,16 +20,14 @@ const Waveform = ({
   durationMs = null,
   showProgress = true,
 }) => {
-  const canvasRef = useRef(null);
   const containerRef = useRef(null);
+  const canvasRefs = useRef([]);
   const draggingRef = useRef(false);
   const [canvasSize, setCanvasSize] = useState({width: 0, height: 0});
 
   // Track container resize so we can redraw with accurate resolution when zooming
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const container = containerRef.current || canvas.parentElement;
+  const container = containerRef.current;
     if (!container) return;
 
     const updateSize = () => {
@@ -53,33 +53,36 @@ const Waveform = ({
     return undefined;
   }, []);
 
-  useEffect(() => {
-    if (!audioBuffer || !canvasRef.current) return;
-    if (!canvasSize.width || !canvasSize.height) return;
+  const tiles = useMemo(() => {
+    const totalWidth = canvasSize.width || 0;
+    if (!totalWidth) return [];
 
-    const canvas = canvasRef.current;
-    const container = containerRef.current;
-    const ctx = canvas.getContext("2d");
+    const chunks = [];
+    let offset = 0;
+    while (offset < totalWidth) {
+      const cssWidth = Math.min(MAX_TILE_CSS_PX, totalWidth - offset);
+      const startRatio = totalWidth > 0 ? offset / totalWidth : 0;
+      const endRatio = totalWidth > 0 ? (offset + cssWidth) / totalWidth : 1;
+      chunks.push({cssWidth, startRatio, endRatio});
+      offset += cssWidth;
+    }
+    return chunks;
+  }, [canvasSize.width]);
+
+  useEffect(() => {
+    canvasRefs.current = canvasRefs.current.slice(0, tiles.length);
+  }, [tiles.length]);
+
+  useEffect(() => {
+    if (!audioBuffer) return;
+    if (!canvasSize.width || !canvasSize.height) return;
+    if (!tiles.length) return;
 
     const dpr =
       typeof window !== "undefined" && window.devicePixelRatio
         ? window.devicePixelRatio
         : 1;
-    const cssWidth = canvasSize.width;
     const cssHeight = canvasSize.height;
-    const pixelWidth = Math.max(1, Math.floor(cssWidth * dpr));
-    const pixelHeight = Math.max(1, Math.floor(cssHeight * dpr));
-
-    if (canvas.width !== pixelWidth || canvas.height !== pixelHeight) {
-      canvas.width = pixelWidth;
-      canvas.height = pixelHeight;
-      canvas.style.width = `${cssWidth}px`;
-      canvas.style.height = `${cssHeight}px`;
-    }
-
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.scale(dpr, dpr);
 
     // 🔧 Unwrap Tone.ToneAudioBuffer -> native AudioBuffer robustly
     let native = null;
@@ -88,43 +91,67 @@ const Waveform = ({
     } else if (audioBuffer && audioBuffer._buffer instanceof AudioBuffer) {
       native = audioBuffer._buffer; // ToneAudioBuffer internal
     } else if (audioBuffer && typeof audioBuffer.get === "function") {
-      // Some Tone versions expose .get(channel?) returning Float32Array; not usable here
-      // Prefer _buffer path above; if not available, abort to avoid rendering garbage
       native = null;
     }
 
     if (!native) return; // still nothing to draw
 
     const data = native.getChannelData(0);
-    const visibleWidth = Math.max(1, cssWidth);
-    const step = Math.max(1, Math.floor(data.length / visibleWidth));
-    const amp = cssHeight / 2;
+    const totalSamples = data.length;
 
-    // allow caller to specify the stroke color (track color) with a sensible default
-    ctx.strokeStyle = color || "#ffffff";
-    ctx.lineWidth = dpr >= 2 ? 0.75 : 1;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-    ctx.beginPath();
+    tiles.forEach((tile, index) => {
+      const canvas = canvasRefs.current[index];
+      if (!canvas) return;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
 
-    for (let i = 0; i < visibleWidth; i++) {
-      let min = 1.0,
-        max = -1.0;
+      const cssWidth = tile.cssWidth;
+      const pixelWidth = Math.max(1, Math.floor(cssWidth * dpr));
+      const pixelHeight = Math.max(1, Math.floor(cssHeight * dpr));
 
-      const base = i * step;
-      for (let j = 0; j < step; j++) {
-        const idx = base + j;
-        if (idx >= data.length) break;
-        const v = data[idx];
-        if (v < min) min = v;
-        if (v > max) max = v;
+      if (canvas.width !== pixelWidth || canvas.height !== pixelHeight) {
+        canvas.width = pixelWidth;
+        canvas.height = pixelHeight;
+        canvas.style.width = `${cssWidth}px`;
+        canvas.style.height = `${cssHeight}px`;
       }
-      const x = i + 0.5; // center lines on pixel for crispness
-      ctx.moveTo(x, (1 + min) * amp);
-      ctx.lineTo(x, (1 + max) * amp);
-    }
-    ctx.stroke();
-  }, [audioBuffer, canvasSize.height, canvasSize.width, color]);
+
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.scale(dpr, dpr);
+
+      const startSample = Math.floor(tile.startRatio * totalSamples);
+      const endSample = Math.floor(tile.endRatio * totalSamples);
+      const sliceLength = Math.max(1, endSample - startSample);
+      const visibleWidth = Math.max(1, Math.round(cssWidth));
+      const step = Math.max(1, Math.floor(sliceLength / visibleWidth));
+      const amp = cssHeight / 2;
+
+      ctx.strokeStyle = color || "#ffffff";
+      ctx.lineWidth = dpr >= 2 ? 0.75 : 1;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.beginPath();
+
+      for (let i = 0; i < visibleWidth; i++) {
+        let min = 1.0;
+        let max = -1.0;
+
+        const base = startSample + i * step;
+        for (let j = 0; j < step; j++) {
+          const idx = base + j;
+          if (idx >= endSample) break;
+          const v = data[idx];
+          if (v < min) min = v;
+          if (v > max) max = v;
+        }
+        const x = i + 0.5; // center lines on pixel for crispness
+        ctx.moveTo(x, (1 + min) * amp);
+        ctx.lineTo(x, (1 + max) * amp);
+      }
+      ctx.stroke();
+    });
+  }, [audioBuffer, canvasSize.height, canvasSize.width, color, tiles]);
 
   const [{ms, lengthMs}, setProgress] = useState(progressStore.getState());
 
@@ -145,7 +172,7 @@ const Waveform = ({
 
   // Scrub helpers
   const msAtClientX = (clientX) => {
-    const el = containerRef.current || canvasRef.current?.parentElement; // container div
+    const el = containerRef.current; // container div
     if (!el) return;
     const rect = el.getBoundingClientRect();
 
@@ -254,7 +281,18 @@ const Waveform = ({
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
     >
-      <canvas ref={canvasRef} className="waveform-canvas" />
+      <div className="waveform-tiles">
+        {tiles.map((tile, index) => (
+          <canvas
+            key={`waveform-tile-${index}`}
+            ref={(node) => {
+              canvasRefs.current[index] = node;
+            }}
+            className="waveform-canvas"
+            style={{width: `${tile.cssWidth}px`}}
+          />
+        ))}
+      </div>
       {showProgress && (
         <div className="waveform-progress" style={{left: `${pct}%`}} />
       )}
