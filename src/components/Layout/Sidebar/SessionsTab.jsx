@@ -1,4 +1,4 @@
-import {useState, useEffect, useContext, useRef} from "react";
+import {useState, useEffect, useContext, useRef, useCallback} from "react";
 import {MoonLoader} from "react-spinners";
 import {RxCross2} from "react-icons/rx";
 import {FaTrash} from "react-icons/fa";
@@ -20,7 +20,7 @@ function SessionsTab() {
   const initializingRef = useRef(false);
 
   // Load sessions from IndexedDB
-  const loadSessions = async () => {
+  const loadSessions = useCallback(async () => {
     try {
       setIsLoading(true);
       const allSessions = await dbManager.getAllSessions();
@@ -39,7 +39,7 @@ function SessionsTab() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [activeSession, setActiveSession]);
 
   // Initialize: Create default session if none exist
   useEffect(() => {
@@ -92,9 +92,15 @@ function SessionsTab() {
     };
 
     initialize();
-  }, [hasInitialized, activeSession, setEffects]);
+  }, [
+    hasInitialized,
+    activeSession,
+    setEffects,
+    loadSessions,
+    setActiveSession,
+  ]);
 
-  // Load session effects when active session changes (REINSTATED)
+  // Load session effects when active session changes
   // This ensures effects parameters are loaded from IndexedDB when switching sessions
   useEffect(() => {
     if (!activeSession || !hasInitialized) return;
