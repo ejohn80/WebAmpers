@@ -2,10 +2,13 @@ import {createContext, useState, useEffect, useCallback, useMemo} from "react";
 import {useUserData} from "../hooks/useUserData";
 import {
   createDefaultEffects,
-  loadEffectsForSession,
-  persistEffectsForSession,
   mergeWithDefaults,
+  // NEW IMPORTS
+  loadActiveEffectsForSession,
+  persistActiveEffectsForSession,
+  createDefaultActiveEffects,
 } from "./effectsStorage";
+
 export const AppContext = createContext();
 
 const getInitialActiveSession = () => {
@@ -45,213 +48,117 @@ const AppContextProvider = ({children}) => {
   // Active session state with localStorage persistence
   const [activeSession, setActiveSession] = useState(getInitialActiveSession);
 
-  // Persist active session to localStorage
-  useEffect(() => {
-    try {
-      if (activeSession !== null) {
-        localStorage.setItem("webamp.activeSession", activeSession.toString());
-      } else {
-        localStorage.removeItem("webamp.activeSession");
-      }
-    } catch (e) {
-      console.warn("Failed to persist active session:", e);
-    }
-  }, [activeSession]);
-
-  // Active effects state - tracks which effects are visible/added
-  const [activeEffects, setActiveEffects] = useState(() => {
-    try {
-      const saved = localStorage.getItem("webamp.activeEffects");
-      return saved ? JSON.parse(saved) : [];
-    } catch (e) {
-      return [];
-    }
-  });
+  // Effect State (Effect Parameter Values) - Loaded/Saved via SessionsTab/IndexedDB
+  const [effects, setEffects] = useState(createDefaultEffects());
+  const [engineRef, setEngineRef] = useState(null);
 
   // Effects Menu State
   const [isEffectsMenuOpen, setIsEffectsMenuOpen] = useState(false);
 
-  // Engine reference to apply effects
-  const [engineRef, setEngineRef] = useState(null);
+  // Active effects list state (Loaded/Saved via effectsStorage/Local Storage)
+  const [activeEffects, setActiveEffects] = useState(createDefaultActiveEffects());
 
-  // Effects state stored per session
-  const [effects, setEffectsState] = useState(() =>
-    loadEffectsForSession(getInitialActiveSession())
-  );
 
-  const setEffects = useCallback(
-    (valueOrUpdater) => {
-      setEffectsState((prev) => {
-        const raw =
-          typeof valueOrUpdater === "function"
-            ? valueOrUpdater(prev)
-            : valueOrUpdater;
-        const resolved = mergeWithDefaults(raw);
-        persistEffectsForSession(activeSession, resolved); // Persist using session logic
-        return resolved;
-      });
-    },
-    [activeSession]
-  );
-
-  // Sync effects state when activeSession changes
-  useEffect(() => {
-    const loaded = loadEffectsForSession(activeSession);
-
-    setEffectsState((prev) =>
-      shallowEqualEffects(prev, loaded) ? prev : loaded
-    );
-
-    if (engineRef?.current) {
-      try {
-        engineRef.current.setMasterEffects(loaded);
-      } catch (error) {
-        console.warn(
-          "Failed to sync engine effects for session change:",
-          error
-        );
-      }
-    }
-  }, [activeSession, engineRef]);
-
-  // Effects Menu Functions
-  const openEffectsMenu = () => setIsEffectsMenuOpen(true);
-  const closeEffectsMenu = () => setIsEffectsMenuOpen(false);
-
-  // Function to add new effects
-  const addEffect = useCallback((effectId) => {
-    if (effectId) {
-      setActiveEffects((prev) => {
-        // Avoid duplicates
-        if (prev.includes(effectId)) return prev;
-        const newActiveEffects = [...prev, effectId];
-
-        // Persist to localStorage
-        try {
-          localStorage.setItem(
-            "webamp.activeEffects",
-            JSON.stringify(newActiveEffects)
-          );
-        } catch (e) {
-          console.warn("Failed to persist active effects to localStorage:", e);
-        }
-
-        return newActiveEffects;
-      });
-    }
-    closeEffectsMenu();
+  const updateEffect = useCallback((effectName, value) => {
+    setEffects((prevEffects) => {
+      const newEffects = {
+        ...prevEffects,
+        [effectName]: value,
+      };
+      return newEffects;
+    });
   }, []);
 
-  // Function to remove effects - optimized to avoid unnecessary state updates
-  const removeEffect = useCallback(
-    (effectId) => {
-      // Define default values
-      const defaultValues = {
-        pitch: 0,
-        volume: 100,
-        reverb: 0,
-        delay: 0,
-        bass: 0,
-        distortion: 0,
-        pan: 0,
-        tremolo: 0,
-        vibrato: 0,
-        highpass: 20,
-        lowpass: 20000,
-        chorus: 0,
-      };
+  const resetEffect = useCallback((effectName, defaultValue) => {
+    setEffects((prevEffects) => ({
+      ...prevEffects,
+      [effectName]: defaultValue,
+    }));
+  }, []);
 
-      const defaultValue = defaultValues[effectId] || 0;
-      const currentValue = effects[effectId];
-
-      // Only update effects state if:
-      // 1. The effect exists in the current state AND
-      // 2. It's not already at the default value
-      const effectExists = effectId in effects;
-      const needsReset = effectExists && currentValue !== defaultValue;
-
-      if (needsReset) {
-        // Use the new setEffects which handles persistence via session logic
-        setEffects((prev) => {
-          const newEffects = {
-            ...prev,
-            [effectId]: defaultValue,
-          };
-          return newEffects;
-        });
-      }
-
-      // Always remove from active effects
-      setActiveEffects((prev) => {
-        const newActiveEffects = prev.filter((id) => id !== effectId);
-
-        // Persist to localStorage
-        try {
-          localStorage.setItem(
-            "webamp.activeEffects",
-            JSON.stringify(newActiveEffects)
-          );
-        } catch (e) {
-          console.warn("Failed to persist active effects to localStorage:", e);
-        }
-
-        return newActiveEffects;
-      });
-    },
-    [effects, setEffects] // Add setEffects dependency for removal logic
-  );
-
-  // Utility function to apply effects to engine (no unlock requirement)
-  const applyEffectsToEngine = useCallback(
-    (effectsToApply = effects) => {
-      if (engineRef?.current) {
-        try {
-          engineRef.current.setMasterEffects(effectsToApply);
-        } catch (error) {
-          console.warn("Failed to apply effects to engine:", error);
-        }
-      }
-    },
-    [engineRef, effects]
-  );
-
-  // Function to update effects
-  const updateEffect = useCallback(
-    async (effectName, value) => {
-      const numericValue = parseFloat(value);
-      setEffects((prev) => ({
-        ...prev,
-        [effectName]: Number.isFinite(numericValue)
-          ? numericValue
-          : (prev?.[effectName] ?? createDefaultEffects()[effectName]),
-      }));
-
-      // Attempt to unlock audio context
-      try {
-        await engineRef?.current?.ensureAudioUnlocked?.();
-      } catch {}
-    },
-    [engineRef, setEffects]
-  );
-
-  const resetEffect = useCallback(
-    (effectName, defaultValue) => {
-      updateEffect(effectName, defaultValue);
-    },
-    [updateEffect]
-  );
-
-  // Reset all effects
   const resetAllEffects = useCallback(() => {
     setEffects(createDefaultEffects());
-  }, [setEffects]);
+    setActiveEffects(createDefaultActiveEffects());
+  }, []);
 
-  // Apply current effects when engine becomes available
+  const openEffectsMenu = useCallback(() => {
+    setIsEffectsMenuOpen(true);
+  }, []);
+
+  const closeEffectsMenu = useCallback(() => {
+    setIsEffectsMenuOpen(false);
+  }, []);
+
+  const addEffect = useCallback((effectId) => {
+    setActiveEffects((prev) => {
+      if (!prev.includes(effectId)) {
+        return [...prev, effectId];
+      }
+      return prev;
+    });
+  }, []);
+
+  const removeEffect = useCallback((effectId) => {
+    setActiveEffects((prev) => prev.filter((id) => id !== effectId));
+  }, []);
+  
+  const applyEffectsToEngine = useCallback(
+    (currentEffects) => {
+      if (!engineRef) {
+        return;
+      }
+      try {
+        if (!shallowEqualEffects(currentEffects, engineRef.current.effects)) {
+          engineRef.current.applyEffects(currentEffects);
+        }
+      } catch (e) {
+        console.error("Failed to apply effects to engine:", e);
+      }
+    },
+    [engineRef]
+  );
+
+  // Persist activeSession (ID) and LOAD Active Effects List
   useEffect(() => {
-    applyEffectsToEngine();
-  }, [engineRef, applyEffectsToEngine]);
+    if (activeSession === undefined) return;
+    try {
+      // Persist activeSession ID
+      if (activeSession === null) {
+        window.localStorage.removeItem("webamp.activeSession");
+      } else {
+        window.localStorage.setItem(
+          "webamp.activeSession",
+          String(activeSession)
+        );
+      }
+    } catch {}
 
-  // Attempt to adopt an engineRef from a global if available
+    // Load ACTIVE EFFECTS LIST whenever activeSession changes
+    if (activeSession !== undefined) {
+      // Parameter values (`effects`) are handled by SessionsTab.jsx
+      
+      // Load and set the active effects list for the new session (Fix 2)
+      const loadedActiveEffects = loadActiveEffectsForSession(activeSession);
+      setActiveEffects(loadedActiveEffects);
+    }
+  }, [activeSession]);
+
+  // Persist ACTIVE EFFECTS LIST and Apply Effect Parameter Values to Engine
+  useEffect(() => {
+    // Only persist if there's an active session
+    if (typeof activeSession === "number" && Object.keys(effects).length > 0) {
+      // The `effects` parameter values are saved to IndexedDB by SessionsTab.jsx
+      // We only save the `activeEffects` list here.
+
+      // Persist the list of active effect IDs per-session (Fix 2)
+      persistActiveEffectsForSession(activeSession, activeEffects);
+    }
+
+    // Apply effect parameter values to the audio engine
+    applyEffectsToEngine(effects);
+  }, [effects, activeSession, applyEffectsToEngine, activeEffects]); 
+
+  // Engine ref adoption (remains the same)
   useEffect(() => {
     try {
       if (!engineRef && window.__WebAmpEngineRef) {
@@ -262,16 +169,6 @@ const AppContextProvider = ({children}) => {
       }
     } catch {}
   }, [engineRef]);
-
-  // Persist active effects when they change
-  useEffect(() => {
-    try {
-      localStorage.setItem(
-        "webamp.activeEffects",
-        JSON.stringify(activeEffects)
-      );
-    } catch {}
-  }, [activeEffects]);
 
 
   const contextValue = useMemo(
@@ -313,6 +210,8 @@ const AppContextProvider = ({children}) => {
       engineRef,
       applyEffectsToEngine,
       isEffectsMenuOpen,
+      openEffectsMenu,
+      closeEffectsMenu,
       addEffect,
       removeEffect,
       activeEffects,

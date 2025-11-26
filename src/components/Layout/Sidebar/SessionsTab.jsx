@@ -92,9 +92,10 @@ function SessionsTab() {
     };
 
     initialize();
-  }, [hasInitialized]);
+  }, [hasInitialized, activeSession, setEffects]);
 
-  // Load session effects when active session changes
+  // Load session effects when active session changes (REINSTATED)
+  // This ensures effects parameters are loaded from IndexedDB when switching sessions
   useEffect(() => {
     if (!activeSession || !hasInitialized) return;
 
@@ -111,9 +112,10 @@ function SessionsTab() {
     };
 
     loadSessionEffects();
-  }, [activeSession, hasInitialized]);
+  }, [activeSession, hasInitialized, setEffects]);
 
-  // Save effects when they change
+  // Save effects when they change (REINSTATED)
+  // This ensures effects parameters are saved to IndexedDB for persistence across refreshes
   useEffect(() => {
     if (!activeSession || !hasInitialized) return;
 
@@ -137,9 +139,9 @@ function SessionsTab() {
       const sessionNumber = sessions.length + 1;
       const newSessionName = `Session ${sessionNumber}`;
 
-      // Create new session with auto-generated name
+      // FIX: Use clean default effects (prevents copying)
       const newSessionId = await dbManager.createSession(newSessionName, {
-        effects: effects || createDefaultEffects(),
+        effects: createDefaultEffects(),
       });
       await loadSessions();
 
