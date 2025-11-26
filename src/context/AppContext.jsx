@@ -73,57 +73,71 @@ const AppContextProvider = ({children}) => {
     closeEffectsMenu();
   }, []);
 
-  // Function to remove effects - also resets the effect value
-  const removeEffect = useCallback((effectId) => {
-    // First reset the effect value to its default
-    const defaultValues = {
-      pitch: 0,
-      volume: 100,
-      reverb: 0,
-      delay: 0,
-      bass: 0,
-      distortion: 0,
-      pan: 0,
-      tremolo: 0,
-      vibrato: 0,
-      highpass: 20,
-      lowpass: 20000,
-      chorus: 0,
-    };
-
-    setEffects((prev) => {
-      const newEffects = {
-        ...prev,
-        [effectId]: defaultValues[effectId] || 0, // Use default value or 0 if not found
+  // Function to remove effects - optimized to avoid unnecessary state updates
+  const removeEffect = useCallback(
+    (effectId) => {
+      // Define default values
+      const defaultValues = {
+        pitch: 0,
+        volume: 100,
+        reverb: 0,
+        delay: 0,
+        bass: 0,
+        distortion: 0,
+        pan: 0,
+        tremolo: 0,
+        vibrato: 0,
+        highpass: 20,
+        lowpass: 20000,
+        chorus: 0,
       };
 
-      // Persist to localStorage
-      try {
-        localStorage.setItem("webamp.effects", JSON.stringify(newEffects));
-      } catch (e) {
-        console.warn("Failed to persist effects to localStorage:", e);
+      const defaultValue = defaultValues[effectId] || 0;
+      const currentValue = effects[effectId];
+
+      // Only update effects state if:
+      // 1. The effect exists in the current state AND
+      // 2. It's not already at the default value
+      const effectExists = effectId in effects;
+      const needsReset = effectExists && currentValue !== defaultValue;
+
+      if (needsReset) {
+        setEffects((prev) => {
+          const newEffects = {
+            ...prev,
+            [effectId]: defaultValue,
+          };
+
+          // Persist to localStorage
+          try {
+            localStorage.setItem("webamp.effects", JSON.stringify(newEffects));
+          } catch (e) {
+            console.warn("Failed to persist effects to localStorage:", e);
+          }
+
+          return newEffects;
+        });
       }
 
-      return newEffects;
-    });
+      // Always remove from active effects
+      setActiveEffects((prev) => {
+        const newActiveEffects = prev.filter((id) => id !== effectId);
 
-    // Then remove from active effects
-    setActiveEffects((prev) => {
-      const newActiveEffects = prev.filter((id) => id !== effectId);
+        // Persist to localStorage
+        try {
+          localStorage.setItem(
+            "webamp.activeEffects",
+            JSON.stringify(newActiveEffects)
+          );
+        } catch (e) {
+          console.warn("Failed to persist active effects to localStorage:", e);
+        }
 
-      // Persist to localStorage
-      try {
-        localStorage.setItem(
-          "webamp.activeEffects",
-          JSON.stringify(newActiveEffects)
-        );
-      } catch (e) {
-        console.warn("Failed to persist active effects to localStorage:", e);
-      }
-
-      return newActiveEffects;
-    });
-  }, []);
+        return newActiveEffects;
+      });
+    },
+    [effects]
+  );
 
   // Utility function to apply effects to engine (no unlock requirement)
   const applyEffectsToEngine = useCallback(
