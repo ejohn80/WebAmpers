@@ -30,8 +30,8 @@ describe("AppContext session effect syncing", () => {
 
     const effectsBySession = {
       sessions: {
-        "1": {...defaults, pitch: 4},
-        "2": {...defaults, reverb: 65},
+        1: {...defaults, pitch: 4},
+        2: {...defaults, reverb: 65},
       },
     };
 

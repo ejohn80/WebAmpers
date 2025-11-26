@@ -92,7 +92,10 @@ const AppContextProvider = ({children}) => {
       try {
         engineRef.current.setMasterEffects(loaded);
       } catch (error) {
-        console.warn("Failed to sync engine effects for session change:", error);
+        console.warn(
+          "Failed to sync engine effects for session change:",
+          error
+        );
       }
     }
   }, [activeSession, engineRef]);
