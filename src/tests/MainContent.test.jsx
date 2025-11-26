@@ -1,7 +1,8 @@
 import React from "react";
 import {describe, it, expect, beforeEach, vi} from "vitest";
 import {render, screen, waitFor} from "@testing-library/react";
-import MainContent from "../components/Layout/MainContent.jsx";
+import MainContent from "../components/Layout/MainContent";
+import {AppContext} from "../context/AppContext";
 
 const {trackLaneMock} = vi.hoisted(() => ({
   trackLaneMock: vi.fn(({track}) => (
@@ -52,9 +53,7 @@ class ResizeObserverStub {
     this.callback();
   }
 
-  disconnect() {
-    /* noop */
-  }
+  disconnect() {}
 }
 
 globalThis.ResizeObserver = ResizeObserverStub;
@@ -70,6 +69,21 @@ const setScrollAreaWidth = (width) => {
   ResizeObserverStub.callback?.();
 };
 
+const mockAppContextValue = {
+  // MainContent needs this property to avoid the TypeError
+  isEffectsMenuOpen: false,
+};
+
+// Wrapper function to ensure the component is rendered with the necessary context
+const renderMainContent = (props) => {
+  return render(
+    <AppContext.Provider value={mockAppContextValue}>
+      <MainContent {...props} />
+    </AppContext.Provider>
+  );
+};
+// --- End Mock Context Setup ---
+
 describe("MainContent multi-track layout", () => {
   beforeEach(() => {
     trackLaneMock.mockClear();
@@ -77,7 +91,7 @@ describe("MainContent multi-track layout", () => {
   });
 
   it("renders empty state when no tracks exist", () => {
-    render(<MainContent tracks={[]} totalLengthMs={0} />);
+    renderMainContent({tracks: [], totalLengthMs: 0});
 
     expect(screen.getByText(/Import an audio file/i)).toBeInTheDocument();
     expect(screen.queryByTestId("mock-tracklane")).not.toBeInTheDocument();
@@ -90,7 +104,7 @@ describe("MainContent multi-track layout", () => {
       {id: "t2", name: "Track 2"},
     ];
 
-    render(<MainContent tracks={tracks} totalLengthMs={2000} />);
+    renderMainContent({tracks, totalLengthMs: 2000});
 
     await waitFor(() => {
       expect(trackLaneMock.mock.calls.length).toBeGreaterThanOrEqual(
