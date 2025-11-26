@@ -1,4 +1,4 @@
-import {useState, useEffect, useContext} from "react";
+import {useState, useEffect, useContext, useRef} from "react";
 import {MoonLoader} from "react-spinners";
 import {RxCross2} from "react-icons/rx";
 import {FaTrash} from "react-icons/fa";
@@ -17,6 +17,7 @@ function SessionsTab() {
   const [hasInitialized, setHasInitialized] = useState(false);
   const [renamingSessionId, setRenamingSessionId] = useState(null);
   const [renameValue, setRenameValue] = useState("");
+  const initializingRef = useRef(false);
 
   // Load sessions from IndexedDB
   const loadSessions = async () => {
@@ -42,44 +43,52 @@ function SessionsTab() {
 
   // Initialize: Create default session if none exist
   useEffect(() => {
-    if (hasInitialized) return;
+    if (hasInitialized || initializingRef.current) return;
+    initializingRef.current = true;
 
     const initialize = async () => {
-      const allSessions = await loadSessions();
+      try {
+        const allSessions = await loadSessions();
 
-      // If no sessions exist, create a default one
-      if (allSessions.length === 0) {
-        try {
-          const defaultSessionId = await dbManager.createSession("Session 1", {
-            effects: createDefaultEffects(),
-          });
-          console.log("Created default session:", defaultSessionId);
-          setActiveSession(defaultSessionId);
-          await loadSessions();
-        } catch (e) {
-          console.error("Failed to create default session:", e);
-        }
-      } else if (!activeSession) {
-        // If sessions exist but none is active, activate the first one
-        console.log(
-          "Setting active session to first available:",
-          allSessions[0].id
-        );
-        setActiveSession(allSessions[0].id);
-      } else {
-        // Active session exists, load its effects
-        console.log("Loading existing active session:", activeSession);
-        try {
-          const session = await dbManager.getSession(activeSession);
-          if (session && session.effects) {
-            setEffects(session.effects);
+        // If no sessions exist, create a default one
+        if (allSessions.length === 0) {
+          try {
+            const defaultSessionId = await dbManager.createSession(
+              "Session 1",
+              {
+                effects: createDefaultEffects(),
+              }
+            );
+            console.log("Created default session:", defaultSessionId);
+            setActiveSession(defaultSessionId);
+            await loadSessions();
+          } catch (e) {
+            console.error("Failed to create default session:", e);
           }
-        } catch (e) {
-          console.error("Failed to load initial session data:", e);
+        } else if (!activeSession) {
+          // If sessions exist but none is active, activate the first one
+          console.log(
+            "Setting active session to first available:",
+            allSessions[0].id
+          );
+          setActiveSession(allSessions[0].id);
+        } else {
+          // Active session exists, load its effects
+          console.log("Loading existing active session:", activeSession);
+          try {
+            const session = await dbManager.getSession(activeSession);
+            if (session && session.effects) {
+              setEffects(session.effects);
+            }
+          } catch (e) {
+            console.error("Failed to load initial session data:", e);
+          }
         }
-      }
 
-      setHasInitialized(true);
+        setHasInitialized(true);
+      } finally {
+        initializingRef.current = false;
+      }
     };
 
     initialize();
