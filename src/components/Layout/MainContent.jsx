@@ -132,10 +132,8 @@ function MainContent({
 
   const hasTracks = Array.isArray(tracks) && tracks.length > 0;
 
-  const zoomIn = () =>
-    setZoomStep((z) => Math.min(MAX_ZOOM_STEP, z + 1));
-  const zoomOut = () =>
-    setZoomStep((z) => Math.max(MIN_ZOOM_STEP, z - 1));
+  const zoomIn = () => setZoomStep((z) => Math.min(MAX_ZOOM_STEP, z + 1));
+  const zoomOut = () => setZoomStep((z) => Math.max(MIN_ZOOM_STEP, z - 1));
   const resetZoom = () => setZoomStep(0);
   const toggleFollow = () => setFollowPlayhead((v) => !v);
 

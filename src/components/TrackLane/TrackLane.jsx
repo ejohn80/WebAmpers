@@ -211,7 +211,6 @@ function TrackLane({
             >
               {soloed ? "Soloed" : "Solo"}
             </button>
-
           </div>
         </div>
       </div>

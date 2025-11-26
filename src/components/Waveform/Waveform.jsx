@@ -27,7 +27,7 @@ const Waveform = ({
 
   // Track container resize so we can redraw with accurate resolution when zooming
   useEffect(() => {
-  const container = containerRef.current;
+    const container = containerRef.current;
     if (!container) return;
 
     const updateSize = () => {
