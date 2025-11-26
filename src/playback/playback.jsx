@@ -91,6 +91,7 @@ class PlaybackEngine {
     Tone.Transport.cancel(0);
     this._cancelRaf();
     this._disposeAll();
+    this._disposeMaster();
     this._emitTransport(false);
 
     // Save the version reference
@@ -102,14 +103,14 @@ class PlaybackEngine {
     const ts = Array.isArray(version.timeSig) ? version.timeSig : [4, 4];
     Tone.Transport.timeSignature = ts;
 
-    // Create master bus
-    this.master = this._makeMaster(version.masterChain);
+    // Create master bus using the effects defined in the project's masterChain
+    this.master = this._createMasterChain(version.masterChain);
 
     // Create all track buses and connect them to master
     (version.tracks || []).forEach((t) => {
       const bus = this._makeTrackBus(t);
       this.trackBuses.set(t.id, bus);
-      (bus.fxOut ?? bus.pan).connect(this.master.fxIn ?? this.master.gain);
+      (bus.fxOut ?? bus.pan).connect(this.master.fxIn);
     });
 
     // Prepare all audio segments (Tone.Player instances)
@@ -947,6 +948,87 @@ class PlaybackEngine {
         /* To suppress linter warning */
       }
     }
+  }
+
+  /** Dispose of the current master bus chain (effects and gain node) */
+  _disposeMaster() {
+    if (this.master) {
+      // If there's an effects chain (fxIn != master gain), disconnect it
+      if (this.master.fxIn && this.master.fxIn !== this.master.gain) {
+        this.master.fxIn.disconnect();
+        if (Array.isArray(this.master.effects)) {
+          // Dispose of all individual effects nodes
+          this.master.effects.forEach((e) => e.dispose());
+        }
+      }
+      // Dispose of the final gain node
+      this.master.gain.dispose();
+      this.master = null;
+    }
+  }
+
+  /**
+   * Create the master audio chain with effects applied.
+   * @param {Object} effects - The effects configuration object (from AppContext.effects).
+   * @returns {{gain: Tone.Gain, fxIn: Tone.AudioNode, effects: Array<Tone.AudioNode>}}
+   */
+  /**
+   * Create the master audio chain with effects applied.
+   * @param {Object} effects - The effects configuration object (from AppContext.effects).
+   * @returns {{gain: Tone.Gain, fxIn: Tone.AudioNode, effects: Array<Tone.AudioNode>}}
+   */
+  _createMasterChain(effects = {}) {
+    // Create the final gain stage (Master Volume). Connected to master output.
+    const masterGain = new Tone.Gain(1).toDestination();
+
+    // Build the effects chain using the existing Tone.js logic
+    const effectsChain = this._buildEffectsChain(effects, Tone.context);
+
+    let fxIn = masterGain; // Default input is the masterGain itself (no effects)
+
+    if (effectsChain.length > 0) {
+      for (let i = 0; i < effectsChain.length - 1; i++) {
+        effectsChain[i].connect(effectsChain[i + 1]);
+      }
+      fxIn = effectsChain[0];
+      effectsChain[effectsChain.length - 1].connect(masterGain);
+    }
+
+    return {
+      gain: masterGain,
+      fxIn: fxIn,
+      effects: effectsChain,
+    };
+  }
+
+  /**
+   * Apply a new set of master effects to the audio engine. (The missing function)
+   * This replaces and reconnects the entire master bus chain to ensure live updates.
+   * @param {Object} effects - The effects configuration object.
+   */
+  applyEffects(effects) {
+    // 1. Create the new master chain with the new effects
+    const newMaster = this._createMasterChain(effects);
+
+    // 2. Reconnect all existing track buses to the new master input
+    this.trackBuses.forEach((bus) => {
+      // Find the old connection point and disconnect it
+      const oldMasterIn = this.master?.fxIn ?? this.master?.gain;
+      if (oldMasterIn) {
+        (bus.fxOut ?? bus.pan).disconnect(oldMasterIn);
+      }
+
+      // Connect to the new master input
+      (bus.fxOut ?? bus.pan).connect(newMaster.fxIn);
+    });
+
+    // 3. Dispose of the old master chain
+    this._disposeMaster();
+
+    // 4. Update the internal reference
+    this.master = newMaster;
+
+    console.log("Master effects applied.");
   }
 }
 

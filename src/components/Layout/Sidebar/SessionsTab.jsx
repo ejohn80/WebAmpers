@@ -1,4 +1,4 @@
-import {useState, useEffect, useContext, useRef} from "react";
+import {useState, useEffect, useContext, useRef, useCallback} from "react";
 import {MoonLoader} from "react-spinners";
 import {RxCross2} from "react-icons/rx";
 import {FaTrash} from "react-icons/fa";
@@ -20,7 +20,7 @@ function SessionsTab() {
   const initializingRef = useRef(false);
 
   // Load sessions from IndexedDB
-  const loadSessions = async () => {
+  const loadSessions = useCallback(async () => {
     try {
       setIsLoading(true);
       const allSessions = await dbManager.getAllSessions();
@@ -39,7 +39,7 @@ function SessionsTab() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [activeSession, setActiveSession]);
 
   // Initialize: Create default session if none exist
   useEffect(() => {
@@ -92,9 +92,16 @@ function SessionsTab() {
     };
 
     initialize();
-  }, [hasInitialized]);
+  }, [
+    hasInitialized,
+    activeSession,
+    setEffects,
+    loadSessions,
+    setActiveSession,
+  ]);
 
   // Load session effects when active session changes
+  // This ensures effects parameters are loaded from IndexedDB when switching sessions
   useEffect(() => {
     if (!activeSession || !hasInitialized) return;
 
@@ -111,9 +118,10 @@ function SessionsTab() {
     };
 
     loadSessionEffects();
-  }, [activeSession, hasInitialized]);
+  }, [activeSession, hasInitialized, setEffects]);
 
-  // Save effects when they change
+  // Save effects when they change (REINSTATED)
+  // This ensures effects parameters are saved to IndexedDB for persistence across refreshes
   useEffect(() => {
     if (!activeSession || !hasInitialized) return;
 
@@ -137,9 +145,9 @@ function SessionsTab() {
       const sessionNumber = sessions.length + 1;
       const newSessionName = `Session ${sessionNumber}`;
 
-      // Create new session with auto-generated name
+      // FIX: Use clean default effects (prevents copying)
       const newSessionId = await dbManager.createSession(newSessionName, {
-        effects: effects || createDefaultEffects(),
+        effects: createDefaultEffects(),
       });
       await loadSessions();
 

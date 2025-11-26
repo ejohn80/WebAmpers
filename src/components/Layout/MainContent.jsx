@@ -1,9 +1,12 @@
-import React, {useEffect, useMemo, useRef, useState} from "react";
+import React, {useEffect, useMemo, useRef, useState, useContext} from "react";
 import DraggableDiv from "../Generic/DraggableDiv";
 import GlobalPlayhead from "../Generic/GlobalPlayhead";
 import TimelineRuler from "./TimelineRuler";
 import TrackLane from "../../components/TrackLane/TrackLane";
 import {progressStore} from "../../playback/progressStore";
+import {AppContext} from "../../context/AppContext";
+import EffectsMenu from "./Effects/EffectsMenu";
+import styles from "./MainContent.module.css";
 import "./MainContent.css";
 
 /**
@@ -30,8 +33,11 @@ function MainContent({
   onSolo,
   onDelete,
   onAssetDrop,
+  onAssetDrop,
   totalLengthMs = 0,
 }) {
+  const {isEffectsMenuOpen} = useContext(AppContext);
+
   // Exponential zoom lets us reach detailed waveform views quickly
   const [zoomStep, setZoomStep] = useState(0); // 0 => 1x, ±n => 2^n scale
   const zoomScale = useMemo(() => Math.pow(2, zoomStep), [zoomStep]);
@@ -195,10 +201,17 @@ function MainContent({
 
   return (
     <DraggableDiv
-      className="maincontent"
+      className={`maincontent ${isEffectsMenuOpen ? styles.blurred : ""}`}
       style={timelineStyle}
       disableSectionPadding
     >
+      {/* Effects Menu */}
+      {isEffectsMenuOpen && (
+        <div className={styles.effectsMenuContainer}>
+          <EffectsMenu />
+        </div>
+      )}
+
       <div
         className="timeline-scroll-area"
         ref={scrollAreaRef}

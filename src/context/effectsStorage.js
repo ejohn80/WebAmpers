@@ -1,6 +1,7 @@
 const EFFECTS_STORAGE_KEY = "webamp.effectsBySession";
 const LEGACY_EFFECTS_KEY = "webamp.effects";
 const GLOBAL_SESSION_KEY = "__global";
+const ACTIVE_EFFECTS_STORAGE_KEY = "webamp.activeEffectsBySession";
 
 const DEFAULT_EFFECTS = Object.freeze({
   pitch: 0,
@@ -139,6 +140,68 @@ export const loadEffectsForSession = (sessionId) => {
 
   const defaults = createDefaultEffects();
   persistEffectsForSessionWithStore(sessionId, defaults, store);
+  return defaults;
+};
+
+// ==========================================================
+// ACTIVE EFFECTS LIST FUNCTIONS (FOR DROPDOWN PERSISTENCE)
+// ==========================================================
+
+export const createDefaultActiveEffects = () => [];
+
+const persistActiveEffectsForSessionWithStore = (sessionId, payload, store) => {
+  if (!canUseStorage()) return;
+  const sessionKey = normalizeSessionKey(sessionId);
+
+  if (!store) {
+    // Read the active effects store (different key)
+    store = readJSON(ACTIVE_EFFECTS_STORAGE_KEY) || {
+      sessions: {},
+      global: createDefaultActiveEffects(),
+    };
+  }
+
+  if (sessionKey === GLOBAL_SESSION_KEY) {
+    store.global = payload;
+  } else {
+    if (!store.sessions) {
+      store.sessions = {};
+    }
+    store.sessions[sessionKey] = payload;
+  }
+
+  writeJSON(ACTIVE_EFFECTS_STORAGE_KEY, store);
+};
+
+export const persistActiveEffectsForSession = (
+  sessionId,
+  activeEffectsList
+) => {
+  persistActiveEffectsForSessionWithStore(sessionId, activeEffectsList);
+};
+
+export const loadActiveEffectsForSession = (sessionId) => {
+  if (!canUseStorage()) return createDefaultActiveEffects();
+
+  const store = readJSON(ACTIVE_EFFECTS_STORAGE_KEY) || {
+    sessions: {},
+    global: createDefaultActiveEffects(),
+  };
+  const sessionKey = normalizeSessionKey(sessionId);
+
+  const sessionActiveEffects =
+    sessionKey === GLOBAL_SESSION_KEY
+      ? store.global
+      : store.sessions && store.sessions[sessionKey];
+
+  if (sessionActiveEffects) {
+    return sessionActiveEffects;
+  }
+
+  const defaults = createDefaultActiveEffects();
+
+  persistActiveEffectsForSessionWithStore(sessionId, defaults, store);
+
   return defaults;
 };
 

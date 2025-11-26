@@ -3,6 +3,9 @@ import {render, waitFor} from "@testing-library/react";
 import * as Tone from "tone";
 import WebAmpPlayback, {PlaybackEngine} from "../playback/playback.jsx";
 
+// Helper function from playback.jsx: Convert decibels to linear gain value
+const dbToGain = (db) => (typeof db === "number" ? Math.pow(10, db / 20) : 1);
+
 // Provide a mock implementation of Tone used by playback.jsx. This mock is
 // deliberately minimal and focused on the Gain/panning/mute/solo behavior we
 // want to test.
@@ -28,6 +31,10 @@ vi.mock("tone", () => {
       connect() {}
       disconnect() {}
       dispose() {}
+      toDestination() {
+        this.connect(this.destination ?? {});
+        return this;
+      }
     },
     // Minimal Panner
     Panner: class MockPan {
@@ -136,19 +143,20 @@ describe("PlaybackEngine mute/solo behavior (via WebAmpPlayback)", () => {
     const bus2 = engineInstance.trackBuses.get("t2");
     expect(bus1).toBeDefined();
     expect(bus2).toBeDefined();
-    // initial gain for gainDb=0 -> 1
-    expect(bus1.gain.gain.value).toBeCloseTo(1);
-    // gainDb=-6 -> ~0.501
-    expect(bus2.gain.gain.value).toBeGreaterThan(0);
+
+    // Use dbToGain for precise assertion
+    expect(bus1.gain.gain.value).toBeCloseTo(dbToGain(0)); // 0dB -> 1.0
+    expect(bus2.gain.gain.value).toBeCloseTo(dbToGain(-6)); // -6dB -> ~0.501
 
     // Mute t1
     engineInstance.setTrackMute("t1", true);
-    // _applyMuteSolo uses exponentialRampToValueAtTime which in our mock sets value
+    // _applyMuteSolo uses 0.0001 for mute target
     expect(bus1.gain.gain.value).toBeCloseTo(0.0001);
 
     // Unmute t1
     engineInstance.setTrackMute("t1", false);
-    expect(bus1.gain.gain.value).toBeCloseTo(1);
+    // Should restore to initial value (1)
+    expect(bus1.gain.gain.value).toBeCloseTo(dbToGain(0));
   });
 
   it("solo mutes other tracks and mute overrides solo", async () => {
@@ -176,13 +184,17 @@ describe("PlaybackEngine mute/solo behavior (via WebAmpPlayback)", () => {
     const b = engineInstance.trackBuses.get("b");
     const c = engineInstance.trackBuses.get("c");
 
-    // Sanity initial: b is muted from metadata
+    // Sanity initial: b is muted from metadata (0.0001)
     expect(b.gain.gain.value).toBeCloseTo(0.0001);
+    // a and c should be at 1.0 (dbToGain(0))
+    expect(a.gain.gain.value).toBeCloseTo(dbToGain(0));
+    expect(c.gain.gain.value).toBeCloseTo(dbToGain(0));
 
     // Solo track 'a'
     engineInstance.setTrackSolo("a", true);
-    // a should be audible, c should be muted because not soloed
-    expect(a.gain.gain.value).toBeGreaterThan(0.1);
+    // a should be audible (1.0) - FIX: use precise assertion
+    expect(a.gain.gain.value).toBeCloseTo(dbToGain(0));
+    // c should be muted because not soloed (0.0001)
     expect(c.gain.gain.value).toBeCloseTo(0.0001);
 
     // Now solo 'b' as well, but b has explicit mute true — mute should take precedence

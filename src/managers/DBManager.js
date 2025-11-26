@@ -1,5 +1,5 @@
 const DB_NAME = "WebAmpDB";
-const DB_VERSION = 3; // Increment version to add assets support
+const DB_VERSION = 3;
 const TRACKS_STORE_NAME = "tracks";
 const SESSIONS_STORE_NAME = "sessions";
 const ASSETS_STORE_NAME = "assets";
