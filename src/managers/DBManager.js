@@ -334,18 +334,44 @@ class DBManager {
         return;
       }
 
-      const updateRequest = store.put(trackData);
+      const existingRequest = store.get(trackData.id);
 
-      updateRequest.onsuccess = () => {
-        console.log(`Track ${track.id} updated in IndexedDB`);
+      existingRequest.onsuccess = () => {
+        const existing = existingRequest.result || {};
+        const merged = {
+          ...existing,
+          ...trackData,
+          sessionId:
+            trackData.sessionId !== undefined && trackData.sessionId !== null
+              ? trackData.sessionId
+              : existing.sessionId,
+          assetId:
+            trackData.assetId !== undefined && trackData.assetId !== null
+              ? trackData.assetId
+              : existing.assetId,
+        };
+
+        const updateRequest = store.put(merged);
+
+        updateRequest.onsuccess = () => {
+          console.log(`Track ${track.id} updated in IndexedDB`);
+        };
+
+        updateRequest.onerror = (event) => {
+          console.error(
+            `Failed to update track ${track.id}:`,
+            event.target.error
+          );
+          reject(new Error("Failed to update track"));
+        };
       };
 
-      updateRequest.onerror = (event) => {
+      existingRequest.onerror = (event) => {
         console.error(
-          `Failed to update track ${track.id}:`,
+          `Failed to load existing track ${track.id} before update:`,
           event.target.error
         );
-        reject(new Error("Failed to update track"));
+        reject(new Error("Failed to read track before update"));
       };
 
       transaction.oncomplete = () => resolve();
@@ -371,6 +397,8 @@ class DBManager {
       mute: track.mute,
       solo: track.solo,
       order: track.order ?? 0,
+      sessionId: track.sessionId ?? track._sessionId,
+      assetId: track.assetId ?? track._assetId,
       segments: [],
     };
 
