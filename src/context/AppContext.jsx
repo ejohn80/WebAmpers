@@ -5,10 +5,9 @@ import {
   loadEffectsForSession,
   persistEffectsForSession,
   mergeWithDefaults,
-} from "./effectsStorage"; // <-- Keep feature branch import
+} from "./effectsStorage";
 export const AppContext = createContext();
 
-// --- Feature Branch Session Logic (Keep) ---
 const getInitialActiveSession = () => {
   if (
     typeof window === "undefined" ||
@@ -35,7 +34,6 @@ const shallowEqualEffects = (a = {}, b = {}) => {
   }
   return true;
 };
-// -------------------------------------------
 
 const AppContextProvider = ({children}) => {
   useEffect(() => {}, []);
@@ -44,10 +42,10 @@ const AppContextProvider = ({children}) => {
 
   const [activeProject, setActiveProject] = useState();
 
-  // Active session state with localStorage persistence (Feature Branch)
+  // Active session state with localStorage persistence
   const [activeSession, setActiveSession] = useState(getInitialActiveSession);
 
-  // Persist active session to localStorage (Feature Branch)
+  // Persist active session to localStorage
   useEffect(() => {
     try {
       if (activeSession !== null) {
@@ -76,7 +74,7 @@ const AppContextProvider = ({children}) => {
   // Engine reference to apply effects
   const [engineRef, setEngineRef] = useState(null);
 
-  // Effects state stored per session (Feature Branch logic)
+  // Effects state stored per session
   const [effects, setEffectsState] = useState(() =>
     loadEffectsForSession(getInitialActiveSession())
   );
@@ -96,7 +94,7 @@ const AppContextProvider = ({children}) => {
     [activeSession]
   );
 
-  // Sync effects state when activeSession changes (Feature Branch logic)
+  // Sync effects state when activeSession changes
   useEffect(() => {
     const loaded = loadEffectsForSession(activeSession);
 
@@ -116,11 +114,11 @@ const AppContextProvider = ({children}) => {
     }
   }, [activeSession, engineRef]);
 
-  // Effects Menu Functions (Head/Merged)
+  // Effects Menu Functions
   const openEffectsMenu = () => setIsEffectsMenuOpen(true);
   const closeEffectsMenu = () => setIsEffectsMenuOpen(false);
 
-  // Function to add new effects (Head/Merged)
+  // Function to add new effects
   const addEffect = useCallback((effectId) => {
     if (effectId) {
       setActiveEffects((prev) => {
@@ -144,7 +142,7 @@ const AppContextProvider = ({children}) => {
     closeEffectsMenu();
   }, []);
 
-  // Function to remove effects - optimized to avoid unnecessary state updates (Head/Merged)
+  // Function to remove effects - optimized to avoid unnecessary state updates
   const removeEffect = useCallback(
     (effectId) => {
       // Define default values
@@ -217,7 +215,7 @@ const AppContextProvider = ({children}) => {
     [engineRef, effects]
   );
 
-  // Function to update effects (Feature Branch logic)
+  // Function to update effects
   const updateEffect = useCallback(
     async (effectName, value) => {
       const numericValue = parseFloat(value);
@@ -233,7 +231,7 @@ const AppContextProvider = ({children}) => {
         await engineRef?.current?.ensureAudioUnlocked?.();
       } catch {}
     },
-    [engineRef, setEffects] // Use setEffects from feature branch
+    [engineRef, setEffects]
   );
 
   const resetEffect = useCallback(
@@ -243,7 +241,7 @@ const AppContextProvider = ({children}) => {
     [updateEffect]
   );
 
-  // Reset all effects (Feature Branch logic)
+  // Reset all effects
   const resetAllEffects = useCallback(() => {
     setEffects(createDefaultEffects());
   }, [setEffects]);
@@ -253,7 +251,7 @@ const AppContextProvider = ({children}) => {
     applyEffectsToEngine();
   }, [engineRef, applyEffectsToEngine]);
 
-  // Attempt to adopt an engineRef from a global if available (Feature Branch logic)
+  // Attempt to adopt an engineRef from a global if available
   useEffect(() => {
     try {
       if (!engineRef && window.__WebAmpEngineRef) {
@@ -265,7 +263,7 @@ const AppContextProvider = ({children}) => {
     } catch {}
   }, [engineRef]);
 
-  // Persist active effects when they change (Head/Merged)
+  // Persist active effects when they change
   useEffect(() => {
     try {
       localStorage.setItem(
@@ -275,8 +273,6 @@ const AppContextProvider = ({children}) => {
     } catch {}
   }, [activeEffects]);
 
-  // NOTE: The previous `useEffect` for effects persistence is now handled inside `setEffects`
-  // NOTE: The previous `useEffect` for fallback effects persistence is removed as setEffects handles it.
 
   const contextValue = useMemo(
     () => ({
@@ -284,10 +280,10 @@ const AppContextProvider = ({children}) => {
       loading,
       activeProject,
       setActiveProject,
-      activeSession, // <-- Keep feature branch state
-      setActiveSession, // <-- Keep feature branch setter
+      activeSession,
+      setActiveSession,
       effects,
-      setEffects, // <-- Keep feature branch setter
+      setEffects,
       updateEffect,
       resetEffect,
       resetAllEffects,
@@ -306,11 +302,11 @@ const AppContextProvider = ({children}) => {
       userData,
       loading,
       activeProject,
-      setActiveProject, // <-- Keep from feature branch (it was implicit in the base)
-      activeSession, // <-- Keep feature branch dependency
-      setActiveSession, // <-- Keep feature branch dependency
+      setActiveProject,
+      activeSession,
+      setActiveSession,
       effects,
-      setEffects, // <-- Keep feature branch dependency
+      setEffects,
       updateEffect,
       resetEffect,
       resetAllEffects,
