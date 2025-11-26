@@ -33,7 +33,6 @@ function MainContent({
   onSolo,
   onDelete,
   onAssetDrop,
-  onAssetDrop,
   totalLengthMs = 0,
 }) {
   const {isEffectsMenuOpen} = useContext(AppContext);

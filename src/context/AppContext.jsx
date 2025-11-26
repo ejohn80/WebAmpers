@@ -5,7 +5,7 @@ import {
   mergeWithDefaults,
   loadActiveEffectsForSession,
   persistActiveEffectsForSession,
-  createDefaultActiveEffects,
+  createDefaultActiveEffects
 } from "./effectsStorage";
 
 export const AppContext = createContext();
@@ -85,45 +85,6 @@ const AppContextProvider = ({children}) => {
     loadEffectParametersForSession(activeSession)
   );
   const [engineRef, setEngineRef] = useState(null);
-
-  // Effects state stored per session
-  const [effects, setEffectsState] = useState(() =>
-    loadEffectsForSession(getInitialActiveSession())
-  );
-
-  const setEffects = useCallback(
-    (valueOrUpdater) => {
-      setEffectsState((prev) => {
-        const raw =
-          typeof valueOrUpdater === "function"
-            ? valueOrUpdater(prev)
-            : valueOrUpdater;
-        const resolved = mergeWithDefaults(raw);
-        persistEffectsForSession(activeSession, resolved);
-        return resolved;
-      });
-    },
-    [activeSession]
-  );
-
-  useEffect(() => {
-    const loaded = loadEffectsForSession(activeSession);
-
-    setEffectsState((prev) =>
-      shallowEqualEffects(prev, loaded) ? prev : loaded
-    );
-
-    if (engineRef?.current) {
-      try {
-        engineRef.current.setMasterEffects(loaded);
-      } catch (error) {
-        console.warn(
-          "Failed to sync engine effects for session change:",
-          error
-        );
-      }
-    }
-  }, [activeSession, engineRef]);
 
   // Effects Menu State
   const [isEffectsMenuOpen, setIsEffectsMenuOpen] = useState(false);
