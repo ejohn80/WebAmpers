@@ -555,20 +555,20 @@ export function SoundOffIcon() {
       fill="none"
     >
       <path
-        fill-rule="evenodd"
-        clip-rule="evenodd"
+        fillRule="evenodd"
+        clipRule="evenodd"
         d="M22.0003 6.08398L17.6533 12Z"
         fill="#17E1FF"
       />
       <path
-        fill-rule="evenodd"
-        clip-rule="evenodd"
+        fillRule="evenodd"
+        clipRule="evenodd"
         d="M22.0003 6.08398L17.6533 12Z"
         fill="#17E1FF"
       />
       <path
-        fill-rule="evenodd"
-        clip-rule="evenodd"
+        fillRule="evenodd"
+        clipRule="evenodd"
         d="M17.6533 6.08398L22.0003 12Z"
         fill="#17E1FF"
       />
@@ -772,9 +772,9 @@ export function PlusSignIcon() {
       <path
         d="M1 6H6.5M6.5 6H12M6.5 6V11M6.5 6V1"
         stroke="#17E1FF"
-        stroke-width="2.5"
-        stroke-linecap="round"
-        stroke-linejoin="round"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
       />
     </svg>
   );
@@ -792,9 +792,9 @@ export function XIcon() {
       <path
         d="M1 9L4.50003 5.00003M4.50003 5.00003L8 1M4.50003 5.00003L1 1M4.50003 5.00003L8 9"
         stroke="white"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
       />
     </svg>
   );
