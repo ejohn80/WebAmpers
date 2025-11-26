@@ -31,6 +31,26 @@ const msToBeats = (ms, bpm) => (ms / 1000) * (bpm / 60);
 // Convert milliseconds to Tone.js "transport time" string format
 const msToToneTime = (ms, bpm) => `${msToBeats(ms, bpm)}i`; // i = immutable numeric time
 
+const EMPTY_TIMELINE_VERSION_TEMPLATE = Object.freeze({
+  bpm: 120,
+  timeSig: [4, 4],
+  lengthMs: 0,
+  tracks: [],
+  segments: [],
+  loop: {enabled: false},
+  masterChain: [],
+});
+
+const createEmptyTimelineVersion = () => ({
+  bpm: EMPTY_TIMELINE_VERSION_TEMPLATE.bpm,
+  timeSig: [...EMPTY_TIMELINE_VERSION_TEMPLATE.timeSig],
+  lengthMs: EMPTY_TIMELINE_VERSION_TEMPLATE.lengthMs,
+  tracks: [],
+  segments: [],
+  loop: {...EMPTY_TIMELINE_VERSION_TEMPLATE.loop},
+  masterChain: [...EMPTY_TIMELINE_VERSION_TEMPLATE.masterChain],
+});
+
 /** ---------- PlaybackEngine----------
  * Core class responsible for handling all playback logic using Tone.js.
  * It manages audio transport, tracks, master bus, and segment playback.
@@ -71,6 +91,7 @@ class PlaybackEngine {
     Tone.Transport.cancel(0);
     this._cancelRaf();
     this._disposeAll();
+    this._disposeMaster();
     this._emitTransport(false);
 
     // Save the version reference
@@ -82,14 +103,14 @@ class PlaybackEngine {
     const ts = Array.isArray(version.timeSig) ? version.timeSig : [4, 4];
     Tone.Transport.timeSignature = ts;
 
-    // Create master bus
-    this.master = this._makeMaster(version.masterChain);
+    // Create master bus using the effects defined in the project's masterChain
+    this.master = this._createMasterChain(version.masterChain);
 
     // Create all track buses and connect them to master
     (version.tracks || []).forEach((t) => {
       const bus = this._makeTrackBus(t);
       this.trackBuses.set(t.id, bus);
-      (bus.fxOut ?? bus.pan).connect(this.master.fxIn ?? this.master.gain);
+      (bus.fxOut ?? bus.pan).connect(this.master.fxIn);
     });
 
     // Prepare all audio segments (Tone.Player instances)
@@ -928,6 +949,87 @@ class PlaybackEngine {
       }
     }
   }
+
+  /** Dispose of the current master bus chain (effects and gain node) */
+  _disposeMaster() {
+    if (this.master) {
+      // If there's an effects chain (fxIn != master gain), disconnect it
+      if (this.master.fxIn && this.master.fxIn !== this.master.gain) {
+        this.master.fxIn.disconnect();
+        if (Array.isArray(this.master.effects)) {
+          // Dispose of all individual effects nodes
+          this.master.effects.forEach((e) => e.dispose());
+        }
+      }
+      // Dispose of the final gain node
+      this.master.gain.dispose();
+      this.master = null;
+    }
+  }
+
+  /**
+   * Create the master audio chain with effects applied.
+   * @param {Object} effects - The effects configuration object (from AppContext.effects).
+   * @returns {{gain: Tone.Gain, fxIn: Tone.AudioNode, effects: Array<Tone.AudioNode>}}
+   */
+  /**
+   * Create the master audio chain with effects applied.
+   * @param {Object} effects - The effects configuration object (from AppContext.effects).
+   * @returns {{gain: Tone.Gain, fxIn: Tone.AudioNode, effects: Array<Tone.AudioNode>}}
+   */
+  _createMasterChain(effects = {}) {
+    // Create the final gain stage (Master Volume). Connected to master output.
+    const masterGain = new Tone.Gain(1).toDestination();
+
+    // Build the effects chain using the existing Tone.js logic
+    const effectsChain = this._buildEffectsChain(effects, Tone.context);
+
+    let fxIn = masterGain; // Default input is the masterGain itself (no effects)
+
+    if (effectsChain.length > 0) {
+      for (let i = 0; i < effectsChain.length - 1; i++) {
+        effectsChain[i].connect(effectsChain[i + 1]);
+      }
+      fxIn = effectsChain[0];
+      effectsChain[effectsChain.length - 1].connect(masterGain);
+    }
+
+    return {
+      gain: masterGain,
+      fxIn: fxIn,
+      effects: effectsChain,
+    };
+  }
+
+  /**
+   * Apply a new set of master effects to the audio engine. (The missing function)
+   * This replaces and reconnects the entire master bus chain to ensure live updates.
+   * @param {Object} effects - The effects configuration object.
+   */
+  applyEffects(effects) {
+    // 1. Create the new master chain with the new effects
+    const newMaster = this._createMasterChain(effects);
+
+    // 2. Reconnect all existing track buses to the new master input
+    this.trackBuses.forEach((bus) => {
+      // Find the old connection point and disconnect it
+      const oldMasterIn = this.master?.fxIn ?? this.master?.gain;
+      if (oldMasterIn) {
+        (bus.fxOut ?? bus.pan).disconnect(oldMasterIn);
+      }
+
+      // Connect to the new master input
+      (bus.fxOut ?? bus.pan).connect(newMaster.fxIn);
+    });
+
+    // 3. Dispose of the old master chain
+    this._disposeMaster();
+
+    // 4. Update the internal reference
+    this.master = newMaster;
+
+    console.log("Master effects applied.");
+  }
 }
 
 // Export the engine class so other modules (hooks/UI) can instantiate it
@@ -1007,7 +1109,34 @@ export default function WebAmpPlayback({version, onEngineReady}) {
   // Load engine when version changes (do not reload on play/pause)
   const prevLoadSigRef = React.useRef(null);
   useEffect(() => {
-    if (!version) return;
+    const cleanup = () => {
+      progressStore.setSeeker(null);
+    };
+
+    const versionHasTracks = !!(
+      version &&
+      Array.isArray(version.tracks) &&
+      version.tracks.length > 0
+    );
+
+    if (!versionHasTracks) {
+      progressStore.setLengthMs(0);
+      progressStore.setMs(0);
+      progressStore.setSeeker(null);
+
+      try {
+        engine.stop();
+      } catch (err) {
+        console.warn("Failed to stop engine for empty session:", err);
+      }
+
+      engine
+        .load(createEmptyTimelineVersion())
+        .catch((e) => console.error("[UI] engine.load(empty) failed:", e));
+      prevLoadSigRef.current = null;
+      return cleanup;
+    }
+
     progressStore.setLengthMs(version.lengthMs ?? 0);
     progressStore.setSeeker((absMs) => {
       try {
@@ -1085,9 +1214,7 @@ export default function WebAmpPlayback({version, onEngineReady}) {
       }
     }
 
-    return () => {
-      progressStore.setSeeker(null);
-    };
+    return cleanup;
   }, [engine, version]);
 
   // Keep effects application separate - this doesn't reload the engine
