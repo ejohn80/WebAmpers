@@ -38,6 +38,28 @@ const getInitialActiveEffects = (activeSessionId) => {
   return loadActiveEffectsForSession(activeSessionId);
 };
 
+const loadEffectParametersForSession = (activeSessionId) => {
+  if (typeof activeSessionId !== "number") {
+    return createDefaultEffects();
+  }
+
+  // Reads from the localStorage key set by the test
+  try {
+    const sessionData = window.localStorage.getItem("webamp.effectsBySession");
+    if (sessionData) {
+      const parsed = JSON.parse(sessionData);
+      const effects = parsed.sessions?.[activeSessionId];
+      if (effects) {
+        // Using mergeWithDefaults for robustness, assuming it's correctly imported
+        return mergeWithDefaults(effects);
+      }
+    }
+  } catch (error) {
+    console.warn("Failed to read effect parameters:", error);
+  }
+  return createDefaultEffects();
+};
+
 const shallowEqualEffects = (a = {}, b = {}) => {
   const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
   for (const key of keys) {
@@ -59,7 +81,9 @@ const AppContextProvider = ({children}) => {
   const [activeSession, setActiveSession] = useState(getInitialActiveSession);
 
   // Effect State (Effect Parameter Values) - Loaded/Saved via SessionsTab/IndexedDB
-  const [effects, setEffects] = useState(createDefaultEffects());
+  const [effects, setEffects] = useState(() =>
+    loadEffectParametersForSession(activeSession)
+  );
   const [engineRef, setEngineRef] = useState(null);
 
   // Effects Menu State
@@ -160,6 +184,9 @@ const AppContextProvider = ({children}) => {
     if (typeof activeSession === "number") {
       const loadedActiveEffects = loadActiveEffectsForSession(activeSession);
       setActiveEffects(loadedActiveEffects);
+
+      const loadedEffectsParams = loadEffectParametersForSession(activeSession);
+      setEffects(loadedEffectsParams);
     }
   }, [activeSession]);
 

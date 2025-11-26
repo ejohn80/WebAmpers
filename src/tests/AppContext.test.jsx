@@ -59,7 +59,8 @@ describe("AppContext session effect syncing", () => {
 
     const engineRef = {
       current: {
-        setMasterEffects: vi.fn(),
+        applyEffects: vi.fn(),
+        effects: {},
       },
     };
 
@@ -68,19 +69,19 @@ describe("AppContext session effect syncing", () => {
     });
 
     await waitFor(() => {
-      expect(engineRef.current.setMasterEffects).toHaveBeenCalledWith(
+      expect(engineRef.current.applyEffects).toHaveBeenCalledWith(
         expect.objectContaining({pitch: 4})
       );
     });
 
-    engineRef.current.setMasterEffects.mockClear();
+    engineRef.current.applyEffects.mockClear();
 
     await act(async () => {
       ctxValue.setActiveSession(2);
     });
 
     await waitFor(() => {
-      expect(engineRef.current.setMasterEffects).toHaveBeenCalledWith(
+      expect(engineRef.current.applyEffects).toHaveBeenCalledWith(
         expect.objectContaining({reverb: 65})
       );
     });
