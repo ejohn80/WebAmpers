@@ -20,6 +20,7 @@ function EffectsTab() {
     isEffectsMenuOpen,
     removeEffect,
     activeEffects, // Get active effects from context
+    selectedTrackEffects, // Get selected track effects
   } = useContext(AppContext);
 
   const [draggingSlider, setDraggingSlider] = useState(null);
@@ -200,7 +201,11 @@ function EffectsTab() {
     ) {
       return localValues[config.name];
     }
-    return effects[config.name] ?? config.default;
+    
+    // Use selectedTrackEffects if available, otherwise fall back to master effects (effects)
+    const currentEffects = selectedTrackEffects ?? effects;
+
+    return currentEffects[config.name] ?? config.default;
   };
 
   // Check if effect is at default value

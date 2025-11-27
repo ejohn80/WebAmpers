@@ -121,7 +121,7 @@ const AppContextProvider = ({children}) => {
   async (effectName, value) => {
     if (!selectedTrackId) return;
 
-    const track = audioManager.getTrack(selectedTrackId);
+    const track = window.audioManager.getTrack(selectedTrackId);
     if (!track) return;
 
     const numValue = parseFloat(value);
@@ -290,6 +290,7 @@ const AppContextProvider = ({children}) => {
       setActiveProject,
       activeSession,
       setActiveSession,
+      effects, // Included master effects
       selectedTrackId,
       setSelectedTrackId,
       selectedTrackEffects,
@@ -312,8 +313,7 @@ const AppContextProvider = ({children}) => {
       setActiveProject,
       activeSession,
       setActiveSession,
-      // effects, // Removed master effects dependency
-      // setEffects, // Removed master effects dependency
+      effects, // Added master effects dependency
       selectedTrackId,
       setSelectedTrackId,
       selectedTrackEffects,
@@ -321,7 +321,6 @@ const AppContextProvider = ({children}) => {
       resetEffect,
       resetAllEffects,
       engineRef,
-      // applyEffectsToEngine, // Removed master effects dependency
       isEffectsMenuOpen,
       openEffectsMenu,
       closeEffectsMenu,
