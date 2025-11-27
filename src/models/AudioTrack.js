@@ -1,4 +1,5 @@
 import * as Tone from "tone";
+import {createDefaultEffects} from "../context/effectsStorage";
 
 /**
  * @class AudioTrack
@@ -60,21 +61,9 @@ export class AudioTrack {
     this._mute = !!options.mute;
     this._solo = !!options.solo;
 
-    // Initialize per-track effects
-    this.effects = options.effects || {
-      pitch: 0,
-      volume: 100,
-      reverb: 0,
-      delay: 0,
-      bass: 0,
-      distortion: 0,
-      pan: 0,
-      tremolo: 0,
-      vibrato: 0,
-      highpass: 20,
-      lowpass: 20000,
-      chorus: 0,
-    };
+    
+    this._effects = options.effects || createDefaultEffects();
+      this.effects = this._effects; // call the setter
 
     // Initialize the Tone.js Channel for mixer controls and set initial
     // values from the primitive fields. The channel remains the runtime
@@ -150,6 +139,18 @@ export class AudioTrack {
   set solo(isSoloed) {
     this._solo = !!isSoloed;
     if (this.channel) this.channel.solo = this._solo;
+  }
+
+  /**
+   * Effect parameters for this track (e.g. {pitch: 5, volume: 100})
+   * @type {Object<string, number>}
+   */
+  get effects() {
+    return this._effects;
+  }
+
+  set effects(newEffects) {
+    this._effects = newEffects;
   }
 
   /**

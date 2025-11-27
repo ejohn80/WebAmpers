@@ -1,4 +1,4 @@
-import {useContext, useCallback, useState, useRef} from "react";
+import {useContext, useCallback, useState, useRef, useEffect} from "react";
 import {AppContext} from "../../../context/AppContext";
 import styles from "../Layout.module.css";
 import {
@@ -21,6 +21,7 @@ function EffectsTab() {
     removeEffect,
     activeEffects, // Get active effects from context
     selectedTrackEffects, // Get selected track effects
+    selectedTrackId, // <-- ADDED: For conditional rendering and effect logic
   } = useContext(AppContext);
 
   const [draggingSlider, setDraggingSlider] = useState(null);
@@ -183,7 +184,9 @@ function EffectsTab() {
         updateEffect(name, pendingValue);
         pendingUpdates.current.delete(name);
       }
-      setDraggingSlider(null);
+      // CRITICAL: We clear draggingSlider here, which triggers the race condition,
+      // but the fix is now handled in getCurrentValue to prevent the snap-back.
+      setDraggingSlider(null); 
     },
     [updateEffect]
   );
@@ -193,20 +196,50 @@ function EffectsTab() {
     return ((currentValue - config.min) / (config.max - config.min)) * 100;
   };
 
-  // Use local value if dragging, otherwise use actual effect value
+  // Use local value if available and different from central state, otherwise use actual effect value
   const getCurrentValue = (config) => {
-    if (
-      draggingSlider === config.name &&
-      localValues[config.name] !== undefined
-    ) {
-      return localValues[config.name];
-    }
+    // 1. Determine the source of truth based on track selection
+    const centralEffects = selectedTrackId ? selectedTrackEffects : effects;
+    const centralValue = centralEffects?.[config.name] ?? config.default;
     
-    // Use selectedTrackEffects if available, otherwise fall back to master effects (effects)
-    const currentEffects = selectedTrackEffects ?? effects;
+    // 2. Get the temporary local value
+    const localValue = localValues[config.name];
 
-    return currentEffects[config.name] ?? config.default;
+    // 3. FIX: If we have a local value and it does NOT match the central state, 
+    // it means the async update hasn't propagated yet. Use the local value 
+    // to prevent the snap-back to the old central state value.
+    if (
+      localValue !== undefined && 
+      localValue !== centralValue
+    ) {
+      return localValue;
+    }
+
+    // 4. Otherwise, use the central value (which is either the default, 
+    // the old value, or the newly updated value).
+    return centralValue;
   };
+
+  // NEW: Cleanup localValues when the central state updates
+  // This prevents memory leaks by clearing the local value once the AppContext state (the source of truth) has caught up.
+  useEffect(() => {
+    const newLocalValues = {...localValues};
+    // Get the correct central state to compare against
+    const centralEffects = selectedTrackId ? selectedTrackEffects : effects;
+    let changed = false;
+
+    // Iterate over local state to see if central state has caught up
+    for (const name in localValues) {
+      if (centralEffects?.[name] === localValues[name]) {
+        delete newLocalValues[name];
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      setLocalValues(newLocalValues);
+    }
+  }, [selectedTrackEffects, effects, selectedTrackId, localValues]);
 
   // Check if effect is at default value
   const isAtDefaultValue = (config) => {
@@ -218,7 +251,19 @@ function EffectsTab() {
   const areAllEffectsAtDefault = () => {
     return activeEffectConfigs.every((config) => isAtDefaultValue(config));
   };
+  
+  // NEW: Conditional Rendering Check
+  if (!selectedTrackId) {
+    return (
+      <div className={styles.container}>
+        <div style={{ padding: "16px", color: "#ccc", textAlign: "center", minHeight: '100px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          Please select an audio track to manage effects.
+        </div>
+      </div>
+    );
+  }
 
+  // Original render logic now only runs if a track is selected
   return (
     <div className={styles.container}>
       {/* Add Effects Button - toggles the menu */}

@@ -117,76 +117,109 @@ const AppContextProvider = ({children}) => {
     refreshSelectedTrackEffects();
   }, [selectedTrackId, refreshSelectedTrackEffects]);
 
- const updateEffect = useCallback(
-  async (effectName, value) => {
-    if (!selectedTrackId) return;
+  const updateEffect = useCallback(
+    async (effectName, value) => {
+      if (!selectedTrackId || !window.audioManager || !window.dbManager || !engineRef.current) {
+        console.warn("[updateEffect] Pre-check failed: Missing selected track, audio manager, or engine.");
+        return;
+      }
+
+      const track = window.audioManager.getTrack(selectedTrackId);
+      if (!track) return;
+
+      const numValue = parseFloat(value);
+
+      const newEffects = {
+        ...track.effects,
+        [effectName]: numValue,
+      };
+
+      // 1. Update the Track Model (Source of truth)
+      track.effects = newEffects;
+
+      // 2. Update UI State IMMEDIATELY (For responsive slider UI)
+      setSelectedTrackEffects(newEffects);
+
+      // 3. Update Audio Engine (Sends new parameters to Tone.js effects)
+      try {
+        // ASSUMPTION: The WebAmpEngine has a setTrackEffects method
+        engineRef.current.setTrackEffects(selectedTrackId, newEffects); // <-- CORE FIX FOR AUDIO
+      } catch (e) {
+        console.error(`[AppContext] Failed to set effect ${effectName} on engine:`, e);
+        // Note: This error likely means the engine is missing the setTrackEffects method.
+      }
+
+      // 4. Persist to DB (Saves value for refresh)
+      try {
+        await window.dbManager.updateTrack(track); // <-- CORE FIX FOR PERSISTENCE
+      } catch (e) {
+        console.error(`[AppContext] Failed to persist effect update for track ${selectedTrackId}:`, e);
+      }
+    },
+    [selectedTrackId, engineRef]
+  );
+
+  const resetEffect = useCallback(
+    async (effectName, defaultValue) => {
+      if (!selectedTrackId || !window.audioManager || !window.dbManager || !engineRef.current) return;
+
+      const track = window.audioManager.getTrack(selectedTrackId);
+      if (!track) return;
+
+      // 1. Update Track Model (set to default value)
+      const newEffects = {
+        ...track.effects,
+        [effectName]: defaultValue,
+      };
+      track.effects = newEffects;
+
+      // 2. Update UI State
+      setSelectedTrackEffects(newEffects);
+
+      // 3. Update Audio Engine
+      try {
+        engineRef.current.setTrackEffects(selectedTrackId, newEffects); // <-- CORE FIX FOR AUDIO
+      } catch (e) {
+        console.error(`[AppContext] Failed to reset effect ${effectName} on engine:`, e);
+      }
+
+      // 4. Persist to DB
+      try {
+        await window.dbManager.updateTrack(track); // <-- CORE FIX FOR PERSISTENCE
+      } catch (e) {
+        console.error(`[AppContext] Failed to persist effect reset for track ${selectedTrackId}:`, e);
+      }
+    },
+    [selectedTrackId, engineRef]
+  );
+
+  const resetAllEffects = useCallback(async () => {
+    const defaultEffects = createDefaultEffects();
+    if (!selectedTrackId || !window.audioManager || !window.dbManager || !engineRef.current) return;
 
     const track = window.audioManager.getTrack(selectedTrackId);
     if (!track) return;
 
-    const numValue = parseFloat(value);
+    // 1. Update Track Model
+    track.effects = defaultEffects;
 
-    // Store the current mute/solo state before updating effects
-    const wasMuted = track.mute;
-    const wasSoloed = track.solo;
+    // 2. Update UI State
+    setSelectedTrackEffects(defaultEffects);
 
-    // Update track effects
-    track.effects = {
-      ...track.effects,
-      [effectName]: numValue,
-    };
-
-    // Update UI
-    refreshSelectedTrackEffects();
-
-    // Persist to DB - this now includes the updated effects
+    // 3. Update Audio Engine
     try {
-      await dbManager.updateTrack(track);
-      console.log(`Persisted ${effectName}=${numValue} for track ${track.id}`);
+      engineRef.current.setTrackEffects(selectedTrackId, defaultEffects); // <-- CORE FIX FOR AUDIO
     } catch (e) {
-      console.warn("Failed to persist track effect:", e);
+      console.error("[AppContext] Failed to reset all effects on engine:", e);
     }
 
-    // Update engine
-    if (engineRef?.current) {
-      try {
-        engineRef.current.setTrackEffects(selectedTrackId, track.effects);
-
-        // CRITICAL: Re-apply mute/solo state after effects update
-        if (wasMuted) {
-          engineRef.current.setTrackMute(selectedTrackId, true);
-        }
-        if (wasSoloed) {
-          engineRef.current.setTrackSolo(selectedTrackId, true);
-        }
-      } catch (e) {
-        console.warn("Engine setTrackEffects failed:", e);
-      }
+    // 4. Persist to DB
+    try {
+      await window.dbManager.updateTrack(track); 
+    } catch (e) {
+      console.error("[AppContext] Failed to persist track effect reset:", e);
     }
-  },
-  [selectedTrackId, engineRef, refreshSelectedTrackEffects]
-);
-
-  const resetEffect = useCallback((effectName, defaultValue) => {
-    if (selectedTrackId) {
-        updateEffect(effectName, defaultValue);
-    }
-  }, [selectedTrackId, updateEffect]);
-
-  const resetAllEffects = useCallback(() => {
-    if (selectedTrackId) {
-      const defaultEffects = createDefaultEffects();
-      const track = window.audioManager?.getTrack(selectedTrackId);
-      if (track) {
-          track.effects = defaultEffects;
-          refreshSelectedTrackEffects();
-          // Ideally: Persist to DB and update engine here.
-      }
-    } else {
-      setEffects(createDefaultEffects());
-      setActiveEffects(createDefaultActiveEffects());
-    }
-  }, [selectedTrackId, refreshSelectedTrackEffects]);
+  }, [selectedTrackId, engineRef]);
 
   const openEffectsMenu = useCallback(() => {
     setIsEffectsMenuOpen(true);
@@ -304,6 +337,7 @@ const AppContextProvider = ({children}) => {
       closeEffectsMenu,
       addEffect,
       removeEffect,
+      setEffects, 
       activeEffects,
     }),
     [
@@ -313,7 +347,7 @@ const AppContextProvider = ({children}) => {
       setActiveProject,
       activeSession,
       setActiveSession,
-      effects, // Added master effects dependency
+      effects,
       selectedTrackId,
       setSelectedTrackId,
       selectedTrackEffects,
@@ -327,6 +361,7 @@ const AppContextProvider = ({children}) => {
       addEffect,
       removeEffect,
       activeEffects,
+      setEffects,
     ]
   );
 

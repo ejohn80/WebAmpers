@@ -198,58 +198,99 @@ class PlaybackEngine {
   }
 
   /** Set effects for a specific track */
-  setTrackEffects(trackId, effects) {
-    const bus = this.trackBuses.get(trackId);
-    if (!bus) return;
+  // Inside the PlaybackEngine class (or WebAmpEngine)
 
-    // Dispose old chain
-    if (bus.chain && bus.chain.length > 0) {
-      bus.gain.disconnect();
-      if (bus.fxOut) bus.fxOut.disconnect();
-      bus.chain.forEach((n) => {
+/**
+ * Updates the parameters of the Tone.js effects for a specific track.
+ * This is the crucial missing link.
+ * * NOTE: This assumes the engine has access to the track's Tone.js effect nodes,
+ * likely stored in a map like 'this.trackEffectChains' or attached to the track's channel.
+ * For this example, we assume effects are attached to 'track.channel.effects' or similar.
+ */
+setTrackEffects(trackId, effectsMap) {
+    if (!window.audioManager) return;
+    
+    // 1. Get the AudioTrack model
+    const track = window.audioManager.getTrack(trackId);
+    if (!track || !track.channel) {
+        console.warn(`Engine: Cannot find channel for track ${trackId}`);
+        return;
+    }
+    
+    // 2. Access the Tone.js Effect Nodes attached to the track's channel
+    // NOTE: If you are chaining effects directly to the channel in your engine's 
+    // track creation logic, you will need to map effectName to the actual Tone.js node.
+    const channel = track.channel; // Assuming the Tone.Channel is on the track model
+    
+    // 3. Apply the changes based on the effect name
+    for (const [effectName, value] of Object.entries(effectsMap)) {
         try {
-          n.dispose();
+            switch (effectName) {
+                // TONE.js Implementation Examples
+                case 'pitch':
+                    // Assuming you have a Tone.PitchShift node named 'pitchShiftNode' 
+                    // in your effect chain
+                    if (channel.pitchShiftNode) {
+                        channel.pitchShiftNode.pitch = value; // value is in semitones
+                    }
+                    break;
+                case 'volume':
+                    // Note: This 'volume' effect is separate from the track's main volume 
+                    // on the channel (track.volume), and often uses a Gain node.
+                    // Value is 0 to 200 (percent gain).
+                    const linearGain = value / 100;
+                    if (channel.effectGainNode) {
+                        channel.effectGainNode.gain.setValueAtTime(linearGain, Tone.context.currentTime);
+                    }
+                    break;
+                case 'bass':
+                    // Bass boost typically uses a Tone.Filter (low-shelf)
+                    if (channel.bassFilter) {
+                        // Assuming bass boost value is directly mapped to filter gain (in dB)
+                        channel.bassFilter.gain.setValueAtTime(value, Tone.context.currentTime); 
+                    }
+                    break;
+                case 'reverb':
+                    if (channel.reverb) {
+                        // Assuming value is a mix level (0 to 1) or a decay time (seconds)
+                        channel.reverb.wet.setValueAtTime(value / 100, Tone.context.currentTime); 
+                    }
+                    break;
+                case 'delay':
+                    if (channel.delay) {
+                        // Assuming value is a mix level (0 to 1) or feedback amount
+                        channel.delay.wet.setValueAtTime(value / 100, Tone.context.currentTime);
+                    }
+                    break;
+                case 'distortion':
+                    if (channel.distortion) {
+                        // Assuming value is a drive amount (0 to 1) or percentage
+                        channel.distortion.distortion = value / 100;
+                    }
+                    break;
+                case 'highpass':
+                    if (channel.highpassFilter) {
+                        // Assuming value is the cutoff frequency
+                        channel.highpassFilter.frequency.setValueAtTime(value, Tone.context.currentTime);
+                    }
+                    break;
+                case 'lowpass':
+                    if (channel.lowpassFilter) {
+                        // Assuming value is the cutoff frequency
+                        channel.lowpassFilter.frequency.setValueAtTime(value, Tone.context.currentTime);
+                    }
+                    break;
+                // ... (Add cases for pan, tremolo, vibrato, chorus)
+
+                default:
+                    // console.warn(`Engine: Unhandled effect type: ${effectName}`);
+                    break;
+            }
         } catch (e) {
-          console.warn("Error disposing effect node:", e);
+            console.error(`Error updating Tone.js for ${effectName}:`, e);
         }
-      });
-    } else {
-      try {
-        bus.gain.disconnect(bus.pan);
-      } catch (e) {
-        // Already disconnected
-      }
     }
-
-    // Build new chain
-    const newNodes = this._buildEffectsChain(effects, Tone.context);
-
-    if (newNodes.length > 0) {
-      const newIn = newNodes[0];
-      const newOut = newNodes[newNodes.length - 1];
-
-      // Wire internal nodes
-      for (let i = 0; i < newNodes.length - 1; i++) {
-        newNodes[i].connect(newNodes[i + 1]);
-      }
-
-      // Wire: Gain -> Chain -> Pan
-      bus.gain.connect(newIn);
-      newOut.connect(bus.pan);
-
-      bus.chain = newNodes;
-      bus.fxIn = newIn;
-      bus.fxOut = newOut;
-    } else {
-      // No FX: Wire Gain -> Pan directly
-      bus.gain.connect(bus.pan);
-      bus.chain = [];
-      bus.fxIn = null;
-      bus.fxOut = null;
-    }
-
-    this._applyMuteSolo();
-  }
+}
 
   /** Solo or unsolo a specific track */
   setTrackSolo(trackId, solo) {
