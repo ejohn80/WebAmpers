@@ -36,7 +36,7 @@ function DropdownPortal({
   onImportError,
 }) {
   const navigate = useNavigate();
-  const {userData} = useContext(AppContext);
+  const {userData, closeEffectsMenu} = useContext(AppContext); // closes effects menu
 
   const [activeDropdown, setActiveDropdown] = useState(null);
   const [position, setPosition] = useState({top: 0, left: 0});
@@ -74,6 +74,9 @@ function DropdownPortal({
   };
 
   const handleButtonClick = (dropdownName, buttonRef) => {
+    // Close effects menu when any header button is clicked
+    closeEffectsMenu();
+
     if (buttonRef.current) {
       const rect = buttonRef.current.getBoundingClientRect();
       setPosition({
