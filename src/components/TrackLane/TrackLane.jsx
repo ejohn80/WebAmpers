@@ -17,6 +17,8 @@ function TrackLane({
   totalLengthMs = 0, // Total timeline length for proportional sizing
   timelineWidth = 0,
   rowWidthPx = 0,
+  isSelected = false,
+  onSelect = () => {},
 }) {
   if (!track) return null;
 
@@ -166,10 +168,24 @@ function TrackLane({
       ? {minWidth: `${rowWidthPx}px`, width: `${rowWidthPx}px`}
       : undefined;
 
+  const handleTrackClick = (e) => {
+    e.stopPropagation();
+    onSelect(track.id);
+  };
+
+  const selectionStyle = isSelected
+    ? {
+        outline: "2px solid #17E1FF",
+        outlineOffset: "-2px",
+        backgroundColor: "rgba(23, 225, 255, 0.05)",
+      }
+    : {};
+
   return (
     <div
       className="tracklane-root"
-      style={rowWidthStyle}
+      style={{...rowWidthStyle, ...selectionStyle}}
+      onClick={handleTrackClick}
       onContextMenu={handleContextMenu}
     >
       <div className="tracklane-side">

@@ -80,7 +80,7 @@ const AppContextProvider = ({children}) => {
   // Active session state with localStorage persistence
   const [activeSession, setActiveSession] = useState(getInitialActiveSession);
 
-  // Effect State (Effect Parameter Values) - Loaded/Saved via SessionsTab/IndexedDB
+  // Effect State (Effect Parameter Values)
   const [effects, setEffects] = useState(() =>
     loadEffectParametersForSession(activeSession)
   );
@@ -93,27 +93,100 @@ const AppContextProvider = ({children}) => {
     getInitialActiveEffects(activeSession)
   );
 
-  const updateEffect = useCallback((effectName, value) => {
-    setEffects((prevEffects) => {
-      const newEffects = {
-        ...prevEffects,
-        [effectName]: value,
-      };
-      return newEffects;
-    });
-  }, []);
+  // Per-track effects state
+  const [selectedTrackId, setSelectedTrackId] = useState(null);
+  const [selectedTrackEffects, setSelectedTrackEffects] = useState(null);
+
+  const refreshSelectedTrackEffects = useCallback(() => {
+    // Assumes 'audioManager' is available in scope (e.g., globally or imported)
+    if (!selectedTrackId) {
+      setSelectedTrackEffects(null);
+      return;
+    }
+
+    const track = window.audioManager?.getTrack(selectedTrackId);
+    if (track && track.effects) {
+      setSelectedTrackEffects(track.effects);
+    } else {
+      setSelectedTrackEffects(null);
+    }
+  }, [selectedTrackId]);
+
+  // Update effect when selection changes
+  useEffect(() => {
+    refreshSelectedTrackEffects();
+  }, [selectedTrackId, refreshSelectedTrackEffects]);
+
+ const updateEffect = useCallback(
+  async (effectName, value) => {
+    if (!selectedTrackId) return;
+
+    const track = audioManager.getTrack(selectedTrackId);
+    if (!track) return;
+
+    const numValue = parseFloat(value);
+
+    // Store the current mute/solo state before updating effects
+    const wasMuted = track.mute;
+    const wasSoloed = track.solo;
+
+    // Update track effects
+    track.effects = {
+      ...track.effects,
+      [effectName]: numValue,
+    };
+
+    // Update UI
+    refreshSelectedTrackEffects();
+
+    // Persist to DB - this now includes the updated effects
+    try {
+      await dbManager.updateTrack(track);
+      console.log(`Persisted ${effectName}=${numValue} for track ${track.id}`);
+    } catch (e) {
+      console.warn("Failed to persist track effect:", e);
+    }
+
+    // Update engine
+    if (engineRef?.current) {
+      try {
+        engineRef.current.setTrackEffects(selectedTrackId, track.effects);
+
+        // CRITICAL: Re-apply mute/solo state after effects update
+        if (wasMuted) {
+          engineRef.current.setTrackMute(selectedTrackId, true);
+        }
+        if (wasSoloed) {
+          engineRef.current.setTrackSolo(selectedTrackId, true);
+        }
+      } catch (e) {
+        console.warn("Engine setTrackEffects failed:", e);
+      }
+    }
+  },
+  [selectedTrackId, engineRef, refreshSelectedTrackEffects]
+);
 
   const resetEffect = useCallback((effectName, defaultValue) => {
-    setEffects((prevEffects) => ({
-      ...prevEffects,
-      [effectName]: defaultValue,
-    }));
-  }, []);
+    if (selectedTrackId) {
+        updateEffect(effectName, defaultValue);
+    }
+  }, [selectedTrackId, updateEffect]);
 
   const resetAllEffects = useCallback(() => {
-    setEffects(createDefaultEffects());
-    setActiveEffects(createDefaultActiveEffects());
-  }, []);
+    if (selectedTrackId) {
+      const defaultEffects = createDefaultEffects();
+      const track = window.audioManager?.getTrack(selectedTrackId);
+      if (track) {
+          track.effects = defaultEffects;
+          refreshSelectedTrackEffects();
+          // Ideally: Persist to DB and update engine here.
+      }
+    } else {
+      setEffects(createDefaultEffects());
+      setActiveEffects(createDefaultActiveEffects());
+    }
+  }, [selectedTrackId, refreshSelectedTrackEffects]);
 
   const openEffectsMenu = useCallback(() => {
     setIsEffectsMenuOpen(true);
@@ -136,18 +209,13 @@ const AppContextProvider = ({children}) => {
     // 1. Remove the effect from the active list
     setActiveEffects((prev) => prev.filter((id) => id !== effectId));
 
-    // 2. Reset the effect's parameter value to default (turns off the applied effect)
-    setEffects((prevEffects) => {
-      // Get the default value for this effect
-      const allDefaults = createDefaultEffects();
-      const defaultValue = allDefaults[effectId];
-
-      return {
-        ...prevEffects,
-        [effectId]: defaultValue,
-      };
-    });
-  }, []);
+    // 2. Reset the effect's parameter value on the selected track
+    if (selectedTrackId) {
+        const allDefaults = createDefaultEffects();
+        const defaultValue = allDefaults[effectId];
+        updateEffect(effectId, defaultValue);
+    }
+  }, [selectedTrackId, updateEffect]);
 
   const applyEffectsToEngine = useCallback(
     (currentEffects) => {
@@ -198,7 +266,7 @@ const AppContextProvider = ({children}) => {
       persistActiveEffectsForSession(activeSession, activeEffects);
     }
 
-    // Apply effect parameter values to the audio engine
+    // Apply master effect parameter values to the audio engine
     applyEffectsToEngine(effects);
   }, [effects, activeSession, applyEffectsToEngine, activeEffects]);
 
@@ -222,15 +290,14 @@ const AppContextProvider = ({children}) => {
       setActiveProject,
       activeSession,
       setActiveSession,
-      effects,
-      setEffects,
+      selectedTrackId,
+      setSelectedTrackId,
+      selectedTrackEffects,
       updateEffect,
       resetEffect,
       resetAllEffects,
       engineRef,
       setEngineRef,
-      applyEffectsToEngine,
-      // Effects Menu State
       isEffectsMenuOpen,
       openEffectsMenu,
       closeEffectsMenu,
@@ -245,13 +312,16 @@ const AppContextProvider = ({children}) => {
       setActiveProject,
       activeSession,
       setActiveSession,
-      effects,
-      setEffects,
+      // effects, // Removed master effects dependency
+      // setEffects, // Removed master effects dependency
+      selectedTrackId,
+      setSelectedTrackId,
+      selectedTrackEffects,
       updateEffect,
       resetEffect,
       resetAllEffects,
       engineRef,
-      applyEffectsToEngine,
+      // applyEffectsToEngine, // Removed master effects dependency
       isEffectsMenuOpen,
       openEffectsMenu,
       closeEffectsMenu,

@@ -197,6 +197,60 @@ class PlaybackEngine {
     this._applyMuteSolo();
   }
 
+  /** Set effects for a specific track */
+  setTrackEffects(trackId, effects) {
+    const bus = this.trackBuses.get(trackId);
+    if (!bus) return;
+
+    // Dispose old chain
+    if (bus.chain && bus.chain.length > 0) {
+      bus.gain.disconnect();
+      if (bus.fxOut) bus.fxOut.disconnect();
+      bus.chain.forEach((n) => {
+        try {
+          n.dispose();
+        } catch (e) {
+          console.warn("Error disposing effect node:", e);
+        }
+      });
+    } else {
+      try {
+        bus.gain.disconnect(bus.pan);
+      } catch (e) {
+        // Already disconnected
+      }
+    }
+
+    // Build new chain
+    const newNodes = this._buildEffectsChain(effects, Tone.context);
+
+    if (newNodes.length > 0) {
+      const newIn = newNodes[0];
+      const newOut = newNodes[newNodes.length - 1];
+
+      // Wire internal nodes
+      for (let i = 0; i < newNodes.length - 1; i++) {
+        newNodes[i].connect(newNodes[i + 1]);
+      }
+
+      // Wire: Gain -> Chain -> Pan
+      bus.gain.connect(newIn);
+      newOut.connect(bus.pan);
+
+      bus.chain = newNodes;
+      bus.fxIn = newIn;
+      bus.fxOut = newOut;
+    } else {
+      // No FX: Wire Gain -> Pan directly
+      bus.gain.connect(bus.pan);
+      bus.chain = [];
+      bus.fxIn = null;
+      bus.fxOut = null;
+    }
+
+    this._applyMuteSolo();
+  }
+
   /** Solo or unsolo a specific track */
   setTrackSolo(trackId, solo) {
     if (!this.version) return;

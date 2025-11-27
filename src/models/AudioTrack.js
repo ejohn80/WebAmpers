@@ -60,6 +60,22 @@ export class AudioTrack {
     this._mute = !!options.mute;
     this._solo = !!options.solo;
 
+    // Initialize per-track effects
+    this.effects = options.effects || {
+      pitch: 0,
+      volume: 100,
+      reverb: 0,
+      delay: 0,
+      bass: 0,
+      distortion: 0,
+      pan: 0,
+      tremolo: 0,
+      vibrato: 0,
+      highpass: 20,
+      lowpass: 20000,
+      chorus: 0,
+    };
+
     // Initialize the Tone.js Channel for mixer controls and set initial
     // values from the primitive fields. The channel remains the runtime
     // audio object and is not serialized directly.
@@ -149,6 +165,7 @@ export class AudioTrack {
       mute: this._mute,
       solo: this._solo,
       segments: this.segments,
+      effects: this.effects, // Add effects to serialization
     };
   }
 
