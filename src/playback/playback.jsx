@@ -108,17 +108,22 @@ class PlaybackEngine {
 
     // Create all track buses and connect them to master
     (version.tracks || []).forEach((t) => {
-      const bus = this._makeTrackBus(t);
-      this.trackBuses.set(t.id, bus);
-      (bus.fxOut ?? bus.pan).connect(this.master.fxIn);
-    });
+    const bus = this._makeTrackBus(t);
+    this.trackBuses.set(t.id, bus);
+    (bus.fxOut ?? bus.pan).connect(this.master.fxIn);
+  });
 
     (version.tracks || []).forEach((t) => {
-        if (t.effects) {
-            // Apply effects without logging to avoid console spam on load
-            this.setTrackEffects(t.id, t.effects, true); 
-        }
-    });
+    // Apply pan if it exists in effects
+    if (t.effects && t.effects.pan !== undefined && t.effects.pan !== 0) {
+      this.setTrackPan(t.id, t.effects.pan);
+    }
+    
+    // Apply other effects
+    if (t.effects) {
+      this.setTrackEffects(t.id, t.effects, true); 
+    }
+  });
 
     // Prepare all audio segments (Tone.Player instances)
     await this._prepareSegments(version);
@@ -251,7 +256,7 @@ setTrackEffects(trackId, effectsMap, silent = false) {
         });
     }
 
-    // 3. BUILD NEW CHAIN
+    // 3. BUILD NEW CHAIN (excluding pan)
     const fxNodes = this._buildTrackEffectsChain(effectsMap);
     bus.fxNodes = fxNodes;
 
@@ -261,6 +266,7 @@ setTrackEffects(trackId, effectsMap, silent = false) {
     } catch(e) {}
 
     if (fxNodes.length > 0) {
+        // Chain: Gain -> Effects -> Pan
         bus.gain.connect(fxNodes[0]);
         
         for (let i = 0; i < fxNodes.length - 1; i++) {
@@ -270,16 +276,20 @@ setTrackEffects(trackId, effectsMap, silent = false) {
         fxNodes[fxNodes.length - 1].connect(bus.pan);
         bus.fxOut = bus.pan; 
     } else {
+        // No effects: Gain -> Pan
         bus.gain.connect(bus.pan);
         bus.fxOut = bus.pan;
     }
 
-    // Finally connect Pan to Master
+    // Connect Pan to Master
     const masterDest = this.master?.fxIn || this.master?.gain;
     if (masterDest) {
+        try {
+            bus.pan.disconnect();
+        } catch (e) {}
         bus.pan.connect(masterDest);
     }
-}
+  }
 
 _updateExistingEffectNodes(fxNodes, effectsMap) {
     if (!fxNodes || fxNodes.length === 0) return false;
@@ -390,10 +400,11 @@ _buildTrackEffectsChain(effectsMap) {
         pitch: effectsMap.pitch
       });
       nodes.push(pitchShift);
+      console.log('[Effects] Added PitchShift:', effectsMap.pitch);
     }
 
     // Reverb
-    if (effectsMap.reverb && effectsMap.reverb > 0) {
+    if (effectsMap.reverb && effectsMap.reverb > 0.01) {
       const wet = Math.max(0, Math.min(1, effectsMap.reverb / 100));
       const roomSize = 0.1 + 0.85 * wet;
       const reverb = new Tone.Freeverb({
@@ -402,10 +413,11 @@ _buildTrackEffectsChain(effectsMap) {
         wet: wet
       });
       nodes.push(reverb);
+      console.log('[Effects] Added Reverb:', effectsMap.reverb);
     }
 
     // Delay
-    if (effectsMap.delay && effectsMap.delay > 0) {
+    if (effectsMap.delay && effectsMap.delay > 0.01) {
       const wet = Math.max(0, Math.min(1, effectsMap.delay / 100));
       const delay = new Tone.FeedbackDelay({
         delayTime: "8n",
@@ -413,6 +425,7 @@ _buildTrackEffectsChain(effectsMap) {
         wet: wet
       });
       nodes.push(delay);
+      console.log('[Effects] Added Delay:', effectsMap.delay);
     }
 
     // Bass Boost (EQ)
@@ -423,35 +436,35 @@ _buildTrackEffectsChain(effectsMap) {
         high: 0
       });
       nodes.push(eq);
+      console.log('[Effects] Added Bass:', effectsMap.bass);
     }
 
     // Distortion
-    if (effectsMap.distortion && effectsMap.distortion > 0) {
+    if (effectsMap.distortion && effectsMap.distortion > 0.01) {
       const amount = Math.max(0, Math.min(1, effectsMap.distortion / 100));
       const distortion = new Tone.Distortion({
         distortion: amount,
         wet: amount * 0.8
       });
       nodes.push(distortion);
+      console.log('[Effects] Added Distortion:', effectsMap.distortion);
     }
 
-    // FIXED: Volume (Gain) - Handle 0% properly
+    // CRITICAL FIX: Volume - Always add if not exactly 100
     if (effectsMap.volume !== undefined && Math.abs(effectsMap.volume - 100) > 0.01) {
-      // Convert 0-200 range to 0-2 gain
       let gain = Math.max(0, Math.min(2, effectsMap.volume / 100));
-      
-      // CRITICAL FIX: At 0%, use a very small value instead of 0 to avoid clicks
-      // and ensure proper muting behavior
       if (gain < 0.001) {
-        gain = 0.0001; // Nearly silent but not exactly 0
+        gain = 0.0001;
       }
-      
       const gainNode = new Tone.Gain(gain);
       nodes.push(gainNode);
+      console.log('[Effects] Added Volume:', effectsMap.volume, 'gain:', gain);
     }
 
+    // Pan is NOT in the effects chain - it's handled by track bus
+
     // Tremolo
-    if (effectsMap.tremolo && effectsMap.tremolo > 0) {
+    if (effectsMap.tremolo && effectsMap.tremolo > 0.01) {
       const wet = Math.max(0, Math.min(1, effectsMap.tremolo / 100));
       const tremolo = new Tone.Tremolo({
         frequency: 0.1 + wet * 19.9,
@@ -459,16 +472,18 @@ _buildTrackEffectsChain(effectsMap) {
         wet: wet
       }).start();
       nodes.push(tremolo);
+      console.log('[Effects] Added Tremolo:', effectsMap.tremolo);
     }
 
     // Vibrato
-    if (effectsMap.vibrato && effectsMap.vibrato > 0) {
+    if (effectsMap.vibrato && effectsMap.vibrato > 0.01) {
       const wet = Math.max(0, Math.min(1, effectsMap.vibrato / 100));
       const vibrato = new Tone.Vibrato({
         frequency: 0.1 + wet * 19.9,
         depth: wet
       });
       nodes.push(vibrato);
+      console.log('[Effects] Added Vibrato:', effectsMap.vibrato);
     }
 
     // High-pass Filter
@@ -478,6 +493,7 @@ _buildTrackEffectsChain(effectsMap) {
         type: "highpass"
       });
       nodes.push(highpass);
+      console.log('[Effects] Added Highpass:', effectsMap.highpass);
     }
 
     // Low-pass Filter
@@ -487,10 +503,11 @@ _buildTrackEffectsChain(effectsMap) {
         type: "lowpass"
       });
       nodes.push(lowpass);
+      console.log('[Effects] Added Lowpass:', effectsMap.lowpass);
     }
 
     // Chorus
-    if (effectsMap.chorus && effectsMap.chorus > 0) {
+    if (effectsMap.chorus && effectsMap.chorus > 0.01) {
       const wet = Math.max(0, Math.min(1, effectsMap.chorus / 100));
       const chorus = new Tone.Chorus({
         frequency: 1.5,
@@ -501,7 +518,10 @@ _buildTrackEffectsChain(effectsMap) {
         wet: wet
       }).start();
       nodes.push(chorus);
+      console.log('[Effects] Added Chorus:', effectsMap.chorus);
     }
+    
+    console.log(`[Effects] Built chain with ${nodes.length} nodes`);
   } catch (e) {
     console.error("Error building track effects chain:", e);
   }
@@ -547,13 +567,33 @@ _makeTrackBus(t) {
 
   /** Adjust the stereo pan (-1 = left, +1 = right) of a track */
   setTrackPan(trackId, pan) {
-    const bus = this.trackBuses.get(trackId);
-    if (bus) bus.pan.pan.value = clamp(pan, -1, 1);
-    if (this.version) {
-      const t = this.version.tracks.find((x) => x.id === trackId);
-      if (t) t.pan = pan;
+  const bus = this.trackBuses.get(trackId);
+  if (!bus) {
+    console.warn(`[setTrackPan] No bus found for track ${trackId}`);
+    return;
+  }
+  
+  // Convert -100 to 100 range to -1 to 1
+  const panValue = Math.max(-1, Math.min(1, pan / 100));
+  
+  console.log(`[setTrackPan] Track ${trackId} pan to ${pan} (${panValue})`);
+  
+  // Set immediately (we can add smooth ramping later if needed)
+  try {
+    bus.pan.pan.value = panValue;
+  } catch (e) {
+    console.error(`[setTrackPan] Failed:`, e);
+  }
+  
+  // Update version data
+  if (this.version) {
+    const t = this.version.tracks.find((x) => x.id === trackId);
+    if (t) {
+      if (!t.effects) t.effects = {};
+      t.effects.pan = pan;
     }
   }
+}
 
   /**
    * Render audio buffer with effects applied using offline rendering
