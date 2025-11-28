@@ -7,6 +7,7 @@ import {
   ResetAllButtonDisabled,
   PlusSignIcon,
   XIcon,
+  DeleteEffectsIcon,
 } from "../Svgs.jsx";
 
 function EffectsTab() {
@@ -15,6 +16,7 @@ function EffectsTab() {
     updateEffect,
     resetEffect,
     resetAllEffects,
+    deleteAllEffects,
     openEffectsMenu,
     closeEffectsMenu,
     isEffectsMenuOpen,
@@ -214,6 +216,9 @@ function EffectsTab() {
     return activeEffectConfigs.every((config) => isAtDefaultValue(config));
   };
 
+  // Check if there are any active effects
+  const hasActiveEffects = activeEffectConfigs.length > 0;
+
   return (
     <div className={styles.container}>
       {/* Add Effects Button - toggles the menu */}
@@ -335,6 +340,20 @@ function EffectsTab() {
             <ResetAllButtonEnabled />
           )}
           <span style={{marginTop: "2px"}}>Reset All Effects</span>
+        </span>
+      </button>
+
+      {/* Delete All Effects Button - Always visible but disabled when no effects */}
+      <button
+        className={`${styles.deleteAllButton} ${
+          !hasActiveEffects ? styles.deleteAllButtonDisabled : ""
+        }`}
+        onClick={!hasActiveEffects ? undefined : deleteAllEffects}
+        disabled={!hasActiveEffects}
+      >
+        <span className={styles.deleteAllButtonContent}>
+          <DeleteEffectsIcon />
+          <span>Delete All</span>
         </span>
       </button>
     </div>

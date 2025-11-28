@@ -291,6 +291,47 @@
   transform: none !important;
 }
 
+/* Delete All Button */
+.deleteAllButton {
+  padding: 10px 20px;
+  margin-top: 8px;
+  background: rgba(238, 32, 53, 0.15);
+  color: #fe5656;
+  border: none;
+  border-radius: 6px;
+  font-weight: bold;
+  cursor: pointer;
+  width: 100%;
+  transition: background-color 0.2s;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.deleteAllButton:hover {
+  background: rgba(220, 53, 69, 0.3);
+}
+
+/* Disabled state for delete all button */
+.deleteAllButtonDisabled {
+  background: #2a2a2a !important;
+  color: #666666 !important;
+  cursor: not-allowed !important;
+  opacity: 0.5;
+}
+
+.deleteAllButtonDisabled:hover {
+  background: #313131 !important;
+  transform: none !important;
+}
+
+.deleteAllButtonContent {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  line-height: 1;
+}
+
 /* Projects Tab */
 
 .loginPrompt {

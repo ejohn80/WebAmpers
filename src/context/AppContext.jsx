@@ -165,6 +165,14 @@ const AppContextProvider = ({children}) => {
     [engineRef]
   );
 
+  const deleteAllEffects = useCallback(() => {
+    // First reset all effect values to defaults
+    setEffects(createDefaultEffects());
+
+    // Then remove all effects from the active list
+    setActiveEffects([]);
+  }, []);
+
   // Persist activeSession (ID) and LOAD Active Effects List on session change (Session switching)
   useEffect(() => {
     if (activeSession === undefined) return;
@@ -227,6 +235,7 @@ const AppContextProvider = ({children}) => {
       updateEffect,
       resetEffect,
       resetAllEffects,
+      deleteAllEffects,
       engineRef,
       setEngineRef,
       applyEffectsToEngine,
@@ -250,6 +259,7 @@ const AppContextProvider = ({children}) => {
       updateEffect,
       resetEffect,
       resetAllEffects,
+      deleteAllEffects,
       engineRef,
       applyEffectsToEngine,
       isEffectsMenuOpen,
