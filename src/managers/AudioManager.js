@@ -164,6 +164,7 @@ class AudioManager {
 
     // CRITICAL FIX: Ensure effects are initialized with defaults if not provided
     const trackEffects = audioData.effects || createDefaultEffects();
+    const trackActiveEffectsList = audioData.activeEffectsList || [];
 
     // Create the new track
     const track = new AudioTrack({
@@ -179,6 +180,7 @@ class AudioManager {
       mute: audioData.mute ?? false,
       solo: audioData.solo ?? false,
       effects: trackEffects, // Add effects to track
+      activeEffectsList: trackActiveEffectsList,
     });
 
     // Add buffer reference at track level for compatibility

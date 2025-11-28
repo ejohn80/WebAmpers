@@ -63,7 +63,9 @@ export class AudioTrack {
 
     
     this._effects = options.effects || createDefaultEffects();
-      this.effects = this._effects; // call the setter
+    this.effects = this._effects; // call the setter
+
+    this.activeEffectsList = options.activeEffectsList || [];
 
     // Initialize the Tone.js Channel for mixer controls and set initial
     // values from the primitive fields. The channel remains the runtime
@@ -167,6 +169,7 @@ export class AudioTrack {
       solo: this._solo,
       segments: this.segments,
       effects: this.effects, // Add effects to serialization
+      activeEffectsList: this.activeEffectsList,
     };
   }
 

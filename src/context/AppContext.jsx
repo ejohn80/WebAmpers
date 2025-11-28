@@ -83,35 +83,35 @@ const AppContextProvider = ({children}) => {
   // Per-track effects state
   const [selectedTrackId, setSelectedTrackId] = useState(null);
   const [selectedTrackEffects, setSelectedTrackEffects] = useState(null);
+  const [selectedTrackActiveEffects, setSelectedTrackActiveEffects] = useState([]);
+  
 
   // Derived state: The list of active effect IDs for the CURRENTLY selected track.
   // This replaces the global list so tracks don't share the same UI toggles.
-  const activeEffects = useMemo(() => {
-    if (!selectedTrackEffects) return [];
-    // We filter keys to ensure they are valid effect names
-    const defaults = createDefaultEffects();
-    // Return all keys present in the selectedTrackEffects object
-    return Object.keys(selectedTrackEffects).filter(k => defaults.hasOwnProperty(k));
-  }, [selectedTrackEffects]);
+  const activeEffects = selectedTrackActiveEffects;
 
   const refreshSelectedTrackEffects = useCallback(() => {
-    if (!selectedTrackId) {
-      setSelectedTrackEffects(null);
-      return;
-    }
+  if (!selectedTrackId) {
+    setSelectedTrackEffects(null);
+    setSelectedTrackActiveEffects([]);
+    return;
+  }
 
-    const track = audioManager.getTrack(selectedTrackId);
-    if (track) {
-      // Ensure the track has an effects object, if not create defaults
-      if (!track.effects) {
-        track.effects = createDefaultEffects();
-      }
-      // Create a copy to trigger React updates
-      setSelectedTrackEffects({...track.effects});
-    } else {
-      setSelectedTrackEffects(null);
+  const track = audioManager.getTrack(selectedTrackId);
+  if (track) {
+    if (!track.effects) {
+      track.effects = createDefaultEffects();
     }
-  }, [selectedTrackId]);
+    if (!track.activeEffectsList) {
+      track.activeEffectsList = [];
+    }
+    setSelectedTrackEffects({...track.effects});
+    setSelectedTrackActiveEffects([...track.activeEffectsList]);
+  } else {
+    setSelectedTrackEffects(null);
+    setSelectedTrackActiveEffects([]);
+  }
+}, [selectedTrackId]);
 
   // Update effect when selection changes
   useEffect(() => {
@@ -214,43 +214,90 @@ const AppContextProvider = ({children}) => {
   }, []);
 
   const addEffect = useCallback((effectId) => {
-    if (!selectedTrackId) return;
-    
-    // To "Add" an effect to the list, we make sure it exists in the track.effects object.
-    const defaults = createDefaultEffects();
-    // We use the current value if it exists, otherwise default
-    const track = audioManager.getTrack(selectedTrackId);
-    const currentValue = track?.effects?.[effectId] ?? defaults[effectId];
-    
-    updateEffect(effectId, currentValue);
-  }, [selectedTrackId, updateEffect]);
+  if (!selectedTrackId) return;
+  
+  const track = audioManager.getTrack(selectedTrackId);
+  if (!track) return;
+  
+  // Check if already added
+  if (track.activeEffectsList && track.activeEffectsList.includes(effectId)) {
+    console.log(`Effect ${effectId} already added`);
+    return;
+  }
+  
+  const defaults = createDefaultEffects();
+  
+  // Add to the active list
+  if (!track.activeEffectsList) {
+    track.activeEffectsList = [];
+  }
+  track.activeEffectsList.push(effectId);
+  
+  // Ensure effect has a value (use current or default)
+  const newEffects = {
+    ...track.effects,
+    [effectId]: track.effects[effectId] ?? defaults[effectId]
+  };
+  
+  track.effects = newEffects;
+  setSelectedTrackEffects(newEffects);
+  setSelectedTrackActiveEffects([...track.activeEffectsList]);
+  
+  console.log(`Added effect ${effectId}, active list:`, track.activeEffectsList);
+  
+  // Update engine
+  if (engineRef?.current && typeof engineRef.current.setTrackEffects === 'function') {
+    try {
+      engineRef.current.setTrackEffects(selectedTrackId, newEffects);
+    } catch (e) {
+      console.error(e);
+    }
+  }
+  
+  // Persist to DB
+  dbManager.updateTrack(track).catch(e => console.error(e));
+}, [selectedTrackId, engineRef]);
 
   const removeEffect = useCallback(async (effectId) => {
-    if (!selectedTrackId) return;
-    
-    const track = audioManager.getTrack(selectedTrackId);
-    if (!track) return;
-
-    // To remove from the UI list, we actually delete the key from the object
-    const newEffects = { ...track.effects };
-    delete newEffects[effectId];
-    
-    track.effects = newEffects;
-    setSelectedTrackEffects(newEffects);
-
-    // Reset in engine (effectively turning it off)
-    // We pass the new object (missing the key) -> Engine should interpret missing key as "no effect"
-    if (engineRef?.current && typeof engineRef.current.setTrackEffects === 'function') {
-        try {
-            engineRef.current.setTrackEffects(selectedTrackId, newEffects);
-        } catch(e) { console.error(e); }
-    }
-
+  if (!selectedTrackId) return;
+  
+  const track = audioManager.getTrack(selectedTrackId);
+  if (!track) return;
+  
+  const defaults = createDefaultEffects();
+  
+  // Remove from active list
+  if (track.activeEffectsList) {
+    track.activeEffectsList = track.activeEffectsList.filter(id => id !== effectId);
+  }
+  
+  // Reset value to default
+  const newEffects = {
+    ...track.effects,
+    [effectId]: defaults[effectId]
+  };
+  
+  track.effects = newEffects;
+  setSelectedTrackEffects(newEffects);
+  setSelectedTrackActiveEffects([...track.activeEffectsList]);
+  
+  console.log(`Removed effect ${effectId}, active list:`, track.activeEffectsList);
+  
+  // Reset in engine
+  if (engineRef?.current && typeof engineRef.current.setTrackEffects === 'function') {
     try {
-        await dbManager.updateTrack(track);
-    } catch (e) { console.error(e); }
-
-  }, [selectedTrackId, engineRef]);
+      engineRef.current.setTrackEffects(selectedTrackId, newEffects);
+    } catch(e) { 
+      console.error(e); 
+    }
+  }
+  
+  try {
+    await dbManager.updateTrack(track);
+  } catch (e) { 
+    console.error(e); 
+  }
+}, [selectedTrackId, engineRef]);
 
   const applyEffectsToEngine = useCallback(
     (currentEffects) => {
@@ -334,6 +381,8 @@ const AppContextProvider = ({children}) => {
       closeEffectsMenu,
       addEffect,
       removeEffect,
+      selectedTrackActiveEffects,
+      setSelectedTrackActiveEffects,
     }),
     [
       userData,
@@ -357,6 +406,7 @@ const AppContextProvider = ({children}) => {
       closeEffectsMenu,
       addEffect,
       removeEffect,
+      selectedTrackActiveEffects,
     ]
   );
 

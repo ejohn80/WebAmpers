@@ -87,7 +87,8 @@ function AudioPage() {
         mute: !!track.mute,
         solo: !!track.solo,
         color: track.color || "#888",
-        effects: track.effects, // <--- CRITICAL: Pass effects to engine so they load on refresh
+        effects: track.effects,
+         activeEffectsList: track.activeEffectsList,
       });
 
       (track.segments || []).forEach((s) => {

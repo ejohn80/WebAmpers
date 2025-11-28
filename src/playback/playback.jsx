@@ -346,15 +346,24 @@ _buildTrackEffectsChain(effectsMap) {
       nodes.push(distortion);
     }
 
-    // Volume (Gain)
-    if (effectsMap.volume && Math.abs(effectsMap.volume - 100) > 0.01) {
-      const gain = Math.max(0, Math.min(2, effectsMap.volume / 100));
+    // FIXED: Volume (Gain) - Handle 0% properly
+    if (effectsMap.volume !== undefined && Math.abs(effectsMap.volume - 100) > 0.01) {
+      // Convert 0-200 range to 0-2 gain
+      let gain = Math.max(0, Math.min(2, effectsMap.volume / 100));
+      
+      // CRITICAL FIX: At 0%, use a very small value instead of 0 to avoid clicks
+      // and ensure proper muting behavior
+      if (gain < 0.001) {
+        gain = 0.0001; // Nearly silent but not exactly 0
+      }
+      
       const gainNode = new Tone.Gain(gain);
       nodes.push(gainNode);
     }
 
-    // Pan
-    if (effectsMap.pan && Math.abs(effectsMap.pan) > 0.01) {
+    // FIXED: Pan - Convert from -100 to 100 range to -1 to 1
+    if (effectsMap.pan !== undefined && Math.abs(effectsMap.pan) > 0.01) {
+      // Convert -100 to 100 range to -1 to 1
       const panValue = Math.max(-1, Math.min(1, effectsMap.pan / 100));
       const panner = new Tone.Panner(panValue);
       nodes.push(panner);
