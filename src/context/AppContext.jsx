@@ -111,8 +111,8 @@ const AppContextProvider = ({children}) => {
   }, []);
 
   const resetAllEffects = useCallback(() => {
+    // Only reset the effect values to defaults, don't touch activeEffects
     setEffects(createDefaultEffects());
-    setActiveEffects(createDefaultActiveEffects());
   }, []);
 
   const openEffectsMenu = useCallback(() => {
