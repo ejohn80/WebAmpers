@@ -19,7 +19,7 @@ function EffectsTab() {
     closeEffectsMenu,
     isEffectsMenuOpen,
     removeEffect,
-    activeEffects, // This is now the derived list of keys for the specific track
+    activeEffects,
     selectedTrackId,
   } = useContext(AppContext);
 
@@ -165,25 +165,30 @@ function EffectsTab() {
     }
   };
 
-  // CRITICAL: Get current value with proper priority
   const getCurrentValue = (config) => {
     const effectName = config.name;
-    
+
     // Priority 1: If actively dragging, use local value
-    if (draggingSlider === effectName && localValues[effectName] !== undefined) {
+    if (
+      draggingSlider === effectName &&
+      localValues[effectName] !== undefined
+    ) {
       return localValues[effectName];
     }
-    
+
     // Priority 2: If we have a local value (from recent change), use it
     if (localValues[effectName] !== undefined) {
       return localValues[effectName];
     }
-    
+
     // Priority 3: Use the track's persisted value
-    if (selectedTrackEffects && selectedTrackEffects[effectName] !== undefined) {
+    if (
+      selectedTrackEffects &&
+      selectedTrackEffects[effectName] !== undefined
+    ) {
       return selectedTrackEffects[effectName];
     }
-    
+
     // Priority 4: Default value
     return config.default;
   };
@@ -192,21 +197,21 @@ function EffectsTab() {
   const handleChange = useCallback(
     (name) => (e) => {
       const value = Number(e.target.value);
-      
+
       // ALWAYS update local state immediately for smooth UI
       setLocalValues((prev) => ({...prev, [name]: value}));
-      
+
       // Clear any existing timeout for this effect
       if (updateTimeoutRef.current[name]) {
         clearTimeout(updateTimeoutRef.current[name]);
       }
-      
+
       // Debounce the actual update
       updateTimeoutRef.current[name] = setTimeout(() => {
         // console.log(`[EffectsTab] Triggering updateEffect for ${name}=${value}`);
         updateEffect(name, value);
         delete updateTimeoutRef.current[name];
-      }, 100); 
+      }, 100);
     },
     [updateEffect]
   );
@@ -215,7 +220,7 @@ function EffectsTab() {
     setDraggingSlider(name);
   }, []);
 
-  const handleSliderEnd = useCallback((name) => {
+  const handleSliderEnd = useCallback(() => {
     // Keep dragging state for a moment to prevent flicker
     setTimeout(() => {
       setDraggingSlider(null);
@@ -251,35 +256,43 @@ function EffectsTab() {
   useEffect(() => {
     if (draggingSlider) return;
     if (Object.keys(updateTimeoutRef.current).length > 0) return;
-    
+
     const timer = setTimeout(() => {
-      if (!draggingSlider && Object.keys(updateTimeoutRef.current).length === 0) {
+      if (
+        !draggingSlider &&
+        Object.keys(updateTimeoutRef.current).length === 0
+      ) {
         setLocalValues({});
       }
-    }, 2000); 
-    
+    }, 2000);
+
     return () => clearTimeout(timer);
   }, [selectedTrackEffects, draggingSlider]);
 
   // Cleanup on unmount
   useEffect(() => {
+    const timeoutId = updateTimeoutRef.current;
     return () => {
-      Object.values(updateTimeoutRef.current).forEach(clearTimeout);
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
     };
   }, []);
 
   if (!selectedTrackId) {
     return (
       <div className={styles.container}>
-        <div style={{ 
-          padding: "16px", 
-          color: "#ccc", 
-          textAlign: "center", 
-          minHeight: '100px', 
-          display: 'flex', 
-          alignItems: 'center', 
-          justifyContent: 'center' 
-        }}>
+        <div
+          style={{
+            padding: "16px",
+            color: "#ccc",
+            textAlign: "center",
+            minHeight: "100px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
           Please select an audio track to manage effects.
         </div>
       </div>
@@ -368,7 +381,10 @@ function EffectsTab() {
                     }`}
                     onClick={() => {
                       if (!isDefault) {
-                        setLocalValues((prev) => ({...prev, [config.name]: config.default}));
+                        setLocalValues((prev) => ({
+                          ...prev,
+                          [config.name]: config.default,
+                        }));
                         resetEffect(config.name, config.default);
                       }
                     }}
@@ -396,7 +412,7 @@ function EffectsTab() {
         onClick={() => {
           if (!areAllEffectsAtDefault()) {
             const defaults = {};
-            activeEffectConfigs.forEach(config => {
+            activeEffectConfigs.forEach((config) => {
               defaults[config.name] = config.default;
             });
             setLocalValues(defaults);

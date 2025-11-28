@@ -61,7 +61,6 @@ export class AudioTrack {
     this._mute = !!options.mute;
     this._solo = !!options.solo;
 
-    
     this._effects = options.effects || createDefaultEffects();
     this.effects = this._effects; // call the setter
 
@@ -78,8 +77,6 @@ export class AudioTrack {
     }).toDestination(); // Connect it to the master output by default
   }
 
-  // --- Mixer Parameter Getters/Setters ---
-
   // Volume in decibels (primitive). Update Tone.Channel when changed.
   get volume() {
     return this._volumeDb;
@@ -88,7 +85,6 @@ export class AudioTrack {
   set volume(v) {
     this._volumeDb = typeof v === "number" ? v : 0;
     if (this.channel) {
-      // Tone.Param sometimes exposes a .value property; set defensively.
       try {
         if (
           this.channel.volume &&
@@ -98,9 +94,7 @@ export class AudioTrack {
         } else {
           this.channel.volume = this._volumeDb;
         }
-      } catch (e) {
-        // ignore - keep the in-memory primitive as the source of truth
-      }
+      } catch (e) {}
     }
   }
 
@@ -168,7 +162,7 @@ export class AudioTrack {
       mute: this._mute,
       solo: this._solo,
       segments: this.segments,
-      effects: this.effects, // Add effects to serialization
+      effects: this.effects,
       activeEffectsList: this.activeEffectsList,
     };
   }

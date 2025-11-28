@@ -162,13 +162,12 @@ class AudioManager {
       builtSegments = [segment];
     }
 
-    // CRITICAL FIX: Ensure effects are initialized with defaults if not provided
     const trackEffects = audioData.effects || createDefaultEffects();
     const trackActiveEffectsList = audioData.activeEffectsList || [];
 
     // Create the new track
     const track = new AudioTrack({
-      id: audioData.id, // Preserve existing ID
+      id: audioData.id,
       name:
         audioData.name ||
         audioData.metadata?.name ||
@@ -179,7 +178,7 @@ class AudioManager {
       pan: audioData.pan ?? 0,
       mute: audioData.mute ?? false,
       solo: audioData.solo ?? false,
-      effects: trackEffects, // Add effects to track
+      effects: trackEffects,
       activeEffectsList: trackActiveEffectsList,
     });
 

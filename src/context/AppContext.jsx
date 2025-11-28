@@ -74,7 +74,7 @@ const AppContextProvider = ({children}) => {
   const [effects, setEffects] = useState(() =>
     loadEffectParametersForSession(activeSession)
   );
-  
+
   const [engineRef, setEngineRef] = useState(null);
 
   // Effects Menu State
@@ -83,35 +83,36 @@ const AppContextProvider = ({children}) => {
   // Per-track effects state
   const [selectedTrackId, setSelectedTrackId] = useState(null);
   const [selectedTrackEffects, setSelectedTrackEffects] = useState(null);
-  const [selectedTrackActiveEffects, setSelectedTrackActiveEffects] = useState([]);
-  
+  const [selectedTrackActiveEffects, setSelectedTrackActiveEffects] = useState(
+    []
+  );
 
   // Derived state: The list of active effect IDs for the CURRENTLY selected track.
   // This replaces the global list so tracks don't share the same UI toggles.
   const activeEffects = selectedTrackActiveEffects;
 
   const refreshSelectedTrackEffects = useCallback(() => {
-  if (!selectedTrackId) {
-    setSelectedTrackEffects(null);
-    setSelectedTrackActiveEffects([]);
-    return;
-  }
+    if (!selectedTrackId) {
+      setSelectedTrackEffects(null);
+      setSelectedTrackActiveEffects([]);
+      return;
+    }
 
-  const track = audioManager.getTrack(selectedTrackId);
-  if (track) {
-    if (!track.effects) {
-      track.effects = createDefaultEffects();
+    const track = audioManager.getTrack(selectedTrackId);
+    if (track) {
+      if (!track.effects) {
+        track.effects = createDefaultEffects();
+      }
+      if (!track.activeEffectsList) {
+        track.activeEffectsList = [];
+      }
+      setSelectedTrackEffects({...track.effects});
+      setSelectedTrackActiveEffects([...track.activeEffectsList]);
+    } else {
+      setSelectedTrackEffects(null);
+      setSelectedTrackActiveEffects([]);
     }
-    if (!track.activeEffectsList) {
-      track.activeEffectsList = [];
-    }
-    setSelectedTrackEffects({...track.effects});
-    setSelectedTrackActiveEffects([...track.activeEffectsList]);
-  } else {
-    setSelectedTrackEffects(null);
-    setSelectedTrackActiveEffects([]);
-  }
-}, [selectedTrackId]);
+  }, [selectedTrackId]);
 
   // Update effect when selection changes
   useEffect(() => {
@@ -119,80 +120,91 @@ const AppContextProvider = ({children}) => {
   }, [selectedTrackId, refreshSelectedTrackEffects]);
 
   const updateEffect = useCallback(
-  async (effectName, value) => {
-    if (!selectedTrackId) {
-      console.warn("[updateEffect] No track selected");
-      return;
-    }
+    async (effectName, value) => {
+      if (!selectedTrackId) {
+        console.warn("[updateEffect] No track selected");
+        return;
+      }
 
-    const track = audioManager.getTrack(selectedTrackId);
-    if (!track) {
-      console.warn("[updateEffect] Track not found:", selectedTrackId);
-      return;
-    }
+      const track = audioManager.getTrack(selectedTrackId);
+      if (!track) {
+        console.warn("[updateEffect] Track not found:", selectedTrackId);
+        return;
+      }
 
-    const numValue = parseFloat(value);
-    if (isNaN(numValue)) return;
+      const numValue = parseFloat(value);
+      if (isNaN(numValue)) return;
 
-    console.log(`[updateEffect] Updating ${effectName} to ${numValue} for track ${selectedTrackId}`);
+      console.log(
+        `[updateEffect] Updating ${effectName} to ${numValue} for track ${selectedTrackId}`
+      );
 
-    // SPECIAL CASE: Pan effect uses the track's built-in pan control
-    if (effectName === 'pan') {
-      // Update track model
-      track.effects = {
-        ...track.effects,
-        pan: numValue
-      };
-      
-      // Update UI
-      setSelectedTrackEffects(track.effects);
-      
-      // Update the track's actual pan control (not effects chain)
-      if (engineRef?.current && typeof engineRef.current.setTrackPan === 'function') {
+      // SPECIAL CASE: Pan effect uses the track's built-in pan control
+      if (effectName === "pan") {
+        // Update track model
+        track.effects = {
+          ...track.effects,
+          pan: numValue,
+        };
+
+        // Update UI
+        setSelectedTrackEffects(track.effects);
+
+        // Update the track's actual pan control (not effects chain)
+        if (
+          engineRef?.current &&
+          typeof engineRef.current.setTrackPan === "function"
+        ) {
+          try {
+            engineRef.current.setTrackPan(selectedTrackId, numValue);
+          } catch (e) {
+            console.error(`[updateEffect] Failed to set pan:`, e);
+          }
+        }
+
+        // Persist
         try {
-          engineRef.current.setTrackPan(selectedTrackId, numValue);
+          await dbManager.updateTrack(track);
         } catch (e) {
-          console.error(`[updateEffect] Failed to set pan:`, e);
+          console.error(`[updateEffect] Failed to persist:`, e);
+        }
+        return;
+      }
+
+      // Normal effect handling for all other effects
+      const newEffects = {
+        ...track.effects,
+        [effectName]: numValue,
+      };
+      track.effects = newEffects;
+
+      // Update UI State
+      setSelectedTrackEffects(newEffects);
+
+      // Update Audio Engine
+      if (
+        engineRef?.current &&
+        typeof engineRef.current.setTrackEffects === "function"
+      ) {
+        try {
+          engineRef.current.setTrackEffects(selectedTrackId, newEffects);
+        } catch (e) {
+          console.error(
+            `[updateEffect] Failed to set effect ${effectName} on engine:`,
+            e
+          );
         }
       }
-      
-      // Persist
+
+      // Persist to DB
       try {
         await dbManager.updateTrack(track);
       } catch (e) {
-        console.error(`[updateEffect] Failed to persist:`, e);
+        console.error(`[updateEffect] Failed to persist effect update:`, e);
       }
-      return;
-    }
-
-    // Normal effect handling for all other effects
-    const newEffects = {
-      ...track.effects,
-      [effectName]: numValue,
-    };
-    track.effects = newEffects;
-
-    // Update UI State
-    setSelectedTrackEffects(newEffects);
-
-    // Update Audio Engine
-    if (engineRef?.current && typeof engineRef.current.setTrackEffects === 'function') {
-      try {
-        engineRef.current.setTrackEffects(selectedTrackId, newEffects);
-      } catch (e) {
-        console.error(`[updateEffect] Failed to set effect ${effectName} on engine:`, e);
-      }
-    }
-
-    // Persist to DB
-    try {
-      await dbManager.updateTrack(track);
-    } catch (e) {
-      console.error(`[updateEffect] Failed to persist effect update:`, e);
-    }
-  },
-  [selectedTrackId, engineRef]
-);
+    },
+    [selectedTrackId, engineRef]
+  );
 
   const resetEffect = useCallback(
     async (effectName, defaultValue) => {
@@ -218,19 +230,28 @@ const AppContextProvider = ({children}) => {
     setSelectedTrackEffects(defaultEffects);
 
     // 3. Update Audio Engine
-    if (engineRef?.current && typeof engineRef.current.setTrackEffects === 'function') {
+    if (
+      engineRef?.current &&
+      typeof engineRef.current.setTrackEffects === "function"
+    ) {
       try {
         engineRef.current.setTrackEffects(selectedTrackId, defaultEffects);
       } catch (e) {
-        console.error("[resetAllEffects] Failed to reset all effects on engine:", e);
+        console.error(
+          "[resetAllEffects] Failed to reset all effects on engine:",
+          e
+        );
       }
     }
 
     // 4. Persist to DB
     try {
-      await dbManager.updateTrack(track); 
+      await dbManager.updateTrack(track);
     } catch (e) {
-      console.error("[resetAllEffects] Failed to persist track effect reset:", e);
+      console.error(
+        "[resetAllEffects] Failed to persist track effect reset:",
+        e
+      );
     }
   }, [selectedTrackId, engineRef]);
 
@@ -242,91 +263,114 @@ const AppContextProvider = ({children}) => {
     setIsEffectsMenuOpen(false);
   }, []);
 
-  const addEffect = useCallback((effectId) => {
-  if (!selectedTrackId) return;
-  
-  const track = audioManager.getTrack(selectedTrackId);
-  if (!track) return;
-  
-  // Check if already added
-  if (track.activeEffectsList && track.activeEffectsList.includes(effectId)) {
-    console.log(`Effect ${effectId} already added`);
-    return;
-  }
-  
-  const defaults = createDefaultEffects();
-  
-  // Add to the active list
-  if (!track.activeEffectsList) {
-    track.activeEffectsList = [];
-  }
-  track.activeEffectsList.push(effectId);
-  
-  // Ensure effect has a value (use current or default)
-  const newEffects = {
-    ...track.effects,
-    [effectId]: track.effects[effectId] ?? defaults[effectId]
-  };
-  
-  track.effects = newEffects;
-  setSelectedTrackEffects(newEffects);
-  setSelectedTrackActiveEffects([...track.activeEffectsList]);
-  
-  console.log(`Added effect ${effectId}, active list:`, track.activeEffectsList);
-  
-  // Update engine
-  if (engineRef?.current && typeof engineRef.current.setTrackEffects === 'function') {
-    try {
-      engineRef.current.setTrackEffects(selectedTrackId, newEffects);
-    } catch (e) {
-      console.error(e);
-    }
-  }
-  
-  // Persist to DB
-  dbManager.updateTrack(track).catch(e => console.error(e));
-}, [selectedTrackId, engineRef]);
+  const addEffect = useCallback(
+    (effectId) => {
+      if (!selectedTrackId) return;
 
-  const removeEffect = useCallback(async (effectId) => {
-  if (!selectedTrackId) return;
-  
-  const track = audioManager.getTrack(selectedTrackId);
-  if (!track) return;
-  
-  const defaults = createDefaultEffects();
-  
-  // Remove from active list
-  if (track.activeEffectsList) {
-    track.activeEffectsList = track.activeEffectsList.filter(id => id !== effectId);
-  }
-  
-  // Reset value to default
-  const newEffects = {
-    ...track.effects,
-    [effectId]: defaults[effectId]
-  };
-  
-  track.effects = newEffects;
-  setSelectedTrackEffects(newEffects);
-  setSelectedTrackActiveEffects([...track.activeEffectsList]);
-  
-  console.log(`Removed effect ${effectId}, active list:`, track.activeEffectsList);
-  
-  // Reset in engine
-  if (engineRef?.current && typeof engineRef.current.setTrackEffects === 'function') {
-    try {
-      engineRef.current.setTrackEffects(selectedTrackId, newEffects);
-    } catch(e) { 
-      console.error(e); 
-    }
-  }
-  
-  try {
-    await dbManager.updateTrack(track);
-  } catch (e) { 
-    console.error(e); 
-  }
-}, [selectedTrackId, engineRef]);
+      const track = audioManager.getTrack(selectedTrackId);
+      if (!track) return;
+
+      // Check if already added
+      if (
+        track.activeEffectsList &&
+        track.activeEffectsList.includes(effectId)
+      ) {
+        console.log(`Effect ${effectId} already added`);
+        return;
+      }
+
+      const defaults = createDefaultEffects();
+
+      // Add to the active list
+      if (!track.activeEffectsList) {
+        track.activeEffectsList = [];
+      }
+      track.activeEffectsList.push(effectId);
+
+      // Ensure effect has a value (use current or default)
+      const newEffects = {
+        ...track.effects,
+        [effectId]: track.effects[effectId] ?? defaults[effectId],
+      };
+
+      track.effects = newEffects;
+      setSelectedTrackEffects(newEffects);
+      setSelectedTrackActiveEffects([...track.activeEffectsList]);
+
+      console.log(
+        `Added effect ${effectId}, active list:`,
+        track.activeEffectsList
+      );
+
+      // Update engine
+      if (
+        engineRef?.current &&
+        typeof engineRef.current.setTrackEffects === "function"
+      ) {
+        try {
+          engineRef.current.setTrackEffects(selectedTrackId, newEffects);
+        } catch (e) {
+          console.error(e);
+        }
+      }
+
+      // Persist to DB
+      dbManager.updateTrack(track).catch((e) => console.error(e));
+    },
+    [selectedTrackId, engineRef]
+  );
+
+  const removeEffect = useCallback(
+    async (effectId) => {
+      if (!selectedTrackId) return;
+
+      const track = audioManager.getTrack(selectedTrackId);
+      if (!track) return;
+
+      const defaults = createDefaultEffects();
+
+      // Remove from active list
+      if (track.activeEffectsList) {
+        track.activeEffectsList = track.activeEffectsList.filter(
+          (id) => id !== effectId
+        );
+      }
+
+      // Reset value to default
+      const newEffects = {
+        ...track.effects,
+        [effectId]: defaults[effectId],
+      };
+
+      track.effects = newEffects;
+      setSelectedTrackEffects(newEffects);
+      setSelectedTrackActiveEffects([...track.activeEffectsList]);
+
+      console.log(
+        `Removed effect ${effectId}, active list:`,
+        track.activeEffectsList
+      );
+
+      // Reset in engine
+      if (
+        engineRef?.current &&
+        typeof engineRef.current.setTrackEffects === "function"
+      ) {
+        try {
+          engineRef.current.setTrackEffects(selectedTrackId, newEffects);
+        } catch (e) {
+          console.error(e);
+        }
+      }
+
+      try {
+        await dbManager.updateTrack(track);
+      } catch (e) {
+        console.error(e);
+      }
+    },
+    [selectedTrackId, engineRef]
+  );
 
   const applyEffectsToEngine = useCallback(
     (currentEffects) => {
@@ -335,7 +379,10 @@ const AppContextProvider = ({children}) => {
       }
       try {
         // This handles MASTER effects
-        if (engineRef.current.effects && !shallowEqualEffects(currentEffects, engineRef.current.effects)) {
+        if (
+          engineRef.current.effects &&
+          !shallowEqualEffects(currentEffects, engineRef.current.effects)
+        ) {
           engineRef.current.applyEffects(currentEffects);
         }
       } catch (e) {
@@ -388,21 +435,21 @@ const AppContextProvider = ({children}) => {
       setActiveProject,
       activeSession,
       setActiveSession,
-      
+
       // Master Effects
-      effects, 
-      setEffects, 
-      
+      effects,
+      setEffects,
+
       // Track Effects
       selectedTrackId,
       setSelectedTrackId,
       selectedTrackEffects,
       activeEffects, // Derived array of strings
-      
+
       updateEffect,
       resetEffect,
       resetAllEffects,
-      
+
       engineRef,
       setEngineRef,
       isEffectsMenuOpen,

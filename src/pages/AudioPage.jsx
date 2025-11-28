@@ -88,7 +88,7 @@ function AudioPage() {
         solo: !!track.solo,
         color: track.color || "#888",
         effects: track.effects,
-         activeEffectsList: track.activeEffectsList,
+        activeEffectsList: track.activeEffectsList,
       });
 
       (track.segments || []).forEach((s) => {
