@@ -210,21 +210,35 @@ setTrackEffects(trackId, effectsMap, silent = false) {
     const bus = this.trackBuses.get(trackId);
     if (!bus) return;
 
-    if(!silent) console.log(`[setTrackEffects] Track ${trackId}`, effectsMap);
+    if (!silent) console.log(`[setTrackEffects] Track ${trackId}`, effectsMap);
 
+    // Store the effects map
+    const track = this.version.tracks.find((x) => x.id === trackId);
+    if (track) {
+        track.effects = effectsMap;
+    }
+
+    // CRITICAL FIX: Check if we can just update existing nodes instead of rebuilding
+    const canUpdateExisting = bus.fxNodes && bus.fxNodes.length > 0;
+    
+    if (canUpdateExisting) {
+        // Try to update existing effect parameters smoothly
+        let updated = this._updateExistingEffectNodes(bus.fxNodes, effectsMap);
+        if (updated) {
+            // Successfully updated existing nodes without rebuild
+            return;
+        }
+    }
+
+    // If we can't update smoothly, rebuild the chain
     // 1. SAFELY DISCONNECT
-    // Check if we have an existing fxOut (the tail of the old chain)
-    // If fxOut exists, it is currently connected to master.fxIn (or master.gain)
     const nextNode = this.master?.fxIn || this.master?.gain;
     
     if (bus.fxOut) {
         try {
             if (nextNode) bus.fxOut.disconnect(nextNode);
-        } catch (e) {
-            // Ignore disconnect errors (node might be already disconnected)
-        }
+        } catch (e) {}
     } else {
-        // If no fxOut, the Pan node is connected to Master
         try {
             if (nextNode) bus.pan.disconnect(nextNode);
         } catch (e) {}
@@ -242,46 +256,121 @@ setTrackEffects(trackId, effectsMap, silent = false) {
     bus.fxNodes = fxNodes;
 
     // 4. RECONNECT
-    // Start of chain: Gain -> Pan -> [Effects] -> Master
-    // Note: Tone.js Panner usually connects to output. 
-    // Current chain in _makeTrackBus is: Gain -> Pan. 
-    // We want: Gain -> [Effects] -> Pan -> Master (Better for stereo effects)
-    // OR: Gain -> Pan -> [Effects] -> Master (Effects apply to panned signal)
-    
-    // Let's stick to the structure: Gain -> [Effects] -> Pan -> Master
-    // But _makeTrackBus hardwires Gain->Pan. Let's disconnect that internal link first.
-    
     try {
         bus.gain.disconnect();
     } catch(e) {}
 
     if (fxNodes.length > 0) {
-        // Gain -> Effect 1
         bus.gain.connect(fxNodes[0]);
         
-        // Effect 1 -> Effect 2 ...
         for (let i = 0; i < fxNodes.length - 1; i++) {
             fxNodes[i].connect(fxNodes[i + 1]);
         }
         
-        // Last Effect -> Pan
         fxNodes[fxNodes.length - 1].connect(bus.pan);
-        
-        // Mark fxOut (not strictly needed for Pan connection, but for clarity)
         bus.fxOut = bus.pan; 
     } else {
-        // No effects: Gain -> Pan
         bus.gain.connect(bus.pan);
         bus.fxOut = bus.pan;
     }
 
     // Finally connect Pan to Master
-    // Use master.fxIn if master effects exist, otherwise master.gain
     const masterDest = this.master?.fxIn || this.master?.gain;
     if (masterDest) {
         bus.pan.connect(masterDest);
     }
 }
+
+_updateExistingEffectNodes(fxNodes, effectsMap) {
+    if (!fxNodes || fxNodes.length === 0) return false;
+    
+    try {
+        fxNodes.forEach(node => {
+            // Update Pitch Shift
+            if (node instanceof Tone.PitchShift && effectsMap.pitch !== undefined) {
+                node.pitch = effectsMap.pitch;
+            }
+            
+            // Update Reverb
+            if (node instanceof Tone.Freeverb && effectsMap.reverb !== undefined) {
+                const wet = Math.max(0, Math.min(1, effectsMap.reverb / 100));
+                const roomSize = 0.1 + 0.85 * wet;
+                node.wet.value = wet;
+                node.roomSize.value = roomSize;
+            }
+            
+            // Update Delay
+            if (node instanceof Tone.FeedbackDelay && effectsMap.delay !== undefined) {
+                const wet = Math.max(0, Math.min(1, effectsMap.delay / 100));
+                node.wet.value = wet;
+                node.feedback.value = 0.3 + 0.4 * wet;
+            }
+            
+            // Update EQ3 (Bass)
+            if (node instanceof Tone.EQ3 && effectsMap.bass !== undefined) {
+                node.low.value = effectsMap.bass;
+            }
+            
+            // Update Distortion
+            if (node instanceof Tone.Distortion && effectsMap.distortion !== undefined) {
+                const amount = Math.max(0, Math.min(1, effectsMap.distortion / 100));
+                node.distortion = amount;
+                node.wet.value = amount * 0.8;
+            }
+            
+            // Update Volume (Gain)
+            if (node instanceof Tone.Gain && effectsMap.volume !== undefined) {
+                let gain = Math.max(0, Math.min(2, effectsMap.volume / 100));
+                if (gain < 0.001) gain = 0.0001;
+                
+                // Smooth ramp to avoid clicks
+                const now = Tone.now();
+                node.gain.cancelScheduledValues(now);
+                node.gain.linearRampToValueAtTime(gain, now + 0.05);
+            }
+            
+            // DON'T update Panner here - it's not in the effects chain
+            
+            // Update Tremolo
+            if (node instanceof Tone.Tremolo && effectsMap.tremolo !== undefined) {
+                const wet = Math.max(0, Math.min(1, effectsMap.tremolo / 100));
+                node.frequency.value = 0.1 + wet * 19.9;
+                node.depth.value = wet;
+                node.wet.value = wet;
+            }
+            
+            // Update Vibrato
+            if (node instanceof Tone.Vibrato && effectsMap.vibrato !== undefined) {
+                const wet = Math.max(0, Math.min(1, effectsMap.vibrato / 100));
+                node.frequency.value = 0.1 + wet * 19.9;
+                node.depth.value = wet;
+            }
+            
+            // Update High-pass Filter
+            if (node instanceof Tone.Filter && node.type === "highpass" && effectsMap.highpass !== undefined) {
+                node.frequency.value = effectsMap.highpass;
+            }
+            
+            // Update Low-pass Filter
+            if (node instanceof Tone.Filter && node.type === "lowpass" && effectsMap.lowpass !== undefined) {
+                node.frequency.value = effectsMap.lowpass;
+            }
+            
+            // Update Chorus
+            if (node instanceof Tone.Chorus && effectsMap.chorus !== undefined) {
+                const wet = Math.max(0, Math.min(1, effectsMap.chorus / 100));
+                node.wet.value = wet;
+            }
+        });
+        
+        return true; // Successfully updated
+    } catch (e) {
+        console.warn("Failed to update existing nodes, will rebuild:", e);
+        return false; // Failed, need to rebuild
+    }
+}
+
+
 
 /**
  * Build Tone.js effects chain for a track
@@ -359,14 +448,6 @@ _buildTrackEffectsChain(effectsMap) {
       
       const gainNode = new Tone.Gain(gain);
       nodes.push(gainNode);
-    }
-
-    // FIXED: Pan - Convert from -100 to 100 range to -1 to 1
-    if (effectsMap.pan !== undefined && Math.abs(effectsMap.pan) > 0.01) {
-      // Convert -100 to 100 range to -1 to 1
-      const panValue = Math.max(-1, Math.min(1, effectsMap.pan / 100));
-      const panner = new Tone.Panner(panValue);
-      nodes.push(panner);
     }
 
     // Tremolo

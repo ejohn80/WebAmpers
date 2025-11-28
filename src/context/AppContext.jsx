@@ -119,51 +119,80 @@ const AppContextProvider = ({children}) => {
   }, [selectedTrackId, refreshSelectedTrackEffects]);
 
   const updateEffect = useCallback(
-    async (effectName, value) => {
-      if (!selectedTrackId) {
-        console.warn("[updateEffect] No track selected");
-        return;
-      }
+  async (effectName, value) => {
+    if (!selectedTrackId) {
+      console.warn("[updateEffect] No track selected");
+      return;
+    }
 
-      const track = audioManager.getTrack(selectedTrackId);
-      if (!track) {
-        console.warn("[updateEffect] Track not found:", selectedTrackId);
-        return;
-      }
+    const track = audioManager.getTrack(selectedTrackId);
+    if (!track) {
+      console.warn("[updateEffect] Track not found:", selectedTrackId);
+      return;
+    }
 
-      const numValue = parseFloat(value);
-      if (isNaN(numValue)) return;
+    const numValue = parseFloat(value);
+    if (isNaN(numValue)) return;
 
-      console.log(`[updateEffect] Updating ${effectName} to ${numValue} for track ${selectedTrackId}`);
+    console.log(`[updateEffect] Updating ${effectName} to ${numValue} for track ${selectedTrackId}`);
 
-      // 1. Update the Track Model (Source of truth)
-      const newEffects = {
+    // SPECIAL CASE: Pan effect uses the track's built-in pan control
+    if (effectName === 'pan') {
+      // Update track model
+      track.effects = {
         ...track.effects,
-        [effectName]: numValue,
+        pan: numValue
       };
-      track.effects = newEffects;
-
-      // 2. Update UI State
-      setSelectedTrackEffects(newEffects);
-
-      // 3. Update Audio Engine if available
-      if (engineRef?.current && typeof engineRef.current.setTrackEffects === 'function') {
+      
+      // Update UI
+      setSelectedTrackEffects(track.effects);
+      
+      // Update the track's actual pan control (not effects chain)
+      if (engineRef?.current && typeof engineRef.current.setTrackPan === 'function') {
         try {
-          engineRef.current.setTrackEffects(selectedTrackId, newEffects);
+          engineRef.current.setTrackPan(selectedTrackId, numValue);
         } catch (e) {
-          console.error(`[updateEffect] Failed to set effect ${effectName} on engine:`, e);
+          console.error(`[updateEffect] Failed to set pan:`, e);
         }
       }
-
-      // 4. Persist to DB
+      
+      // Persist
       try {
         await dbManager.updateTrack(track);
       } catch (e) {
-        console.error(`[updateEffect] Failed to persist effect update:`, e);
+        console.error(`[updateEffect] Failed to persist:`, e);
       }
-    },
-    [selectedTrackId, engineRef]
-  );
+      return;
+    }
+
+    // Normal effect handling for all other effects
+    const newEffects = {
+      ...track.effects,
+      [effectName]: numValue,
+    };
+    track.effects = newEffects;
+
+    // Update UI State
+    setSelectedTrackEffects(newEffects);
+
+    // Update Audio Engine
+    if (engineRef?.current && typeof engineRef.current.setTrackEffects === 'function') {
+      try {
+        engineRef.current.setTrackEffects(selectedTrackId, newEffects);
+      } catch (e) {
+        console.error(`[updateEffect] Failed to set effect ${effectName} on engine:`, e);
+      }
+    }
+
+    // Persist to DB
+    try {
+      await dbManager.updateTrack(track);
+    } catch (e) {
+      console.error(`[updateEffect] Failed to persist effect update:`, e);
+    }
+  },
+  [selectedTrackId, engineRef]
+);
 
   const resetEffect = useCallback(
     async (effectName, defaultValue) => {
