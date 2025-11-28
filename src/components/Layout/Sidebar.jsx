@@ -5,7 +5,7 @@ import EffectsTab from "./Sidebar/EffectsTab";
 import SessionsTab from "./Sidebar/SessionsTab";
 import {AppContext} from "../../context/AppContext";
 import React from "react";
-// import styles from './Layout.module.css';
+import "./Sidebar.css";
 
 /**
  * Sidebar component for the application layout.

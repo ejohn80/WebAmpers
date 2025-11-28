@@ -138,7 +138,6 @@
   color: #00e5ff;
 }
 
-/* Effect item needs relative positioning for absolute close button */
 .effectItem {
   margin-bottom: 20px;
   padding: 12px;
@@ -146,7 +145,8 @@
   border-radius: 6px;
   border: 2px solid #333239;
   overflow: visible;
-  position: relative; /* Important for absolute positioning of close button */
+  position: relative;
+  box-sizing: border-box;
 }
 
 /* Close effect button styles */
@@ -186,7 +186,7 @@
   flex-grow: 1;
   overflow-y: auto;
   margin-bottom: 15px;
-  padding-right: 8px;
+  padding-right: 0px;
   min-height: 0;
 }
 
