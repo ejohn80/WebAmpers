@@ -7,10 +7,18 @@
   overflow-y: hidden;
 }
 
-.waveform-canvas {
+.waveform-svg {
+  width: 100%;
   height: 100%;
-  width: auto; /* allow it to expand with canvas.width */
   display: block;
+}
+
+.waveform-shape {
+  stroke: currentColor;
+  stroke-width: 1;
+  stroke-linecap: round;
+  fill: none;
+  vector-effect: non-scaling-stroke;
 }
 
 /* Red playhead, now positioned in px (we'll control it in JS) */
