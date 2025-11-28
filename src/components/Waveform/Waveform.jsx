@@ -47,7 +47,9 @@ const computePeaks = (audioBuffer, targetPoints) => {
   for (let point = 0; point < points; point++) {
     const start = Math.floor((point / points) * length);
     const end =
-      point === points - 1 ? length : Math.floor(((point + 1) / points) * length);
+      point === points - 1
+        ? length
+        : Math.floor(((point + 1) / points) * length);
 
     let min = 1.0;
     let max = -1.0;
