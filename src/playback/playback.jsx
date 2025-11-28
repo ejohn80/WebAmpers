@@ -197,99 +197,245 @@ class PlaybackEngine {
     this._applyMuteSolo();
   }
 
-  /** Set effects for a specific track */
-  // Inside the PlaybackEngine class (or WebAmpEngine)
-
 /**
- * Updates the parameters of the Tone.js effects for a specific track.
- * This is the crucial missing link.
- * * NOTE: This assumes the engine has access to the track's Tone.js effect nodes,
- * likely stored in a map like 'this.trackEffectChains' or attached to the track's channel.
- * For this example, we assume effects are attached to 'track.channel.effects' or similar.
+ * Update track effects and apply them to the audio in real-time
+ * This creates an effects chain on the track bus for real-time processing
  */
 setTrackEffects(trackId, effectsMap) {
-    if (!window.audioManager) return;
-    
-    // 1. Get the AudioTrack model
-    const track = window.audioManager.getTrack(trackId);
-    if (!track || !track.channel) {
-        console.warn(`Engine: Cannot find channel for track ${trackId}`);
-        return;
-    }
-    
-    // 2. Access the Tone.js Effect Nodes attached to the track's channel
-    // NOTE: If you are chaining effects directly to the channel in your engine's 
-    // track creation logic, you will need to map effectName to the actual Tone.js node.
-    const channel = track.channel; // Assuming the Tone.Channel is on the track model
-    
-    // 3. Apply the changes based on the effect name
-    for (const [effectName, value] of Object.entries(effectsMap)) {
-        try {
-            switch (effectName) {
-                // TONE.js Implementation Examples
-                case 'pitch':
-                    // Assuming you have a Tone.PitchShift node named 'pitchShiftNode' 
-                    // in your effect chain
-                    if (channel.pitchShiftNode) {
-                        channel.pitchShiftNode.pitch = value; // value is in semitones
-                    }
-                    break;
-                case 'volume':
-                    // Note: This 'volume' effect is separate from the track's main volume 
-                    // on the channel (track.volume), and often uses a Gain node.
-                    // Value is 0 to 200 (percent gain).
-                    const linearGain = value / 100;
-                    if (channel.effectGainNode) {
-                        channel.effectGainNode.gain.setValueAtTime(linearGain, Tone.context.currentTime);
-                    }
-                    break;
-                case 'bass':
-                    // Bass boost typically uses a Tone.Filter (low-shelf)
-                    if (channel.bassFilter) {
-                        // Assuming bass boost value is directly mapped to filter gain (in dB)
-                        channel.bassFilter.gain.setValueAtTime(value, Tone.context.currentTime); 
-                    }
-                    break;
-                case 'reverb':
-                    if (channel.reverb) {
-                        // Assuming value is a mix level (0 to 1) or a decay time (seconds)
-                        channel.reverb.wet.setValueAtTime(value / 100, Tone.context.currentTime); 
-                    }
-                    break;
-                case 'delay':
-                    if (channel.delay) {
-                        // Assuming value is a mix level (0 to 1) or feedback amount
-                        channel.delay.wet.setValueAtTime(value / 100, Tone.context.currentTime);
-                    }
-                    break;
-                case 'distortion':
-                    if (channel.distortion) {
-                        // Assuming value is a drive amount (0 to 1) or percentage
-                        channel.distortion.distortion = value / 100;
-                    }
-                    break;
-                case 'highpass':
-                    if (channel.highpassFilter) {
-                        // Assuming value is the cutoff frequency
-                        channel.highpassFilter.frequency.setValueAtTime(value, Tone.context.currentTime);
-                    }
-                    break;
-                case 'lowpass':
-                    if (channel.lowpassFilter) {
-                        // Assuming value is the cutoff frequency
-                        channel.lowpassFilter.frequency.setValueAtTime(value, Tone.context.currentTime);
-                    }
-                    break;
-                // ... (Add cases for pan, tremolo, vibrato, chorus)
+  if (!this.version) {
+    console.warn("[setTrackEffects] No version loaded");
+    return;
+  }
+  
+  const track = this.version.tracks.find((x) => x.id === trackId);
+  if (!track) {
+    console.warn(`[setTrackEffects] Track ${trackId} not found in version`);
+    return;
+  }
+  
+  const bus = this.trackBuses.get(trackId);
+  if (!bus) {
+    console.warn(`[setTrackEffects] No bus found for track ${trackId}`);
+    return;
+  }
 
-                default:
-                    // console.warn(`Engine: Unhandled effect type: ${effectName}`);
-                    break;
-            }
-        } catch (e) {
-            console.error(`Error updating Tone.js for ${effectName}:`, e);
-        }
+  console.log(`[setTrackEffects] Applying effects to track ${trackId}:`, effectsMap);
+
+  // Store effects in track metadata
+  track.effects = effectsMap;
+
+  // Disconnect old effects chain if it exists
+  if (bus.fxOut) {
+    try {
+      bus.fxOut.disconnect();
+    } catch (e) {
+      console.warn("Failed to disconnect old effects:", e);
     }
+  }
+
+  // Dispose old effect nodes
+  if (bus.fxNodes && Array.isArray(bus.fxNodes)) {
+    bus.fxNodes.forEach(node => {
+      try {
+        node.dispose();
+      } catch (e) {
+        console.warn("Failed to dispose effect node:", e);
+      }
+    });
+  }
+
+  // Build new effects chain
+  const fxNodes = this._buildTrackEffectsChain(effectsMap);
+  bus.fxNodes = fxNodes;
+
+  // Reconnect the signal chain
+  if (fxNodes.length > 0) {
+    // Chain: gain -> effect1 -> effect2 -> ... -> pan -> master
+    try {
+      bus.gain.disconnect();
+      bus.gain.connect(fxNodes[0]);
+      
+      for (let i = 0; i < fxNodes.length - 1; i++) {
+        fxNodes[i].connect(fxNodes[i + 1]);
+      }
+      
+      fxNodes[fxNodes.length - 1].connect(bus.pan);
+      bus.fxOut = fxNodes[fxNodes.length - 1];
+    } catch (e) {
+      console.error("Failed to connect effects chain:", e);
+      // Fallback: reconnect without effects
+      try {
+        bus.gain.connect(bus.pan);
+        bus.fxOut = null;
+      } catch (e2) {
+        console.error("Failed to reconnect fallback:", e2);
+      }
+    }
+  } else {
+    // No effects - direct connection
+    try {
+      bus.gain.connect(bus.pan);
+      bus.fxOut = null;
+    } catch (e) {
+      console.error("Failed to connect direct path:", e);
+    }
+  }
+
+  console.log(`[setTrackEffects] Applied ${fxNodes.length} effects to track ${trackId}`);
+}
+
+/**
+ * Build Tone.js effects chain for a track
+ * This creates the actual audio processing nodes
+ */
+_buildTrackEffectsChain(effectsMap) {
+  const nodes = [];
+
+  if (!effectsMap || typeof effectsMap !== 'object') {
+    return nodes;
+  }
+
+  try {
+    // Pitch Shift
+    if (effectsMap.pitch && Math.abs(effectsMap.pitch) > 0.01) {
+      const pitchShift = new Tone.PitchShift({
+        pitch: effectsMap.pitch
+      });
+      nodes.push(pitchShift);
+    }
+
+    // Reverb
+    if (effectsMap.reverb && effectsMap.reverb > 0) {
+      const wet = Math.max(0, Math.min(1, effectsMap.reverb / 100));
+      const roomSize = 0.1 + 0.85 * wet;
+      const reverb = new Tone.Freeverb({
+        roomSize: roomSize,
+        dampening: 3000,
+        wet: wet
+      });
+      nodes.push(reverb);
+    }
+
+    // Delay
+    if (effectsMap.delay && effectsMap.delay > 0) {
+      const wet = Math.max(0, Math.min(1, effectsMap.delay / 100));
+      const delay = new Tone.FeedbackDelay({
+        delayTime: "8n",
+        feedback: 0.3 + 0.4 * wet,
+        wet: wet
+      });
+      nodes.push(delay);
+    }
+
+    // Bass Boost (EQ)
+    if (effectsMap.bass && Math.abs(effectsMap.bass) > 0.01) {
+      const eq = new Tone.EQ3({
+        low: effectsMap.bass,
+        mid: 0,
+        high: 0
+      });
+      nodes.push(eq);
+    }
+
+    // Distortion
+    if (effectsMap.distortion && effectsMap.distortion > 0) {
+      const amount = Math.max(0, Math.min(1, effectsMap.distortion / 100));
+      const distortion = new Tone.Distortion({
+        distortion: amount,
+        wet: amount * 0.8
+      });
+      nodes.push(distortion);
+    }
+
+    // Volume (Gain)
+    if (effectsMap.volume && Math.abs(effectsMap.volume - 100) > 0.01) {
+      const gain = Math.max(0, Math.min(2, effectsMap.volume / 100));
+      const gainNode = new Tone.Gain(gain);
+      nodes.push(gainNode);
+    }
+
+    // Pan
+    if (effectsMap.pan && Math.abs(effectsMap.pan) > 0.01) {
+      const panValue = Math.max(-1, Math.min(1, effectsMap.pan / 100));
+      const panner = new Tone.Panner(panValue);
+      nodes.push(panner);
+    }
+
+    // Tremolo
+    if (effectsMap.tremolo && effectsMap.tremolo > 0) {
+      const wet = Math.max(0, Math.min(1, effectsMap.tremolo / 100));
+      const tremolo = new Tone.Tremolo({
+        frequency: 0.1 + wet * 19.9,
+        depth: wet,
+        wet: wet
+      }).start();
+      nodes.push(tremolo);
+    }
+
+    // Vibrato
+    if (effectsMap.vibrato && effectsMap.vibrato > 0) {
+      const wet = Math.max(0, Math.min(1, effectsMap.vibrato / 100));
+      const vibrato = new Tone.Vibrato({
+        frequency: 0.1 + wet * 19.9,
+        depth: wet
+      });
+      nodes.push(vibrato);
+    }
+
+    // High-pass Filter
+    if (effectsMap.highpass && effectsMap.highpass > 20) {
+      const highpass = new Tone.Filter({
+        frequency: effectsMap.highpass,
+        type: "highpass"
+      });
+      nodes.push(highpass);
+    }
+
+    // Low-pass Filter
+    if (effectsMap.lowpass && effectsMap.lowpass < 20000) {
+      const lowpass = new Tone.Filter({
+        frequency: effectsMap.lowpass,
+        type: "lowpass"
+      });
+      nodes.push(lowpass);
+    }
+
+    // Chorus
+    if (effectsMap.chorus && effectsMap.chorus > 0) {
+      const wet = Math.max(0, Math.min(1, effectsMap.chorus / 100));
+      const chorus = new Tone.Chorus({
+        frequency: 1.5,
+        delayTime: 3.5,
+        depth: 0.7,
+        type: "sine",
+        spread: 180,
+        wet: wet
+      }).start();
+      nodes.push(chorus);
+    }
+  } catch (e) {
+    console.error("Error building track effects chain:", e);
+  }
+
+  return nodes;
+}
+
+/**
+ * Also update the _makeTrackBus method to initialize the fxNodes array:
+ */
+_makeTrackBus(t) {
+  const gain = new Tone.Gain(dbToGain(t.gainDb));
+  const pan = new Tone.Panner(clamp(t.pan ?? 0, -1, 1));
+  gain.connect(pan);
+  return {
+    id: t.id, 
+    gain, 
+    pan, 
+    fxIn: null, 
+    fxOut: null, 
+    fxNodes: [], // Add this line
+    chain: []
+  };
 }
 
   /** Solo or unsolo a specific track */

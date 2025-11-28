@@ -11,7 +11,7 @@ import {
 
 function EffectsTab() {
   const {
-    effects,
+    selectedTrackEffects,
     updateEffect,
     resetEffect,
     resetAllEffects,
@@ -19,14 +19,15 @@ function EffectsTab() {
     closeEffectsMenu,
     isEffectsMenuOpen,
     removeEffect,
-    activeEffects, // Get active effects from context
-    selectedTrackEffects, // Get selected track effects
-    selectedTrackId, // <-- ADDED: For conditional rendering and effect logic
+    activeEffects,
+    selectedTrackId,
   } = useContext(AppContext);
 
-  const [draggingSlider, setDraggingSlider] = useState(null);
+  // Local state for smooth dragging
   const [localValues, setLocalValues] = useState({});
-  const pendingUpdates = useRef(new Map());
+  const [draggingSlider, setDraggingSlider] = useState(null);
+  const updateTimeoutRef = useRef({});
+  const lastTrackIdRef = useRef(null);
 
   const effectConfigs = [
     {
@@ -151,12 +152,11 @@ function EffectsTab() {
     },
   ];
 
-  // Filter effects to only show active ones and maintain addition order
+  // Filter effects to only show active ones
   const activeEffectConfigs = activeEffects
     .map((effectId) => effectConfigs.find((config) => config.name === effectId))
-    .filter(Boolean); // Remove any undefined values in case of mismatches
+    .filter(Boolean);
 
-  // Toggle effects menu
   const toggleEffectsMenu = () => {
     if (isEffectsMenuOpen) {
       closeEffectsMenu();
@@ -165,108 +165,136 @@ function EffectsTab() {
     }
   };
 
-  // Update local state immediately for smooth UI
+  // CRITICAL: Get current value with proper priority
+  const getCurrentValue = (config) => {
+    const effectName = config.name;
+    
+    // Priority 1: If actively dragging, use local value
+    if (draggingSlider === effectName && localValues[effectName] !== undefined) {
+      return localValues[effectName];
+    }
+    
+    // Priority 2: If we have a local value (from recent change), use it
+    if (localValues[effectName] !== undefined) {
+      return localValues[effectName];
+    }
+    
+    // Priority 3: Use the track's persisted value
+    if (selectedTrackEffects && selectedTrackEffects[effectName] !== undefined) {
+      return selectedTrackEffects[effectName];
+    }
+    
+    // Priority 4: Default value
+    return config.default;
+  };
+
+  // Update local state immediately and debounce the persist
   const handleChange = useCallback(
     (name) => (e) => {
-      const raw = e.target.value;
-      const num = Number(raw);
-      setLocalValues((prev) => ({...prev, [name]: num}));
-      pendingUpdates.current.set(name, num);
-    },
-    []
-  );
-
-  // Apply all pending effects when user releases slider
-  const handleSliderEnd = useCallback(
-    (name) => () => {
-      const pendingValue = pendingUpdates.current.get(name);
-      if (pendingValue !== undefined) {
-        updateEffect(name, pendingValue);
-        pendingUpdates.current.delete(name);
+      const value = Number(e.target.value);
+      
+      // ALWAYS update local state immediately for smooth UI
+      setLocalValues((prev) => ({...prev, [name]: value}));
+      
+      // Clear any existing timeout for this effect
+      if (updateTimeoutRef.current[name]) {
+        clearTimeout(updateTimeoutRef.current[name]);
       }
-      // CRITICAL: We clear draggingSlider here, which triggers the race condition,
-      // but the fix is now handled in getCurrentValue to prevent the snap-back.
-      setDraggingSlider(null); 
+      
+      // Debounce the actual update
+      updateTimeoutRef.current[name] = setTimeout(() => {
+        console.log(`[EffectsTab] Triggering updateEffect for ${name}=${value}`);
+        updateEffect(name, value);
+        delete updateTimeoutRef.current[name];
+      }, 100); // Slightly longer debounce for stability
     },
     [updateEffect]
   );
+
+  const handleSliderStart = useCallback((name) => {
+    console.log(`[EffectsTab] Started dragging ${name}`);
+    setDraggingSlider(name);
+  }, []);
+
+  const handleSliderEnd = useCallback((name) => {
+    console.log(`[EffectsTab] Stopped dragging ${name}`);
+    // Keep dragging state for a moment to prevent flicker
+    setTimeout(() => {
+      setDraggingSlider(null);
+    }, 200);
+  }, []);
 
   const getSliderFillPercentage = (config, value) => {
     const currentValue = value ?? config.default;
     return ((currentValue - config.min) / (config.max - config.min)) * 100;
   };
 
-  // Use local value if available and different from central state, otherwise use actual effect value
-  const getCurrentValue = (config) => {
-    // 1. Determine the source of truth based on track selection
-    const centralEffects = selectedTrackId ? selectedTrackEffects : effects;
-    const centralValue = centralEffects?.[config.name] ?? config.default;
-    
-    // 2. Get the temporary local value
-    const localValue = localValues[config.name];
-
-    // 3. FIX: If we have a local value and it does NOT match the central state, 
-    // it means the async update hasn't propagated yet. Use the local value 
-    // to prevent the snap-back to the old central state value.
-    if (
-      localValue !== undefined && 
-      localValue !== centralValue
-    ) {
-      return localValue;
-    }
-
-    // 4. Otherwise, use the central value (which is either the default, 
-    // the old value, or the newly updated value).
-    return centralValue;
-  };
-
-  // NEW: Cleanup localValues when the central state updates
-  // This prevents memory leaks by clearing the local value once the AppContext state (the source of truth) has caught up.
-  useEffect(() => {
-    const newLocalValues = {...localValues};
-    // Get the correct central state to compare against
-    const centralEffects = selectedTrackId ? selectedTrackEffects : effects;
-    let changed = false;
-
-    // Iterate over local state to see if central state has caught up
-    for (const name in localValues) {
-      if (centralEffects?.[name] === localValues[name]) {
-        delete newLocalValues[name];
-        changed = true;
-      }
-    }
-
-    if (changed) {
-      setLocalValues(newLocalValues);
-    }
-  }, [selectedTrackEffects, effects, selectedTrackId, localValues]);
-
   // Check if effect is at default value
   const isAtDefaultValue = (config) => {
     const currentValue = getCurrentValue(config);
-    return currentValue === config.default;
+    return Math.abs(currentValue - config.default) < 0.01;
   };
 
   // Check if ALL effects are at their default values
   const areAllEffectsAtDefault = () => {
     return activeEffectConfigs.every((config) => isAtDefaultValue(config));
   };
-  
-  // NEW: Conditional Rendering Check
+
+  // Clear local values when track changes
+  useEffect(() => {
+    if (selectedTrackId !== lastTrackIdRef.current) {
+      console.log(`[EffectsTab] Track changed from ${lastTrackIdRef.current} to ${selectedTrackId}, clearing local values`);
+      setLocalValues({});
+      lastTrackIdRef.current = selectedTrackId;
+    }
+  }, [selectedTrackId]);
+
+  // Sync local values with track effects after updates settle
+  useEffect(() => {
+    // Don't sync while dragging
+    if (draggingSlider) return;
+    
+    // Don't sync if we have pending updates
+    if (Object.keys(updateTimeoutRef.current).length > 0) return;
+    
+    // After everything settles, clear local values so we use persisted values
+    const timer = setTimeout(() => {
+      if (!draggingSlider && Object.keys(updateTimeoutRef.current).length === 0) {
+        console.log("[EffectsTab] Clearing local values after settle");
+        setLocalValues({});
+      }
+    }, 2000); // Wait 2 seconds after last change
+    
+    return () => clearTimeout(timer);
+  }, [selectedTrackEffects, draggingSlider]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      Object.values(updateTimeoutRef.current).forEach(clearTimeout);
+    };
+  }, []);
+
   if (!selectedTrackId) {
     return (
       <div className={styles.container}>
-        <div style={{ padding: "16px", color: "#ccc", textAlign: "center", minHeight: '100px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ 
+          padding: "16px", 
+          color: "#ccc", 
+          textAlign: "center", 
+          minHeight: '100px', 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center' 
+        }}>
           Please select an audio track to manage effects.
         </div>
       </div>
     );
   }
 
-  // Original render logic now only runs if a track is selected
   return (
     <div className={styles.container}>
-      {/* Add Effects Button - toggles the menu */}
       <button
         className={`${styles.addEffectsButton} ${isEffectsMenuOpen ? styles.addEffectsButtonActive : ""}`}
         onClick={toggleEffectsMenu}
@@ -277,7 +305,6 @@ function EffectsTab() {
         </span>
       </button>
 
-      {/* Effect sliders - only show active effects in addition order */}
       <div className={styles.effectsList}>
         {activeEffectConfigs.map((config) => {
           const currentValue = getCurrentValue(config);
@@ -286,7 +313,6 @@ function EffectsTab() {
 
           return (
             <div key={config.name} className={styles.effectItem}>
-              {/* Close button in top right */}
               <button
                 className={styles.closeEffectButton}
                 onClick={() => removeEffect(config.name)}
@@ -300,7 +326,6 @@ function EffectsTab() {
                 <div className={styles.description}>{config.description}</div>
               </div>
 
-              {/* Custom Slider */}
               <div
                 className={`${styles.sliderContainer} ${
                   draggingSlider === config.name ? styles.dragging : ""
@@ -330,17 +355,17 @@ function EffectsTab() {
                   step={config.step}
                   value={currentValue}
                   onChange={handleChange(config.name)}
-                  onMouseDown={() => setDraggingSlider(config.name)}
-                  onMouseUp={handleSliderEnd(config.name)}
-                  onTouchStart={() => setDraggingSlider(config.name)}
-                  onTouchEnd={handleSliderEnd(config.name)}
+                  onMouseDown={() => handleSliderStart(config.name)}
+                  onMouseUp={() => handleSliderEnd(config.name)}
+                  onTouchStart={() => handleSliderStart(config.name)}
+                  onTouchEnd={() => handleSliderEnd(config.name)}
                   className={styles.sliderInput}
                 />
               </div>
 
               <div className={styles.bottomRow}>
                 <span className={styles.value}>
-                  {currentValue}
+                  {currentValue.toFixed(config.step < 1 ? 1 : 0)}
                   {config.unit}
                 </span>
                 <div className={styles.controls}>
@@ -348,11 +373,13 @@ function EffectsTab() {
                     className={`${styles.button} ${
                       isDefault ? styles.buttonDisabled : ""
                     }`}
-                    onClick={
-                      isDefault
-                        ? undefined
-                        : () => resetEffect(config.name, config.default)
-                    }
+                    onClick={() => {
+                      if (!isDefault) {
+                        console.log(`[EffectsTab] Resetting ${config.name}`);
+                        setLocalValues((prev) => ({...prev, [config.name]: config.default}));
+                        resetEffect(config.name, config.default);
+                      }
+                    }}
                     disabled={isDefault}
                   >
                     Reset
@@ -363,7 +390,6 @@ function EffectsTab() {
           );
         })}
 
-        {/* Show message when no effects are active */}
         {activeEffectConfigs.length === 0 && (
           <div className={styles.noEffectsMessage}>
             No effects yet. Add one to get started
@@ -375,7 +401,18 @@ function EffectsTab() {
         className={`${styles.resetAllButton} ${
           areAllEffectsAtDefault() ? styles.resetAllButtonDisabled : ""
         }`}
-        onClick={areAllEffectsAtDefault() ? undefined : resetAllEffects}
+        onClick={() => {
+          if (!areAllEffectsAtDefault()) {
+            console.log(`[EffectsTab] Resetting all effects`);
+            // Set all to defaults in local state
+            const defaults = {};
+            activeEffectConfigs.forEach(config => {
+              defaults[config.name] = config.default;
+            });
+            setLocalValues(defaults);
+            resetAllEffects();
+          }
+        }}
         disabled={areAllEffectsAtDefault()}
       >
         <span className={styles.resetAllButtonContent}>
