@@ -113,6 +113,13 @@ class PlaybackEngine {
       (bus.fxOut ?? bus.pan).connect(this.master.fxIn);
     });
 
+    (version.tracks || []).forEach((t) => {
+        if (t.effects) {
+            // Apply effects without logging to avoid console spam on load
+            this.setTrackEffects(t.id, t.effects, true); 
+        }
+    });
+
     // Prepare all audio segments (Tone.Player instances)
     await this._prepareSegments(version);
 
@@ -197,91 +204,83 @@ class PlaybackEngine {
     this._applyMuteSolo();
   }
 
-/**
- * Update track effects and apply them to the audio in real-time
- * This creates an effects chain on the track bus for real-time processing
- */
-setTrackEffects(trackId, effectsMap) {
-  if (!this.version) {
-    console.warn("[setTrackEffects] No version loaded");
-    return;
-  }
-  
-  const track = this.version.tracks.find((x) => x.id === trackId);
-  if (!track) {
-    console.warn(`[setTrackEffects] Track ${trackId} not found in version`);
-    return;
-  }
-  
-  const bus = this.trackBuses.get(trackId);
-  if (!bus) {
-    console.warn(`[setTrackEffects] No bus found for track ${trackId}`);
-    return;
-  }
+setTrackEffects(trackId, effectsMap, silent = false) {
+    if (!this.version) return;
+    
+    const bus = this.trackBuses.get(trackId);
+    if (!bus) return;
 
-  console.log(`[setTrackEffects] Applying effects to track ${trackId}:`, effectsMap);
+    if(!silent) console.log(`[setTrackEffects] Track ${trackId}`, effectsMap);
 
-  // Store effects in track metadata
-  track.effects = effectsMap;
-
-  // Disconnect old effects chain if it exists
-  if (bus.fxOut) {
-    try {
-      bus.fxOut.disconnect();
-    } catch (e) {
-      console.warn("Failed to disconnect old effects:", e);
+    // 1. SAFELY DISCONNECT
+    // Check if we have an existing fxOut (the tail of the old chain)
+    // If fxOut exists, it is currently connected to master.fxIn (or master.gain)
+    const nextNode = this.master?.fxIn || this.master?.gain;
+    
+    if (bus.fxOut) {
+        try {
+            if (nextNode) bus.fxOut.disconnect(nextNode);
+        } catch (e) {
+            // Ignore disconnect errors (node might be already disconnected)
+        }
+    } else {
+        // If no fxOut, the Pan node is connected to Master
+        try {
+            if (nextNode) bus.pan.disconnect(nextNode);
+        } catch (e) {}
     }
-  }
 
-  // Dispose old effect nodes
-  if (bus.fxNodes && Array.isArray(bus.fxNodes)) {
-    bus.fxNodes.forEach(node => {
-      try {
-        node.dispose();
-      } catch (e) {
-        console.warn("Failed to dispose effect node:", e);
-      }
-    });
-  }
+    // 2. DISPOSE OLD NODES
+    if (bus.fxNodes && Array.isArray(bus.fxNodes)) {
+        bus.fxNodes.forEach(node => {
+            try { node.dispose(); } catch (e) {}
+        });
+    }
 
-  // Build new effects chain
-  const fxNodes = this._buildTrackEffectsChain(effectsMap);
-  bus.fxNodes = fxNodes;
+    // 3. BUILD NEW CHAIN
+    const fxNodes = this._buildTrackEffectsChain(effectsMap);
+    bus.fxNodes = fxNodes;
 
-  // Reconnect the signal chain
-  if (fxNodes.length > 0) {
-    // Chain: gain -> effect1 -> effect2 -> ... -> pan -> master
+    // 4. RECONNECT
+    // Start of chain: Gain -> Pan -> [Effects] -> Master
+    // Note: Tone.js Panner usually connects to output. 
+    // Current chain in _makeTrackBus is: Gain -> Pan. 
+    // We want: Gain -> [Effects] -> Pan -> Master (Better for stereo effects)
+    // OR: Gain -> Pan -> [Effects] -> Master (Effects apply to panned signal)
+    
+    // Let's stick to the structure: Gain -> [Effects] -> Pan -> Master
+    // But _makeTrackBus hardwires Gain->Pan. Let's disconnect that internal link first.
+    
     try {
-      bus.gain.disconnect();
-      bus.gain.connect(fxNodes[0]);
-      
-      for (let i = 0; i < fxNodes.length - 1; i++) {
-        fxNodes[i].connect(fxNodes[i + 1]);
-      }
-      
-      fxNodes[fxNodes.length - 1].connect(bus.pan);
-      bus.fxOut = fxNodes[fxNodes.length - 1];
-    } catch (e) {
-      console.error("Failed to connect effects chain:", e);
-      // Fallback: reconnect without effects
-      try {
+        bus.gain.disconnect();
+    } catch(e) {}
+
+    if (fxNodes.length > 0) {
+        // Gain -> Effect 1
+        bus.gain.connect(fxNodes[0]);
+        
+        // Effect 1 -> Effect 2 ...
+        for (let i = 0; i < fxNodes.length - 1; i++) {
+            fxNodes[i].connect(fxNodes[i + 1]);
+        }
+        
+        // Last Effect -> Pan
+        fxNodes[fxNodes.length - 1].connect(bus.pan);
+        
+        // Mark fxOut (not strictly needed for Pan connection, but for clarity)
+        bus.fxOut = bus.pan; 
+    } else {
+        // No effects: Gain -> Pan
         bus.gain.connect(bus.pan);
-        bus.fxOut = null;
-      } catch (e2) {
-        console.error("Failed to reconnect fallback:", e2);
-      }
+        bus.fxOut = bus.pan;
     }
-  } else {
-    // No effects - direct connection
-    try {
-      bus.gain.connect(bus.pan);
-      bus.fxOut = null;
-    } catch (e) {
-      console.error("Failed to connect direct path:", e);
-    }
-  }
 
-  console.log(`[setTrackEffects] Applied ${fxNodes.length} effects to track ${trackId}`);
+    // Finally connect Pan to Master
+    // Use master.fxIn if master effects exist, otherwise master.gain
+    const masterDest = this.master?.fxIn || this.master?.gain;
+    if (masterDest) {
+        bus.pan.connect(masterDest);
+    }
 }
 
 /**

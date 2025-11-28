@@ -156,6 +156,7 @@ class DBManager {
             : typeof trackData.solo !== "undefined"
               ? trackData.solo
               : base._solo,
+        effects: base.effects || trackData.effects || {}, // Ensure effects are stored
       };
 
       // Convert any segment-level buffers into a storable representation.
@@ -399,6 +400,8 @@ class DBManager {
       order: track.order ?? 0,
       sessionId: track.sessionId ?? track._sessionId,
       assetId: track.assetId ?? track._assetId,
+      // CRITICAL FIX: Ensure effects are saved
+      effects: track.effects || {}, 
       segments: [],
     };
 

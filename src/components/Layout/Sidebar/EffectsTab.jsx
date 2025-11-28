@@ -19,7 +19,7 @@ function EffectsTab() {
     closeEffectsMenu,
     isEffectsMenuOpen,
     removeEffect,
-    activeEffects,
+    activeEffects, // This is now the derived list of keys for the specific track
     selectedTrackId,
   } = useContext(AppContext);
 
@@ -152,8 +152,8 @@ function EffectsTab() {
     },
   ];
 
-  // Filter effects to only show active ones
-  const activeEffectConfigs = activeEffects
+  // Filter effects to only show active ones based on the context list
+  const activeEffectConfigs = (activeEffects || [])
     .map((effectId) => effectConfigs.find((config) => config.name === effectId))
     .filter(Boolean);
 
@@ -203,21 +203,19 @@ function EffectsTab() {
       
       // Debounce the actual update
       updateTimeoutRef.current[name] = setTimeout(() => {
-        console.log(`[EffectsTab] Triggering updateEffect for ${name}=${value}`);
+        // console.log(`[EffectsTab] Triggering updateEffect for ${name}=${value}`);
         updateEffect(name, value);
         delete updateTimeoutRef.current[name];
-      }, 100); // Slightly longer debounce for stability
+      }, 100); 
     },
     [updateEffect]
   );
 
   const handleSliderStart = useCallback((name) => {
-    console.log(`[EffectsTab] Started dragging ${name}`);
     setDraggingSlider(name);
   }, []);
 
   const handleSliderEnd = useCallback((name) => {
-    console.log(`[EffectsTab] Stopped dragging ${name}`);
     // Keep dragging state for a moment to prevent flicker
     setTimeout(() => {
       setDraggingSlider(null);
@@ -243,7 +241,7 @@ function EffectsTab() {
   // Clear local values when track changes
   useEffect(() => {
     if (selectedTrackId !== lastTrackIdRef.current) {
-      console.log(`[EffectsTab] Track changed from ${lastTrackIdRef.current} to ${selectedTrackId}, clearing local values`);
+      // console.log(`[EffectsTab] Track changed, clearing local values`);
       setLocalValues({});
       lastTrackIdRef.current = selectedTrackId;
     }
@@ -251,19 +249,14 @@ function EffectsTab() {
 
   // Sync local values with track effects after updates settle
   useEffect(() => {
-    // Don't sync while dragging
     if (draggingSlider) return;
-    
-    // Don't sync if we have pending updates
     if (Object.keys(updateTimeoutRef.current).length > 0) return;
     
-    // After everything settles, clear local values so we use persisted values
     const timer = setTimeout(() => {
       if (!draggingSlider && Object.keys(updateTimeoutRef.current).length === 0) {
-        console.log("[EffectsTab] Clearing local values after settle");
         setLocalValues({});
       }
-    }, 2000); // Wait 2 seconds after last change
+    }, 2000); 
     
     return () => clearTimeout(timer);
   }, [selectedTrackEffects, draggingSlider]);
@@ -375,7 +368,6 @@ function EffectsTab() {
                     }`}
                     onClick={() => {
                       if (!isDefault) {
-                        console.log(`[EffectsTab] Resetting ${config.name}`);
                         setLocalValues((prev) => ({...prev, [config.name]: config.default}));
                         resetEffect(config.name, config.default);
                       }
@@ -403,8 +395,6 @@ function EffectsTab() {
         }`}
         onClick={() => {
           if (!areAllEffectsAtDefault()) {
-            console.log(`[EffectsTab] Resetting all effects`);
-            // Set all to defaults in local state
             const defaults = {};
             activeEffectConfigs.forEach(config => {
               defaults[config.name] = config.default;
