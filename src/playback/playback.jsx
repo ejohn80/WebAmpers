@@ -223,16 +223,11 @@ setTrackEffects(trackId, effectsMap, silent = false) {
         track.effects = effectsMap;
     }
 
-    // CRITICAL FIX: Check if we can just update existing nodes instead of rebuilding
     const canUpdateExisting = bus.fxNodes && bus.fxNodes.length > 0;
     
     if (canUpdateExisting) {
         // Try to update existing effect parameters smoothly
-        let updated = this._updateExistingEffectNodes(bus.fxNodes, effectsMap);
-        if (updated) {
-            // Successfully updated existing nodes without rebuild
-            return;
-        }
+        this._updateExistingEffectNodes(bus.fxNodes, effectsMap);
     }
 
     // If we can't update smoothly, rebuild the chain
