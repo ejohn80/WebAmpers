@@ -209,6 +209,25 @@ class PlaybackEngine {
     this._applyMuteSolo();
   }
 
+  /**
+   * Apply effects to a specific track by rebuilding its effects chain.
+   * This method updates the track's audio processing nodes and reconnects the audio graph.
+   *
+   * @param {string} trackId - The unique identifier of the track
+   * @param {Object} effectsMap - Effects configuration object containing effect parameters
+   * @param {number} [effectsMap.pitch] - Pitch shift in semitones (-12 to +12)
+   * @param {number} [effectsMap.reverb] - Reverb amount (0-100)
+   * @param {number} [effectsMap.delay] - Delay amount (0-100)
+   * @param {number} [effectsMap.bass] - Bass boost in dB (-12 to +12)
+   * @param {number} [effectsMap.distortion] - Distortion amount (0-100)
+   * @param {number} [effectsMap.volume] - Volume percentage (0-200)
+   * @param {number} [effectsMap.tremolo] - Tremolo amount (0-100)
+   * @param {number} [effectsMap.vibrato] - Vibrato amount (0-100)
+   * @param {number} [effectsMap.highpass] - High-pass filter frequency in Hz
+   * @param {number} [effectsMap.lowpass] - Low-pass filter frequency in Hz
+   * @param {number} [effectsMap.chorus] - Chorus amount (0-100)
+   * @param {boolean} [silent=false] - If true, suppresses console logging
+   */
   setTrackEffects(trackId, effectsMap, silent = false) {
     if (!this.version) return;
 
@@ -288,6 +307,15 @@ class PlaybackEngine {
     }
   }
 
+  /**
+   * Update parameters of existing effect nodes without rebuilding the entire chain.
+   * This provides smoother transitions when adjusting effect parameters in real-time.
+   *
+   * @private
+   * @param {Array<Tone.AudioNode>} fxNodes - Array of existing Tone.js effect nodes
+   * @param {Object} effectsMap - New effect parameter values to apply
+   * @returns {boolean} True if update was successful, false if chain needs rebuilding
+   */
   _updateExistingEffectNodes(fxNodes, effectsMap) {
     if (!fxNodes || fxNodes.length === 0) return false;
 
@@ -392,8 +420,13 @@ class PlaybackEngine {
   }
 
   /**
-   * Build Tone.js effects chain for a track
-   * This creates the actual audio processing nodes
+   * Build a chain of Tone.js audio effect nodes for a track.
+   * Creates and configures all effect processors based on the provided parameters.
+   * Note: Pan is handled separately by the track bus and is not included in this chain.
+   *
+   * @private
+   * @param {Object} effectsMap - Effects configuration object
+   * @returns {Array<Tone.AudioNode>} Array of connected Tone.js effect nodes
    */
   _buildTrackEffectsChain(effectsMap) {
     const nodes = [];
@@ -547,7 +580,15 @@ class PlaybackEngine {
   }
 
   /**
-   * Also update the _makeTrackBus method to initialize the fxNodes array:
+   * Create a track bus with gain and pan nodes.
+   * The bus serves as the audio routing structure for a track: Gain → Effects → Pan → Master
+   *
+   * @private
+   * @param {Object} t - Track configuration object
+   * @param {string} t.id - Track identifier
+   * @param {number} t.gainDb - Track gain in decibels
+   * @param {number} [t.pan=0] - Stereo pan position (-1 to +1)
+   * @returns {Object} Track bus object containing gain, pan, and effect routing nodes
    */
   _makeTrackBus(t) {
     const gain = new Tone.Gain(dbToGain(t.gainDb));
@@ -559,12 +600,18 @@ class PlaybackEngine {
       pan,
       fxIn: null,
       fxOut: null,
-      fxNodes: [], // Add this line
+      fxNodes: [],
       chain: [],
     };
   }
 
-  /** Solo or unsolo a specific track */
+  /**
+   * Solo or unsolo a specific track.
+   * When any track is soloed, all non-soloed tracks are muted.
+   *
+   * @param {string} trackId - The unique identifier of the track
+   * @param {boolean} solo - True to solo the track, false to unsolo
+   */
   setTrackSolo(trackId, solo) {
     if (!this.version) return;
     const t = this.version.tracks.find((x) => x.id === trackId);
@@ -572,7 +619,13 @@ class PlaybackEngine {
     this._applyMuteSolo();
   }
 
-  /** Adjust the gain (volume) of a track in decibels */
+  /**
+   * Adjust the gain (volume) of a track in decibels.
+   * Updates both the audio node and the track's stored gain value.
+   *
+   * @param {string} trackId - The unique identifier of the track
+   * @param {number} db - Gain value in decibels (typically -60 to +12)
+   */
   setTrackGainDb(trackId, db) {
     const bus = this.trackBuses.get(trackId);
     if (bus) bus.gain.gain.value = dbToGain(db);
@@ -582,7 +635,13 @@ class PlaybackEngine {
     }
   }
 
-  /** Adjust the stereo pan (-1 = left, +1 = right) of a track */
+  /**
+   * Adjust the stereo pan position of a track.
+   * Converts from percentage (-100 to +100) to normalized range (-1 to +1).
+   *
+   * @param {string} trackId - The unique identifier of the track
+   * @param {number} pan - Pan position as percentage (-100=left, 0=center, +100=right)
+   */
   setTrackPan(trackId, pan) {
     const bus = this.trackBuses.get(trackId);
     if (!bus) {
@@ -859,7 +918,13 @@ class PlaybackEngine {
     return chain;
   }
 
-  /** Replace the master chain (placeholder for future FX support) */
+  /**
+   * Replace the master effects chain with a new configuration.
+   * Preserves master output level and reconnects all track buses to the new master.
+   *
+   * @param {Array<Object>} chain - Array of effect configuration objects
+   * @param {string} chain[].type - Effect type (pitch, freeverb, delay, eq3, distortion, gain, etc.)
+   */
   replaceMasterChain(chain) {
     const old = this.master;
     const prevLevel = (() => {
@@ -899,7 +964,24 @@ class PlaybackEngine {
     }
   }
 
-  /** Set master effects from UI (pitch in semitones, reverb 0-100, volume 0-200) */
+  /**
+   * Set master effects from UI parameters.
+   * Converts UI-friendly parameter ranges to internal effect configuration and applies them.
+   *
+   * @param {Object} effects - Master effects configuration
+   * @param {number} [effects.pitch] - Pitch shift in semitones
+   * @param {number} [effects.reverb] - Reverb amount (0-100)
+   * @param {number} [effects.volume] - Volume percentage (0-200)
+   * @param {number} [effects.delay] - Delay amount (0-100)
+   * @param {number} [effects.bass] - Bass boost in dB
+   * @param {number} [effects.distortion] - Distortion amount (0-100)
+   * @param {number} [effects.pan] - Pan position (-1 to +1)
+   * @param {number} [effects.tremolo] - Tremolo amount (0-100)
+   * @param {number} [effects.vibrato] - Vibrato amount (0-100)
+   * @param {number} [effects.highpass] - High-pass filter frequency in Hz
+   * @param {number} [effects.lowpass] - Low-pass filter frequency in Hz
+   * @param {number} [effects.chorus] - Chorus amount (0-100)
+   */
   setMasterEffects(effects) {
     const chain = [];
     // Pitch (semitones, can be negative)
@@ -934,11 +1016,6 @@ class PlaybackEngine {
     if (typeof effects?.distortion === "number" && effects.distortion > 0) {
       const amount = Math.max(0, Math.min(1, effects.distortion / 100));
       chain.push({type: "distortion", amount});
-    }
-    // Effect volume (0-200% -> 0.0-2.0 linear)
-    if (typeof effects?.volume === "number" && effects.volume !== 100) {
-      const linear = Math.max(0, Math.min(2, effects.volume / 100));
-      chain.push({type: "gain", gain: linear});
     }
     // Pan
     if (typeof effects?.pan === "number" && effects.pan !== 0) {
@@ -992,7 +1069,10 @@ class PlaybackEngine {
     this.replaceMasterChain(chain);
   }
 
-  /** Dispose all audio resources */
+  /**
+   * Dispose all audio resources to free memory.
+   * Cancels animation frame updates and disposes all players and buses.
+   */
   dispose() {
     this._cancelRaf();
     this._disposeAll();
@@ -1080,15 +1160,18 @@ class PlaybackEngine {
     this._applyMuteSolo();
   }
 
-  /** Create a simple Gain → Pan chain for one track */
-  _makeTrackBus(t) {
-    const gain = new Tone.Gain(dbToGain(t.gainDb));
-    const pan = new Tone.Panner(clamp(t.pan ?? 0, -1, 1));
-    gain.connect(pan);
-    return {id: t.id, gain, pan, fxIn: null, fxOut: null, chain: []};
-  }
-
-  /** Create a master bus and connect it to the audio output */
+  /**
+   * Create a master bus with optional effects chain and connect to audio output.
+   * The master bus is the final stage before audio reaches the speakers.
+   *
+   * @private
+   * @param {Array<Object>} chain - Array of effect configurations to build
+   * @returns {Object} Master bus object with gain node, effect nodes, and routing
+   * @returns {Tone.Gain} returns.gain - Master output gain node
+   * @returns {Array<Tone.AudioNode>} returns.chain - Array of effect nodes in the chain
+   * @returns {Tone.AudioNode} returns.fxIn - First node in effects chain (input)
+   * @returns {Tone.AudioNode} returns.fxOut - Last node in effects chain (output)
+   */
   _makeMaster(chain) {
     const outGain = new Tone.Gain(1);
 
@@ -1223,7 +1306,13 @@ class PlaybackEngine {
     return {gain: outGain, chain: nodes, fxIn, fxOut};
   }
 
-  /** Handle mute/solo logic and smoothly apply gain changes */
+  /**
+   * Apply mute/solo logic across all tracks.
+   * Mute takes precedence over solo. If any track is soloed, all non-soloed tracks are muted.
+   * Uses exponential ramping to avoid audio clicks during gain changes.
+   *
+   * @private
+   */
   _applyMuteSolo() {
     if (!this.version) return;
     const tracks = this.version.tracks || [];
@@ -1245,7 +1334,13 @@ class PlaybackEngine {
     });
   }
 
-  /** Preload an audio file asynchronously */
+  /**
+   * Preload an audio file asynchronously to reduce playback latency.
+   * Only preloads network URLs and Blob URLs, skipping already-loaded files.
+   *
+   * @private
+   * @param {string} url - URL of the audio file to preload
+   */
   _preload(url) {
     if (typeof url !== "string") return; // only preload network/Blob URLs
     if (this.preloaded.has(url)) return;
@@ -1261,7 +1356,12 @@ class PlaybackEngine {
       );
   }
 
-  /** Start updating progress every animation frame */
+  /**
+   * Start the requestAnimationFrame loop for updating playback progress.
+   * Monitors playback position and automatically pauses when reaching the end.
+   *
+   * @private
+   */
   _startRaf() {
     const tick = () => {
       let ms = this.getPositionMs();
@@ -1286,13 +1386,24 @@ class PlaybackEngine {
     this.rafId = requestAnimationFrame(tick);
   }
 
-  /** Stop the RAF loop */
+  /**
+   * Stop the requestAnimationFrame loop.
+   * Called when stopping playback or disposing the engine.
+   *
+   * @private
+   */
   _cancelRaf() {
     if (this.rafId != null) cancelAnimationFrame(this.rafId);
     this.rafId = null;
   }
 
-  /** Emit transport event to React (e.g., when playing/paused) */
+  /**
+   * Emit transport state change event to React components.
+   * Notifies listeners of play/pause state and current position.
+   *
+   * @private
+   * @param {boolean} playing - Whether transport is currently playing
+   */
   _emitTransport(playing) {
     this.events.onTransport &&
       this.events.onTransport({
@@ -1302,7 +1413,12 @@ class PlaybackEngine {
       });
   }
 
-  /** Dispose of all audio players and buses to free memory */
+  /**
+   * Dispose of all audio players and track buses to free memory.
+   * Disconnects all nodes, disposes resources, and clears internal maps.
+   *
+   * @private
+   */
   _disposeAll() {
     this.playersBySegment.forEach((h) => {
       try {
@@ -1337,7 +1453,12 @@ class PlaybackEngine {
     }
   }
 
-  /** Dispose of the current master bus chain (effects and gain node) */
+  /**
+   * Dispose of the current master bus chain.
+   * Disconnects and disposes all master effects nodes and the master gain node.
+   *
+   * @private
+   */
   _disposeMaster() {
     if (this.master) {
       // If there's an effects chain (fxIn != master gain), disconnect it
@@ -1356,13 +1477,14 @@ class PlaybackEngine {
 
   /**
    * Create the master audio chain with effects applied.
-   * @param {Object} effects - The effects configuration object (from AppContext.effects).
-   * @returns {{gain: Tone.Gain, fxIn: Tone.AudioNode, effects: Array<Tone.AudioNode>}}
-   */
-  /**
-   * Create the master audio chain with effects applied.
-   * @param {Object} effects - The effects configuration object (from AppContext.effects).
-   * @returns {{gain: Tone.Gain, fxIn: Tone.AudioNode, effects: Array<Tone.AudioNode>}}
+   * Uses offline rendering context for building the effects chain.
+   *
+   * @private
+   * @param {Object} effects - Effects configuration object
+   * @returns {Object} Master chain object
+   * @returns {Tone.Gain} returns.gain - Master gain node connected to destination
+   * @returns {Tone.AudioNode} returns.fxIn - Input node for the effects chain
+   * @returns {Array<Tone.AudioNode>} returns.effects - Array of effect nodes
    */
   _createMasterChain(effects = {}) {
     // Create the final gain stage (Master Volume). Connected to master output.
@@ -1389,9 +1511,11 @@ class PlaybackEngine {
   }
 
   /**
-   * Apply a new set of master effects to the audio engine. (The missing function)
-   * This replaces and reconnects the entire master bus chain to ensure live updates.
-   * @param {Object} effects - The effects configuration object.
+   * Apply a new set of master effects to the audio engine.
+   * Replaces and reconnects the entire master bus chain to ensure live updates.
+   * All track buses are reconnected to the new master input.
+   *
+   * @param {Object} effects - The effects configuration object
    */
   applyEffects(effects) {
     // 1. Create the new master chain with the new effects
@@ -1603,17 +1727,6 @@ export default function WebAmpPlayback({version, onEngineReady}) {
 
     return cleanup;
   }, [engine, version]);
-
-  // Keep effects application separate - this doesn't reload the engine
-  useEffect(() => {
-    if (engine && effects) {
-      try {
-        engine.setMasterEffects(effects);
-      } catch (error) {
-        console.warn("Failed to apply effects to engine:", error);
-      }
-    }
-  }, [engine, effects]);
 
   // Keep scrub handlers updated with current playing state without reloading engine
   useEffect(() => {
