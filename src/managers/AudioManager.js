@@ -1,5 +1,6 @@
 import {AudioTrack} from "../models/AudioTrack";
 import {AudioSegment} from "../models/AudioSegment";
+import {createDefaultEffects} from "../context/effectsStorage";
 import * as Tone from "tone";
 
 /**
@@ -161,9 +162,12 @@ class AudioManager {
       builtSegments = [segment];
     }
 
+    const trackEffects = audioData.effects || createDefaultEffects();
+    const trackActiveEffectsList = audioData.activeEffectsList || [];
+
     // Create the new track
     const track = new AudioTrack({
-      id: audioData.id, // Preserve existing ID
+      id: audioData.id,
       name:
         audioData.name ||
         audioData.metadata?.name ||
@@ -174,6 +178,8 @@ class AudioManager {
       pan: audioData.pan ?? 0,
       mute: audioData.mute ?? false,
       solo: audioData.solo ?? false,
+      effects: trackEffects,
+      activeEffectsList: trackActiveEffectsList,
     });
 
     // Add buffer reference at track level for compatibility

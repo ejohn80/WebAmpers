@@ -87,6 +87,8 @@ function AudioPage() {
         mute: !!track.mute,
         solo: !!track.solo,
         color: track.color || "#888",
+        effects: track.effects,
+        activeEffectsList: track.activeEffectsList,
       });
 
       (track.segments || []).forEach((s) => {
@@ -151,6 +153,7 @@ function AudioPage() {
             const trackData = {
               ...savedTrack,
               buffer: new Tone.ToneAudioBuffer(audioBuffer),
+              effects: savedTrack.effects, // Ensure effects are loaded into the Track model
             };
 
             audioManager.addTrackFromBuffer(trackData);

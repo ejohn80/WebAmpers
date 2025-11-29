@@ -31,7 +31,8 @@ function MainContent({
   onAssetDrop,
   totalLengthMs = 0,
 }) {
-  const {isEffectsMenuOpen} = useContext(AppContext);
+  const {selectedTrackId, setSelectedTrackId, isEffectsMenuOpen} =
+    useContext(AppContext);
 
   // Default visible window length (in ms) before horizontal scrolling is needed
   // Timeline scale is driven by pixels-per-second instead of a fixed window length
@@ -48,6 +49,11 @@ function MainContent({
   const [timelineContentWidth, setTimelineContentWidth] = useState(0);
   const [scrollAreaWidth, setScrollAreaWidth] = useState(0);
   const scrollAreaRef = useRef(null);
+
+  // Deselect when clicking background
+  const handleBackgroundClick = () => {
+    setSelectedTrackId(null);
+  };
 
   useEffect(() => {
     const lengthMs = Math.max(1, totalLengthMs || 0);
@@ -195,6 +201,7 @@ function MainContent({
       <div
         className="timeline-scroll-area"
         ref={scrollAreaRef}
+        onClick={handleBackgroundClick}
         onDrop={handleDrop}
         onDragOver={handleDragOver}
       >
@@ -238,6 +245,8 @@ function MainContent({
                         track={track}
                         trackIndex={index}
                         totalTracks={tracks.length}
+                        isSelected={track.id === selectedTrackId}
+                        onSelect={(id) => setSelectedTrackId(id)}
                         showTitle={true}
                         onMute={onMute}
                         onSolo={onSolo}
