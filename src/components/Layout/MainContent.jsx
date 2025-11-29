@@ -37,7 +37,7 @@ function MainContent({
   // Timeline scale is driven by pixels-per-second instead of a fixed window length
   const BASE_PX_PER_SEC = 100; // default density: 100px per second at 100% zoom
   const MIN_ZOOM = 0.25; // 25% (zoom out)
-  const MAX_ZOOM = 8; // 800% (zoom in)
+  const MAX_ZOOM = 5; // 500% (zoom in)
   const [zoom, setZoom] = useState(1);
 
   // Follow-mode toggle to auto-scroll the timeline during playback
