@@ -173,14 +173,6 @@
   border: none;
 }
 
-.header {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  margin-bottom: 8px;
-  padding-right: 30px;
-}
-
 .effectsList {
   flex: 1;
   flex-grow: 1;
@@ -607,4 +599,131 @@
   background: #1e3135;
   border-color: #17e1ff;
   transform: translateY(-1px);
+}
+
+/* Toggle Switch Styles */
+.toggleSwitch {
+  width: 31px;
+  height: 15px;
+  background: #333239;
+  border-radius: 5px;
+  position: relative;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.toggleSwitch.toggleOn {
+  background: #11a1b7;
+}
+
+.toggleSwitch.toggleOff {
+  background: #4e4e4e;
+}
+
+.toggleSlider {
+  position: absolute;
+  top: 2px;
+  left: 3.5px; /* Add this */
+  width: 10px;
+  height: 10px;
+  background: white;
+  border-radius: 2px;
+  transition: all 0.3s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.toggleOn .toggleSlider {
+  transform: translateX(14.5px);
+}
+
+.toggleOff .toggleSlider {
+  transform: translateX(0);
+}
+
+/* Individual Effect Toggle Button */
+.effectToggleButton {
+  position: absolute;
+  top: 8.5px;
+  right: 33px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Master Toggle Button */
+.masterToggleButton {
+  padding: 10px 20px;
+  margin-bottom: 12px;
+  background: #262529;
+  color: #e5e5e5;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  width: 100%;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.masterToggleButton:hover {
+  background: #2a2a2a;
+  /* border-color: #17e1ff; */
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  margin-bottom: 8px;
+  padding-right: 30px;
+  /* border: 1px solid red; */
+}
+
+/* Disabled Effect Styles */
+.effectDisabled {
+  opacity: 0.7;
+  border-color: #555 !important;
+}
+
+.effectDisabled .label {
+  color: #888 !important;
+}
+
+.effectDisabled .description {
+  color: #666 !important;
+}
+
+/* Disabled Slider Styles */
+.sliderDisabled .sliderTrack {
+  background: #2a2a2a !important;
+  outline-color: #555 !important;
+}
+
+.sliderDisabled .sliderFill {
+  background: #666 !important;
+}
+
+.sliderDisabled .sliderFillDisabled {
+  background: #555 !important;
+}
+
+.valueDisabled {
+  color: #666 !important;
+}
+
+/* master toggle button text */
+.masterToggleContent {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #e5e5e5;
 }

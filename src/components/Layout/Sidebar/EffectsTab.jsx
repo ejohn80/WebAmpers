@@ -21,7 +21,10 @@ function EffectsTab() {
     closeEffectsMenu,
     isEffectsMenuOpen,
     removeEffect,
-    activeEffects, // Get active effects from context
+    activeEffects,
+    enabledEffects,
+    toggleEffect,
+    toggleAllEffects,
   } = useContext(AppContext);
 
   const [draggingSlider, setDraggingSlider] = useState(null);
@@ -31,7 +34,7 @@ function EffectsTab() {
   const effectConfigs = [
     {
       name: "pitch",
-      label: "Pitch Shift",
+      label: "Pitch",
       min: -12,
       max: 12,
       step: 0.1,
@@ -154,7 +157,7 @@ function EffectsTab() {
   // Filter effects to only show active ones and maintain addition order
   const activeEffectConfigs = activeEffects
     .map((effectId) => effectConfigs.find((config) => config.name === effectId))
-    .filter(Boolean); // Remove any undefined values in case of mismatches
+    .filter(Boolean);
 
   // Toggle effects menu
   const toggleEffectsMenu = () => {
@@ -216,6 +219,19 @@ function EffectsTab() {
     return activeEffectConfigs.every((config) => isAtDefaultValue(config));
   };
 
+  // Check if effect is enabled
+  const isEffectEnabled = (effectId) => enabledEffects[effectId] !== false;
+
+  // Check if all effects are enabled
+  const areAllEffectsEnabled =
+    activeEffectConfigs.length > 0 &&
+    activeEffectConfigs.every((config) => isEffectEnabled(config.name));
+
+  // Check if any effects are enabled (for master toggle display)
+  const areAnyEffectsEnabled = activeEffectConfigs.some((config) =>
+    isEffectEnabled(config.name)
+  );
+
   // Check if there are any active effects
   const hasActiveEffects = activeEffectConfigs.length > 0;
 
@@ -232,15 +248,36 @@ function EffectsTab() {
         </span>
       </button>
 
+      {/* Master Toggle Switch */}
+      {hasActiveEffects && (
+        <button
+          className={styles.masterToggleButton}
+          onClick={toggleAllEffects}
+        >
+          <span className={styles.masterToggleContent}>
+            <span>{areAnyEffectsEnabled ? "Disable All" : "Enable All"}</span>
+            <div
+              className={`${styles.toggleSwitch} ${areAnyEffectsEnabled ? styles.toggleOn : styles.toggleOff}`}
+            >
+              <div className={styles.toggleSlider}></div>
+            </div>
+          </span>
+        </button>
+      )}
+
       {/* Effect sliders - only show active effects in addition order */}
       <div className={styles.effectsList}>
         {activeEffectConfigs.map((config) => {
           const currentValue = getCurrentValue(config);
           const fillPercentage = getSliderFillPercentage(config, currentValue);
           const isDefault = isAtDefaultValue(config);
+          const isEnabled = isEffectEnabled(config.name);
 
           return (
-            <div key={config.name} className={styles.effectItem}>
+            <div
+              key={config.name}
+              className={`${styles.effectItem} ${!isEnabled ? styles.effectDisabled : ""}`}
+            >
               {/* Close button in top right */}
               <button
                 className={styles.closeEffectButton}
@@ -250,22 +287,35 @@ function EffectsTab() {
                 <XIcon />
               </button>
 
+              {/* Individual Toggle Switch - top right, left of close button */}
+              <button
+                className={styles.effectToggleButton}
+                onClick={() => toggleEffect(config.name)}
+                aria-label={`${isEnabled ? "Disable" : "Enable"} ${config.label} effect`}
+              >
+                <div
+                  className={`${styles.toggleSwitch} ${isEnabled ? styles.toggleOn : styles.toggleOff}`}
+                >
+                  <div className={styles.toggleSlider}></div>
+                </div>
+              </button>
+
               <div className={styles.header}>
                 <span className={styles.label}>{config.label}</span>
                 <div className={styles.description}>{config.description}</div>
               </div>
 
-              {/* Custom Slider */}
+              {/* Custom Slider - disabled state */}
               <div
                 className={`${styles.sliderContainer} ${
                   draggingSlider === config.name ? styles.dragging : ""
-                }`}
+                } ${!isEnabled ? styles.sliderDisabled : ""}`}
               >
                 <div className={styles.sliderTrack}></div>
                 <div
                   className={`${styles.sliderFill} ${
                     isDefault ? styles.default : styles.changed
-                  }`}
+                  } ${!isEnabled ? styles.sliderFillDisabled : ""}`}
                   style={{width: `${fillPercentage}%`}}
                 ></div>
                 <div
@@ -273,7 +323,7 @@ function EffectsTab() {
                     draggingSlider === config.name
                       ? styles.sliderKnobWrapperDragging
                       : ""
-                  }`}
+                  } ${!isEnabled ? styles.sliderKnobDisabled : ""}`}
                   style={{left: `${fillPercentage}%`}}
                 >
                   <EffectsSliderKnob />
@@ -290,11 +340,14 @@ function EffectsTab() {
                   onTouchStart={() => setDraggingSlider(config.name)}
                   onTouchEnd={handleSliderEnd(config.name)}
                   className={styles.sliderInput}
+                  disabled={!isEnabled}
                 />
               </div>
 
               <div className={styles.bottomRow}>
-                <span className={styles.value}>
+                <span
+                  className={`${styles.value} ${!isEnabled ? styles.valueDisabled : ""}`}
+                >
                   {currentValue}
                   {config.unit}
                 </span>
@@ -302,13 +355,13 @@ function EffectsTab() {
                   <button
                     className={`${styles.button} ${
                       isDefault ? styles.buttonDisabled : ""
-                    }`}
+                    } ${!isEnabled ? styles.buttonDisabled : ""}`}
                     onClick={
-                      isDefault
+                      isDefault || !isEnabled
                         ? undefined
                         : () => resetEffect(config.name, config.default)
                     }
-                    disabled={isDefault}
+                    disabled={isDefault || !isEnabled}
                   >
                     Reset
                   </button>
@@ -326,6 +379,7 @@ function EffectsTab() {
         )}
       </div>
 
+      {/* Reset All Effects Button */}
       <button
         className={`${styles.resetAllButton} ${
           areAllEffectsAtDefault() ? styles.resetAllButtonDisabled : ""
@@ -343,7 +397,7 @@ function EffectsTab() {
         </span>
       </button>
 
-      {/* Delete All Effects Button - Always visible but disabled when no effects */}
+      {/* Delete All Effects Button */}
       <button
         className={`${styles.deleteAllButton} ${
           !hasActiveEffects ? styles.deleteAllButtonDisabled : ""
