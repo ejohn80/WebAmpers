@@ -38,6 +38,46 @@ const getInitialActiveEffects = (activeSessionId) => {
   return loadActiveEffectsForSession(activeSessionId);
 };
 
+// Load enabled effects for session
+const loadEnabledEffectsForSession = (activeSessionId) => {
+  if (typeof activeSessionId !== "number") {
+    return {};
+  }
+
+  try {
+    const sessionData = window.localStorage.getItem(
+      "webamp.enabledEffectsBySession"
+    );
+    if (sessionData) {
+      const parsed = JSON.parse(sessionData);
+      return parsed.sessions?.[activeSessionId] || {};
+    }
+  } catch (error) {
+    console.warn("Failed to read enabled effects:", error);
+  }
+  return {};
+};
+
+// Persist enabled effects for session
+const persistEnabledEffectsForSession = (activeSessionId, enabledEffects) => {
+  if (typeof activeSessionId !== "number") return;
+
+  try {
+    const sessionData = window.localStorage.getItem(
+      "webamp.enabledEffectsBySession"
+    );
+    const parsed = sessionData ? JSON.parse(sessionData) : {sessions: {}};
+
+    parsed.sessions[activeSessionId] = enabledEffects;
+    window.localStorage.setItem(
+      "webamp.enabledEffectsBySession",
+      JSON.stringify(parsed)
+    );
+  } catch (error) {
+    console.warn("Failed to persist enabled effects:", error);
+  }
+};
+
 const loadEffectParametersForSession = (activeSessionId) => {
   if (typeof activeSessionId !== "number") {
     return createDefaultEffects();
@@ -93,15 +133,10 @@ const AppContextProvider = ({children}) => {
     getInitialActiveEffects(activeSession)
   );
 
-  // Add enabledEffects state
-  const [enabledEffects, setEnabledEffects] = useState(() => {
-    try {
-      const saved = localStorage.getItem("webamp.enabledEffects");
-      return saved ? JSON.parse(saved) : {};
-    } catch (e) {
-      return {};
-    }
-  });
+  // Session-specific enabled effects state
+  const [enabledEffects, setEnabledEffects] = useState(() =>
+    loadEnabledEffectsForSession(activeSession)
+  );
 
   const updateEffect = useCallback((effectName, value) => {
     setEffects((prevEffects) => {
@@ -140,13 +175,26 @@ const AppContextProvider = ({children}) => {
       }
       return prev;
     });
+
+    // When adding an effect, default it to enabled
+    setEnabledEffects((prev) => ({
+      ...prev,
+      [effectId]: true,
+    }));
   }, []);
 
   const removeEffect = useCallback((effectId) => {
     // 1. Remove the effect from the active list
     setActiveEffects((prev) => prev.filter((id) => id !== effectId));
 
-    // 2. Reset the effect's parameter value to default (turns off the applied effect)
+    // 2. Remove from enabled effects
+    setEnabledEffects((prev) => {
+      const newEnabled = {...prev};
+      delete newEnabled[effectId];
+      return newEnabled;
+    });
+
+    // 3. Reset the effect's parameter value to default (turns off the applied effect)
     setEffects((prevEffects) => {
       // Get the default value for this effect
       const allDefaults = createDefaultEffects();
@@ -159,14 +207,40 @@ const AppContextProvider = ({children}) => {
     });
   }, []);
 
-  // Update applyEffectsToEngine to only apply enabled effects
+  // Toggle individual effect on/off - session-specific
+  const toggleEffect = useCallback((effectId) => {
+    setEnabledEffects((prev) => {
+      const newEnabledEffects = {
+        ...prev,
+        [effectId]: !prev[effectId], // Toggle the enabled state
+      };
+      return newEnabledEffects;
+    });
+  }, []);
+
+  // Toggle all effects on/off - session-specific
+  const toggleAllEffects = useCallback(() => {
+    setEnabledEffects((prev) => {
+      const anyEnabled = Object.values(prev).some(Boolean);
+      const newEnabledEffects = {};
+
+      // Toggle all active effects based on current state
+      activeEffects.forEach((effectId) => {
+        newEnabledEffects[effectId] = !anyEnabled;
+      });
+
+      return newEnabledEffects;
+    });
+  }, [activeEffects]);
+
+  // Apply only enabled effects to engine
   const applyEffectsToEngine = useCallback(
     (currentEffects) => {
       if (!engineRef) {
         return;
       }
       try {
-        // Only apply effects that are enabled
+        // Filter effects to only include enabled ones
         const enabledEffectsToApply = {};
         Object.keys(currentEffects).forEach((effectId) => {
           if (enabledEffects[effectId] !== false) {
@@ -193,57 +267,59 @@ const AppContextProvider = ({children}) => {
 
     // Then remove all effects from the active list
     setActiveEffects([]);
+
+    // And clear enabled effects
+    setEnabledEffects({});
   }, []);
 
-  // Add this useEffect to initialize enabledEffects for new effects
+  // Persist activeSession (ID) and LOAD Active Effects List on session change (Session switching)
   useEffect(() => {
-    setEnabledEffects((prev) => {
-      const newEnabledEffects = {...prev};
-      let hasChanges = false;
-
-      // Ensure all active effects have an enabled state
-      activeEffects.forEach((effectId) => {
-        if (newEnabledEffects[effectId] === undefined) {
-          newEnabledEffects[effectId] = true; // Default to enabled
-          hasChanges = true;
-        }
-      });
-
-      // Remove entries for effects that are no longer active
-      Object.keys(newEnabledEffects).forEach((effectId) => {
-        if (!activeEffects.includes(effectId)) {
-          delete newEnabledEffects[effectId];
-          hasChanges = true;
-        }
-      });
-
-      if (hasChanges) {
-        // Persist changes
-        try {
-          localStorage.setItem(
-            "webamp.enabledEffects",
-            JSON.stringify(newEnabledEffects)
-          );
-        } catch (e) {
-          console.warn("Failed to persist enabled effects:", e);
-        }
+    if (activeSession === undefined) return;
+    try {
+      // Persist activeSession ID
+      if (activeSession === null) {
+        window.localStorage.removeItem("webamp.activeSession");
+      } else {
+        window.localStorage.setItem(
+          "webamp.activeSession",
+          String(activeSession)
+        );
       }
+    } catch {}
 
-      return newEnabledEffects;
-    });
-  }, [activeEffects]);
+    // Load active effects list and enabled effects whenever activeSession changes
+    if (typeof activeSession === "number") {
+      const loadedActiveEffects = loadActiveEffectsForSession(activeSession);
+      setActiveEffects(loadedActiveEffects);
 
-  // Persist active effects list and Apply Effect Parameter Values to Engine
+      const loadedEffectsParams = loadEffectParametersForSession(activeSession);
+      setEffects(loadedEffectsParams);
+
+      const loadedEnabledEffects = loadEnabledEffectsForSession(activeSession);
+      setEnabledEffects(loadedEnabledEffects);
+    }
+  }, [activeSession]);
+
+  // Persist active effects list, enabled effects, and Apply Effect Parameter Values to Engine
   useEffect(() => {
     // Only persist if there's an active session
     if (typeof activeSession === "number" && Object.keys(effects).length > 0) {
       // Persist the list of active effect IDs per-session
       persistActiveEffectsForSession(activeSession, activeEffects);
+
+      // Persist enabled effects per-session
+      persistEnabledEffectsForSession(activeSession, enabledEffects);
     }
 
-    // Apply effect parameter values to the audio engine
+    // Apply effect parameter values to the audio engine (only enabled ones)
     applyEffectsToEngine(effects);
-  }, [effects, activeSession, applyEffectsToEngine, activeEffects]);
+  }, [
+    effects,
+    activeSession,
+    applyEffectsToEngine,
+    activeEffects,
+    enabledEffects,
+  ]);
 
   // Engine ref adoption (remains the same)
   useEffect(() => {
@@ -256,53 +332,6 @@ const AppContextProvider = ({children}) => {
       }
     } catch {}
   }, [engineRef]);
-
-  // Toggle individual effect on/off
-  const toggleEffect = useCallback((effectId) => {
-    setEnabledEffects((prev) => {
-      const newEnabledEffects = {
-        ...prev,
-        [effectId]: !prev[effectId],
-      };
-
-      // Persist to localStorage
-      try {
-        localStorage.setItem(
-          "webamp.enabledEffects",
-          JSON.stringify(newEnabledEffects)
-        );
-      } catch (e) {
-        console.warn("Failed to persist enabled effects:", e);
-      }
-
-      return newEnabledEffects;
-    });
-  }, []);
-
-  // Toggle all effects on/off
-  const toggleAllEffects = useCallback(() => {
-    setEnabledEffects((prev) => {
-      const anyEnabled = Object.values(prev).some(Boolean);
-      const newEnabledEffects = {};
-
-      // Toggle all effects based on current state
-      activeEffects.forEach((effectId) => {
-        newEnabledEffects[effectId] = !anyEnabled;
-      });
-
-      // Persist to localStorage
-      try {
-        localStorage.setItem(
-          "webamp.enabledEffects",
-          JSON.stringify(newEnabledEffects)
-        );
-      } catch (e) {
-        console.warn("Failed to persist enabled effects:", e);
-      }
-
-      return newEnabledEffects;
-    });
-  }, [activeEffects]);
 
   const contextValue = useMemo(
     () => ({
@@ -328,6 +357,7 @@ const AppContextProvider = ({children}) => {
       addEffect,
       removeEffect,
       activeEffects,
+      // Toggle functionality
       enabledEffects,
       toggleEffect,
       toggleAllEffects,

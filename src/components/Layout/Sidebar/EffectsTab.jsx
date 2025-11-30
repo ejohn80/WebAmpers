@@ -22,7 +22,7 @@ function EffectsTab() {
     isEffectsMenuOpen,
     removeEffect,
     activeEffects,
-    enabledEffects,
+    enabledEffects, // Add this back
     toggleEffect,
     toggleAllEffects,
   } = useContext(AppContext);
@@ -219,18 +219,18 @@ function EffectsTab() {
     return activeEffectConfigs.every((config) => isAtDefaultValue(config));
   };
 
-  // Check if effect is enabled
+  // Check if effect is enabled (default to true if not set)
   const isEffectEnabled = (effectId) => enabledEffects[effectId] !== false;
+
+  // Check if any effects are enabled (for master toggle)
+  const areAnyEffectsEnabled = activeEffectConfigs.some((config) =>
+    isEffectEnabled(config.name)
+  );
 
   // Check if all effects are enabled
   const areAllEffectsEnabled =
     activeEffectConfigs.length > 0 &&
     activeEffectConfigs.every((config) => isEffectEnabled(config.name));
-
-  // Check if any effects are enabled (for master toggle display)
-  const areAnyEffectsEnabled = activeEffectConfigs.some((config) =>
-    isEffectEnabled(config.name)
-  );
 
   // Check if there are any active effects
   const hasActiveEffects = activeEffectConfigs.length > 0;
@@ -257,7 +257,7 @@ function EffectsTab() {
             onClick={toggleAllEffects}
           >
             <span className={styles.masterToggleContent}>
-              <span>{areAnyEffectsEnabled ? "Effects" : "Effects"}</span>
+              <span>Effects</span>
               <div
                 className={`${styles.toggleSwitch} ${areAnyEffectsEnabled ? styles.toggleOn : styles.toggleOff}`}
               >
