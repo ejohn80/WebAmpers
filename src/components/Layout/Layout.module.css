@@ -244,8 +244,7 @@
 }
 
 .resetAllButton {
-  padding: 10px 20px;
-  margin-top: 10px;
+  padding: 10px 16px;
   background: #172528;
   color: #17e1ff;
   border: none;
@@ -256,6 +255,8 @@
   transition: all 0.2s;
   line-height: 1;
   flex-shrink: 0;
+  flex: 1;
+  min-height: 40px;
 }
 
 .resetAllButtonContent {
@@ -581,7 +582,7 @@
 }
 
 .addEffectsButton {
-  padding: 12px 20px;
+  padding: 10px 20px;
   margin-bottom: 16px;
   background: #172528;
   color: #17e1ff;
@@ -657,18 +658,18 @@
 
 /* Master Toggle Button */
 .masterToggleButton {
-  padding: 10px 20px;
-  margin-bottom: 12px;
   background: #262529;
   color: #e5e5e5;
   border: none;
   border-radius: 6px;
   cursor: pointer;
-  width: 100%;
+  width: 50%;
   transition: all 0.2s ease;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
+  flex: 1;
+  min-height: 40px;
 }
 
 .masterToggleButton:hover {
@@ -717,13 +718,22 @@
   color: #666 !important;
 }
 
-/* master toggle button text */
+/* Master toggle button text */
 .masterToggleContent {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 14;
+  font-weight: bold;
   color: #e5e5e5;
+  width: 100%;
+  gap: 8px;
+}
+
+/* Toggle and Reset Row - Side by Side Layout */
+.toggleResetRow {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  margin-bottom: 15px;
 }

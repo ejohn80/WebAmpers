@@ -248,21 +248,42 @@ function EffectsTab() {
         </span>
       </button>
 
-      {/* Master Toggle Switch */}
+      {/* Master Toggle and Reset All Buttons - Side by Side */}
       {hasActiveEffects && (
-        <button
-          className={styles.masterToggleButton}
-          onClick={toggleAllEffects}
-        >
-          <span className={styles.masterToggleContent}>
-            <span>{areAnyEffectsEnabled ? "Disable All" : "Enable All"}</span>
-            <div
-              className={`${styles.toggleSwitch} ${areAnyEffectsEnabled ? styles.toggleOn : styles.toggleOff}`}
-            >
-              <div className={styles.toggleSlider}></div>
-            </div>
-          </span>
-        </button>
+        <div className={styles.toggleResetRow}>
+          {/* Enable/Disable All Button - Left Side */}
+          <button
+            className={styles.masterToggleButton}
+            onClick={toggleAllEffects}
+          >
+            <span className={styles.masterToggleContent}>
+              <span>{areAnyEffectsEnabled ? "Effects" : "Effects"}</span>
+              <div
+                className={`${styles.toggleSwitch} ${areAnyEffectsEnabled ? styles.toggleOn : styles.toggleOff}`}
+              >
+                <div className={styles.toggleSlider}></div>
+              </div>
+            </span>
+          </button>
+
+          {/* Reset All Effects Button - Right Side */}
+          <button
+            className={`${styles.resetAllButton} ${
+              areAllEffectsAtDefault() ? styles.resetAllButtonDisabled : ""
+            }`}
+            onClick={areAllEffectsAtDefault() ? undefined : resetAllEffects}
+            disabled={areAllEffectsAtDefault()}
+          >
+            <span className={styles.resetAllButtonContent}>
+              {areAllEffectsAtDefault() ? (
+                <ResetAllButtonDisabled />
+              ) : (
+                <ResetAllButtonEnabled />
+              )}
+              <span style={{marginTop: "2px"}}>Reset All</span>
+            </span>
+          </button>
+        </div>
       )}
 
       {/* Effect sliders - only show active effects in addition order */}
@@ -378,24 +399,6 @@ function EffectsTab() {
           </div>
         )}
       </div>
-
-      {/* Reset All Effects Button */}
-      <button
-        className={`${styles.resetAllButton} ${
-          areAllEffectsAtDefault() ? styles.resetAllButtonDisabled : ""
-        }`}
-        onClick={areAllEffectsAtDefault() ? undefined : resetAllEffects}
-        disabled={areAllEffectsAtDefault()}
-      >
-        <span className={styles.resetAllButtonContent}>
-          {areAllEffectsAtDefault() ? (
-            <ResetAllButtonDisabled />
-          ) : (
-            <ResetAllButtonEnabled />
-          )}
-          <span style={{marginTop: "2px"}}>Reset All Effects</span>
-        </span>
-      </button>
 
       {/* Delete All Effects Button */}
       <button
