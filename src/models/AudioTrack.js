@@ -1,4 +1,5 @@
 import * as Tone from "tone";
+import {createDefaultEffects} from "../context/effectsStorage";
 
 /**
  * @class AudioTrack
@@ -60,6 +61,11 @@ export class AudioTrack {
     this._mute = !!options.mute;
     this._solo = !!options.solo;
 
+    this._effects = options.effects || createDefaultEffects();
+    this.effects = this._effects; // call the setter
+
+    this.activeEffectsList = options.activeEffectsList || [];
+
     // Initialize the Tone.js Channel for mixer controls and set initial
     // values from the primitive fields. The channel remains the runtime
     // audio object and is not serialized directly.
@@ -71,8 +77,6 @@ export class AudioTrack {
     }).toDestination(); // Connect it to the master output by default
   }
 
-  // --- Mixer Parameter Getters/Setters ---
-
   // Volume in decibels (primitive). Update Tone.Channel when changed.
   get volume() {
     return this._volumeDb;
@@ -81,7 +85,6 @@ export class AudioTrack {
   set volume(v) {
     this._volumeDb = typeof v === "number" ? v : 0;
     if (this.channel) {
-      // Tone.Param sometimes exposes a .value property; set defensively.
       try {
         if (
           this.channel.volume &&
@@ -91,9 +94,7 @@ export class AudioTrack {
         } else {
           this.channel.volume = this._volumeDb;
         }
-      } catch (e) {
-        // ignore - keep the in-memory primitive as the source of truth
-      }
+      } catch (e) {}
     }
   }
 
@@ -137,6 +138,18 @@ export class AudioTrack {
   }
 
   /**
+   * Effect parameters for this track (e.g. {pitch: 5, volume: 100})
+   * @type {Object<string, number>}
+   */
+  get effects() {
+    return this._effects;
+  }
+
+  set effects(newEffects) {
+    this._effects = newEffects;
+  }
+
+  /**
    * Return a serializable representation suitable for DB storage.
    */
   toJSON() {
@@ -149,6 +162,8 @@ export class AudioTrack {
       mute: this._mute,
       solo: this._solo,
       segments: this.segments,
+      effects: this.effects,
+      activeEffectsList: this.activeEffectsList,
     };
   }
 
