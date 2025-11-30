@@ -2,14 +2,101 @@ import React, {useRef, useEffect, useState} from "react";
 import "./Waveform.css";
 import {progressStore} from "../../playback/progressStore";
 
+const MIN_POINTS = 512;
+const MAX_POINTS = 20000;
+const DEFAULT_POINTS = 4000;
+const VIEWBOX_HEIGHT = 100;
+
+const clamp = (value, min, max) =>
+  Math.min(max, Math.max(min, Number.isFinite(value) ? value : min));
+
+const isAudioBuffer = (value) =>
+  typeof AudioBuffer !== "undefined" && value instanceof AudioBuffer;
+
+const unwrapAudioBuffer = (candidate) => {
+  if (!candidate) return null;
+  if (isAudioBuffer(candidate)) return candidate;
+  if (candidate._buffer && isAudioBuffer(candidate._buffer)) {
+    return candidate._buffer;
+  }
+  if (candidate.buffer && isAudioBuffer(candidate.buffer)) {
+    return candidate.buffer;
+  }
+  return null;
+};
+
+const computePeaks = (audioBuffer, targetPoints) => {
+  if (!audioBuffer) return [];
+  const length = audioBuffer.length ?? 0;
+  if (!length || !audioBuffer.numberOfChannels) return [];
+
+  const points = clamp(targetPoints, MIN_POINTS, Math.min(MAX_POINTS, length));
+  const channelData = [];
+  for (let ch = 0; ch < audioBuffer.numberOfChannels; ch++) {
+    try {
+      channelData.push(audioBuffer.getChannelData(ch));
+    } catch (err) {
+      console.warn("Waveform: unable to read channel data", err);
+      break;
+    }
+  }
+
+  if (!channelData.length) return [];
+
+  const peaks = new Array(points);
+  for (let point = 0; point < points; point++) {
+    const start = Math.floor((point / points) * length);
+    const end =
+      point === points - 1
+        ? length
+        : Math.floor(((point + 1) / points) * length);
+
+    let min = 1.0;
+    let max = -1.0;
+
+    if (start >= length) {
+      peaks[point] = {min: 0, max: 0};
+      continue;
+    }
+
+    const boundedEnd = Math.max(start + 1, Math.min(end, length));
+    for (let sampleIdx = start; sampleIdx < boundedEnd; sampleIdx++) {
+      for (let ch = 0; ch < channelData.length; ch++) {
+        const sample = channelData[ch][sampleIdx] ?? 0;
+        if (sample < min) min = sample;
+        if (sample > max) max = sample;
+      }
+    }
+
+    if (min === 1.0) min = 0;
+    if (max === -1.0) max = 0;
+    peaks[point] = {min, max};
+  }
+
+  return peaks;
+};
+
+const buildWavePath = (peaks) => {
+  if (!peaks.length) return {d: "", width: 0};
+  const mid = VIEWBOX_HEIGHT / 2;
+  const amp = VIEWBOX_HEIGHT / 2;
+  const sanitize = (value) => (Number.isFinite(value) ? value : 0);
+  const toY = (value) => mid - sanitize(value) * amp;
+
+  const commands = [];
+  for (let i = 0; i < peaks.length; i++) {
+    const x = i;
+    const upper = toY(peaks[i].max);
+    const lower = toY(peaks[i].min);
+    commands.push(`M ${x} ${upper} L ${x} ${lower}`);
+  }
+
+  return {d: commands.join(" "), width: Math.max(1, peaks.length - 1)};
+};
+
 /**
- * A component that renders an audio buffer as a waveform on a canvas.
- * @param {object} props
- * @param {Tone.ToneAudioBuffer} props.audioBuffer - The audio buffer to visualize.
- * @param {string} [props.color] - Stroke color for the waveform.
- * @param {number} [props.startOnTimelineMs] - Segment start time on the global timeline (ms).
- * @param {number} [props.durationMs] - Segment duration on the global timeline (ms).
- * @param {boolean} [props.showProgress] - Whether to render the progress bar within this waveform (default true).
+ * Renders an audio buffer waveform using a scalable SVG path so very long tracks
+ * don't exceed browser canvas limits.
  */
 const Waveform = ({
   audioBuffer,
@@ -18,119 +105,80 @@ const Waveform = ({
   durationMs = null,
   showProgress = true,
 }) => {
-  const canvasRef = useRef(null);
   const containerRef = useRef(null);
   const draggingRef = useRef(false);
-  const [canvasSize, setCanvasSize] = useState({width: 0, height: 0});
-
-  // Track container resize so we can redraw with accurate resolution when zooming
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const container = canvas.parentElement;
-    if (!container) return;
-
-    const updateSize = () => {
-      const rect = container.getBoundingClientRect();
-      setCanvasSize({
-        width: Math.max(1, Math.round(rect.width)),
-        height: Math.max(1, Math.round(rect.height)),
-      });
-    };
-
-    updateSize();
-
-    if (typeof ResizeObserver !== "undefined") {
-      const observer = new ResizeObserver(updateSize);
-      observer.observe(container);
-      return () => observer.disconnect();
-    }
-
-    if (typeof window !== "undefined") {
-      window.addEventListener("resize", updateSize);
-      return () => window.removeEventListener("resize", updateSize);
-    }
-    return undefined;
-  }, []);
-
-  useEffect(() => {
-    if (!audioBuffer || !canvasRef.current) return;
-    if (!canvasSize.width || !canvasSize.height) return;
-
-    const canvas = canvasRef.current;
-    const container = containerRef.current;
-    const ctx = canvas.getContext("2d");
-
-    const dpr =
-      typeof window !== "undefined" && window.devicePixelRatio
-        ? window.devicePixelRatio
-        : 1;
-    const cssWidth = canvasSize.width;
-    const cssHeight = canvasSize.height;
-    const pixelWidth = Math.max(1, Math.floor(cssWidth * dpr));
-    const pixelHeight = Math.max(1, Math.floor(cssHeight * dpr));
-
-    if (canvas.width !== pixelWidth || canvas.height !== pixelHeight) {
-      canvas.width = pixelWidth;
-      canvas.height = pixelHeight;
-      canvas.style.width = `${cssWidth}px`;
-      canvas.style.height = `${cssHeight}px`;
-    }
-
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.scale(dpr, dpr);
-
-    // 🔧 Unwrap Tone.ToneAudioBuffer -> native AudioBuffer robustly
-    let native = null;
-    if (audioBuffer instanceof AudioBuffer) {
-      native = audioBuffer;
-    } else if (audioBuffer && audioBuffer._buffer instanceof AudioBuffer) {
-      native = audioBuffer._buffer; // ToneAudioBuffer internal
-    } else if (audioBuffer && typeof audioBuffer.get === "function") {
-      // Some Tone versions expose .get(channel?) returning Float32Array; not usable here
-      // Prefer _buffer path above; if not available, abort to avoid rendering garbage
-      native = null;
-    }
-
-    if (!native) return; // still nothing to draw
-
-    const data = native.getChannelData(0);
-    const visibleWidth = Math.max(1, cssWidth);
-    const step = Math.max(1, Math.floor(data.length / visibleWidth));
-    const amp = cssHeight / 2;
-
-    // allow caller to specify the stroke color (track color) with a sensible default
-    ctx.strokeStyle = color || "#ffffff";
-    ctx.lineWidth = dpr >= 2 ? 0.75 : 1;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-    ctx.beginPath();
-
-    for (let i = 0; i < visibleWidth; i++) {
-      let min = 1.0,
-        max = -1.0;
-
-      const base = i * step;
-      for (let j = 0; j < step; j++) {
-        const idx = base + j;
-        if (idx >= data.length) break;
-        const v = data[idx];
-        if (v < min) min = v;
-        if (v > max) max = v;
-      }
-      const x = i + 0.5; // center lines on pixel for crispness
-      ctx.moveTo(x, (1 + min) * amp);
-      ctx.lineTo(x, (1 + max) * amp);
-    }
-    ctx.stroke();
-  }, [audioBuffer, canvasSize.height, canvasSize.width, color]);
-
+  const [resolutionHint, setResolutionHint] = useState(DEFAULT_POINTS);
+  const [wavePath, setWavePath] = useState({d: "", width: 0});
   const [{ms, lengthMs}, setProgress] = useState(progressStore.getState());
 
   useEffect(() => {
     return progressStore.subscribe(setProgress);
   }, []);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const updateResolution = () => {
+      const rect = container.getBoundingClientRect();
+      const width = rect?.width ?? 0;
+      if (!width) return;
+      const next = clamp(Math.round(width), MIN_POINTS, MAX_POINTS);
+      setResolutionHint((prev) => (prev === next ? prev : next));
+    };
+
+    updateResolution();
+
+    if (typeof ResizeObserver !== "undefined") {
+      const observer = new ResizeObserver(updateResolution);
+      observer.observe(container);
+      return () => observer.disconnect();
+    }
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("resize", updateResolution);
+      return () => window.removeEventListener("resize", updateResolution);
+    }
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const native = unwrapAudioBuffer(audioBuffer);
+    if (!native) {
+      setWavePath({d: "", width: 0});
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const targetPoints = clamp(
+      Math.round(resolutionHint || DEFAULT_POINTS),
+      MIN_POINTS,
+      MAX_POINTS
+    );
+
+    const compute = () => {
+      if (cancelled) return;
+      const peaks = computePeaks(native, targetPoints);
+      const nextPath = buildWavePath(peaks);
+      if (!cancelled) {
+        setWavePath(nextPath);
+      }
+    };
+
+    if (typeof window !== "undefined" && "requestIdleCallback" in window) {
+      const handle = window.requestIdleCallback(compute, {timeout: 200});
+      return () => {
+        cancelled = true;
+        window.cancelIdleCallback(handle);
+      };
+    }
+
+    compute();
+    return () => {
+      cancelled = true;
+    };
+  }, [audioBuffer, resolutionHint]);
 
   // Compute playhead position within this segment if we have segment timing,
   // otherwise fall back to global percentage (legacy behavior)
@@ -145,7 +193,7 @@ const Waveform = ({
 
   // Scrub helpers
   const msAtClientX = (clientX) => {
-    const el = canvasRef.current?.parentElement; // container div
+    const el = containerRef.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
 
@@ -170,8 +218,10 @@ const Waveform = ({
       // preview only: move the playhead visually without seeking audio
       progressStore.setMs(target); // visual move
     }
-    window.addEventListener("mousemove", onMouseMove);
-    window.addEventListener("mouseup", onMouseUp);
+    if (typeof window !== "undefined") {
+      window.addEventListener("mousemove", onMouseMove);
+      window.addEventListener("mouseup", onMouseUp);
+    }
   };
 
   const onMouseMove = (e) => {
@@ -190,8 +240,10 @@ const Waveform = ({
       progressStore.requestSeek(target); // commit seek to engine
     }
     progressStore.endScrub();
-    window.removeEventListener("mousemove", onMouseMove);
-    window.removeEventListener("mouseup", onMouseUp);
+    if (typeof window !== "undefined") {
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+    }
   };
 
   const onWheel = (e) => {
@@ -209,8 +261,10 @@ const Waveform = ({
 
   useEffect(
     () => () => {
-      window.removeEventListener("mousemove", onMouseMove);
-      window.removeEventListener("mouseup", onMouseUp);
+      if (typeof window !== "undefined") {
+        window.removeEventListener("mousemove", onMouseMove);
+        window.removeEventListener("mouseup", onMouseUp);
+      }
     },
     []
   );
@@ -251,8 +305,20 @@ const Waveform = ({
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
+      onWheel={onWheel}
     >
-      <canvas ref={canvasRef} className="waveform-canvas" />
+      {wavePath.d ? (
+        <svg
+          className="waveform-svg"
+          viewBox={`0 0 ${wavePath.width || 1} ${VIEWBOX_HEIGHT}`}
+          preserveAspectRatio="none"
+          style={{color}}
+        >
+          <path className="waveform-shape" d={wavePath.d} />
+        </svg>
+      ) : (
+        <div className="waveform-placeholder">Generating waveform…</div>
+      )}
       {showProgress && (
         <div className="waveform-progress" style={{left: `${pct}%`}} />
       )}
