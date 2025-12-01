@@ -4,6 +4,8 @@
 import * as Tone from "tone";
 import PythonApiClient from "../../backend/PythonApiClient";
 
+const EQ_BANDS = [32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
+
 class ExportManager {
   constructor() {
     this.pythonApi = new PythonApiClient();
@@ -25,6 +27,9 @@ class ExportManager {
     if (!effects || Object.keys(effects).length === 0) {
       return buffer;
     }
+    const hasEQChanges = EQ_BANDS.some(
+      freq => effects[freq] !== undefined && Math.abs(effects[freq]) > 0.01
+    );
 
     // Check if there are any actual effects to apply
     const hasEffects =
@@ -39,7 +44,8 @@ class ExportManager {
       (effects?.vibrato && effects.vibrato > 0) ||
       (effects?.chorus && effects.chorus > 0) ||
       (effects?.highpass && effects.highpass > 20) ||
-      (effects?.lowpass && effects.lowpass < 20000);
+      (effects?.lowpass && effects.lowpass < 20000) ||
+      hasEQChanges;
 
     if (!hasEffects) {
       return buffer;

@@ -6,6 +6,7 @@ import {useNavigate} from "react-router-dom";
 
 import AudioExportButton from "../AudioExport/AudioExportButton";
 import AudioImportButton from "../AudioImport/AudioImportButton";
+import Equalizer from "../Tools/Equalizer";
 
 import "./Header.css";
 import {
@@ -42,6 +43,7 @@ function DropdownPortal({
   const [position, setPosition] = useState({top: 0, left: 0});
 
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isEQOpen, setIsEQOpen] = useState(false);
 
   const fileButtonRef = useRef(null);
   const editButtonRef = useRef(null);
@@ -469,13 +471,14 @@ function DropdownPortal({
         }}
         onMouseLeave={handleDropdownMouseLeave}
       >
-        {/* ALL DISABLED */}
         <a
           href="#"
-          className="dropdown-item-disabled"
-          onClick={(e) => e.preventDefault()}
+          onClick={(e) => {
+            e.preventDefault();
+            setIsEQOpen((prev) => !prev);
+          }}
         >
-          Tool 1
+          Equalizer
         </a>
         <a
           href="#"
@@ -703,7 +706,21 @@ function DropdownPortal({
           </div>
         )}
       </div>
-
+      {isEQOpen && (
+        <Equalizer
+          isOpen={true}
+          onClose={() => setIsEQOpen(false)}
+          onEQChange={(eqSettings, values) => {
+            console.log("EQ changed:", eqSettings, values);
+          }}
+          style={{
+            position: "fixed",
+            top: "100px",
+            left: "100px",
+            zIndex: 999999,
+          }}
+        />
+      )}
       {/* Dropdowns rendered via portal */}
       {activeDropdown &&
         ReactDOM.createPortal(dropdownContent[activeDropdown], document.body)}
