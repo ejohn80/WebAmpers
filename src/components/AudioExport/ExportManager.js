@@ -1,6 +1,7 @@
 /**
  * ExportManager - Mix and export multiple tracks with master effects
  */
+import { PlaybackEngine } from "../../playback/playback";
 import * as Tone from "tone";
 import PythonApiClient from "../../backend/PythonApiClient";
 
@@ -233,71 +234,61 @@ class ExportManager {
     const audioContext = Tone.context.rawContext;
     const sampleRate = audioContext.sampleRate;
     const totalLengthSec = totalLengthMs / 1000;
-    const totalSamples = Math.ceil(totalLengthSec * sampleRate);
 
-    const mixedBuffer = audioContext.createBuffer(2, totalSamples, sampleRate);
-    const leftChannel = mixedBuffer.getChannelData(0);
-    const rightChannel = mixedBuffer.getChannelData(1);
+    const renderedBuffer = await Tone.Offline(async (context) => {
+      const tempEngine = new PlaybackEngine();
 
-    for (const track of tracks) {
-      if (track.mute) continue;
+      for (const track of tracks) {
+        if (track.mute) continue;
 
-      const anySolo = tracks.some((t) => t.solo);
-      if (anySolo && !track.solo) continue;
+        const anySolo = tracks.some((t) => t.solo);
+        if (anySolo && !track.solo) continue;
 
-      for (const segment of track.segments || []) {
-        try {
-          let sourceBuffer = segment.buffer;
-          if (!sourceBuffer) continue;
+        const effects = track.effects || {};
+        // Reusing from playback
+        const effectsChain = tempEngine._buildEffectsChain(effects, context);
 
-          if (sourceBuffer.get) {
-            sourceBuffer = sourceBuffer.get();
+        for (const segment of track.segments || []) {
+          try {
+            let sourceBuffer = segment.buffer;
+            if (!sourceBuffer) continue;
+
+            if (sourceBuffer.get) {
+              sourceBuffer = sourceBuffer.get();
+            }
+            if (sourceBuffer._buffer) {
+              sourceBuffer = sourceBuffer._buffer;
+            }
+
+            const toneBuffer = new Tone.ToneAudioBuffer(sourceBuffer);
+            const player = new Tone.Player({ url: toneBuffer, context });
+
+            if (effectsChain.length > 0) {
+              player.chain(...effectsChain, context.destination);
+            } else {
+              player.connect(context.destination);
+            }
+
+            const startTimeSec = (segment.startOnTimelineMs || 0) / 1000;
+            const offsetSec = (segment.startInFileMs || 0) / 1000;
+            const durationSec = (segment.durationMs || sourceBuffer.duration * 1000) / 1000;
+
+            player.start(startTimeSec, offsetSec, durationSec);
+          } catch (error) {
+            console.warn(`Failed to mix segment ${segment.id}:`, error);
           }
-          if (sourceBuffer._buffer) {
-            sourceBuffer = sourceBuffer._buffer;
-          }
-
-          const startTimeMs = segment.startOnTimelineMs || 0;
-          const startSample = Math.floor((startTimeMs / 1000) * sampleRate);
-          const offsetMs = segment.startInFileMs || 0;
-          const offsetSample = Math.floor(
-            (offsetMs / 1000) * sourceBuffer.sampleRate
-          );
-          const durationMs = segment.durationMs || sourceBuffer.duration * 1000;
-          const durationSamples = Math.floor(
-            (durationMs / 1000) * sourceBuffer.sampleRate
-          );
-
-          const volumeDb = typeof track.volume === "number" ? track.volume : 0;
-          const volumeGain = Math.pow(10, volumeDb / 20);
-
-          const pan = typeof track.pan === "number" ? track.pan : 0;
-          const leftGain = volumeGain * (pan <= 0 ? 1 : 1 - pan);
-          const rightGain = volumeGain * (pan >= 0 ? 1 : 1 + pan);
-
-          for (let i = 0; i < durationSamples; i++) {
-            const outputIndex = startSample + i;
-            if (outputIndex >= totalSamples) break;
-
-            const sourceIndex = offsetSample + i;
-            if (sourceIndex >= sourceBuffer.length) break;
-
-            const leftSample = sourceBuffer.getChannelData(0)[sourceIndex] || 0;
-            const rightSample =
-              sourceBuffer.numberOfChannels > 1
-                ? sourceBuffer.getChannelData(1)[sourceIndex]
-                : leftSample;
-
-            leftChannel[outputIndex] += leftSample * leftGain;
-            rightChannel[outputIndex] += rightSample * rightGain;
-          }
-        } catch (error) {
-          console.warn(`Failed to mix segment ${segment.id}:`, error);
         }
       }
-    }
+    }, totalLengthSec, 2, sampleRate);
 
-    // Normalize
+    // Get the native AudioBuffer
+    const mixedBuffer = renderedBuffer.get();
+
+    // Normalize to prevent clipping
+    const leftChannel = mixedBuffer.getChannelData(0);
+    const rightChannel = mixedBuffer.getChannelData(1);
+    const totalSamples = mixedBuffer.length;
+
     let maxSample = 0;
     for (let i = 0; i < totalSamples; i++) {
       maxSample = Math.max(
