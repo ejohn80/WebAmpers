@@ -1,0 +1,211 @@
+.effectsMenuOverlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: transparent;
+  display: flex;
+  align-items: left;
+  justify-content: left;
+  z-index: 1000;
+  padding: 60px;
+}
+
+.effectsMenu {
+  background: rgba(29, 29, 30, 0.95);
+  border: 2px solid #0fb1c9;
+  border-radius: 10px;
+  width: 100%;
+  max-width: 250px;
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  padding: 10px 24px 1px;
+  border-bottom: 1px solid #333239;
+  position: relative;
+}
+
+.header h2 {
+  margin: 0;
+  color: #e5e5e5;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.subtitle {
+  margin: 4px 0 10px;
+  color: #9c9c9c;
+  font-size: 14px;
+}
+
+.effectsContent {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px 24px;
+}
+
+.effectsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.effectCard {
+  background: #1e1d20;
+  border: 1px solid #333239;
+  border-radius: 8px;
+  padding: 5px 10px 8px;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  overflow: hidden;
+  margin-top: 2px;
+  position: relative;
+}
+
+/* Remove the old hover effects */
+.effectCard:hover {
+  border-color: #17e1ff; /* Keep original border color */
+  transform: none;
+  box-shadow: none;
+  margin-bottom: 1px;
+  margin-top: 1px;
+}
+
+/* Text gradient sweep animation */
+.effectCard:hover .effectName {
+  background: linear-gradient(90deg, #17e1ff, #17e1ff, #17e1ff);
+  background-size: 200% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: textSweep 0.8s ease-in-out;
+}
+
+.effectCard:hover .effectDescription {
+  background: linear-gradient(
+    90deg,
+    #17e1ff 0%,
+    /* start with blue */ #ff0080 65%,
+    /* pink starts at 65% */ #17e1ff 100% /* blue again */
+  );
+  background-size: 200% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: textSweepReverse 1.3s linear forwards;
+}
+
+@keyframes textSweepReverse {
+  0% {
+    background-position: 100% 0; /* start at end */
+  }
+  100% {
+    background-position: 0% 0; /* move to start */
+  }
+}
+
+.effectName {
+  color: #e5e5e5;
+  font-weight: 600;
+  font-size: 14px;
+  transition: all 0.3s ease;
+  position: relative;
+  margin-top: 5px;
+}
+
+.effectDescription {
+  color: #888;
+  font-size: 12px;
+  line-height: 1.3;
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.footer {
+  padding: 10px 24px;
+  border-top: 1px solid #333239;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.cancelButton {
+  background: #2a2a2a;
+  color: #888;
+  border: 1px solid #333239;
+  border-radius: 6px;
+  padding: 8px 16px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.cancelButton:hover {
+  background: #333239;
+  color: #e5e5e5;
+}
+
+/* Scrollbar styling */
+.effectsContent::-webkit-scrollbar {
+  width: 6px;
+}
+
+.effectsContent::-webkit-scrollbar-track {
+  background: #1e1d20;
+}
+
+.effectsContent::-webkit-scrollbar-thumb {
+  background: #333239;
+  border-radius: 3px;
+}
+
+.effectsContent::-webkit-scrollbar-thumb:hover {
+  background: #5c5b62;
+}
+
+/* Styling for a disabled (already active) effect card */
+.effectCardDisabled {
+  opacity: 0.4; /* Visually grey out */
+  cursor: not-allowed !important; /* Change cursor */
+  border-color: #333239 !important; /* Subtle border */
+  /* Ensure it doesn't shift position */
+  margin-top: 2px !important;
+  margin-bottom: 0 !important;
+}
+
+/* Remove hover effects on disabled card */
+.effectCardDisabled:hover {
+  border-color: #333239 !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* Remove text gradient sweep animation for disabled cards */
+.effectCardDisabled:hover .effectName,
+.effectCardDisabled:hover .effectDescription {
+  background: none !important;
+  background-clip: none !important;
+  -webkit-background-clip: none !important;
+  -webkit-text-fill-color: inherit !important;
+  animation: none !important;
+}
+
+.effectCardDisabled .effectName {
+  color: #888; /* Ensure name is also greyed */
+}
+
+.effectCardDisabled .effectDescription {
+  color: #666; /* Ensure description is also greyed */
+}
