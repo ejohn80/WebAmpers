@@ -1,7 +1,7 @@
 /**
  * ExportManager - Mix and export multiple tracks with master effects
  */
-import { PlaybackEngine } from "../../playback/playback";
+import {PlaybackEngine} from "../../playback/playback";
 import * as Tone from "tone";
 import PythonApiClient from "../../backend/PythonApiClient";
 
@@ -235,51 +235,57 @@ class ExportManager {
     const sampleRate = audioContext.sampleRate;
     const totalLengthSec = totalLengthMs / 1000;
 
-    const renderedBuffer = await Tone.Offline(async (context) => {
-      const tempEngine = new PlaybackEngine();
+    const renderedBuffer = await Tone.Offline(
+      async (context) => {
+        const tempEngine = new PlaybackEngine();
 
-      for (const track of tracks) {
-        if (track.mute) continue;
+        for (const track of tracks) {
+          if (track.mute) continue;
 
-        const anySolo = tracks.some((t) => t.solo);
-        if (anySolo && !track.solo) continue;
+          const anySolo = tracks.some((t) => t.solo);
+          if (anySolo && !track.solo) continue;
 
-        const effects = track.effects || {};
-        // Reusing from playback
-        const effectsChain = tempEngine._buildEffectsChain(effects, context);
+          const effects = track.effects || {};
+          // Reusing from playback
+          const effectsChain = tempEngine._buildEffectsChain(effects, context);
 
-        for (const segment of track.segments || []) {
-          try {
-            let sourceBuffer = segment.buffer;
-            if (!sourceBuffer) continue;
+          for (const segment of track.segments || []) {
+            try {
+              let sourceBuffer = segment.buffer;
+              if (!sourceBuffer) continue;
 
-            if (sourceBuffer.get) {
-              sourceBuffer = sourceBuffer.get();
+              if (sourceBuffer.get) {
+                sourceBuffer = sourceBuffer.get();
+              }
+              if (sourceBuffer._buffer) {
+                sourceBuffer = sourceBuffer._buffer;
+              }
+
+              const toneBuffer = new Tone.ToneAudioBuffer(sourceBuffer);
+              const player = new Tone.Player({url: toneBuffer, context});
+
+              if (effectsChain.length > 0) {
+                player.chain(...effectsChain, context.destination);
+              } else {
+                player.connect(context.destination);
+              }
+
+              const startTimeSec = (segment.startOnTimelineMs || 0) / 1000;
+              const offsetSec = (segment.startInFileMs || 0) / 1000;
+              const durationSec =
+                (segment.durationMs || sourceBuffer.duration * 1000) / 1000;
+
+              player.start(startTimeSec, offsetSec, durationSec);
+            } catch (error) {
+              console.warn(`Failed to mix segment ${segment.id}:`, error);
             }
-            if (sourceBuffer._buffer) {
-              sourceBuffer = sourceBuffer._buffer;
-            }
-
-            const toneBuffer = new Tone.ToneAudioBuffer(sourceBuffer);
-            const player = new Tone.Player({ url: toneBuffer, context });
-
-            if (effectsChain.length > 0) {
-              player.chain(...effectsChain, context.destination);
-            } else {
-              player.connect(context.destination);
-            }
-
-            const startTimeSec = (segment.startOnTimelineMs || 0) / 1000;
-            const offsetSec = (segment.startInFileMs || 0) / 1000;
-            const durationSec = (segment.durationMs || sourceBuffer.duration * 1000) / 1000;
-
-            player.start(startTimeSec, offsetSec, durationSec);
-          } catch (error) {
-            console.warn(`Failed to mix segment ${segment.id}:`, error);
           }
         }
-      }
-    }, totalLengthSec, 2, sampleRate);
+      },
+      totalLengthSec,
+      2,
+      sampleRate
+    );
 
     // Get the native AudioBuffer
     const mixedBuffer = renderedBuffer.get();
