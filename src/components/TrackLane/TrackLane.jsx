@@ -17,6 +17,8 @@ function TrackLane({
   totalLengthMs = 0, // Total timeline length for proportional sizing
   timelineWidth = 0,
   rowWidthPx = 0,
+  isSelected = false,
+  onSelect = () => {},
 }) {
   if (!track) return null;
 
@@ -35,6 +37,12 @@ function TrackLane({
 
   const [muted, setMuted] = useState(getInitialState().muted);
   const [soloed, setSoloed] = useState(getInitialState().soloed);
+  // Track a custom context menu for right-click actions on the track lane
+  const [contextMenu, setContextMenu] = useState({
+    open: false,
+    x: 0,
+    y: 0,
+  });
 
   useEffect(() => {
     try {
@@ -54,6 +62,50 @@ function TrackLane({
   useEffect(() => {
     setSoloed(!!track.solo);
   }, [track.solo, track.id]);
+
+  // Close the menu on outside click or Escape while it is open
+  useEffect(() => {
+    if (!contextMenu.open) return undefined;
+
+    const handlePointerDown = (event) => {
+      if (
+        event.target instanceof Node &&
+        event.target.closest(".tracklane-context-menu")
+      ) {
+        return;
+      }
+      closeContextMenu();
+    };
+
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") {
+        closeContextMenu();
+      }
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [contextMenu.open]);
+
+  // Helper to close and reset the context menu state
+  const closeContextMenu = () => {
+    setContextMenu({open: false, x: 0, y: 0});
+  };
+
+  // Open the context menu at the pointer location, clamped to the viewport
+  const handleContextMenu = (event) => {
+    event.preventDefault();
+    const menuWidth = 180;
+    const menuHeight = 140;
+    const x = Math.min(event.clientX, window.innerWidth - menuWidth);
+    const y = Math.min(event.clientY, window.innerHeight - menuHeight);
+    setContextMenu({open: true, x, y});
+  };
 
   const toggleMute = () => {
     const next = !muted;
@@ -83,6 +135,12 @@ function TrackLane({
     }
   };
 
+  // Run the selected menu action and close the menu
+  const handleMenuAction = (action) => {
+    action();
+    closeContextMenu();
+  };
+
   const parsedTimelineWidth =
     typeof timelineWidth === "number"
       ? timelineWidth
@@ -110,8 +168,26 @@ function TrackLane({
       ? {minWidth: `${rowWidthPx}px`, width: `${rowWidthPx}px`}
       : undefined;
 
+  const handleTrackClick = (e) => {
+    e.stopPropagation();
+    onSelect(track.id);
+  };
+
+  const selectionStyle = isSelected
+    ? {
+        outline: "2px solid #17E1FF",
+        outlineOffset: "-2px",
+        backgroundColor: "rgba(23, 225, 255, 0.05)",
+      }
+    : {};
+
   return (
-    <div className="tracklane-root" style={rowWidthStyle}>
+    <div
+      className="tracklane-root"
+      style={{...rowWidthStyle, ...selectionStyle}}
+      onClick={handleTrackClick}
+      onContextMenu={handleContextMenu}
+    >
       <div className="tracklane-side">
         {showTitle && (
           <div className="tracklane-header">
@@ -234,6 +310,37 @@ function TrackLane({
           })}
         </div>
       </div>
+
+      {contextMenu.open && (
+        <div
+          className="tracklane-context-menu"
+          style={{top: `${contextMenu.y}px`, left: `${contextMenu.x}px`}}
+          role="menu"
+        >
+          <button
+            className="context-menu-item"
+            onClick={() => handleMenuAction(toggleMute)}
+            role="menuitem"
+          >
+            {muted ? "Unmute" : "Mute"}
+          </button>
+          <button
+            className="context-menu-item"
+            onClick={() => handleMenuAction(toggleSolo)}
+            role="menuitem"
+          >
+            {soloed ? "Unsolo" : "Solo"}
+          </button>
+          <div className="context-menu-divider" />
+          <button
+            className="context-menu-item context-menu-item--danger"
+            onClick={() => handleMenuAction(handleDelete)}
+            role="menuitem"
+          >
+            Delete
+          </button>
+        </div>
+      )}
     </div>
   );
 }

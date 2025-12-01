@@ -1,9 +1,9 @@
-import {useState, useEffect, useContext} from "react";
+import {useState, useEffect} from "react";
 import DraggableDiv from "../Generic/DraggableDiv";
-import {AppContext} from "../../context/AppContext";
 import AssetsTab from "./Sidebar/AssetsTab";
 import EffectsTab from "./Sidebar/EffectsTab";
-import ProjectsTab from "./Sidebar/ProjectsTab";
+import SessionsTab from "./Sidebar/SessionsTab";
+import React from "react";
 // import styles from './Layout.module.css';
 
 /**
@@ -12,53 +12,86 @@ import ProjectsTab from "./Sidebar/ProjectsTab";
  * @param {number} props.width - The current width of the sidebar.
  * @param {function} props.onImportSuccess - Callback for successful audio import.
  * @param {function} props.onImportError - Callback for failed audio import.
+ * @param {function} props.onAssetDelete - Callback for asset deletion.
+ * @param {number} props.assetsRefreshTrigger - Counter to trigger assets reload.
+ * @param {Map} props.assetBufferCache - Cache for shared audio buffers.
  */
-function Sidebar({width, onImportSuccess, onImportError}) {
-  const {userData} = useContext(AppContext);
-  const [currentTab, setCurrentTab] = useState("projects");
+const SIDEBAR_TAB_KEY = "webamp.sidebarTab";
 
-  // If logged out, only redirect away from Assets (Effects/Projects stay allowed)
-  useEffect(() => {
-    if (!userData && currentTab === "assets") {
-      setCurrentTab("effects");
-    }
-  }, [userData, currentTab]);
+const getInitialTab = () => {
+  if (
+    typeof window === "undefined" ||
+    typeof window.localStorage === "undefined"
+  ) {
+    return "assets";
+  }
 
-  const tabs = {
-    projects: {
-      label: "Projects",
-      component: <ProjectsTab />,
-    },
-    effects: {
-      label: "Effects",
-      component: <EffectsTab />,
-    },
-    assets: {
+  try {
+    const stored = window.localStorage.getItem(SIDEBAR_TAB_KEY);
+    return stored || "assets";
+  } catch {
+    return "assets";
+  }
+};
+
+function Sidebar({
+  width,
+  onImportSuccess,
+  onImportError,
+  onAssetDelete,
+  assetsRefreshTrigger,
+  assetBufferCache,
+}) {
+  const [currentTab, setCurrentTab] = useState(getInitialTab);
+
+  const tabs = [
+    {
+      key: "assets",
       label: "Assets",
-      component: (
-        <AssetsTab
-          onImportSuccess={onImportSuccess}
-          onImportError={onImportError}
-        />
-      ),
+      Component: AssetsTab,
+      props: {
+        onImportSuccess,
+        onImportError,
+        onAssetDelete,
+        refreshTrigger: assetsRefreshTrigger,
+        assetBufferCache,
+      },
     },
-  };
+    {
+      key: "effects",
+      label: "Effects",
+      Component: EffectsTab,
+      props: {},
+    },
+    {
+      key: "sessions",
+      label: "Sessions",
+      Component: SessionsTab,
+      props: {},
+    },
+  ];
 
   const handleTabClick = (key) => {
-    // Allow Effects and Projects even when not logged in; keep Assets gated
-    if (userData || key !== "assets") {
-      setCurrentTab(key);
-    }
+    setCurrentTab(key);
   };
+
+  useEffect(() => {
+    try {
+      if (typeof window !== "undefined" && window.localStorage) {
+        window.localStorage.setItem(SIDEBAR_TAB_KEY, currentTab);
+      }
+    } catch (error) {
+      console.warn("Failed to persist sidebar tab selection:", error);
+    }
+  }, [currentTab]);
 
   return (
     <DraggableDiv color="1E1D20" className="sidebar-container">
       <div style={{display: "flex", marginBottom: "10px", borderRadius: "8px"}}>
-        {Object.entries(tabs).map(([key, tab]) => (
+        {tabs.map(({key, label}) => (
           <button
             key={key}
             onClick={() => handleTabClick(key)}
-            disabled={!userData && key === "assets"}
             style={{
               flex: 1,
               padding: "10px 0",
@@ -66,17 +99,25 @@ function Sidebar({width, onImportSuccess, onImportError}) {
               background: currentTab === key ? "#17E1FF" : "#193338",
               color: currentTab === key ? "#193338" : "#17E1FF",
               fontWeight: currentTab === key ? "bold" : "bold",
-              cursor: userData || key !== "assets" ? "pointer" : "not-allowed",
-              opacity: !userData && key === "assets" ? 0.5 : 1,
-              transition: "background 0.2s, color 0.2s, opacity 0.2s",
+              cursor: "pointer",
+              transition: "background 0.2s, color 0.2s",
             }}
           >
-            {tab.label}
+            {label}
           </button>
         ))}
       </div>
 
-      <div>{tabs[currentTab].component}</div>
+      <div>
+        {tabs.map(({key, Component, props}) => (
+          <div
+            key={key}
+            style={{display: currentTab === key ? "block" : "none"}}
+          >
+            <Component {...props} />
+          </div>
+        ))}
+      </div>
     </DraggableDiv>
   );
 }

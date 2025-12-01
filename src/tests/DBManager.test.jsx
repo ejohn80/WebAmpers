@@ -125,4 +125,23 @@ describe("DBManager Behavioral Tests", () => {
     // No segments or buffer present for metadata-only track
     expect(tracks[0].segments).toBeUndefined();
   });
+
+  it("preserves session linkage when updating track mute/solo", async () => {
+    const track = createMockTrack(1, "Session Track");
+
+    await dbManager.addTrack(track, 123);
+
+    // Update mute without sessionId to simulate UI updates
+    await dbManager.updateTrack({
+      id: 1,
+      name: "Session Track",
+      mute: true,
+      solo: false,
+      segments: track.segments,
+    });
+
+    const sessionTracks = await dbManager.getAllTracks(123);
+    expect(sessionTracks).toHaveLength(1);
+    expect(sessionTracks[0].mute).toBe(true);
+  });
 });
