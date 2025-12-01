@@ -354,8 +354,10 @@ class PlaybackEngine {
         // Full Equalizer
         if (node instanceof Tone.Filter && node.type === "peaking") {
           const nodeFreq = node.frequency.value;
-          const matchingBand = EQ_BANDS.find(f => Math.abs(f - nodeFreq) < 10);
-          
+          const matchingBand = EQ_BANDS.find(
+            (f) => Math.abs(f - nodeFreq) < 10
+          );
+
           if (matchingBand && effectsMap[matchingBand] !== undefined) {
             node.gain.value = effectsMap[matchingBand];
           }
@@ -494,11 +496,12 @@ class PlaybackEngine {
       }
 
       const hasEQChanges = EQ_BANDS.some(
-        freq => effectsMap[freq] !== undefined && Math.abs(effectsMap[freq]) > 0.01
+        (freq) =>
+          effectsMap[freq] !== undefined && Math.abs(effectsMap[freq]) > 0.01
       );
 
       if (hasEQChanges) {
-        EQ_BANDS.forEach(freq => {
+        EQ_BANDS.forEach((freq) => {
           const gain = effectsMap[freq];
           if (gain !== undefined && Math.abs(gain) > 0.01) {
             const filter = new Tone.Filter({
@@ -833,12 +836,12 @@ class PlaybackEngine {
     }
 
     const hasEQChanges = EQ_BANDS.some(
-      freq => effects[freq] !== undefined && Math.abs(effects[freq]) > 0.01
+      (freq) => effects[freq] !== undefined && Math.abs(effects[freq]) > 0.01
     );
 
     if (hasEQChanges) {
       try {
-        EQ_BANDS.forEach(freq => {
+        EQ_BANDS.forEach((freq) => {
           const gain = effects[freq];
           if (gain !== undefined && Math.abs(gain) > 0.01) {
             const filter = new Tone.Filter({
@@ -1123,10 +1126,10 @@ class PlaybackEngine {
       });
     }
     // Full EQ
-    EQ_BANDS.forEach(freq => {
+    EQ_BANDS.forEach((freq) => {
       const gain = effects?.[freq];
       if (typeof gain === "number" && Math.abs(gain) > 0.01) {
-        chain.push({ type: "peaking", frequency: freq, gain: gain, Q: 1.0 });
+        chain.push({type: "peaking", frequency: freq, gain: gain, Q: 1.0});
       }
     });
     this.replaceMasterChain(chain);

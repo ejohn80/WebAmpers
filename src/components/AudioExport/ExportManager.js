@@ -28,7 +28,7 @@ class ExportManager {
       return buffer;
     }
     const hasEQChanges = EQ_BANDS.some(
-      freq => effects[freq] !== undefined && Math.abs(effects[freq]) > 0.01
+      (freq) => effects[freq] !== undefined && Math.abs(effects[freq]) > 0.01
     );
 
     // Check if there are any actual effects to apply

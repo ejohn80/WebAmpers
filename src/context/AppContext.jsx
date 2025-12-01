@@ -415,13 +415,13 @@ const AppContextProvider = ({children}) => {
 
   useEffect(() => {
     try {
-      const saved = localStorage.getItem('webamp.masterEffects');
+      const saved = localStorage.getItem("webamp.masterEffects");
       if (saved) {
         const parsed = JSON.parse(saved);
         setEffects(mergeWithDefaults(parsed));
       }
     } catch (e) {
-      console.warn('Failed to load master effects:', e);
+      console.warn("Failed to load master effects:", e);
     }
   }, []);
 
