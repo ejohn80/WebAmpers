@@ -305,6 +305,9 @@ class PlaybackEngine {
       } catch (e) {}
       bus.pan.connect(masterDest);
     }
+
+    const panValue = effectsMap?.pan ? Math.max(-1, Math.min(1, effectsMap.pan / 100)) : 0;
+    bus.pan.pan.value = panValue;
   }
 
   /**
