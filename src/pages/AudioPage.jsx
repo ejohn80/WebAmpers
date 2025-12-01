@@ -1,4 +1,4 @@
-import React, {useState, useEffect, useContext, useRef} from "react";
+import React, {useState, useEffect, useContext, useRef, useCallback} from "react";
 import "./AudioPage.css";
 import * as Tone from "tone";
 
@@ -7,9 +7,9 @@ import Sidebar from "../components/Layout/Sidebar";
 import MainContent from "../components/Layout/MainContent";
 import Footer from "../components/Layout/Footer";
 import {audioManager} from "../managers/AudioManager";
-import WebAmpPlayback from "../playback/playback.jsx";
 import {dbManager} from "../managers/DBManager";
 import {AppContext} from "../context/AppContext";
+import {progressStore} from "../playback/progressStore";
 
 const MIN_WIDTH = 0;
 const MAX_WIDTH = 300;
@@ -20,6 +20,11 @@ function AudioPage() {
   const [tracks, setTracks] = useState(audioManager.tracks);
   const [audioData, setAudioData] = useState(null);
   const [recording, setRecording] = useState({stream: null, startTs: 0});
+  const [trimBuffer, setTrimBuffer] = useState([]);
+  const [selection, setSelection] = useState(null);
+  const [selectMode, setSelectMode] = useState(false);
+  const [editAction, setEditAction] = useState("trim"); // "trim" or "cut"
+  const [selectedTrackId, setSelectedTrackId] = useState(null);
 
   const hasLoadedFromDB = useRef(false);
   const engineRef = React.useRef(null);
@@ -53,15 +58,27 @@ function AudioPage() {
 
       (track.segments || []).forEach((s) => {
         const fileUrl = s.buffer ?? s.fileUrl ?? null;
+        // Prefer explicit millisecond fields from editing (cut/trim) over legacy fields
         const startOnTimelineMs =
-          s.startOnTimelineMs ??
-          (s.startOnTimeline ? Math.round(s.startOnTimeline * 1000) : 0);
-        const startInFileMs = s.offset
-          ? Math.round(s.offset * 1000)
-          : (s.startInFileMs ?? 0);
-        const durationMs = s.duration
-          ? Math.round(s.duration * 1000)
-          : (s.durationMs ?? 0);
+          typeof s.startOnTimelineMs === "number"
+            ? s.startOnTimelineMs
+            : s.startOnTimeline
+              ? Math.round(s.startOnTimeline * 1000)
+              : 0;
+
+        const startInFileMs =
+          typeof s.startInFileMs === "number"
+            ? s.startInFileMs
+            : s.offset
+              ? Math.round(s.offset * 1000)
+              : 0;
+
+        const durationMs =
+          typeof s.durationMs === "number" && s.durationMs > 0
+            ? s.durationMs
+            : s.duration
+              ? Math.round(s.duration * 1000)
+              : 0;
 
         vs.segments.push({
           id: s.id ?? `seg_${Math.random().toString(36).slice(2, 8)}`,
@@ -330,6 +347,9 @@ function AudioPage() {
   // Build version object for playback engine
   const version = buildVersionFromTracks(tracks);
 
+  // Convenience: current timeline length in ms
+  const timelineLengthMs = version?.lengthMs || 0;
+
   const audioBuffer =
     tracks.length > 0
       ? tracks[0].buffer || tracks[0].segments?.[0]?.buffer
@@ -348,14 +368,296 @@ function AudioPage() {
     "--sidebar-width": `${sidebarWidth}px`,
   };
 
+  // --- TRIM / CUT selection tool (segment-based) ---
+  const applySelectionEdit  = async (targetTrackId, mode = "trim") => {
+    if (!audioManager || !audioManager.tracks?.length) return false;
+
+    if (!selectedTrackId) {
+      alert("Please click a track to select it before editing.");
+      return false;
+    }
+
+    if (
+      !selection ||
+      typeof selection.startMs !== "number" ||
+      typeof selection.endMs !== "number"
+    ) {
+      console.warn("Selection edit: no selection defined.");
+      return false;
+    }
+
+    // Normalize selection window (in timeline ms)
+    let selStart = Math.min(selection.startMs, selection.endMs);
+    let selEnd = Math.max(selection.startMs, selection.endMs);
+    if (selStart < 0) selStart = 0;
+
+    const idx = audioManager.tracks.findIndex((t) => t.id === selectedTrackId);
+    if (idx === -1) {
+      console.warn("Selection edit: track not found.");
+      return false;
+    }
+
+    const track = audioManager.tracks[idx];
+
+    // Work from existing segments; if none, synthesize a single full-length segment
+    let baseSegments = Array.isArray(track.segments) ? track.segments : [];
+    if (baseSegments.length === 0) {
+      const buf =
+        track.buffer ||
+        (Array.isArray(track.segments) && track.segments[0]?.buffer) ||
+        null;
+      if (buf && typeof buf.duration === "number" && buf.duration > 0) {
+        const durMs = buf.duration * 1000;
+        baseSegments = [
+          {
+            id: `${track.id}_seg0`,
+            trackId: track.id,
+            buffer: buf,
+            fileUrl: null,
+            startOnTimelineMs: 0,
+            startInFileMs: 0,
+            durationMs: durMs,
+            gainDb: 0,
+            fades: { inMs: 5, outMs: 5 },
+          },
+        ];
+      }
+    }
+
+    if (!baseSegments.length) {
+      console.warn("Selection edit: track has no segments or buffer.");
+      return false;
+    }
+
+    const newSegments = [];
+    const removedPieces = [];
+
+    // Helper: push a cloned sub-segment
+    const pushSegmentSlice = (sourceSeg, sliceStartMs, sliceEndMs, newTimelineStart) => {
+      const srcStart = sourceSeg.startOnTimelineMs || 0;
+      const srcFileStartMs = sourceSeg.startInFileMs || 0;
+
+      const clampedStart = Math.max(srcStart, sliceStartMs);
+      const clampedEnd = Math.min(srcStart + (sourceSeg.durationMs || 0), sliceEndMs);
+      if (clampedEnd <= clampedStart) return;
+
+      const offsetIntoSeg = clampedStart - srcStart;
+      const newStartInFileMs = srcFileStartMs + offsetIntoSeg;
+      const newDurationMs = clampedEnd - clampedStart;
+
+      newSegments.push({
+        ...sourceSeg,
+        // keep buffer/fileUrl/gain/fades etc
+        startOnTimelineMs: newTimelineStart,
+        startInFileMs: newStartInFileMs,
+        durationMs: newDurationMs,
+      });
+    };
+
+    // Helper for removed pieces buffer (optional)
+    const pushRemovedSlice = (sourceSeg, sliceStartMs, sliceEndMs) => {
+      const srcStart = sourceSeg.startOnTimelineMs || 0;
+      const srcFileStartMs = sourceSeg.startInFileMs || 0;
+
+      const clampedStart = Math.max(srcStart, sliceStartMs);
+      const clampedEnd = Math.min(srcStart + (sourceSeg.durationMs || 0), sliceEndMs);
+      if (clampedEnd <= clampedStart) return;
+
+      const offsetIntoSeg = clampedStart - srcStart;
+      const newStartInFileMs = srcFileStartMs + offsetIntoSeg;
+      const newDurationMs = clampedEnd - clampedStart;
+
+      removedPieces.push({
+        ...sourceSeg,
+        startOnTimelineMs: clampedStart,
+        startInFileMs: newStartInFileMs,
+        durationMs: newDurationMs,
+      });
+    };
+
+    if (mode === "trim") {
+      // ======== TRIM: keep only [selStart, selEnd], re-based so selStart → 0 ========
+      baseSegments.forEach((seg) => {
+        const segStart = seg.startOnTimelineMs || 0;
+        const segEnd = segStart + (seg.durationMs || 0);
+
+        // Intersection with selection
+        const keepStart = Math.max(segStart, selStart);
+        const keepEnd = Math.min(segEnd, selEnd);
+        if (keepEnd <= keepStart) return;
+
+        // New timeline start is shifted so selection starts at 0
+        const newTimelineStart = keepStart - selStart;
+        pushSegmentSlice(seg, keepStart, keepEnd, newTimelineStart);
+
+        // Left and right outside pieces go to "removed" buffer
+        pushRemovedSlice(seg, segStart, Math.min(segEnd, selStart));
+        pushRemovedSlice(seg, Math.max(segStart, selEnd), segEnd);
+      });
+    } else {
+      // ======== CUT: remove [selStart, selEnd] but keep timeline position (gap) ====
+      baseSegments.forEach((seg) => {
+        const segStart = seg.startOnTimelineMs || 0;
+        const segEnd = segStart + (seg.durationMs || 0);
+
+        // Completely before or after selection → keep unchanged
+        if (segEnd <= selStart || segStart >= selEnd) {
+          newSegments.push({ ...seg });
+          return;
+        }
+
+        // Segment overlaps selection → split into left/right pieces as needed
+        // Left piece (before selection)
+        if (segStart < selStart) {
+          pushSegmentSlice(seg, segStart, selStart, segStart);
+        }
+
+        // Middle (inside selection) → removed
+        pushRemovedSlice(seg, selStart, selEnd);
+
+        // Right piece (after selection), starting at selEnd (keep the gap)
+        if (segEnd > selEnd) {
+          const rightStartOnTimeline = selEnd;
+          pushSegmentSlice(seg, selEnd, segEnd, rightStartOnTimeline);
+        }
+      });
+    }
+
+    // If trim produced nothing, bail
+    if (!newSegments.length && mode === "trim") {
+      console.warn("Trim resulted in no audio to keep.");
+      return false;
+    }
+
+    // Write back into audioManager & React state
+    const newTrack = { ...track, segments: newSegments };
+    const newTracks = [...audioManager.tracks];
+    newTracks[idx] = newTrack;
+    audioManager.tracks = newTracks;
+    if (removedPieces.length) {
+      setTrimBuffer((prev) => [...prev, ...removedPieces]);
+    }
+    setTracks(newTracks);
+
+    // Reset playhead & timeline length
+    progressStore.setMs(0);
+
+    // Clear selection & mode
+    setSelection(null);
+    setSelectedTrackId(null);
+
+    return true;
+  };
+
+  const handleTrimStart = () => {
+      if (!selectMode) {
+      // Turn ON trim mode with "trim" as the current operation
+      setEditAction("trim");
+      setSelectMode(true);
+      setSelection(null);
+      setSelectedTrackId(null);
+    } else {
+      if (editAction === "trim") {
+        // Trim mode already active -> turn OFF
+        setSelectMode(false);
+        setSelection(null);
+        setSelectedTrackId(null);
+      } else {
+        // We were in cut mode; switch to trim but keep current selection/track
+        setEditAction("trim");
+      }
+    }
+  };
+
+  const handleCutStart = () => {
+    if (!selectMode) {
+      // Turn ON selection mode as "cut"
+      setEditAction("cut");
+      setSelectMode(true);
+      setSelection(null);
+      setSelectedTrackId(null);
+    } else {
+      if (editAction === "cut") {
+        // Cut mode already active -> turn OFF
+        setSelectMode(false);
+        setSelection(null);
+        setSelectedTrackId(null);
+      } else {
+        // We were in trim mode; switch to cut but keep current selection/track
+        setEditAction("cut");
+      }
+    }
+  };
+
+  const handleTrackSelection  = React.useCallback(
+    (trackId) => {
+      if (!selectMode) return; // only respond in trim mode
+
+      // which track we're trimming
+      setSelectedTrackId(trackId);
+
+      // If we don't have a selection, or we've switched tracks,
+      // default the selection to this track's own length.
+      if (!selection || trackId !== selectedTrackId) {
+        const track = tracks.find((t) => t.id === trackId);
+
+        let trackEndMs = 0;
+        if (track && Array.isArray(track.segments)) {
+          track.segments.forEach((seg) => {
+            const segStart = seg.startOnTimelineMs || 0;
+            const durMs =
+              typeof seg.durationMs === "number" && seg.durationMs > 0
+                ? seg.durationMs
+                : (seg.duration || 0) * 1000;
+            if (durMs <= 0) return;
+            const segEnd = segStart + durMs;
+            if (segEnd > trackEndMs) trackEndMs = segEnd;
+          });
+        }
+
+        const fallbackEnd = timelineLengthMs > 0 ? timelineLengthMs : 0;
+        const endMs = trackEndMs > 0 ? trackEndMs : fallbackEnd;
+
+        if (endMs > 0) {
+          setSelection({ startMs: 0, endMs });
+        }
+      }
+    },
+    [selectMode, selection, timelineLengthMs, tracks, selectedTrackId]
+  );
+
+  // User cancels trim (red X)
+  const cancelEditMode = useCallback(() => {
+    setSelectMode(false);
+    setSelection(null);
+    setSelectedTrackId(null);
+  }, []);
+
+  // User confirms trim (green check)
+  const confirmEdit = useCallback(async () => {
+    if (!selectMode || !selection) return;
+    if (!selectedTrackId) {
+      console.warn("Trim: no track selected for single-track trim.");
+      return;
+    }
+
+    await applySelectionEdit(selectedTrackId, editAction);
+
+    setSelectMode(false);
+    setSelection(null);
+    setSelectedTrackId(null);
+  }, [selectMode, selection, selectedTrackId, editAction]);
+
   return (
     <div className="app-container">
       <Header
         tracks={tracks}
-        totalLengthMs={version?.lengthMs || 0}
+        totalLengthMs={timelineLengthMs}
         onImportSuccess={handleImportSuccess}
         onImportError={handleImportError}
         onExportComplete={handleExportComplete}
+        onTrim={handleTrimStart}
+        onCut={handleCutStart}
       />
 
       <div className="main-content-area" style={mainContentStyle}>
@@ -374,7 +676,14 @@ function AudioPage() {
         <MainContent
           tracks={tracks}
           recording={recording}
-          totalLengthMs={version?.lengthMs || 0}
+          totalLengthMs={timelineLengthMs}
+          selection={selection}
+          onSelectionChange={setSelection}
+          selectMode={selectMode}
+          confirmEdit={confirmEdit}
+          onTrimCancel={cancelEditMode}
+          selectedTrackId={selectedTrackId}
+          onTrimTrackSelect={handleTrackSelection}
           onMute={async (trackId, muted) => {
             try {
               engineRef.current?.setTrackMute(trackId, muted);

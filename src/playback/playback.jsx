@@ -71,6 +71,7 @@ class PlaybackEngine {
     Tone.Transport.cancel(0);
     this._cancelRaf();
     this._disposeAll();
+    Tone.Transport.cancel(0);
     this._emitTransport(false);
 
     // Save the version reference
@@ -156,10 +157,9 @@ class PlaybackEngine {
   /** Define a loop range for the transport */
   setLoop(startMs, endMs) {
     if (!this.version) return;
-    Tone.Transport.setLoopPoints(
-      msToToneTime(startMs, this.version.bpm || 120),
-      msToToneTime(endMs, this.version.bpm || 120)
-    );
+    const startSec = (startMs || 0) / 1000;
+    const endSec = (endMs || 0) / 1000;
+    Tone.Transport.setLoopPoints(startSec, endSec);
     Tone.Transport.loop = endMs > startMs;
   }
 
@@ -658,15 +658,15 @@ class PlaybackEngine {
       const offsetSec = (seg.startInFileMs || 0) / 1000;
       const durSec = (seg.durationMs || 0) / 1000;
 
+      // If the segment has zero duration, skip entirely (prevents Tone.js from playing unintended audio)
+      if (durSec <= 0) continue;
+
       // Sync player to Transport so pause/stop works correctly
       player.sync();
 
-      // Schedule start time in the Transport
-      const startTT = msToToneTime(
-        seg.startOnTimelineMs || 0,
-        version.bpm || 120
-      );
-      player.start(startTT, offsetSec, durSec);
+      // schedule using seconds, not beats
+      const startSec = (seg.startOnTimelineMs || 0) / 1000;
+      player.start(startSec, offsetSec, durSec);
     }
 
     this._applyMuteSolo();
@@ -897,12 +897,9 @@ class PlaybackEngine {
   /** Dispose of all audio players and buses to free memory */
   _disposeAll() {
     this.playersBySegment.forEach((h) => {
-      try {
-        h.player.unsync?.();
-        h.disposers.forEach((d) => d());
-      } catch {
-        /* To suppress linter warning */
-      }
+        try { h.player.stop(); } catch {}
+        try { h.player.unsync(); } catch {}
+        try { h.disposers.forEach((d) => d()); } catch {}
     });
     this.playersBySegment.clear();
 

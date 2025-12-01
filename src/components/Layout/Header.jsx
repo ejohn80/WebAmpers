@@ -9,6 +9,8 @@ function Header({
   tracks,
   totalLengthMs,
   onExportComplete,
+  onTrim,
+  onCut,
 }) {
   const navigate = useNavigate();
   const {userData, loading} = useUserData();
@@ -26,6 +28,8 @@ function Header({
             onExportComplete={onExportComplete}
             onImportSuccess={onImportSuccess}
             onImportError={onImportError}
+            onTrim={onTrim}
+            onCut={onCut}
           />
         </div>
 

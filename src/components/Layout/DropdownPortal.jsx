@@ -16,6 +16,7 @@ import {
   UndoIcon,
   RedoIcon,
   CutIcon,
+  TrimIcon,
   CopyIcon,
   PasteIcon,
   DeleteIcon,
@@ -34,6 +35,8 @@ function DropdownPortal({
   onExportComplete,
   onImportSuccess,
   onImportError,
+  onTrim,
+  onCut,
 }) {
   const navigate = useNavigate();
   const {userData} = useContext(AppContext);
@@ -348,6 +351,8 @@ function DropdownPortal({
           top: position.top,
           left: position.left,
           zIndex: 99999,
+          display: "flex",
+          flexDirection: "column",
         }}
         onMouseLeave={handleDropdownMouseLeave}
       >
@@ -387,9 +392,12 @@ function DropdownPortal({
           </span>
         </a>
         <a
-          href="#"
-          className="dropdown-item-disabled"
-          onClick={(e) => e.preventDefault()}
+          className={`dropdown-item ${!onCut ? "dropdown-item-disabled" : ""}`}
+          onClick={(e) => {
+            e.preventDefault();
+            if (!onCut) return;
+            onCut();
+          }}
         >
           <span
             style={{
@@ -401,6 +409,26 @@ function DropdownPortal({
           >
             <CutIcon />
             <span>Cut</span>
+          </span>
+        </a>
+        <a
+          href="#"
+          className={`dropdown-item ${!onTrim ? "dropdown-item-disabled" : ""}`}
+          onClick={(e) => {
+            e.preventDefault();
+            if (onTrim) onTrim();
+          }}
+        >
+          <span
+            style={{
+              display: "flex",
+              alignItems: "center",
+              width: "100%",
+              gap: "8px",
+            }}
+          >
+            <TrimIcon />
+            <span>Trim</span>
           </span>
         </a>
         <a
