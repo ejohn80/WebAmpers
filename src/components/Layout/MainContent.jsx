@@ -427,7 +427,8 @@ function MainContent({
                   style={{width: `${timelineMetrics.rowWidthPx}px`}}
                 >
                   {tracks.map((track, index) => {
-                    const isTrimSelected = selectMode && selectedTrackId === track.id;
+                    const isTrimSelected =
+                      selectMode && selectedTrackId === track.id;
                     const isTrackSelected = selectedTrackId === track.id;
                     // Build row classes so we can show hover + selected states
                     const rowClasses = [

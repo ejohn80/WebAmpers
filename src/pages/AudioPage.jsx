@@ -1,4 +1,10 @@
-import React, {useState, useEffect, useContext, useRef, useCallback} from "react";
+import React, {
+  useState,
+  useEffect,
+  useContext,
+  useRef,
+  useCallback,
+} from "react";
 import "./AudioPage.css";
 import * as Tone from "tone";
 
@@ -27,7 +33,13 @@ const EMPTY_VERSION = {
   masterChain: [],
 };
 function AudioPage() {
-  const {setEngineRef, applyEffectsToEngine, activeSession, selectedTrackId, setSelectedTrackId} = useContext(AppContext);
+  const {
+    setEngineRef,
+    applyEffectsToEngine,
+    activeSession,
+    selectedTrackId,
+    setSelectedTrackId,
+  } = useContext(AppContext);
   const [sidebarWidth, setSidebarWidth] = useState(MAX_WIDTH);
   const [tracks, setTracks] = useState(audioManager.tracks);
   const [audioData, setAudioData] = useState(null);
@@ -306,7 +318,7 @@ function AudioPage() {
     console.log("Export process complete.");
   };
 
-   // Handle dropping an asset from the assets tab to create a new track
+  // Handle dropping an asset from the assets tab to create a new track
   const handleAssetDrop = async (assetId) => {
     try {
       console.log(`Dropping asset ${assetId} to create track`);
@@ -634,7 +646,7 @@ function AudioPage() {
   };
 
   // --- TRIM / CUT selection tool (segment-based) ---
-  const applySelectionEdit  = async (targetTrackId, mode = "trim") => {
+  const applySelectionEdit = async (targetTrackId, mode = "trim") => {
     if (!audioManager || !audioManager.tracks?.length) return false;
 
     if (!selectedTrackId) {
@@ -683,7 +695,7 @@ function AudioPage() {
             startInFileMs: 0,
             durationMs: durMs,
             gainDb: 0,
-            fades: { inMs: 5, outMs: 5 },
+            fades: {inMs: 5, outMs: 5},
           },
         ];
       }
@@ -698,12 +710,20 @@ function AudioPage() {
     const removedPieces = [];
 
     // Helper: push a cloned sub-segment
-    const pushSegmentSlice = (sourceSeg, sliceStartMs, sliceEndMs, newTimelineStart) => {
+    const pushSegmentSlice = (
+      sourceSeg,
+      sliceStartMs,
+      sliceEndMs,
+      newTimelineStart
+    ) => {
       const srcStart = sourceSeg.startOnTimelineMs || 0;
       const srcFileStartMs = sourceSeg.startInFileMs || 0;
 
       const clampedStart = Math.max(srcStart, sliceStartMs);
-      const clampedEnd = Math.min(srcStart + (sourceSeg.durationMs || 0), sliceEndMs);
+      const clampedEnd = Math.min(
+        srcStart + (sourceSeg.durationMs || 0),
+        sliceEndMs
+      );
       if (clampedEnd <= clampedStart) return;
 
       const offsetIntoSeg = clampedStart - srcStart;
@@ -725,7 +745,10 @@ function AudioPage() {
       const srcFileStartMs = sourceSeg.startInFileMs || 0;
 
       const clampedStart = Math.max(srcStart, sliceStartMs);
-      const clampedEnd = Math.min(srcStart + (sourceSeg.durationMs || 0), sliceEndMs);
+      const clampedEnd = Math.min(
+        srcStart + (sourceSeg.durationMs || 0),
+        sliceEndMs
+      );
       if (clampedEnd <= clampedStart) return;
 
       const offsetIntoSeg = clampedStart - srcStart;
@@ -767,7 +790,7 @@ function AudioPage() {
 
         // Completely before or after selection → keep unchanged
         if (segEnd <= selStart || segStart >= selEnd) {
-          newSegments.push({ ...seg });
+          newSegments.push({...seg});
           return;
         }
 
@@ -795,7 +818,7 @@ function AudioPage() {
     }
 
     // Write back into audioManager & React state
-    const newTrack = { ...track, segments: newSegments };
+    const newTrack = {...track, segments: newSegments};
     const newTracks = [...audioManager.tracks];
     newTracks[idx] = newTrack;
     audioManager.tracks = newTracks;
@@ -861,19 +884,19 @@ function AudioPage() {
     return {startMs: minStart, endMs: maxEnd};
   };
 
-    // When we're in trim/cut mode and the selected track changes,
-    // reset the yellow selection region to that track's own bounds.
-    useEffect(() => {
-      if (!selectMode || !selectedTrackId) return;
+  // When we're in trim/cut mode and the selected track changes,
+  // reset the yellow selection region to that track's own bounds.
+  useEffect(() => {
+    if (!selectMode || !selectedTrackId) return;
 
-      const track = tracks.find((t) => t.id === selectedTrackId);
-      if (!track) return;
+    const track = tracks.find((t) => t.id === selectedTrackId);
+    if (!track) return;
 
-      const {startMs, endMs} = getTrackLengthMs(track);
-      if (endMs <= startMs) return;
+    const {startMs, endMs} = getTrackLengthMs(track);
+    if (endMs <= startMs) return;
 
-      setSelection({startMs, endMs});
-    }, [selectMode, selectedTrackId, tracks]);
+    setSelection({startMs, endMs});
+  }, [selectMode, selectedTrackId, tracks]);
 
   const handleTrimStart = () => {
     if (!selectedTrackId) {
