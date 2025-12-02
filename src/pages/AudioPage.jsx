@@ -1,4 +1,10 @@
-import React, {useState, useEffect, useContext, useRef, useCallback} from "react";
+import React, {
+  useState,
+  useEffect,
+  useContext,
+  useRef,
+  useCallback,
+} from "react";
 import "./AudioPage.css";
 import * as Tone from "tone";
 
@@ -404,7 +410,7 @@ function AudioPage() {
   };
 
   // --- TRIM / CUT selection tool (segment-based) ---
-  const applySelectionEdit  = async (targetTrackId, mode = "trim") => {
+  const applySelectionEdit = async (targetTrackId, mode = "trim") => {
     if (!audioManager || !audioManager.tracks?.length) return false;
 
     if (!selectedTrackId) {
@@ -453,7 +459,7 @@ function AudioPage() {
             startInFileMs: 0,
             durationMs: durMs,
             gainDb: 0,
-            fades: { inMs: 5, outMs: 5 },
+            fades: {inMs: 5, outMs: 5},
           },
         ];
       }
@@ -468,12 +474,20 @@ function AudioPage() {
     const removedPieces = [];
 
     // Helper: push a cloned sub-segment
-    const pushSegmentSlice = (sourceSeg, sliceStartMs, sliceEndMs, newTimelineStart) => {
+    const pushSegmentSlice = (
+      sourceSeg,
+      sliceStartMs,
+      sliceEndMs,
+      newTimelineStart
+    ) => {
       const srcStart = sourceSeg.startOnTimelineMs || 0;
       const srcFileStartMs = sourceSeg.startInFileMs || 0;
 
       const clampedStart = Math.max(srcStart, sliceStartMs);
-      const clampedEnd = Math.min(srcStart + (sourceSeg.durationMs || 0), sliceEndMs);
+      const clampedEnd = Math.min(
+        srcStart + (sourceSeg.durationMs || 0),
+        sliceEndMs
+      );
       if (clampedEnd <= clampedStart) return;
 
       const offsetIntoSeg = clampedStart - srcStart;
@@ -495,7 +509,10 @@ function AudioPage() {
       const srcFileStartMs = sourceSeg.startInFileMs || 0;
 
       const clampedStart = Math.max(srcStart, sliceStartMs);
-      const clampedEnd = Math.min(srcStart + (sourceSeg.durationMs || 0), sliceEndMs);
+      const clampedEnd = Math.min(
+        srcStart + (sourceSeg.durationMs || 0),
+        sliceEndMs
+      );
       if (clampedEnd <= clampedStart) return;
 
       const offsetIntoSeg = clampedStart - srcStart;
@@ -537,7 +554,7 @@ function AudioPage() {
 
         // Completely before or after selection → keep unchanged
         if (segEnd <= selStart || segStart >= selEnd) {
-          newSegments.push({ ...seg });
+          newSegments.push({...seg});
           return;
         }
 
@@ -565,7 +582,7 @@ function AudioPage() {
     }
 
     // Write back into audioManager & React state
-    const newTrack = { ...track, segments: newSegments };
+    const newTrack = {...track, segments: newSegments};
     const newTracks = [...audioManager.tracks];
     newTracks[idx] = newTrack;
     audioManager.tracks = newTracks;
@@ -585,7 +602,7 @@ function AudioPage() {
   };
 
   const handleTrimStart = () => {
-      if (!selectMode) {
+    if (!selectMode) {
       // Turn ON trim mode with "trim" as the current operation
       setEditAction("trim");
       setSelectMode(true);
@@ -624,7 +641,7 @@ function AudioPage() {
     }
   };
 
-  const handleTrackSelection  = React.useCallback(
+  const handleTrackSelection = React.useCallback(
     (trackId) => {
       if (!selectMode) return; // only respond in trim mode
 
@@ -654,7 +671,7 @@ function AudioPage() {
         const endMs = trackEndMs > 0 ? trackEndMs : fallbackEnd;
 
         if (endMs > 0) {
-          setSelection({ startMs: 0, endMs });
+          setSelection({startMs: 0, endMs});
         }
       }
     },
