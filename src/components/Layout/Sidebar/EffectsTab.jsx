@@ -248,7 +248,7 @@ function EffectsTab() {
   };
 
   // Check if effect is enabled (default to true if not set)
-  const isEffectEnabled = (effectId) => enabledEffects[effectId] !== false;
+const isEffectEnabled = (effectId) => enabledEffects[effectId] !== false;
 
   // Check if any effects are enabled (for master toggle)
   const areAnyEffectsEnabled = activeEffectConfigs.some((config) =>
@@ -396,11 +396,11 @@ function EffectsTab() {
                 onClick={() => toggleEffect(config.name)}
                 aria-label={`${isEnabled ? "Disable" : "Enable"} ${config.label} effect`}
               >
-                <div
-                  className={`${styles.toggleSwitch} ${isEnabled ? styles.toggleOn : styles.toggleOff}`}
-                >
-                  <div className={styles.toggleSlider}></div>
-                </div>
+<div
+  className={`${styles.toggleSwitch} ${isEffectEnabled(config.name) ? styles.toggleOn : styles.toggleOff}`}
+>
+  <div className={styles.toggleSlider}></div>
+</div>
               </button>
 
               <div className={styles.header}>
