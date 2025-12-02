@@ -160,8 +160,6 @@ function MainContent({
     return Math.max(0, Math.min(totalLengthMs, Math.round(ms)));
   };
 
-
-
   // Click behavior on the main timeline.
   // - In trim mode: clicking does nothing (only handles can move)
   // - Outside trim mode: clicking seeks playhead position (red line)
@@ -181,7 +179,7 @@ function MainContent({
 
     // Move the red line immediately and seek audio there.
     progressStore.beginScrub();
-    progressStore.setMs(target);       // visual playhead move
+    progressStore.setMs(target); // visual playhead move
     progressStore.requestSeek(target); // jump playback
     progressStore.endScrub();
   };
@@ -204,9 +202,9 @@ function MainContent({
     const selEnd = Math.max(selection.startMs, selection.endMs);
 
     trimDragStateRef.current = {
-      side,                       // "left" or "right"
-      startClientX: e.clientX,    // mouse x at drag start
-      initialStartMs: selStart,   // selection at drag start
+      side, // "left" or "right"
+      startClientX: e.clientX, // mouse x at drag start
+      initialStartMs: selStart, // selection at drag start
       initialEndMs: selEnd,
     };
 
@@ -224,7 +222,7 @@ function MainContent({
       const state = trimDragStateRef.current;
       if (!state) return;
 
-      const { side, startClientX, initialStartMs, initialEndMs } = state;
+      const {side, startClientX, initialStartMs, initialEndMs} = state;
 
       // How many pixels the mouse moved since drag started
       const deltaPx = e.clientX - startClientX;
@@ -252,7 +250,7 @@ function MainContent({
         endMs = nextEnd;
       }
 
-      onSelectionChange({ startMs, endMs });
+      onSelectionChange({startMs, endMs});
     };
 
     const handleUp = () => {
@@ -401,7 +399,6 @@ function MainContent({
                   pointerEvents: "auto",
                 }}
               >
-                
                 <GlobalPlayhead
                   totalLengthMs={totalLengthMs}
                   timelineWidth={timelineMetrics.widthPx}
@@ -454,8 +451,14 @@ function MainContent({
                       selection.endMs !== selection.startMs &&
                       totalLengthMs > 0
                     ) {
-                      const selStart = Math.min(selection.startMs, selection.endMs);
-                      const selEnd = Math.max(selection.startMs, selection.endMs);
+                      const selStart = Math.min(
+                        selection.startMs,
+                        selection.endMs
+                      );
+                      const selEnd = Math.max(
+                        selection.startMs,
+                        selection.endMs
+                      );
                       const total = Math.max(totalLengthMs || 1, 1);
 
                       const timelineWidthPx = timelineMetrics.widthPx;
@@ -492,21 +495,25 @@ function MainContent({
                             {/* Left handle at selection start */}
                             <div
                               className="trim-handle trim-handle-left"
-                              style={{ left: `${trackSelLeftPx}px` }}
+                              style={{left: `${trackSelLeftPx}px`}}
                               onMouseDown={(e) => startHandleDrag("left", e)}
                             />
 
                             {/* Right handle at selection end */}
                             <div
                               className="trim-handle trim-handle-right"
-                              style={{ left: `${trackSelLeftPx + trackSelWidthPx}px` }}
+                              style={{
+                                left: `${trackSelLeftPx + trackSelWidthPx}px`,
+                              }}
                               onMouseDown={(e) => startHandleDrag("right", e)}
                             />
 
                             {/* ✓ / ✕ controls, following the right edge */}
                             <div
                               className="trim-controls"
-                              style={{ left: `${trackSelLeftPx + trackSelWidthPx}px` }}
+                              style={{
+                                left: `${trackSelLeftPx + trackSelWidthPx}px`,
+                              }}
                               onMouseDown={(e) => e.stopPropagation()}
                             >
                               <button

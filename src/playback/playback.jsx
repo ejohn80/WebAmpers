@@ -1426,9 +1426,15 @@ class PlaybackEngine {
    */
   _disposeAll() {
     this.playersBySegment.forEach((h) => {
-        try { h.player.stop(); } catch {}
-        try { h.player.unsync(); } catch {}
-        try { h.disposers.forEach((d) => d()); } catch {}
+      try {
+        h.player.stop();
+      } catch {}
+      try {
+        h.player.unsync();
+      } catch {}
+      try {
+        h.disposers.forEach((d) => d());
+      } catch {}
     });
     this.playersBySegment.clear();
 
