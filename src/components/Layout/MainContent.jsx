@@ -8,7 +8,6 @@ import {AppContext} from "../../context/AppContext";
 import EffectsMenu from "./Effects/EffectsMenu";
 import styles from "./MainContent.module.css";
 import "./MainContent.css";
-import { progressStore } from "../../playback/progressStore";
 
 /**
  * MainContent component for the application layout.
@@ -37,10 +36,10 @@ function MainContent({
   confirmEdit,
   onTrimCancel,
   selectedTrackId,
+  setSelectedTrackId,
   onTrimTrackSelect,
 }) {
-  const {selectedTrackId, setSelectedTrackId, isEffectsMenuOpen} =
-    useContext(AppContext);
+  const {isEffectsMenuOpen} = useContext(AppContext);
 
   // Default visible window length (in ms) before horizontal scrolling is needed
   // Timeline scale is driven by pixels-per-second instead of a fixed window length
@@ -59,8 +58,19 @@ function MainContent({
   const scrollAreaRef = useRef(null);
   const [draggingHandle, setDraggingHandle] = useState(null);
 
-  // Deselect when clicking background
-  const handleBackgroundClick = () => {
+  // Background click: only clear selection when NOT in trim/cut mode,
+  // and only if the click was NOT inside a track row.
+  const handleBackgroundClick = (e) => {
+    // If we're in trim/cut mode, never clear selection via background click
+    if (selectMode) return;
+
+    // If click happened inside a track row, ignore
+    const target = e.target;
+    if (target && target.closest && target.closest(".track-wrapper")) {
+      return;
+    }
+
+    // Real empty-background click -> clear selected track
     setSelectedTrackId(null);
   };
 
@@ -421,7 +431,7 @@ function MainContent({
                 >
                   {tracks.map((track, index) => {
                     const isTrimSelected = selectMode && selectedTrackId === track.id;
-
+                    const isTrackSelected = selectedTrackId === track.id;
                     // Build row classes so we can show hover + selected states
                     const rowClasses = [
                       "track-wrapper",
@@ -523,6 +533,8 @@ function MainContent({
                           track={track}
                           trackIndex={index}
                           totalTracks={tracks.length}
+                          isSelected={isTrackSelected}
+                          onSelect={setSelectedTrackId}
                           showTitle={true}
                           onMute={onMute}
                           onSolo={onSolo}
@@ -534,24 +546,6 @@ function MainContent({
                       </div>
                     );
                   })}
-                  {tracks.map((track, index) => (
-                    <div key={track.id} className="track-wrapper">
-                      <TrackLane
-                        track={track}
-                        trackIndex={index}
-                        totalTracks={tracks.length}
-                        isSelected={track.id === selectedTrackId}
-                        onSelect={(id) => setSelectedTrackId(id)}
-                        showTitle={true}
-                        onMute={onMute}
-                        onSolo={onSolo}
-                        onDelete={onDelete}
-                        totalLengthMs={totalLengthMs}
-                        timelineWidth={timelineMetrics.widthPx}
-                        rowWidthPx={timelineMetrics.rowWidthPx}
-                      />
-                    </div>
-                  ))}
                 </div>
               </div>
             </div>

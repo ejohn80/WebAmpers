@@ -39,8 +39,8 @@ function DropdownPortal({
   onCut,
 }) {
   const navigate = useNavigate();
-  const {userData} = useContext(AppContext);
-
+  const {userData, selectedTrackId} = useContext(AppContext);
+  const canTrimOrCut = !!selectedTrackId;
   const [activeDropdown, setActiveDropdown] = useState(null);
   const [position, setPosition] = useState({top: 0, left: 0});
 
@@ -392,10 +392,12 @@ function DropdownPortal({
           </span>
         </a>
         <a
-          className={`dropdown-item ${!onCut ? "dropdown-item-disabled" : ""}`}
+          className={`dropdown-item ${
+            !onCut || !canTrimOrCut ? "dropdown-item-disabled" : ""
+          }`}
           onClick={(e) => {
             e.preventDefault();
-            if (!onCut) return;
+            if (!onCut || !canTrimOrCut) return;
             onCut();
           }}
         >
@@ -413,10 +415,13 @@ function DropdownPortal({
         </a>
         <a
           href="#"
-          className={`dropdown-item ${!onTrim ? "dropdown-item-disabled" : ""}`}
+          className={`dropdown-item ${
+            !onTrim || !canTrimOrCut ? "dropdown-item-disabled" : ""
+          }`}
           onClick={(e) => {
             e.preventDefault();
-            if (onTrim) onTrim();
+            if (!onTrim || !canTrimOrCut) return;
+            onTrim();
           }}
         >
           <span
