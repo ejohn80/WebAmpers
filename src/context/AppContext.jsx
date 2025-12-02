@@ -1,4 +1,11 @@
-import {createContext, useState, useEffect, useCallback, useMemo} from "react";
+import {
+  createContext,
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+} from "react";
 import {useUserData} from "../hooks/useUserData";
 import {
   createDefaultEffects,
@@ -113,6 +120,8 @@ const AppContextProvider = ({children}) => {
   // Active session state with localStorage persistence
   const [activeSession, setActiveSession] = useState(getInitialActiveSession);
 
+  const lastSessionRef = useRef(activeSession);
+
   // Master Effect State (Global Session Effects)
   const [effects, setEffects] = useState(() =>
     loadEffectParametersForSession(activeSession)
@@ -151,20 +160,31 @@ const AppContextProvider = ({children}) => {
     }
 
     const track = audioManager.getTrack(selectedTrackId);
-    if (track) {
-      if (!track.effects) {
-        track.effects = createDefaultEffects();
-      }
-      if (!track.activeEffectsList) {
-        track.activeEffectsList = [];
-      }
-      setSelectedTrackEffects({...track.effects});
-      setSelectedTrackActiveEffects([...track.activeEffectsList]);
-    } else {
+    if (!track) {
       setSelectedTrackEffects(null);
       setSelectedTrackActiveEffects([]);
+      return;
     }
-  }, [selectedTrackId]);
+
+    if (!track.effects) track.effects = createDefaultEffects();
+    if (!track.activeEffectsList) track.activeEffectsList = [];
+
+    setSelectedTrackEffects({...track.effects});
+    setSelectedTrackActiveEffects([...track.activeEffectsList]);
+
+    // Apply only enabled effects to engine
+    const trackEnabled = enabledEffectsByTrack[selectedTrackId] || {};
+    const filteredEffects = {};
+    Object.keys(track.effects).forEach((id) => {
+      if (trackEnabled[id] !== false) {
+        filteredEffects[id] = track.effects[id];
+      }
+    });
+
+    if (engineRef?.current?.setTrackEffects) {
+      engineRef.current.setTrackEffects(selectedTrackId, filteredEffects);
+    }
+  }, [selectedTrackId, enabledEffectsByTrack, engineRef]);
 
   // Update effect when selection changes
   useEffect(() => {
@@ -514,7 +534,6 @@ const AppContextProvider = ({children}) => {
     dbManager.updateTrack(track).catch((e) => console.error(e));
   }, [selectedTrackId, engineRef]);
 
-  // Persist activeSession (ID) and load session data (clear & reapply to engine)
   useEffect(() => {
     if (activeSession === undefined) return;
 
@@ -529,79 +548,84 @@ const AppContextProvider = ({children}) => {
       }
     } catch {}
 
+    // Only run this block once per actual session change
+    if (lastSessionRef.current !== activeSession) {
+      lastSessionRef.current = activeSession;
+
+      // POLL for first track (audioManager.tracks may be populated asynchronously)
+      let cancelled = false;
+      const maxAttempts = 20;
+      const intervalMs = 50;
+      let attempts = 0;
+
+      const trySelectFirst = () => {
+        attempts++;
+        const firstTrackId = audioManager.tracks?.[0]?.id ?? null;
+
+        if (firstTrackId) {
+          // setSelection — this will trigger your existing refreshSelectedTrackEffects effect
+          setSelectedTrackId(firstTrackId);
+          setSelectedTrackEffects(null);
+          setSelectedTrackActiveEffects([]);
+        } else if (!cancelled && attempts < maxAttempts) {
+          setTimeout(trySelectFirst, intervalMs);
+        } else {
+          // give up — no tracks available right now
+        }
+      };
+
+      trySelectFirst();
+
+      // cleanup on unmount / session change
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    // --- session-level loading (master effects / enabled map) ---
     if (typeof activeSession === "number") {
-      // Load session-level blobs
       const loadedEffectsParams =
         loadEffectParametersForSession(activeSession) || createDefaultEffects();
       setEffects(loadedEffectsParams);
 
       const loadedEnabledEffects =
         loadEnabledEffectsForSession(activeSession) || {};
-      // loadedEnabledEffects is expected to be the per-track map already (sessions/sessionId => {trackId: {...}})
       setEnabledEffectsByTrack(loadedEnabledEffects);
 
-      // If engine is available, clear previous state and reapply filtered values immediately
+      // Apply master-level session effects and per-track engine state.
+      // NOTE: avoid setting selectedTrackId here (we already did above).
       if (engineRef?.current) {
         try {
-          // 1) Clear master-level effects (so we don't leave stale keys)
-          if (typeof engineRef.current.applyEffects === "function") {
-            engineRef.current.applyEffects({}); // replace master effects with empty map
-          }
+          // Clear master-level effects
+          engineRef.current.applyEffects?.({});
 
-          // 2) If the engine exposes per-track state and a setTrackEffects, try to clear all tracks.
-          //    We don't know all track IDs here, but clearing the selectedTrackId prevents the "stuck" case.
-          if (
-            selectedTrackId &&
-            typeof engineRef.current.setTrackEffects === "function"
-          ) {
-            // Clear per-track effects for selectedTrack to remove any leftover values
-            try {
-              engineRef.current.setTrackEffects(selectedTrackId, {});
-            } catch (e) {
-              // If clearing isn't supported, ignore and continue to reapply below
-            }
-          }
-
-          // 3) Apply session MASTER effects filtered by loadedEnabledEffects
-          //    (undefined in loadedEnabledEffects === enabled)
-          const masterFiltered = {};
-          Object.keys(loadedEffectsParams).forEach((id) => {
-            if (loadedEnabledEffects[id] !== false) {
-              masterFiltered[id] = loadedEffectsParams[id];
-            }
-          });
-          if (typeof engineRef.current.applyEffects === "function") {
-            engineRef.current.applyEffects(masterFiltered);
-          }
-
-          // 4) Also re-apply the currently selected TRACK's effects filtered by loadedEnabledEffects,
-          //    because per-track params may differ from session master params.
-          if (
-            selectedTrackId &&
-            typeof engineRef.current.setTrackEffects === "function"
-          ) {
-            const track = audioManager.getTrack(selectedTrackId);
-            const trackEffects =
-              track && track.effects ? track.effects : loadedEffectsParams;
-            const trackFiltered = {};
-            Object.keys(trackEffects).forEach((id) => {
-              if (loadedEnabledEffects[id] !== false) {
-                trackFiltered[id] = trackEffects[id];
-              }
-            });
-
-            engineRef.current.setTrackEffects(selectedTrackId, trackFiltered);
-          }
-
-          console.log(
-            "[Session Change] engine cleared and session-filtered effects applied"
+          // Apply master session effects (only enabled)
+          const masterFiltered = Object.fromEntries(
+            Object.entries(loadedEffectsParams).filter(
+              ([id]) => loadedEnabledEffects[id] !== false
+            )
           );
+          engineRef.current.applyEffects?.(masterFiltered);
+
+          // Reapply effects for all tracks currently present (if engine supports it)
+          audioManager.tracks.forEach((track) => {
+            if (!track?.id) return;
+
+            const trackEnabled = loadedEnabledEffects[track.id] || {};
+            const filteredEffects = Object.fromEntries(
+              Object.entries(track.effects ?? loadedEffectsParams).filter(
+                ([effectId]) => trackEnabled[effectId] !== false
+              )
+            );
+
+            engineRef.current.setTrackEffects?.(track.id, filteredEffects);
+          });
         } catch (e) {
           console.error("[Session Change] Failed to clear/reapply effects:", e);
         }
       }
     }
-  }, [activeSession, selectedTrackId, engineRef]);
+  }, [activeSession, engineRef]); // <-- NO selectedTrackId here
 
   // Persist enabled effects and Apply Master Effect Parameter Values to Engine
   useEffect(() => {
