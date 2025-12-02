@@ -72,9 +72,8 @@
   top: 0;
   bottom: 0;
   pointer-events: none; /* don't block clicking on tracks */
-  z-index: 9;          /* under handles & timeline header, above track bg */
+  z-index: 9; /* under handles & timeline header, above track bg */
 }
-
 
 /* Trim selection side handles */
 .trim-handle {
@@ -97,7 +96,7 @@
 /* Trim controls (✓ / ✕) */
 .trim-controls {
   position: absolute;
-  top: 4x;              /* tweak if you want it higher/lower */
+  top: 4px; /* tweak if you want it higher/lower */
   transform: translateX(-66px); /* small offset to the right of the handle */
   display: flex;
   gap: 4px;
@@ -131,7 +130,9 @@
 .track-wrapper-trim-hover {
   cursor: pointer;
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.28) inset;
-  transition: box-shadow 0.12s ease-out, background-color 0.12s ease-out;
+  transition:
+    box-shadow 0.12s ease-out,
+    background-color 0.12s ease-out;
 }
 
 /* Slightly stronger highlight on hover */
@@ -304,7 +305,7 @@
   border-left: 2px solid rgba(255, 215, 0, 0.9);
   border-right: 2px solid rgba(255, 215, 0, 0.9);
   pointer-events: none;
-  z-index: 14
+  z-index: 14;
 }
 
 .empty-state {
