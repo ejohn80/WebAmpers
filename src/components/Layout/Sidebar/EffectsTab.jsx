@@ -1,4 +1,4 @@
-import {useContext, useCallback, useState, useRef} from "react";
+import {useContext, useCallback, useState, useRef, useEffect} from "react";
 import {AppContext} from "../../../context/AppContext";
 import styles from "../Layout.module.css";
 import {
@@ -12,7 +12,7 @@ import {
 
 function EffectsTab() {
   const {
-    effects,
+    selectedTrackEffects,
     updateEffect,
     resetEffect,
     resetAllEffects,
@@ -22,14 +22,17 @@ function EffectsTab() {
     isEffectsMenuOpen,
     removeEffect,
     activeEffects,
-    enabledEffects, // Add this back
+    enabledEffects,
     toggleEffect,
     toggleAllEffects,
+    selectedTrackId,
   } = useContext(AppContext);
 
-  const [draggingSlider, setDraggingSlider] = useState(null);
+  // Local state for smooth dragging
   const [localValues, setLocalValues] = useState({});
-  const pendingUpdates = useRef(new Map());
+  const [draggingSlider, setDraggingSlider] = useState(null);
+  const updateTimeoutRef = useRef({});
+  const lastTrackIdRef = useRef(null);
 
   const effectConfigs = [
     {
@@ -154,12 +157,11 @@ function EffectsTab() {
     },
   ];
 
-  // Filter effects to only show active ones and maintain addition order
-  const activeEffectConfigs = activeEffects
+  // Filter effects to only show active ones based on the context list
+  const activeEffectConfigs = (activeEffects || [])
     .map((effectId) => effectConfigs.find((config) => config.name === effectId))
     .filter(Boolean);
 
-  // Toggle effects menu
   const toggleEffectsMenu = () => {
     if (isEffectsMenuOpen) {
       closeEffectsMenu();
@@ -168,50 +170,76 @@ function EffectsTab() {
     }
   };
 
-  // Update local state immediately for smooth UI
+  const getCurrentValue = (config) => {
+    const effectName = config.name;
+
+    // Priority 1: If actively dragging, use local value
+    if (
+      draggingSlider === effectName &&
+      localValues[effectName] !== undefined
+    ) {
+      return localValues[effectName];
+    }
+
+    // Priority 2: If we have a local value (from recent change), use it
+    if (localValues[effectName] !== undefined) {
+      return localValues[effectName];
+    }
+
+    // Priority 3: Use the track's persisted value
+    if (
+      selectedTrackEffects &&
+      selectedTrackEffects[effectName] !== undefined
+    ) {
+      return selectedTrackEffects[effectName];
+    }
+
+    // Priority 4: Default value
+    return config.default;
+  };
+
+  // Update local state immediately and debounce the persist
   const handleChange = useCallback(
     (name) => (e) => {
-      const raw = e.target.value;
-      const num = Number(raw);
-      setLocalValues((prev) => ({...prev, [name]: num}));
-      pendingUpdates.current.set(name, num);
-    },
-    []
-  );
+      const value = Number(e.target.value);
 
-  // Apply all pending effects when user releases slider
-  const handleSliderEnd = useCallback(
-    (name) => () => {
-      const pendingValue = pendingUpdates.current.get(name);
-      if (pendingValue !== undefined) {
-        updateEffect(name, pendingValue);
-        pendingUpdates.current.delete(name);
+      // ALWAYS update local state immediately for smooth UI
+      setLocalValues((prev) => ({...prev, [name]: value}));
+
+      // Clear any existing timeout for this effect
+      if (updateTimeoutRef.current[name]) {
+        clearTimeout(updateTimeoutRef.current[name]);
       }
-      setDraggingSlider(null);
+
+      // Debounce the actual update
+      updateTimeoutRef.current[name] = setTimeout(() => {
+        updateEffect(name, value);
+        delete updateTimeoutRef.current[name];
+      }, 100);
     },
     [updateEffect]
   );
+
+  const handleSliderStart = useCallback((name) => {
+    setDraggingSlider(name);
+  }, []);
+
+  const handleSliderEnd = useCallback(() => {
+    // Keep dragging state for a moment to prevent flicker
+    setTimeout(() => {
+      setDraggingSlider(null);
+    }, 200);
+  }, []);
 
   const getSliderFillPercentage = (config, value) => {
     const currentValue = value ?? config.default;
     return ((currentValue - config.min) / (config.max - config.min)) * 100;
   };
 
-  // Use local value if dragging, otherwise use actual effect value
-  const getCurrentValue = (config) => {
-    if (
-      draggingSlider === config.name &&
-      localValues[config.name] !== undefined
-    ) {
-      return localValues[config.name];
-    }
-    return effects[config.name] ?? config.default;
-  };
-
   // Check if effect is at default value
   const isAtDefaultValue = (config) => {
     const currentValue = getCurrentValue(config);
-    return currentValue === config.default;
+    return Math.abs(currentValue - config.default) < 0.01;
   };
 
   // Check if ALL effects are at their default values
@@ -235,9 +263,63 @@ function EffectsTab() {
   // Check if there are any active effects
   const hasActiveEffects = activeEffectConfigs.length > 0;
 
+  // Clear local values when track changes
+  useEffect(() => {
+    if (selectedTrackId !== lastTrackIdRef.current) {
+      setLocalValues({});
+      lastTrackIdRef.current = selectedTrackId;
+    }
+  }, [selectedTrackId]);
+
+  // Sync local values with track effects after updates settle
+  useEffect(() => {
+    if (draggingSlider) return;
+    if (Object.keys(updateTimeoutRef.current).length > 0) return;
+
+    const timer = setTimeout(() => {
+      if (
+        !draggingSlider &&
+        Object.keys(updateTimeoutRef.current).length === 0
+      ) {
+        setLocalValues({});
+      }
+    }, 2000);
+
+    return () => clearTimeout(timer);
+  }, [selectedTrackEffects, draggingSlider]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    const timeoutId = updateTimeoutRef.current;
+    return () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
+  }, []);
+
+  if (!selectedTrackId) {
+    return (
+      <div className={styles.container}>
+        <div
+          style={{
+            padding: "16px",
+            color: "#ccc",
+            textAlign: "center",
+            minHeight: "100px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          Please select an audio track to manage effects.
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={styles.container}>
-      {/* Add Effects Button - toggles the menu */}
       <button
         className={`${styles.addEffectsButton} ${isEffectsMenuOpen ? styles.addEffectsButtonActive : ""}`}
         onClick={toggleEffectsMenu}
@@ -356,10 +438,10 @@ function EffectsTab() {
                   step={config.step}
                   value={currentValue}
                   onChange={handleChange(config.name)}
-                  onMouseDown={() => setDraggingSlider(config.name)}
-                  onMouseUp={handleSliderEnd(config.name)}
-                  onTouchStart={() => setDraggingSlider(config.name)}
-                  onTouchEnd={handleSliderEnd(config.name)}
+                  onMouseDown={() => handleSliderStart(config.name)}
+                  onMouseUp={() => handleSliderEnd(config.name)}
+                  onTouchStart={() => handleSliderStart(config.name)}
+                  onTouchEnd={() => handleSliderEnd(config.name)}
                   className={styles.sliderInput}
                   disabled={!isEnabled}
                 />
@@ -369,7 +451,7 @@ function EffectsTab() {
                 <span
                   className={`${styles.value} ${!isEnabled ? styles.valueDisabled : ""}`}
                 >
-                  {currentValue}
+                  {currentValue.toFixed(config.step < 1 ? 1 : 0)}
                   {config.unit}
                 </span>
                 <div className={styles.controls}>
@@ -380,7 +462,13 @@ function EffectsTab() {
                     onClick={
                       isDefault || !isEnabled
                         ? undefined
-                        : () => resetEffect(config.name, config.default)
+                        : () => {
+                            setLocalValues((prev) => ({
+                              ...prev,
+                              [config.name]: config.default,
+                            }));
+                            resetEffect(config.name, config.default);
+                          }
                     }
                     disabled={isDefault || !isEnabled}
                   >
@@ -392,7 +480,6 @@ function EffectsTab() {
           );
         })}
 
-        {/* Show message when no effects are active */}
         {activeEffectConfigs.length === 0 && (
           <div className={styles.noEffectsMessage}>
             No effects yet. Add one to get started
