@@ -754,8 +754,9 @@ class DBManager {
       };
 
       request.onerror = (event) => {
-        console.error("Error creating asset:", event.target.error);
-        reject(new Error("Could not create asset"));
+        const error = event.target.error;
+        console.error("Error creating asset:", error);
+        reject(error || new Error("Could not create asset"));
       };
     });
   }
