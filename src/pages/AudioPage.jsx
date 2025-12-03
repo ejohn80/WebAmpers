@@ -244,7 +244,9 @@ function AudioPage() {
               (seg) => seg?.buffer?.channels
             );
             if (fallbackSerialized?.buffer) {
-              const audioBuffer = deserializeAudioBuffer(fallbackSerialized.buffer);
+              const audioBuffer = deserializeAudioBuffer(
+                fallbackSerialized.buffer
+              );
               primaryBuffer = new Tone.ToneAudioBuffer(audioBuffer);
             }
           }
@@ -259,7 +261,8 @@ function AudioPage() {
           const trackData = {
             ...savedTrack,
             buffer: primaryBuffer,
-            segments: hydratedSegments.length > 0 ? hydratedSegments : undefined,
+            segments:
+              hydratedSegments.length > 0 ? hydratedSegments : undefined,
             effects: savedTrack.effects,
           };
 
@@ -438,9 +441,8 @@ function AudioPage() {
       }
 
       // Get the native AudioBuffer from toneBuffer for metadata
-      const audioBuffer = typeof toneBuffer.get === "function"
-        ? toneBuffer.get()
-        : null;
+      const audioBuffer =
+        typeof toneBuffer.get === "function" ? toneBuffer.get() : null;
 
       if (!audioBuffer) {
         console.error("Tone buffer did not provide an AudioBuffer");

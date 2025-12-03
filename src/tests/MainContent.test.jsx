@@ -137,8 +137,8 @@ describe("MainContent multi-track layout", () => {
 
     const [{timelineWidth, rowWidthPx}] = trackLaneMock.mock.calls.slice(-1)[0];
 
-  expect(timelineWidth).toBeCloseTo(7080, 0); // 708px available width * (600s / 60s)
-  expect(rowWidthPx).toBeCloseTo(7272, 0); // add left offset (180 + 12)
+    expect(timelineWidth).toBeCloseTo(7080, 0); // 708px available width * (600s / 60s)
+    expect(rowWidthPx).toBeCloseTo(7272, 0); // add left offset (180 + 12)
 
     const leftOffset = 180 + 12;
     const pxPerMs = timelineWidth / 600000;

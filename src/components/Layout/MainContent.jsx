@@ -58,10 +58,7 @@ function MainContent({
 
   useEffect(() => {
     const lengthMs = Math.max(1, totalLengthMs || 0);
-    const visibleWindowMs = Math.max(
-      1,
-      Math.min(lengthMs, DEFAULT_VISIBLE_MS)
-    );
+    const visibleWindowMs = Math.max(1, Math.min(lengthMs, DEFAULT_VISIBLE_MS));
     const availableWidthPx = Math.max(
       1,
       scrollAreaWidth - (TRACK_CONTROLS_WIDTH + TRACK_CONTROLS_GAP)

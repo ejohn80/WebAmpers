@@ -40,9 +40,7 @@ class DBManager {
       for (let i = 0; i < numberOfChannels; i++) {
         const channel = buffer.channels[i] || [];
         channels.push(
-          channel instanceof Float32Array
-            ? channel
-            : new Float32Array(channel)
+          channel instanceof Float32Array ? channel : new Float32Array(channel)
         );
       }
     } else {
