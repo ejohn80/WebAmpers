@@ -70,13 +70,13 @@ function MainContent({
   }, [timelineContentWidth, scrollAreaWidth]);
 
   // === OPTIMIZED SCROLLING LOGIC ===
-  // This replaces the old state-based scrolling. 
+  // This replaces the old state-based scrolling.
   // It reads directly from the store and manipulates the DOM.
   useEffect(() => {
     const unsubscribe = progressStore.subscribe(({ms}) => {
       // If follow mode is off, do nothing
       if (!followPlayhead) return;
-      
+
       const node = scrollAreaRef.current;
       if (!node) return;
 
@@ -84,7 +84,7 @@ function MainContent({
       if (lengthMs === 0 || timelineMetrics.widthPx === 0) return;
 
       const pxPerMs = timelineMetrics.widthPx / lengthMs;
-      
+
       // Calculate where the playhead is in pixels
       const playheadX =
         timelineMetrics.leftOffsetPx +
@@ -105,11 +105,7 @@ function MainContent({
     });
 
     return unsubscribe;
-  }, [
-    followPlayhead, 
-    totalLengthMs, 
-    timelineMetrics 
-  ]);
+  }, [followPlayhead, totalLengthMs, timelineMetrics]);
 
   useEffect(() => {
     const lengthMs = Math.max(1, totalLengthMs || 0);

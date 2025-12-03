@@ -16,7 +16,7 @@ export default function GlobalPlayhead({totalLengthMs = 0, timelineWidth = 0}) {
       if (timelineWidth <= 0) return;
 
       const denom = totalLengthMs > 0 ? totalLengthMs : lengthMs || 0;
-      
+
       // Calculate position
       const p = denom > 0 ? Math.max(0, Math.min(1, ms / denom)) : 0;
       const leftPx = p * timelineWidth;
@@ -30,10 +30,10 @@ export default function GlobalPlayhead({totalLengthMs = 0, timelineWidth = 0}) {
 
   // Initial style sets left to 0, movement is handled by transform in the effect
   return (
-    <div 
-      ref={playheadRef} 
-      className="global-playhead" 
-      style={{left: 0, willChange: 'transform'}} 
+    <div
+      ref={playheadRef}
+      className="global-playhead"
+      style={{left: 0, willChange: "transform"}}
     />
   );
 }
