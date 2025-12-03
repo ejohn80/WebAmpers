@@ -223,27 +223,94 @@ function AudioPage() {
         // Clear current tracks
         audioManager.clearAllTracks();
 
+        const localAssetBufferCache = new Map();
+        const getToneBufferForAsset = async (assetId) => {
+          if (!assetId) return null;
+
+          if (assetBufferCache.has(assetId)) {
+            return assetBufferCache.get(assetId);
+          }
+
+          if (localAssetBufferCache.has(assetId)) {
+            return localAssetBufferCache.get(assetId);
+          }
+
+          try {
+            const asset = await dbManager.getAsset(assetId);
+            const toneBuffer = await buildToneBufferFromAssetRecord(asset);
+            if (toneBuffer) {
+              assetBufferCache.set(assetId, toneBuffer);
+              localAssetBufferCache.set(assetId, toneBuffer);
+              return toneBuffer;
+            }
+          } catch (e) {
+            console.warn(`Failed to load asset ${assetId} for hydration`, e);
+          }
+
+          localAssetBufferCache.set(assetId, null);
+          return null;
+        };
+
         // Reconstruct tracks from DB
         for (const savedTrack of savedTracks) {
-          const maybeBufferData = savedTrack.segments?.[0]?.buffer;
+          const hydratedSegments = [];
+          if (Array.isArray(savedTrack.segments)) {
+            for (const segment of savedTrack.segments) {
+              const segAssetId = segment.assetId ?? savedTrack.assetId ?? null;
 
-          if (maybeBufferData && maybeBufferData.channels) {
-            const audioBuffer = deserializeAudioBuffer(maybeBufferData);
+              let segmentToneBuffer = await getToneBufferForAsset(segAssetId);
+              if (!segmentToneBuffer && segment?.buffer?.channels) {
+                const audioBuffer = deserializeAudioBuffer(segment.buffer);
+                segmentToneBuffer = new Tone.ToneAudioBuffer(audioBuffer);
+              }
 
-            const trackData = {
-              ...savedTrack,
-              buffer: new Tone.ToneAudioBuffer(audioBuffer),
-              effects: savedTrack.effects,
-              assetId: savedTrack.assetId, // Preserve assetId from DB
-            };
+              if (!segmentToneBuffer) {
+                console.warn(
+                  `Skipping segment ${segment.id} on track ${savedTrack.id} - missing buffer`
+                );
+                continue;
+              }
 
-            const createdTrack = audioManager.addTrackFromBuffer(trackData);
-
-            // Ensure assetId is set on the created track
-            if (createdTrack && savedTrack.assetId) {
-              createdTrack.assetId = savedTrack.assetId;
+              hydratedSegments.push({
+                ...segment,
+                assetId: segAssetId,
+                buffer: segmentToneBuffer,
+              });
             }
           }
+
+          let primaryBuffer = hydratedSegments[0]?.buffer ?? null;
+          if (!primaryBuffer && savedTrack.assetId) {
+            primaryBuffer = await getToneBufferForAsset(savedTrack.assetId);
+          }
+          if (!primaryBuffer && savedTrack.segments?.length) {
+            const fallbackSerialized = savedTrack.segments.find(
+              (seg) => seg?.buffer?.channels
+            );
+            if (fallbackSerialized?.buffer) {
+              const audioBuffer = deserializeAudioBuffer(
+                fallbackSerialized.buffer
+              );
+              primaryBuffer = new Tone.ToneAudioBuffer(audioBuffer);
+            }
+          }
+
+          if (!primaryBuffer) {
+            console.warn(
+              `[AudioPage] Skipping track ${savedTrack.id} - could not resolve buffer`
+            );
+            continue;
+          }
+
+          const trackData = {
+            ...savedTrack,
+            buffer: primaryBuffer,
+            segments:
+              hydratedSegments.length > 0 ? hydratedSegments : undefined,
+            effects: savedTrack.effects,
+          };
+
+          audioManager.addTrackFromBuffer(trackData);
         }
 
         setTracks([...audioManager.tracks]);
@@ -401,58 +468,47 @@ function AudioPage() {
       if (toneBuffer) {
         console.log(`Using cached buffer for asset ${assetId}`);
       } else {
-        console.log(`Creating new buffer for asset ${assetId}`);
+        console.log(`Decoding buffer for asset ${assetId}`);
+        toneBuffer = await buildToneBufferFromAssetRecord(asset);
 
-        const {buffer: serializedBuffer} = asset;
-
-        if (!serializedBuffer || !serializedBuffer.channels) {
+        if (!toneBuffer) {
           console.error("Asset has no valid buffer data");
           alert("Asset has no valid audio buffer data");
           return;
         }
 
-        console.log("Deserializing buffer:", {
-          channels: serializedBuffer.numberOfChannels,
-          length: serializedBuffer.length,
-          sampleRate: serializedBuffer.sampleRate,
-        });
-
-        // Reconstruct AudioBuffer from serialized data
-        const audioBuffer = deserializeAudioBuffer(serializedBuffer);
-        console.log("AudioBuffer reconstructed successfully");
-
-        // Create a Tone.js buffer and cache it
-        toneBuffer = new Tone.ToneAudioBuffer(audioBuffer);
         assetBufferCache.set(assetId, toneBuffer);
         console.log(
           `Cached buffer for asset ${assetId}, cache size: ${assetBufferCache.size}`
         );
       }
 
-      // Get the serialized buffer for DB storage
-      const {buffer: serializedBuffer} = asset;
-
       // Get the native AudioBuffer from toneBuffer for metadata
-      const audioBuffer = toneBuffer.get();
+      const audioBuffer =
+        typeof toneBuffer.get === "function" ? toneBuffer.get() : null;
 
-      // Save to database first with current session
+      if (!audioBuffer) {
+        console.error("Tone buffer did not provide an AudioBuffer");
+        alert("Asset could not be decoded for playback");
+        return;
+      }
+
+      const segmentId = `seg_${Date.now()}`;
+      const durationSeconds = audioBuffer.duration;
+      const durationMs = Math.round(durationSeconds * 1000);
+
+      // Save to database first with current session to get the DB-assigned ID
       const trackData = {
         name: asset.name,
         color: `hsl(${Math.random() * 360}, 70%, 50%)`,
         assetId: assetId,
         segments: [
           {
-            id: `seg_${Date.now()}`,
-            buffer: {
-              numberOfChannels: audioBuffer.numberOfChannels,
-              length: audioBuffer.length,
-              sampleRate: audioBuffer.sampleRate,
-              duration: audioBuffer.duration,
-              channels: serializedBuffer.channels,
-            },
+            id: segmentId,
+            assetId,
             offset: 0,
-            duration: audioBuffer.duration,
-            durationMs: Math.round(audioBuffer.duration * 1000),
+            duration: durationSeconds,
+            durationMs,
             startOnTimelineMs: 0,
             startInFileMs: 0,
           },
@@ -477,11 +533,12 @@ function AudioPage() {
         buffer: toneBuffer,
         segments: [
           {
-            id: `seg_${Date.now()}`,
+            id: segmentId,
+            assetId,
             buffer: toneBuffer,
             offset: 0,
-            duration: audioBuffer.duration,
-            durationMs: Math.round(audioBuffer.duration * 1000),
+            duration: durationSeconds,
+            durationMs,
             startOnTimelineMs: 0,
             startInFileMs: 0,
           },
