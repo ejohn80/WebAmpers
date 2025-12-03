@@ -280,15 +280,6 @@ function TrackLane({
                 }}
               >
                 <div className="tracklane-segment">
-                  <div className="segment-meta">
-                    <div className="segment-name">
-                      {seg.id ?? seg.fileUrl ?? "segment"}
-                    </div>
-                    <div className="segment-duration">
-                      {seg.durationMs ? `${Math.round(seg.durationMs)} ms` : ""}
-                    </div>
-                  </div>
-
                   <div className="segment-waveform">
                     {audioBuffer ? (
                       <Waveform
