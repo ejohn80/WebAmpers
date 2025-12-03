@@ -9,6 +9,11 @@ function Header({
   tracks,
   totalLengthMs,
   onExportComplete,
+  onCutTrack,
+  onCopyTrack,
+  onPasteTrack,
+  selectedTrackId,
+  hasClipboard,
 }) {
   const navigate = useNavigate();
   const {userData, loading} = useUserData();
@@ -26,6 +31,11 @@ function Header({
             onExportComplete={onExportComplete}
             onImportSuccess={onImportSuccess}
             onImportError={onImportError}
+            onCutTrack={onCutTrack}
+            onCopyTrack={onCopyTrack}
+            onPasteTrack={onPasteTrack}
+            selectedTrackId={selectedTrackId}
+            hasClipboard={hasClipboard}
           />
         </div>
 
