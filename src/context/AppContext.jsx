@@ -480,16 +480,30 @@ const AppContextProvider = ({children}) => {
     if (!track.enabledEffects) track.enabledEffects = {};
     if (!track.activeEffectsList) track.activeEffectsList = [];
 
-    // Determine if any effect is currently enabled
-    const anyEnabled = track.activeEffectsList.some(
+    // Get effects to toggle (excluding pan)
+    const effectsToToggle = track.activeEffectsList.filter(
+      (effectId) => effectId !== "pan"
+    );
+
+    // If no effects to toggle (or only pan exists), return
+    if (effectsToToggle.length === 0) return;
+
+    // Determine if any of the toggleable effects are currently enabled
+    const anyEnabled = effectsToToggle.some(
       (effectId) => track.enabledEffects[effectId] !== false
     );
 
-    // Toggle all active effects
-    const newEnabledEffects = {};
-    track.activeEffectsList.forEach((effectId) => {
+    // Toggle all toggleable effects
+    const newEnabledEffects = {...track.enabledEffects};
+    effectsToToggle.forEach((effectId) => {
       newEnabledEffects[effectId] = !anyEnabled;
     });
+
+    // Preserve pan's enabled state (pan is always enabled in UI, but we keep its state)
+    // If pan doesn't have a state yet, set it to true (enabled)
+    if (newEnabledEffects.pan === undefined) {
+      newEnabledEffects.pan = true;
+    }
 
     track.enabledEffects = newEnabledEffects;
 

@@ -253,10 +253,17 @@ function EffectsTab() {
   // Check if effect is enabled (default to true if not set)
   const isEffectEnabled = (effectId) => trackEnabled[effectId] !== false;
 
-  // Check if any effects are enabled (for master toggle)
-  const areAnyEffectsEnabled = activeEffectConfigs.some((config) =>
-    isEffectEnabled(config.name)
-  );
+  // Check if any effects are enabled (for master toggle) - exclude pan
+  const areAnyEffectsEnabled = activeEffectConfigs
+    .filter((config) => config.name !== "pan")
+    .some((config) => isEffectEnabled(config.name));
+
+  // Check if all effects are enabled - exclude pan
+  const areAllEffectsEnabled =
+    activeEffectConfigs.filter((config) => config.name !== "pan").length > 0 &&
+    activeEffectConfigs
+      .filter((config) => config.name !== "pan")
+      .every((config) => isEffectEnabled(config.name));
 
   // Check if there are any active effects
   const hasActiveEffects = activeEffectConfigs.length > 0;
@@ -372,12 +379,20 @@ function EffectsTab() {
           const currentValue = getCurrentValue(config);
           const fillPercentage = getSliderFillPercentage(config, currentValue);
           const isDefault = isAtDefaultValue(config);
-          const isEnabled = isEffectEnabled(config.name);
+
+          // Pan should always be considered enabled since it's not part of the toggle system
+          const isEnabled =
+            config.name === "pan" ? true : isEffectEnabled(config.name);
+
+          // For pan, we don't show disabled styling even if master toggle is off
+          const shouldShowDisabled = config.name === "pan" ? false : !isEnabled;
 
           return (
             <div
               key={config.name}
-              className={`${styles.effectItem} ${!isEnabled ? styles.effectDisabled : ""}`}
+              className={`${styles.effectItem} ${
+                shouldShowDisabled ? styles.effectDisabled : ""
+              }`}
             >
               {/* Close button in top right */}
               <button
@@ -388,8 +403,7 @@ function EffectsTab() {
                 <XIcon />
               </button>
 
-              {/* Individual Toggle Switch - top right, left of close button */}
-              {/* CONDITIONAL RENDERING: Don't show toggle for pan effect */}
+              {/* Individual Toggle Switch - don't show for pan */}
               {config.name !== "pan" && (
                 <button
                   className={styles.effectToggleButton}
@@ -413,17 +427,17 @@ function EffectsTab() {
                 <div className={styles.description}>{config.description}</div>
               </div>
 
-              {/* Custom Slider - disabled state */}
+              {/* Custom Slider - pan should never be disabled */}
               <div
                 className={`${styles.sliderContainer} ${
                   draggingSlider === config.name ? styles.dragging : ""
-                } ${!isEnabled ? styles.sliderDisabled : ""}`}
+                } ${config.name !== "pan" && !isEnabled ? styles.sliderDisabled : ""}`}
               >
                 <div className={styles.sliderTrack}></div>
                 <div
                   className={`${styles.sliderFill} ${
                     isDefault ? styles.default : styles.changed
-                  } ${!isEnabled ? styles.sliderFillDisabled : ""}`}
+                  } ${config.name !== "pan" && !isEnabled ? styles.sliderFillDisabled : ""}`}
                   style={{width: `${fillPercentage}%`}}
                 ></div>
                 <div
@@ -431,7 +445,7 @@ function EffectsTab() {
                     draggingSlider === config.name
                       ? styles.sliderKnobWrapperDragging
                       : ""
-                  } ${!isEnabled ? styles.sliderKnobDisabled : ""}`}
+                  } ${config.name !== "pan" && !isEnabled ? styles.sliderKnobDisabled : ""}`}
                   style={{left: `${fillPercentage}%`}}
                 >
                   <EffectsSliderKnob />
@@ -448,13 +462,17 @@ function EffectsTab() {
                   onTouchStart={() => handleSliderStart(config.name)}
                   onTouchEnd={() => handleSliderEnd(config.name)}
                   className={styles.sliderInput}
-                  disabled={!isEnabled}
+                  disabled={config.name !== "pan" && !isEnabled} // Pan is never disabled
                 />
               </div>
 
               <div className={styles.bottomRow}>
                 <span
-                  className={`${styles.value} ${!isEnabled ? styles.valueDisabled : ""}`}
+                  className={`${styles.value} ${
+                    config.name !== "pan" && !isEnabled
+                      ? styles.valueDisabled
+                      : ""
+                  }`}
                 >
                   {currentValue.toFixed(config.step < 1 ? 1 : 0)}
                   {config.unit}
@@ -463,9 +481,9 @@ function EffectsTab() {
                   <button
                     className={`${styles.button} ${
                       isDefault ? styles.buttonDisabled : ""
-                    } ${!isEnabled ? styles.buttonDisabled : ""}`}
+                    } ${config.name !== "pan" && !isEnabled ? styles.buttonDisabled : ""}`}
                     onClick={
-                      isDefault || !isEnabled
+                      isDefault || (config.name !== "pan" && !isEnabled)
                         ? undefined
                         : () => {
                             setLocalValues((prev) => ({
@@ -475,7 +493,9 @@ function EffectsTab() {
                             resetEffect(config.name, config.default);
                           }
                     }
-                    disabled={isDefault || !isEnabled}
+                    disabled={
+                      isDefault || (config.name !== "pan" && !isEnabled)
+                    }
                   >
                     Reset
                   </button>
