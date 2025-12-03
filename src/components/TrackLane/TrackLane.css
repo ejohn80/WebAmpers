@@ -26,6 +26,7 @@
     var(--timeline-left-offset) + var(--timeline-content-width, 100%)
   );
   position: relative;
+  contain: layout style;
 }
 
 .tracklane-main {
@@ -136,6 +137,8 @@
   border-radius: 4px;
   display: flex;
   flex-direction: column;
+  contain: strict;
+  will-change: transform; 
 }
 
 .tracklane-segment-positioned {
