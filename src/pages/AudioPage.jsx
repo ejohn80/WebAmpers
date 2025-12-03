@@ -120,8 +120,6 @@ function AudioPage() {
 
   // Helper function to generate a unique copy name
   const generateCopyName = (baseName) => {
-    // Remove any existing "Copy" suffix patterns to get the true base name
-    // Matches: "Copy", "Copy 2", "Copy 3", etc.
     const cleanName = baseName.replace(/\s+Copy(\s+\d+)?$/, "");
 
     // Get all existing track names

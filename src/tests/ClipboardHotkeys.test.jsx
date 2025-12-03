@@ -3,10 +3,6 @@ import {render, fireEvent, screen, waitFor} from "@testing-library/react";
 import {vi, describe, it, expect, beforeEach, afterEach} from "vitest";
 import {MemoryRouter} from "react-router-dom";
 
-// -------------------------------------------------------------------------
-// 1. Mocking External Libraries (Tone.js)
-// -------------------------------------------------------------------------
-
 vi.mock("tone", () => ({
   // Mock the context object used internally by Tone
   context: {
@@ -43,13 +39,6 @@ vi.mock("tone", () => ({
   start: vi.fn(() => Promise.resolve()),
 }));
 
-// -------------------------------------------------------------------------
-// 2. Mocking Stateful Managers (AudioManager, ClipboardManager, DBManager)
-// NOTE: We rely on the App/AudioPage component to handle the UI state (selection, tracks)
-// but use these mocks to manage the underlying data store interactions.
-// -------------------------------------------------------------------------
-
-// --- Mock Audio Manager ---
 const mockTracks = [];
 const mockAudioManager = {
   tracks: mockTracks,
@@ -79,7 +68,6 @@ vi.mock("../managers/AudioManager", () => ({
   audioManager: mockAudioManager,
 }));
 
-// --- Mock Clipboard Manager ---
 let mockClipboard = null;
 const mockClipboardManager = {
   getClipboard: vi.fn(() => mockClipboard),
@@ -129,9 +117,6 @@ vi.mock("../managers/DBManager", () => ({
   dbManager: mockDbManager,
 }));
 
-// --- Mock AppContext and Component Under Test (AudioPage) ---
-// Since we don't have the real AudioPage and AppContext, we need to create
-// a mock context provider and mock component that simulates the real hotkey logic.
 const AppContext = React.createContext({});
 const AudioPage = ({children}) => {
   // Mock state to track selected track ID
