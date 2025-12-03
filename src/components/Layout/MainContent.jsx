@@ -37,7 +37,7 @@ function MainContent({
   // Default visible window length (in ms) before horizontal scrolling is needed
   // Timeline scale is driven by pixels-per-second instead of a fixed window length
   const BASE_PX_PER_SEC = 100; // fallback density: 100px per second when viewport not measured
-  const DEFAULT_VISIBLE_MS = 120000; // 2 minutes of timeline should fit in the viewport at 100% zoom
+  const DEFAULT_VISIBLE_MS = 60000; // 1 minute of timeline should fit in the viewport at 100% zoom
   const MIN_ZOOM = 0.25; // 25% (zoom out)
   const MAX_ZOOM = 5; // 500% (zoom in)
   const [zoom, setZoom] = useState(1);
