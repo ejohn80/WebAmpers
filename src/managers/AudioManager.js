@@ -143,6 +143,7 @@ class AudioManager {
           if (typeof s.startInFileMs === "number")
             seg.startInFileMs = s.startInFileMs;
           if (s.id) seg.id = s.id;
+          seg.assetId = s?.assetId ?? audioData.assetId ?? null;
           builtSegments.push(seg);
         } catch (e) {
           console.warn("Failed to rebuild segment, skipping:", e);
@@ -159,6 +160,7 @@ class AudioManager {
       segment.durationMs = durationMs;
       segment.startOnTimelineMs = 0;
       segment.startInFileMs = 0;
+      segment.assetId = audioData.assetId ?? null;
       builtSegments = [segment];
     }
 

@@ -14,10 +14,10 @@
 }
 
 .waveform-shape {
+  fill: currentColor;
+  fill-opacity: 0.55;
   stroke: currentColor;
-  stroke-width: 1;
-  stroke-linecap: round;
-  fill: none;
+  stroke-width: 0.5;
   vector-effect: non-scaling-stroke;
 }
 
