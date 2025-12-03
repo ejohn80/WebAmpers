@@ -36,7 +36,8 @@ function MainContent({
 
   // Default visible window length (in ms) before horizontal scrolling is needed
   // Timeline scale is driven by pixels-per-second instead of a fixed window length
-  const BASE_PX_PER_SEC = 100; // default density: 100px per second at 100% zoom
+  const BASE_PX_PER_SEC = 100; // fallback density: 100px per second when viewport not measured
+  const DEFAULT_VISIBLE_MS = 120000; // 2 minutes of timeline should fit in the viewport at 100% zoom
   const MIN_ZOOM = 0.25; // 25% (zoom out)
   const MAX_ZOOM = 5; // 500% (zoom in)
   const [zoom, setZoom] = useState(1);
@@ -57,10 +58,24 @@ function MainContent({
 
   useEffect(() => {
     const lengthMs = Math.max(1, totalLengthMs || 0);
-    const pxPerMs = (BASE_PX_PER_SEC * (zoom || 1)) / 1000;
+    const visibleWindowMs = Math.max(
+      1,
+      Math.min(lengthMs, DEFAULT_VISIBLE_MS)
+    );
+    const availableWidthPx = Math.max(
+      1,
+      scrollAreaWidth - (TRACK_CONTROLS_WIDTH + TRACK_CONTROLS_GAP)
+    );
+
+    const basePxPerMs =
+      availableWidthPx > 1
+        ? availableWidthPx / visibleWindowMs
+        : BASE_PX_PER_SEC / 1000;
+
+    const pxPerMs = basePxPerMs * (zoom || 1);
     const desiredWidth = Math.max(1, Math.round(pxPerMs * lengthMs));
     setTimelineContentWidth(desiredWidth);
-  }, [totalLengthMs, zoom]);
+  }, [totalLengthMs, zoom, scrollAreaWidth]);
 
   useEffect(() => {
     const node = scrollAreaRef.current;

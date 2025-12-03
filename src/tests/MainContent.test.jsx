@@ -124,4 +124,26 @@ describe("MainContent multi-track layout", () => {
 
     expect(screen.getAllByTestId("mock-tracklane")).toHaveLength(2);
   });
+
+  it("caps default zoom width to roughly two minutes for long sessions", async () => {
+    setScrollAreaWidth(900);
+    const tracks = [{id: "long", name: "Long Track"}];
+
+    renderMainContent({tracks, totalLengthMs: 600000}); // 10 minutes
+
+    await waitFor(() => {
+      expect(trackLaneMock).toHaveBeenCalled();
+    });
+
+    const [{timelineWidth, rowWidthPx}] = trackLaneMock.mock.calls.slice(-1)[0];
+
+    expect(timelineWidth).toBeCloseTo(3540, 0); // 708px available width * (600s / 120s)
+    expect(rowWidthPx).toBeCloseTo(3732, 0); // add left offset (180 + 12)
+
+    const leftOffset = 180 + 12;
+    const pxPerMs = timelineWidth / 600000;
+    const availableWidth = 900 - leftOffset; // scroll area width minus controls
+    const visibleWindowMs = availableWidth / pxPerMs;
+    expect(visibleWindowMs).toBeCloseTo(120000, -1); // viewport shows ~2 minutes
+  });
 });
