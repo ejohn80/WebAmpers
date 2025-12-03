@@ -83,15 +83,29 @@ const buildWavePath = (peaks) => {
   const sanitize = (value) => (Number.isFinite(value) ? value : 0);
   const toY = (value) => mid - sanitize(value) * amp;
 
-  const commands = [];
+  const topCommands = [];
+  const bottomCommands = [];
   for (let i = 0; i < peaks.length; i++) {
     const x = i;
     const upper = toY(peaks[i].max);
-    const lower = toY(peaks[i].min);
-    commands.push(`M ${x} ${upper} L ${x} ${lower}`);
+    topCommands.push([x, upper]);
   }
 
-  return {d: commands.join(" "), width: Math.max(1, peaks.length - 1)};
+  for (let i = peaks.length - 1; i >= 0; i--) {
+    const x = i;
+    const lower = toY(peaks[i].min);
+    bottomCommands.push([x, lower]);
+  }
+
+  const firstPoint = topCommands[0] ?? [0, mid];
+  const d = [
+    `M ${firstPoint[0]} ${firstPoint[1]}`,
+    ...topCommands.slice(1).map(([x, y]) => `L ${x} ${y}`),
+    ...bottomCommands.map(([x, y]) => `L ${x} ${y}`),
+    "Z",
+  ].join(" ");
+
+  return {d, width: Math.max(1, peaks.length - 1)};
 };
 
 /**
