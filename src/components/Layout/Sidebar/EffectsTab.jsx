@@ -258,11 +258,6 @@ function EffectsTab() {
     isEffectEnabled(config.name)
   );
 
-  // Check if all effects are enabled
-  const areAllEffectsEnabled =
-    activeEffectConfigs.length > 0 &&
-    activeEffectConfigs.every((config) => isEffectEnabled(config.name));
-
   // Check if there are any active effects
   const hasActiveEffects = activeEffectConfigs.length > 0;
 
