@@ -22,7 +22,7 @@ function EffectsTab() {
     isEffectsMenuOpen,
     removeEffect,
     activeEffects,
-    enabledEffectsByTrack,
+    enabledEffects, // Changed from enabledEffectsByTrack to enabledEffects
     toggleEffect,
     toggleAllEffects,
     selectedTrackId,
@@ -247,7 +247,8 @@ function EffectsTab() {
     return activeEffectConfigs.every((config) => isAtDefaultValue(config));
   };
 
-  const trackEnabled = enabledEffectsByTrack[selectedTrackId] || {};
+  // Use enabledEffects from context (comes from track's enabledEffects in IndexedDB)
+  const trackEnabled = enabledEffects || {};
 
   // Check if effect is enabled (default to true if not set)
   const isEffectEnabled = (effectId) => trackEnabled[effectId] !== false;

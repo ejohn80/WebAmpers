@@ -164,6 +164,7 @@ class AudioManager {
 
     const trackEffects = audioData.effects || createDefaultEffects();
     const trackActiveEffectsList = audioData.activeEffectsList || [];
+    const trackEnabledEffects = audioData.enabledEffects || {};
 
     // Create the new track
     const track = new AudioTrack({
@@ -179,7 +180,14 @@ class AudioManager {
       mute: audioData.mute ?? false,
       solo: audioData.solo ?? false,
       effects: trackEffects,
+      enabledEffects: trackEnabledEffects,
       activeEffectsList: trackActiveEffectsList,
+    });
+
+    console.log(`[AudioManager] Creating track from audioData:`, {
+      id: audioData.id,
+      hasEnabledEffects: !!audioData.enabledEffects,
+      enabledEffects: audioData.enabledEffects,
     });
 
     // Add buffer reference at track level for compatibility

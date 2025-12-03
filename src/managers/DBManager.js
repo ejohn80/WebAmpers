@@ -157,6 +157,7 @@ class DBManager {
               ? trackData.solo
               : base._solo,
         effects: base.effects || trackData.effects || {},
+        enabledEffects: base.enabledEffects || trackData.enabledEffects || {},
         activeEffectsList:
           base.activeEffectsList || trackData.activeEffectsList || [],
       };
@@ -403,6 +404,7 @@ class DBManager {
       sessionId: track.sessionId ?? track._sessionId,
       assetId: track.assetId ?? track._assetId,
       effects: track.effects || {},
+      enabledEffects: track.enabledEffects || {}, // ADD THIS LINE
       activeEffectsList: track.activeEffectsList || [],
       segments: [],
     };

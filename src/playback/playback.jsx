@@ -83,6 +83,7 @@ class PlaybackEngine {
   }
 
   /** Load a new project ("version") into the playback engine */
+  /** Load a new project ("version") into the playback engine */
   async load(version) {
     await this.ensureAudioUnlocked();
 
@@ -119,9 +120,9 @@ class PlaybackEngine {
         this.setTrackPan(t.id, t.effects.pan);
       }
 
-      // Apply other effects
+      // Apply other effects - FIXED: Pass empty enabled map and silent flag
       if (t.effects) {
-        this.setTrackEffects(t.id, t.effects, true);
+        this.setTrackEffects(t.id, t.effects, t.enabledEffects || {}, true);
       }
     });
 
@@ -230,7 +231,19 @@ class PlaybackEngine {
    * @param {number} [effectsMap.chorus] - Chorus amount (0-100)
    * @param {boolean} [silent=false] - If true, suppresses console logging
    */
-  setTrackEffects(trackId, effectsMap, enabledEffectsMap = {}, silent = false) {
+  setTrackEffects(
+    trackId,
+    effectsMap,
+    enabledEffectsMapOrSilent = {},
+    silent = false
+  ) {
+    // Handle backward compatibility: if third argument is boolean, it's the silent flag
+    let enabledEffectsMap = enabledEffectsMapOrSilent;
+    if (typeof enabledEffectsMapOrSilent === "boolean") {
+      silent = enabledEffectsMapOrSilent;
+      enabledEffectsMap = {};
+    }
+
     if (!this.version) return;
 
     const bus = this.trackBuses.get(trackId);
