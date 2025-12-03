@@ -43,6 +43,48 @@ function AudioPage() {
   const engineRef = React.useRef(null);
   const lastSessionRef = useRef(null);
 
+  // Keyboard shortcuts for cut/copy/paste
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Check if we're in an input or textarea
+      const activeElement = document.activeElement;
+      const isInputField = 
+        activeElement.tagName === 'INPUT' || 
+        activeElement.tagName === 'TEXTAREA' ||
+        activeElement.isContentEditable;
+
+      // Don't trigger shortcuts if typing in an input field
+      if (isInputField) return;
+
+      // Check for Ctrl/Cmd + X (Cut)
+      if ((e.ctrlKey || e.metaKey) && e.key === 'x') {
+        e.preventDefault();
+        if (selectedTrackId) {
+          handleCutTrack();
+        }
+      }
+
+      // Check for Ctrl/Cmd + C (Copy)
+      if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+        e.preventDefault();
+        if (selectedTrackId) {
+          handleCopyTrack();
+        }
+      }
+
+      // Check for Ctrl/Cmd + V (Paste)
+      if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
+        e.preventDefault();
+        if (clipboardManager.hasClipboard()) {
+          handlePasteTrack();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedTrackId]); // Re-bind when selected track changes
+
   // Helper function to deserialize audio buffer from DB format
   const deserializeAudioBuffer = (serializedBuffer) => {
     const audioBuffer = Tone.context.createBuffer(
@@ -61,6 +103,30 @@ function AudioPage() {
     }
 
     return audioBuffer;
+  };
+
+  // Helper function to generate a unique copy name
+  const generateCopyName = (baseName) => {
+    // Remove any existing (number) suffix to get the true base name
+    const cleanName = baseName.replace(/\s*\(\d+\)$/, '');
+    
+    // Get all existing track names
+    const existingNames = new Set(audioManager.tracks.map(t => t.name));
+    
+    // If the clean name doesn't exist, use it
+    if (!existingNames.has(cleanName)) {
+      return cleanName;
+    }
+    
+    // Otherwise, find the next available number
+    let counter = 1;
+    let newName;
+    do {
+      newName = `${cleanName} (${counter})`;
+      counter++;
+    } while (existingNames.has(newName));
+    
+    return newName;
   };
 
   // Helper function to build version from tracks
@@ -668,9 +734,12 @@ function AudioPage() {
       const {buffer: serializedBuffer} = asset;
       const audioBuffer = toneBuffer.get();
 
+      // Generate a unique copy name
+      const copyName = generateCopyName(trackData.name);
+
       // Create new track with pasted data
       const newTrackData = {
-        name: `${trackData.name} (Copy)`,
+        name: copyName,
         color: trackData.color || `hsl(${Math.random() * 360}, 70%, 50%)`,
         assetId: trackData.assetId,
         volume: trackData.volume ?? 0,
@@ -705,7 +774,7 @@ function AudioPage() {
       // Create track for audioManager
       const pastedTrack = {
         id: dbId,
-        name: newTrackData.name,
+        name: copyName,
         color: newTrackData.color,
         buffer: toneBuffer,
         assetId: trackData.assetId,
