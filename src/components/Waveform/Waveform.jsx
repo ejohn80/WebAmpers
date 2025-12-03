@@ -269,7 +269,6 @@ const Waveform = ({
 
     if (delta === 0) return;
 
-    e.preventDefault(); // don't vertical-scroll the page
     el.scrollLeft += delta;
   };
 
