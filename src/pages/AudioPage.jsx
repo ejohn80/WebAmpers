@@ -12,7 +12,7 @@ import {dbManager} from "../managers/DBManager";
 import {AppContext} from "../context/AppContext";
 import {progressStore} from "../playback/progressStore";
 import {saveAsset} from "../utils/assetUtils";
-import {clipboardManager} from "../managers/clipboardManager";
+import {clipboardManager} from "../managers/ClipboardManager.js";
 
 const MIN_WIDTH = 0;
 const MAX_WIDTH = 300;
@@ -32,8 +32,13 @@ const EMPTY_VERSION = {
 };
 
 function AudioPage() {
-  const {setEngineRef, applyEffectsToEngine, activeSession, selectedTrackId, setSelectedTrackId} =
-    useContext(AppContext);
+  const {
+    setEngineRef,
+    applyEffectsToEngine,
+    activeSession,
+    selectedTrackId,
+    setSelectedTrackId,
+  } = useContext(AppContext);
   const [sidebarWidth, setSidebarWidth] = useState(MAX_WIDTH);
   const [tracks, setTracks] = useState(audioManager.tracks);
   const [audioData, setAudioData] = useState(null);
@@ -48,16 +53,16 @@ function AudioPage() {
     const handleKeyDown = (e) => {
       // Check if we're in an input or textarea
       const activeElement = document.activeElement;
-      const isInputField = 
-        activeElement.tagName === 'INPUT' || 
-        activeElement.tagName === 'TEXTAREA' ||
+      const isInputField =
+        activeElement.tagName === "INPUT" ||
+        activeElement.tagName === "TEXTAREA" ||
         activeElement.isContentEditable;
 
       // Don't trigger shortcuts if typing in an input field
       if (isInputField) return;
 
       // Check for Ctrl/Cmd + X (Cut)
-      if ((e.ctrlKey || e.metaKey) && e.key === 'x') {
+      if ((e.ctrlKey || e.metaKey) && e.key === "x") {
         e.preventDefault();
         if (selectedTrackId) {
           handleCutTrack();
@@ -65,7 +70,7 @@ function AudioPage() {
       }
 
       // Check for Ctrl/Cmd + C (Copy)
-      if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+      if ((e.ctrlKey || e.metaKey) && e.key === "c") {
         e.preventDefault();
         if (selectedTrackId) {
           handleCopyTrack();
@@ -73,16 +78,24 @@ function AudioPage() {
       }
 
       // Check for Ctrl/Cmd + V (Paste)
-      if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
+      if ((e.ctrlKey || e.metaKey) && e.key === "v") {
         e.preventDefault();
         if (clipboardManager.hasClipboard()) {
           handlePasteTrack();
         }
       }
+
+      // Check for Backspace or Delete (Delete track)
+      if (e.key === "Backspace" || e.key === "Delete") {
+        e.preventDefault();
+        if (selectedTrackId) {
+          handleDeleteTrack(selectedTrackId);
+        }
+      }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [selectedTrackId]); // Re-bind when selected track changes
 
   // Helper function to deserialize audio buffer from DB format
@@ -109,17 +122,17 @@ function AudioPage() {
   const generateCopyName = (baseName) => {
     // Remove any existing "Copy" suffix patterns to get the true base name
     // Matches: "Copy", "Copy 2", "Copy 3", etc.
-    const cleanName = baseName.replace(/\s+Copy(\s+\d+)?$/, '');
-    
+    const cleanName = baseName.replace(/\s+Copy(\s+\d+)?$/, "");
+
     // Get all existing track names
-    const existingNames = new Set(audioManager.tracks.map(t => t.name));
-    
+    const existingNames = new Set(audioManager.tracks.map((t) => t.name));
+
     // Try "BaseName Copy" first
     const firstCopyName = `${cleanName} Copy`;
     if (!existingNames.has(firstCopyName)) {
       return firstCopyName;
     }
-    
+
     // Otherwise, find the next available "Copy N" number
     let counter = 2;
     let newName;
@@ -127,7 +140,7 @@ function AudioPage() {
       newName = `${cleanName} Copy ${counter}`;
       counter++;
     } while (existingNames.has(newName));
-    
+
     return newName;
   };
 
@@ -227,7 +240,7 @@ function AudioPage() {
             };
 
             const createdTrack = audioManager.addTrackFromBuffer(trackData);
-            
+
             // Ensure assetId is set on the created track
             if (createdTrack && savedTrack.assetId) {
               createdTrack.assetId = savedTrack.assetId;
@@ -629,13 +642,13 @@ function AudioPage() {
     // Get the track from DB to ensure we have the assetId
     try {
       const allTracks = await dbManager.getAllTracks(activeSession);
-      const dbTrack = allTracks.find(t => t.id === selectedTrackId);
-      
+      const dbTrack = allTracks.find((t) => t.id === selectedTrackId);
+
       if (dbTrack && dbTrack.assetId) {
         // Merge the assetId into the track object
         track.assetId = dbTrack.assetId;
       }
-      
+
       console.log(`Track being cut - assetId: ${track.assetId}`);
     } catch (error) {
       console.warn("Failed to retrieve assetId from DB:", error);
@@ -666,13 +679,13 @@ function AudioPage() {
     // Get the track from DB to ensure we have the assetId
     try {
       const allTracks = await dbManager.getAllTracks(activeSession);
-      const dbTrack = allTracks.find(t => t.id === selectedTrackId);
-      
+      const dbTrack = allTracks.find((t) => t.id === selectedTrackId);
+
       if (dbTrack && dbTrack.assetId) {
         // Merge the assetId into the track object
         track.assetId = dbTrack.assetId;
       }
-      
+
       console.log(`Track being copied - assetId: ${track.assetId}`);
     } catch (error) {
       console.warn("Failed to retrieve assetId from DB:", error);
@@ -687,7 +700,7 @@ function AudioPage() {
   // Paste track from clipboard
   const handlePasteTrack = async () => {
     const clipboardData = clipboardManager.getClipboard();
-    
+
     if (!clipboardData) {
       console.warn("No track in clipboard to paste");
       return;
@@ -701,7 +714,9 @@ function AudioPage() {
     if (!trackData.assetId) {
       console.error("Cannot paste track without assetId");
       console.error("Full track data:", trackData);
-      alert("Cannot paste track: missing asset reference. This may happen if the track was created before the clipboard system was implemented.");
+      alert(
+        "Cannot paste track: missing asset reference. This may happen if the track was created before the clipboard system was implemented."
+      );
       return;
     }
 
@@ -718,7 +733,9 @@ function AudioPage() {
       let toneBuffer = assetBufferCache.get(trackData.assetId);
 
       if (!toneBuffer) {
-        console.log(`Creating buffer for pasted track from asset ${trackData.assetId}`);
+        console.log(
+          `Creating buffer for pasted track from asset ${trackData.assetId}`
+        );
         const {buffer: serializedBuffer} = asset;
 
         if (!serializedBuffer || !serializedBuffer.channels) {
