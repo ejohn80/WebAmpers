@@ -107,22 +107,24 @@ function AudioPage() {
 
   // Helper function to generate a unique copy name
   const generateCopyName = (baseName) => {
-    // Remove any existing (number) suffix to get the true base name
-    const cleanName = baseName.replace(/\s*\(\d+\)$/, '');
+    // Remove any existing "Copy" suffix patterns to get the true base name
+    // Matches: "Copy", "Copy 2", "Copy 3", etc.
+    const cleanName = baseName.replace(/\s+Copy(\s+\d+)?$/, '');
     
     // Get all existing track names
     const existingNames = new Set(audioManager.tracks.map(t => t.name));
     
-    // If the clean name doesn't exist, use it
-    if (!existingNames.has(cleanName)) {
-      return cleanName;
+    // Try "BaseName Copy" first
+    const firstCopyName = `${cleanName} Copy`;
+    if (!existingNames.has(firstCopyName)) {
+      return firstCopyName;
     }
     
-    // Otherwise, find the next available number
-    let counter = 1;
+    // Otherwise, find the next available "Copy N" number
+    let counter = 2;
     let newName;
     do {
-      newName = `${cleanName} (${counter})`;
+      newName = `${cleanName} Copy ${counter}`;
       counter++;
     } while (existingNames.has(newName));
     
