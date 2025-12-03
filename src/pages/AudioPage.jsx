@@ -204,6 +204,7 @@ function AudioPage() {
         solo: !!track.solo,
         color: track.color || "#888",
         effects: track.effects,
+        enabledEffects: track.enabledEffects || {},
         activeEffectsList: track.activeEffectsList,
       });
 
@@ -239,6 +240,7 @@ function AudioPage() {
     return vs;
   };
 
+  // Load tracks for active session
   // Load tracks for active session
   useEffect(() => {
     if (!activeSession) return;
@@ -344,6 +346,7 @@ function AudioPage() {
             segments:
               hydratedSegments.length > 0 ? hydratedSegments : undefined,
             effects: savedTrack.effects,
+            enabledEffects: savedTrack.enabledEffects || {},
           };
 
           audioManager.addTrackFromBuffer(trackData);
@@ -403,6 +406,7 @@ function AudioPage() {
       ...importedAudioData,
       buffer: toneBuffer || importedAudioData.buffer,
       assetId: assetId,
+      enabledEffects: importedAudioData.enabledEffects || {}, // Ensure enabledEffects is set
     };
 
     const createdTrack = audioManager.addTrackFromBuffer(trackData);
@@ -457,6 +461,7 @@ function AudioPage() {
       const updatedImportResult = {
         ...importResult,
         name: savedAsset.name,
+        enabledEffects: {}, // Initialize empty enabledEffects
       };
 
       // Cache the buffer
@@ -538,6 +543,7 @@ function AudioPage() {
         name: asset.name,
         color: `hsl(${Math.random() * 360}, 70%, 50%)`,
         assetId: assetId,
+        enabledEffects: {}, // Initialize empty enabledEffects
         segments: [
           {
             id: segmentId,
@@ -567,6 +573,7 @@ function AudioPage() {
         name: asset.name,
         color: trackData.color,
         buffer: toneBuffer,
+        enabledEffects: {}, // Initialize empty enabledEffects
         segments: [
           {
             id: segmentId,
