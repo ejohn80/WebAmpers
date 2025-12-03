@@ -118,6 +118,42 @@ function AudioPage() {
     return audioBuffer;
   };
 
+  const createToneBufferFromSerialized = (serializedBuffer) => {
+    const audioBuffer = deserializeAudioBuffer(serializedBuffer);
+    return new Tone.ToneAudioBuffer(audioBuffer);
+  };
+
+  const buildToneBufferFromAssetRecord = async (asset) => {
+    if (!asset) return null;
+
+    if (asset.buffer?.channels?.length) {
+      try {
+        return createToneBufferFromSerialized(asset.buffer);
+      } catch (error) {
+        console.warn(
+          `[AudioPage] Failed to deserialize stored buffer for asset ${asset.id}:`,
+          error
+        );
+      }
+    }
+
+    if (asset.fileBlob) {
+      try {
+        const arrayBuffer = await asset.fileBlob.arrayBuffer();
+        const audioBuffer =
+          await Tone.context.rawContext.decodeAudioData(arrayBuffer);
+        return new Tone.ToneAudioBuffer(audioBuffer);
+      } catch (error) {
+        console.warn(
+          `[AudioPage] Failed to decode blob for asset ${asset.id}:`,
+          error
+        );
+      }
+    }
+
+    return null;
+  };
+
   // Helper function to generate a unique copy name
   const generateCopyName = (baseName) => {
     const cleanName = baseName.replace(/\s+Copy(\s+\d+)?$/, "");
