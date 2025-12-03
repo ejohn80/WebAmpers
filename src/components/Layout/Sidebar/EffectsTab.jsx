@@ -259,11 +259,11 @@ function EffectsTab() {
     .some((config) => isEffectEnabled(config.name));
 
   // Check if all effects are enabled - exclude pan
-  const areAllEffectsEnabled =
-    activeEffectConfigs.filter((config) => config.name !== "pan").length > 0 &&
-    activeEffectConfigs
-      .filter((config) => config.name !== "pan")
-      .every((config) => isEffectEnabled(config.name));
+  // const areAllEffectsEnabled =
+  //   activeEffectConfigs.filter((config) => config.name !== "pan").length > 0 &&
+  //   activeEffectConfigs
+  //     .filter((config) => config.name !== "pan")
+  //     .every((config) => isEffectEnabled(config.name));
 
   // Check if there are any active effects
   const hasActiveEffects = activeEffectConfigs.length > 0;
