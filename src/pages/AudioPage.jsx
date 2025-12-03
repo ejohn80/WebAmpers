@@ -124,6 +124,7 @@ function AudioPage() {
         solo: !!track.solo,
         color: track.color || "#888",
         effects: track.effects,
+        enabledEffects: track.enabledEffects || {},
         activeEffectsList: track.activeEffectsList,
       });
 
@@ -159,6 +160,7 @@ function AudioPage() {
     return vs;
   };
 
+  // Load tracks for active session
   // Load tracks for active session
   useEffect(() => {
     if (!activeSession) return;
@@ -264,6 +266,7 @@ function AudioPage() {
             segments:
               hydratedSegments.length > 0 ? hydratedSegments : undefined,
             effects: savedTrack.effects,
+            enabledEffects: savedTrack.enabledEffects || {},
           };
 
           audioManager.addTrackFromBuffer(trackData);
@@ -322,7 +325,8 @@ function AudioPage() {
     const trackData = {
       ...importedAudioData,
       buffer: toneBuffer || importedAudioData.buffer,
-      assetId: assetId, // Store reference to source asset
+      assetId: assetId,
+      enabledEffects: importedAudioData.enabledEffects || {}, // Ensure enabledEffects is set
     };
 
     const createdTrack = audioManager.addTrackFromBuffer(trackData);
@@ -377,7 +381,8 @@ function AudioPage() {
       // Update importResult with the actual saved name (may have been renamed for duplicates)
       const updatedImportResult = {
         ...importResult,
-        name: savedAsset.name, // Use the name from DB which may include (2), (3), etc.
+        name: savedAsset.name,
+        enabledEffects: {}, // Initialize empty enabledEffects
       };
 
       // Cache the buffer
@@ -458,7 +463,8 @@ function AudioPage() {
       const trackData = {
         name: asset.name,
         color: `hsl(${Math.random() * 360}, 70%, 50%)`,
-        assetId: assetId, // Store reference to source asset
+        assetId: assetId,
+        enabledEffects: {}, // Initialize empty enabledEffects
         segments: [
           {
             id: segmentId,
@@ -487,7 +493,8 @@ function AudioPage() {
         id: dbId,
         name: asset.name,
         color: trackData.color,
-        buffer: toneBuffer, // Add buffer at top level for audioManager
+        buffer: toneBuffer,
+        enabledEffects: {}, // Initialize empty enabledEffects
         segments: [
           {
             id: segmentId,
