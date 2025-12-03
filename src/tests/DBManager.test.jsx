@@ -6,12 +6,14 @@ import {dbManager} from "../managers/DBManager";
  */
 // Place the buffer inside a `segments` array to match current DBManager
 // serialization expectations (segment-level buffers are serialized).
-const createMockTrack = (id, name) => ({
+const createMockTrack = (id, name, assetId = null) => ({
   id,
   name,
+  assetId,
   segments: [
     {
       id: `${id}-seg`,
+      assetId,
       buffer: {
         get: () => ({
           numberOfChannels: 2,
@@ -143,5 +145,17 @@ describe("DBManager Behavioral Tests", () => {
     const sessionTracks = await dbManager.getAllTracks(123);
     expect(sessionTracks).toHaveLength(1);
     expect(sessionTracks[0].mute).toBe(true);
+  });
+
+  it("stores asset-backed tracks without duplicating buffer data", async () => {
+    const track = createMockTrack(5, "Asset Track", 9001);
+
+    await dbManager.addTrack(track, 55);
+
+    const tracks = await dbManager.getAllTracks(55);
+    expect(tracks).toHaveLength(1);
+    expect(tracks[0].assetId).toBe(9001);
+    expect(tracks[0].segments[0].assetId).toBe(9001);
+    expect(tracks[0].segments[0].buffer).toBeUndefined();
   });
 });
