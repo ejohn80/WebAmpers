@@ -394,17 +394,24 @@ function EffectsTab() {
               </button>
 
               {/* Individual Toggle Switch - top right, left of close button */}
-              <button
-                className={styles.effectToggleButton}
-                onClick={() => toggleEffect(config.name)}
-                aria-label={`${isEnabled ? "Disable" : "Enable"} ${config.label} effect`}
-              >
-                <div
-                  className={`${styles.toggleSwitch} ${isEffectEnabled(config.name) ? styles.toggleOn : styles.toggleOff}`}
+              {/* CONDITIONAL RENDERING: Don't show toggle for pan effect */}
+              {config.name !== "pan" && (
+                <button
+                  className={styles.effectToggleButton}
+                  onClick={() => toggleEffect(config.name)}
+                  aria-label={`${isEnabled ? "Disable" : "Enable"} ${config.label} effect`}
                 >
-                  <div className={styles.toggleSlider}></div>
-                </div>
-              </button>
+                  <div
+                    className={`${styles.toggleSwitch} ${
+                      isEffectEnabled(config.name)
+                        ? styles.toggleOn
+                        : styles.toggleOff
+                    }`}
+                  >
+                    <div className={styles.toggleSlider}></div>
+                  </div>
+                </button>
+              )}
 
               <div className={styles.header}>
                 <span className={styles.label}>{config.label}</span>

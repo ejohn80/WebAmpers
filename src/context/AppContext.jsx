@@ -90,19 +90,19 @@ const AppContextProvider = ({children}) => {
     []
   );
   const [selectedTrackEnabledEffects, setSelectedTrackEnabledEffects] =
-    useState({}); // Add this state
+    useState({});
 
   // Derived state: The list of active effect IDs for the CURRENTLY selected track.
   const activeEffects = selectedTrackActiveEffects;
 
-  // Enabled effects for the selected track - use the state we just created
+  // Enabled effects for the selected track
   const enabledEffects = selectedTrackEnabledEffects;
 
   const refreshSelectedTrackEffects = useCallback(() => {
     if (!selectedTrackId) {
       setSelectedTrackEffects(null);
       setSelectedTrackActiveEffects([]);
-      setSelectedTrackEnabledEffects({}); // Reset this too
+      setSelectedTrackEnabledEffects({});
       return;
     }
 
@@ -110,7 +110,7 @@ const AppContextProvider = ({children}) => {
     if (!track) {
       setSelectedTrackEffects(null);
       setSelectedTrackActiveEffects([]);
-      setSelectedTrackEnabledEffects({}); // Reset this too
+      setSelectedTrackEnabledEffects({});
       return;
     }
 
@@ -120,7 +120,7 @@ const AppContextProvider = ({children}) => {
 
     setSelectedTrackEffects({...track.effects});
     setSelectedTrackActiveEffects([...track.activeEffectsList]);
-    setSelectedTrackEnabledEffects({...track.enabledEffects}); // Set this from track
+    setSelectedTrackEnabledEffects({...track.enabledEffects});
 
     // Use track's enabledEffects from IndexedDB
     const trackEnabled = track.enabledEffects || {};
@@ -164,17 +164,67 @@ const AppContextProvider = ({children}) => {
 
   const updateEffect = useCallback(
     async (effectName, value) => {
-      if (!selectedTrackId) return;
+      if (!selectedTrackId) {
+        console.warn("[updateEffect] No track selected");
+        return;
+      }
 
       const track = audioManager.getTrack(selectedTrackId);
-      if (!track) return;
+      if (!track) {
+        console.warn("[updateEffect] Track not found:", selectedTrackId);
+        return;
+      }
 
       const numValue = parseFloat(value);
       if (isNaN(numValue)) return;
 
-      const newEffects = {...track.effects, [effectName]: numValue};
+      console.log(
+        `[updateEffect] Updating ${effectName} to ${numValue} for track ${selectedTrackId}`
+      );
+
+      // SPECIAL CASE: Pan effect uses the track's built-in pan control
+      if (effectName === "pan") {
+        // Update track model
+        track.effects = {
+          ...track.effects,
+          pan: numValue,
+        };
+
+        // Update UI
+        setSelectedTrackEffects(track.effects);
+
+        // Update the track's actual pan control (not effects chain)
+        if (
+          engineRef?.current &&
+          typeof engineRef.current.setTrackPan === "function"
+        ) {
+          try {
+            engineRef.current.setTrackPan(selectedTrackId, numValue);
+          } catch (e) {
+            console.error(`[updateEffect] Failed to set pan:`, e);
+          }
+        }
+
+        // Also update the track's pan property (for AudioTrack model)
+        track.pan = numValue / 100; // Convert from -100 to 100 range to -1 to 1
+
+        // Persist
+        try {
+          await dbManager.updateTrack(track);
+        } catch (e) {
+          console.error(`[updateEffect] Failed to persist:`, e);
+        }
+        return;
+      }
+
+      // Normal effect handling for all other effects
+      const newEffects = {
+        ...track.effects,
+        [effectName]: numValue,
+      };
       track.effects = newEffects;
 
+      // Update UI State
       setSelectedTrackEffects(newEffects);
 
       // Apply effects to engine with enabled map from track
@@ -187,6 +237,7 @@ const AppContextProvider = ({children}) => {
         );
       }
 
+      // Persist to DB
       try {
         await dbManager.updateTrack(track);
       } catch (e) {
@@ -291,7 +342,7 @@ const AppContextProvider = ({children}) => {
 
       setSelectedTrackEffects(newEffects);
       setSelectedTrackActiveEffects([...track.activeEffectsList]);
-      setSelectedTrackEnabledEffects({...track.enabledEffects}); // Update UI state
+      setSelectedTrackEnabledEffects({...track.enabledEffects});
 
       console.log(
         `Added effect ${effectId}, active list:`,
@@ -350,7 +401,7 @@ const AppContextProvider = ({children}) => {
 
       setSelectedTrackEffects(newEffects);
       setSelectedTrackActiveEffects([...track.activeEffectsList]);
-      setSelectedTrackEnabledEffects({...track.enabledEffects}); // Update UI state
+      setSelectedTrackEnabledEffects({...track.enabledEffects});
 
       console.log(
         `Removed effect ${effectId}, active list:`,
@@ -398,7 +449,7 @@ const AppContextProvider = ({children}) => {
 
       // Update UI state
       setSelectedTrackEffects({...track.effects});
-      setSelectedTrackEnabledEffects({...newEnabledEffects}); // Update UI state
+      setSelectedTrackEnabledEffects({...newEnabledEffects});
 
       // Apply to engine immediately
       if (engineRef?.current?.setTrackEffects) {
@@ -444,7 +495,7 @@ const AppContextProvider = ({children}) => {
 
     // Update UI state
     setSelectedTrackEffects({...track.effects});
-    setSelectedTrackEnabledEffects({...newEnabledEffects}); // Update UI state
+    setSelectedTrackEnabledEffects({...newEnabledEffects});
 
     // Apply to engine immediately
     if (engineRef?.current?.setTrackEffects) {
@@ -506,7 +557,7 @@ const AppContextProvider = ({children}) => {
 
     setSelectedTrackEffects(defaultEffects);
     setSelectedTrackActiveEffects([]);
-    setSelectedTrackEnabledEffects({}); // Update UI state
+    setSelectedTrackEnabledEffects({});
 
     if (engineRef?.current?.setTrackEffects) {
       try {
@@ -545,6 +596,7 @@ const AppContextProvider = ({children}) => {
       setSelectedTrackId(null);
       setSelectedTrackEffects(null);
       setSelectedTrackActiveEffects([]);
+      setSelectedTrackEnabledEffects({});
     }
 
     // --- session-level loading (master effects) ---
