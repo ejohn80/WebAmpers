@@ -170,33 +170,36 @@ function EffectsTab() {
     }
   };
 
-  const getCurrentValue = (config) => {
-    const effectName = config.name;
+  const getCurrentValue = useCallback(
+    (config) => {
+      const effectName = config.name;
 
-    // Priority 1: If actively dragging, use local value
-    if (
-      draggingSlider === effectName &&
-      localValues[effectName] !== undefined
-    ) {
-      return localValues[effectName];
-    }
+      // Priority 1: If actively dragging, use local value
+      if (
+        draggingSlider === effectName &&
+        localValues[effectName] !== undefined
+      ) {
+        return localValues[effectName];
+      }
 
-    // Priority 2: If we have a local value (from recent change), use it
-    if (localValues[effectName] !== undefined) {
-      return localValues[effectName];
-    }
+      // Priority 2: If we have a local value (from recent change), use it
+      if (localValues[effectName] !== undefined) {
+        return localValues[effectName];
+      }
 
-    // Priority 3: Use the track's persisted value
-    if (
-      selectedTrackEffects &&
-      selectedTrackEffects[effectName] !== undefined
-    ) {
-      return selectedTrackEffects[effectName];
-    }
+      // Priority 3: Use the track's persisted value
+      if (
+        selectedTrackEffects &&
+        selectedTrackEffects[effectName] !== undefined
+      ) {
+        return selectedTrackEffects[effectName];
+      }
 
-    // Priority 4: Default value
-    return config.default;
-  };
+      // Priority 4: Default value
+      return config.default;
+    },
+    [draggingSlider, localValues, selectedTrackEffects]
+  );
 
   // Update local state immediately and debounce the persist
   const handleChange = useCallback(
@@ -220,6 +223,44 @@ function EffectsTab() {
     [updateEffect]
   );
 
+  // Check if effect is at default value
+  const isAtDefaultValue = useCallback(
+    (config) => {
+      const currentValue = getCurrentValue(config);
+
+      return Math.abs(currentValue - config.default) < 0.01;
+    },
+    [getCurrentValue]
+  );
+
+  // Check if ALL effects are at their default values
+  const areAllEffectsAtDefault = useCallback(() => {
+    return activeEffectConfigs.every((config) => isAtDefaultValue(config));
+  }, [activeEffectConfigs, isAtDefaultValue]);
+
+  // Handle reset all with immediate local state update
+  const handleResetAll = useCallback(() => {
+    if (areAllEffectsAtDefault()) return;
+
+    // Clear all pending timeouts
+    Object.keys(updateTimeoutRef.current).forEach((key) => {
+      clearTimeout(updateTimeoutRef.current[key]);
+      delete updateTimeoutRef.current[key];
+    });
+
+    // Build new local values with all defaults
+    const newLocalValues = {};
+    activeEffectConfigs.forEach((config) => {
+      newLocalValues[config.name] = config.default;
+    });
+
+    // Update local state immediately for instant visual feedback
+    setLocalValues(newLocalValues);
+
+    // Call resetAllEffects which will persist the changes
+    resetAllEffects();
+  }, [activeEffectConfigs, resetAllEffects, areAllEffectsAtDefault]);
+
   const handleSliderStart = useCallback((name) => {
     setDraggingSlider(name);
   }, []);
@@ -234,17 +275,6 @@ function EffectsTab() {
   const getSliderFillPercentage = (config, value) => {
     const currentValue = value ?? config.default;
     return ((currentValue - config.min) / (config.max - config.min)) * 100;
-  };
-
-  // Check if effect is at default value
-  const isAtDefaultValue = (config) => {
-    const currentValue = getCurrentValue(config);
-    return Math.abs(currentValue - config.default) < 0.01;
-  };
-
-  // Check if ALL effects are at their default values
-  const areAllEffectsAtDefault = () => {
-    return activeEffectConfigs.every((config) => isAtDefaultValue(config));
   };
 
   // Use enabledEffects from context (comes from track's enabledEffects in IndexedDB)
@@ -358,7 +388,7 @@ function EffectsTab() {
             className={`${styles.resetAllButton} ${
               areAllEffectsAtDefault() ? styles.resetAllButtonDisabled : ""
             }`}
-            onClick={areAllEffectsAtDefault() ? undefined : resetAllEffects}
+            onClick={areAllEffectsAtDefault() ? undefined : handleResetAll}
             disabled={areAllEffectsAtDefault()}
           >
             <span className={styles.resetAllButtonContent}>
