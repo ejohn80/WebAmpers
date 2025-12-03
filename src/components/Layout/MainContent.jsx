@@ -9,17 +9,6 @@ import EffectsMenu from "./Effects/EffectsMenu";
 import styles from "./MainContent.module.css";
 import "./MainContent.css";
 
-/**
- * MainContent component for the application layout.
- * Displays all audio tracks or a placeholder message.
- * @param {object} props
- * @param {Array} props.tracks - Array of all audio tracks
- * @param {Function} props.onMute - Callback for mute toggle
- * @param {Function} props.onSolo - Callback for solo toggle
- * @param {Function} props.onDelete - Callback for track deletion
- * @param {Function} props.onAssetDrop - Callback for dropping an asset to create a track
- * @param {number} props.totalLengthMs - Global timeline length in milliseconds for proportional sizing
- */
 const TRACK_CONTROLS_WIDTH = 180;
 const TRACK_CONTROLS_GAP = 12;
 
@@ -43,9 +32,6 @@ function MainContent({
 
   // Follow-mode toggle to auto-scroll the timeline during playback
   const [followPlayhead, setFollowPlayhead] = useState(false);
-  const [progressMs, setProgressMs] = useState(
-    progressStore.getState().ms || 0
-  );
   const [timelineContentWidth, setTimelineContentWidth] = useState(0);
   const [scrollAreaWidth, setScrollAreaWidth] = useState(0);
   const scrollAreaRef = useRef(null);
@@ -54,6 +40,76 @@ function MainContent({
   const handleBackgroundClick = () => {
     setSelectedTrackId(null);
   };
+
+  const verticalScale = useMemo(
+    () => Math.min(2.25, Math.max(0.6, Math.pow(Math.max(zoom, 0.01), 0.5))),
+    [zoom]
+  );
+
+  const timelineStyle = useMemo(
+    () => ({
+      "--timeline-content-width": `${Math.max(1, timelineContentWidth)}px`,
+      "--track-height": `${Math.round(96 * verticalScale)}px`,
+    }),
+    [timelineContentWidth, verticalScale]
+  );
+
+  const timelineMetrics = useMemo(() => {
+    const leftOffsetPx = TRACK_CONTROLS_WIDTH + TRACK_CONTROLS_GAP;
+    const minimumTimelineWidth = Math.max(
+      1,
+      Math.round(scrollAreaWidth - leftOffsetPx)
+    );
+    const widthPx = Math.max(
+      1,
+      Math.round(timelineContentWidth),
+      minimumTimelineWidth
+    );
+    const rowWidthPx = widthPx + leftOffsetPx;
+    return {widthPx, leftOffsetPx, rowWidthPx};
+  }, [timelineContentWidth, scrollAreaWidth]);
+
+  // === OPTIMIZED SCROLLING LOGIC ===
+  // This replaces the old state-based scrolling. 
+  // It reads directly from the store and manipulates the DOM.
+  useEffect(() => {
+    const unsubscribe = progressStore.subscribe(({ms}) => {
+      // If follow mode is off, do nothing
+      if (!followPlayhead) return;
+      
+      const node = scrollAreaRef.current;
+      if (!node) return;
+
+      const lengthMs = Math.max(0, totalLengthMs || 0);
+      if (lengthMs === 0 || timelineMetrics.widthPx === 0) return;
+
+      const pxPerMs = timelineMetrics.widthPx / lengthMs;
+      
+      // Calculate where the playhead is in pixels
+      const playheadX =
+        timelineMetrics.leftOffsetPx +
+        Math.max(0, Math.min(ms, lengthMs)) * pxPerMs;
+
+      const viewportWidth = node.clientWidth || 0;
+      if (viewportWidth === 0) return;
+
+      // Center the playhead
+      const desiredScroll = playheadX - viewportWidth / 2;
+      const maxScroll = Math.max(0, timelineMetrics.rowWidthPx - viewportWidth);
+      const nextScroll = Math.min(Math.max(0, desiredScroll), maxScroll);
+
+      if (Number.isFinite(nextScroll)) {
+        // Direct DOM update (High Performance)
+        node.scrollLeft = nextScroll;
+      }
+    });
+
+    return unsubscribe;
+  }, [
+    followPlayhead, 
+    totalLengthMs, 
+    timelineMetrics 
+  ]);
 
   useEffect(() => {
     const lengthMs = Math.max(1, totalLengthMs || 0);
@@ -86,40 +142,6 @@ function MainContent({
     return undefined;
   }, []);
 
-  useEffect(
-    // Track global playhead position for follow mode
-    () => progressStore.subscribe(({ms}) => setProgressMs(ms || 0)),
-    []
-  );
-
-  const verticalScale = useMemo(
-    () => Math.min(2.25, Math.max(0.6, Math.pow(Math.max(zoom, 0.01), 0.5))),
-    [zoom]
-  );
-
-  const timelineStyle = useMemo(
-    () => ({
-      "--timeline-content-width": `${Math.max(1, timelineContentWidth)}px`,
-      "--track-height": `${Math.round(96 * verticalScale)}px`,
-    }),
-    [timelineContentWidth, verticalScale]
-  );
-
-  const timelineMetrics = useMemo(() => {
-    const leftOffsetPx = TRACK_CONTROLS_WIDTH + TRACK_CONTROLS_GAP;
-    const minimumTimelineWidth = Math.max(
-      1,
-      Math.round(scrollAreaWidth - leftOffsetPx)
-    );
-    const widthPx = Math.max(
-      1,
-      Math.round(timelineContentWidth),
-      minimumTimelineWidth
-    );
-    const rowWidthPx = widthPx + leftOffsetPx;
-    return {widthPx, leftOffsetPx, rowWidthPx};
-  }, [timelineContentWidth, scrollAreaWidth]);
-
   const hasTracks = Array.isArray(tracks) && tracks.length > 0;
 
   const zoomIn = () =>
@@ -151,39 +173,6 @@ function MainContent({
     e.preventDefault();
     e.dataTransfer.dropEffect = "copy";
   };
-
-  // Auto-scroll to keep the red playhead centered when follow mode is on
-  useEffect(() => {
-    if (!followPlayhead) return;
-    const node = scrollAreaRef.current;
-    if (!node) return;
-
-    const lengthMs = Math.max(0, totalLengthMs || 0);
-    if (lengthMs === 0 || timelineMetrics.widthPx === 0) return;
-
-    const pxPerMs = timelineMetrics.widthPx / lengthMs;
-    const playheadX =
-      timelineMetrics.leftOffsetPx +
-      Math.max(0, Math.min(progressMs, lengthMs)) * pxPerMs;
-
-    const viewportWidth = node.clientWidth || 0;
-    if (viewportWidth === 0) return;
-
-    const desiredScroll = playheadX - viewportWidth / 2;
-    const maxScroll = Math.max(0, timelineMetrics.rowWidthPx - viewportWidth);
-    const nextScroll = Math.min(Math.max(0, desiredScroll), maxScroll);
-
-    if (Number.isFinite(nextScroll)) {
-      node.scrollLeft = nextScroll;
-    }
-  }, [
-    followPlayhead,
-    progressMs,
-    totalLengthMs,
-    timelineMetrics.leftOffsetPx,
-    timelineMetrics.rowWidthPx,
-    timelineMetrics.widthPx,
-  ]);
 
   return (
     <DraggableDiv
@@ -273,8 +262,8 @@ function MainContent({
           role="toolbar"
           aria-label="Timeline zoom controls"
         >
-          <button className="zoom-btn" onClick={zoomOut} title="Zoom out (−)">
-            −
+          <button className="zoom-btn" onClick={zoomOut} title="Zoom out (-)">
+            -
           </button>
           <span className="zoom-label">{Math.round(zoom * 100)}%</span>
           <button className="zoom-btn" onClick={zoomIn} title="Zoom in (+)">
