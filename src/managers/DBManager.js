@@ -9,6 +9,158 @@ class DBManager {
     this.db = null;
   }
 
+  serializeBufferForStorage(buffer) {
+    if (!buffer) return null;
+
+    const numberOfChannels = buffer.numberOfChannels || buffer.channels?.length;
+    if (typeof numberOfChannels !== "number" || numberOfChannels <= 0) {
+      return null;
+    }
+
+    const sampleRate = buffer.sampleRate ?? buffer._sampleRate ?? 44100;
+    const length = buffer.length ?? buffer._length ?? 0;
+    const duration = buffer.duration ?? buffer._duration ?? length / sampleRate;
+
+    const channels = [];
+    if (typeof buffer.getChannelData === "function") {
+      for (let i = 0; i < numberOfChannels; i++) {
+        try {
+          const channelData = buffer.getChannelData(i);
+          channels.push(
+            channelData instanceof Float32Array
+              ? channelData
+              : new Float32Array(channelData)
+          );
+        } catch (e) {
+          console.warn("Failed to read channel data for storage", e);
+          channels.push(new Float32Array());
+        }
+      }
+    } else if (Array.isArray(buffer.channels)) {
+      for (let i = 0; i < numberOfChannels; i++) {
+        const channel = buffer.channels[i] || [];
+        channels.push(
+          channel instanceof Float32Array ? channel : new Float32Array(channel)
+        );
+      }
+    } else {
+      return null;
+    }
+
+    return {
+      numberOfChannels,
+      length,
+      sampleRate,
+      duration,
+      channels,
+    };
+  }
+
+  extractBufferCandidate(candidate) {
+    if (!candidate) return null;
+
+    if (
+      typeof AudioBuffer !== "undefined" &&
+      candidate instanceof AudioBuffer
+    ) {
+      return candidate;
+    }
+
+    if (typeof candidate.get === "function") {
+      try {
+        const result = candidate.get();
+        if (result) return result;
+      } catch (e) {
+        console.warn("Failed to read Tone buffer via get()", e);
+      }
+    }
+
+    if (candidate.buffer) {
+      if (
+        typeof AudioBuffer !== "undefined" &&
+        candidate.buffer instanceof AudioBuffer
+      ) {
+        return candidate.buffer;
+      }
+      if (typeof candidate.buffer.get === "function") {
+        try {
+          const result = candidate.buffer.get();
+          if (result) return result;
+        } catch (e) {
+          console.warn("Failed to read nested buffer via get()", e);
+        }
+      }
+      if (
+        typeof candidate.buffer.numberOfChannels === "number" &&
+        typeof candidate.buffer.length === "number"
+      ) {
+        return candidate.buffer;
+      }
+    }
+
+    if (
+      typeof candidate.numberOfChannels === "number" &&
+      typeof candidate.length === "number"
+    ) {
+      return candidate;
+    }
+
+    return null;
+  }
+
+  serializeSegmentForStorage(segment, defaultAssetId = null) {
+    if (!segment) return null;
+
+    const segAssetId =
+      segment.assetId ?? segment.asset?.id ?? defaultAssetId ?? null;
+
+    const serialized = {
+      id: segment.id,
+      assetId: segAssetId,
+      offset:
+        typeof segment.offset === "number"
+          ? segment.offset
+          : typeof segment.startInFileMs === "number"
+            ? segment.startInFileMs / 1000
+            : undefined,
+      duration:
+        typeof segment.duration === "number"
+          ? segment.duration
+          : typeof segment.durationMs === "number"
+            ? segment.durationMs / 1000
+            : undefined,
+      durationMs: segment.durationMs,
+      startOnTimelineMs: segment.startOnTimelineMs,
+      startInFileMs: segment.startInFileMs,
+    };
+
+    if (!serialized.id) {
+      serialized.id = `seg_${Date.now()}_${Math.random()
+        .toString(36)
+        .slice(2, 7)}`;
+    }
+
+    if (!segAssetId) {
+      const bufferCandidate =
+        segment.buffer || segment.bufferData || segment.audioBuffer;
+      const nativeBuffer = this.extractBufferCandidate(bufferCandidate);
+      const buffer = this.serializeBufferForStorage(nativeBuffer);
+      if (buffer) {
+        serialized.buffer = buffer;
+      }
+    }
+
+    return serialized;
+  }
+
+  serializeSegmentsForStorage(segments = [], defaultAssetId = null) {
+    return segments
+      .map((segment) =>
+        this.serializeSegmentForStorage(segment, defaultAssetId)
+      )
+      .filter(Boolean);
+  }
+
   async openDB() {
     if (this.db) {
       return this.db;
@@ -168,56 +320,10 @@ class DBManager {
           ? trackData.segments
           : [];
       if (segments.length > 0) {
-        storableTrack.segments = segments.map((s) => {
-          const seg = {...s};
-          // Try to get a native AudioBuffer from possible shapes
-          let audioBuffer = null;
-          try {
-            const candidate =
-              s.buffer ||
-              (trackData.segments &&
-                trackData.segments.find((ss) => ss.id === s.id)?.buffer);
-            if (candidate) {
-              if (typeof candidate.get === "function")
-                audioBuffer = candidate.get();
-              else if (candidate instanceof AudioBuffer)
-                audioBuffer = candidate;
-              else if (
-                candidate._buffer &&
-                candidate._buffer instanceof AudioBuffer
-              )
-                audioBuffer = candidate._buffer;
-            }
-          } catch (e) {
-            console.warn(
-              "Failed to extract segment AudioBuffer for DB storage:",
-              e
-            );
-          }
-
-          if (audioBuffer) {
-            const channels = [];
-            for (let i = 0; i < audioBuffer.numberOfChannels; i++)
-              channels.push(audioBuffer.getChannelData(i));
-            seg.buffer = {
-              channels,
-              sampleRate: audioBuffer.sampleRate,
-              length: audioBuffer.length,
-              duration: audioBuffer.duration,
-              numberOfChannels: audioBuffer.numberOfChannels,
-            };
-          } else {
-            // If no buffer available, leave buffer as-is (may be a URL) or remove to avoid errors
-            if (
-              seg.buffer &&
-              typeof seg.buffer === "object" &&
-              !seg.buffer.channels
-            )
-              delete seg.buffer;
-          }
-
-          return seg;
-        });
+        storableTrack.segments = this.serializeSegmentsForStorage(
+          segments,
+          storableTrack.assetId
+        );
       }
 
       // FIX: Always let IndexedDB assign the ID for new tracks
@@ -404,40 +510,15 @@ class DBManager {
       assetId: track.assetId ?? track._assetId,
       effects: track.effects || {},
       activeEffectsList: track.activeEffectsList || [],
-      segments: [],
     };
 
-    // Serialize segments with buffer data
-    (track.segments || []).forEach((seg) => {
-      const segData = {
-        id: seg.id,
-        offset: seg.offset,
-        duration: seg.duration,
-        durationMs: seg.durationMs,
-        startOnTimelineMs: seg.startOnTimelineMs,
-        startInFileMs: seg.startInFileMs,
-      };
-
-      // Serialize the audio buffer
-      if (seg.buffer) {
-        const buffer = seg.buffer.get ? seg.buffer.get() : seg.buffer;
-        if (buffer) {
-          const channels = [];
-          for (let i = 0; i < buffer.numberOfChannels; i++) {
-            channels.push(buffer.getChannelData(i));
-          }
-
-          segData.buffer = {
-            numberOfChannels: buffer.numberOfChannels,
-            length: buffer.length,
-            sampleRate: buffer.sampleRate,
-            channels: channels,
-          };
-        }
-      }
-
-      serialized.segments.push(segData);
-    });
+    const serializedSegments = this.serializeSegmentsForStorage(
+      track.segments || [],
+      serialized.assetId
+    );
+    if (serializedSegments.length > 0) {
+      serialized.segments = serializedSegments;
+    }
 
     return serialized;
   }
@@ -671,8 +752,9 @@ class DBManager {
       };
 
       request.onerror = (event) => {
-        console.error("Error creating asset:", event.target.error);
-        reject(new Error("Could not create asset"));
+        const error = event.target.error;
+        console.error("Error creating asset:", error);
+        reject(error || new Error("Could not create asset"));
       };
     });
   }
