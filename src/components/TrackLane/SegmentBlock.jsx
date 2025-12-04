@@ -3,6 +3,8 @@ import Waveform from "../Waveform/Waveform";
 import {progressStore} from "../../playback/progressStore";
 import "./SegmentBlock.css";
 
+const DRAG_ACTIVATION_THRESHOLD_PX = 3;
+
 /**
  * SegmentBlock - A draggable audio segment within a track lane
  */
@@ -32,8 +34,30 @@ const SegmentBlock = ({
   const startOnTimelineMs = Math.max(0, segment.startOnTimelineMs || 0);
   const durationMs = Math.max(0, segment.durationMs || 0);
 
+  const startDragSession = () => {
+    if (dragPlayheadMsRef.current !== null) return;
+
+    const savedMs = progressStore.getState().ms;
+    dragPlayheadMsRef.current = savedMs;
+    try {
+      progressStore.beginScrub({pauseTransport: true});
+      progressStore.setScrubLocked(true);
+    } catch (err) {
+      console.warn("[SegmentBlock] Failed to enter scrub mode:", err);
+    }
+    setIsDragging(true);
+  };
+
   const handleMouseMove = (e) => {
     const deltaX = e.clientX - dragStartX.current;
+
+    if (dragPlayheadMsRef.current === null) {
+      if (Math.abs(deltaX) < DRAG_ACTIVATION_THRESHOLD_PX) {
+        return;
+      }
+      startDragSession();
+    }
+
     setDragOffset(deltaX);
   };
 
@@ -54,6 +78,16 @@ const SegmentBlock = ({
   };
 
   const handleMouseUp = (e) => {
+    document.removeEventListener("mousemove", handleMouseMove);
+    document.removeEventListener("mouseup", handleMouseUp);
+
+    if (dragPlayheadMsRef.current === null) {
+      // Click without dragging; no position change or scrub session
+      setIsDragging(false);
+      setDragOffset(0);
+      return;
+    }
+
     const deltaX = e.clientX - dragStartX.current;
     const currentPxPerMs = pxPerMsRef.current;
     const deltaMs = currentPxPerMs > 0 ? deltaX / currentPxPerMs : 0;
@@ -74,9 +108,6 @@ const SegmentBlock = ({
 
     setIsDragging(false);
     setDragOffset(0);
-
-    document.removeEventListener("mousemove", handleMouseMove);
-    document.removeEventListener("mouseup", handleMouseUp);
 
     const finish = () => {
       finalizeDragPlaybackState();
@@ -123,13 +154,9 @@ const SegmentBlock = ({
       onSelect(segmentIndex);
     }
 
-    // Start dragging
-    setIsDragging(true);
     dragStartX.current = e.clientX;
     originalPosition.current = startOnTimelineMs;
-    dragPlayheadMsRef.current = progressStore.getState().ms;
-  progressStore.beginScrub({pauseTransport: true});
-    progressStore.setScrubLocked(true);
+    dragPlayheadMsRef.current = null;
 
     // Add global listeners
     document.addEventListener("mousemove", handleMouseMove);

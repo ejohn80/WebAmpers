@@ -18,6 +18,7 @@ import "./MainContent.css";
 
 const TRACK_CONTROLS_WIDTH = 180;
 const TRACK_CONTROLS_GAP = 12;
+const TRACK_ROW_PADDING = 8; // Keep in sync with --track-row-padding in CSS
 
 function MainContent({
   tracks = [],
@@ -114,17 +115,18 @@ function MainContent({
   );
 
   const timelineMetrics = useMemo(() => {
-    const leftOffsetPx = TRACK_CONTROLS_WIDTH + TRACK_CONTROLS_GAP;
+    const leftOffsetPx =
+      TRACK_ROW_PADDING + TRACK_CONTROLS_WIDTH + TRACK_CONTROLS_GAP;
     const minimumTimelineWidth = Math.max(
       1,
-      Math.round(scrollAreaWidth - leftOffsetPx)
+      Math.round(scrollAreaWidth - (leftOffsetPx + TRACK_ROW_PADDING))
     );
     const widthPx = Math.max(
       1,
       Math.round(timelineContentWidth),
       minimumTimelineWidth
     );
-    const rowWidthPx = widthPx + leftOffsetPx;
+    const rowWidthPx = widthPx + leftOffsetPx + TRACK_ROW_PADDING;
     return {widthPx, leftOffsetPx, rowWidthPx};
   }, [timelineContentWidth, scrollAreaWidth]);
 
@@ -169,10 +171,9 @@ function MainContent({
   useEffect(() => {
     const lengthMs = Math.max(1, totalLengthMs || 0);
     const visibleWindowMs = Math.max(1, Math.min(lengthMs, DEFAULT_VISIBLE_MS));
-    const availableWidthPx = Math.max(
-      1,
-      scrollAreaWidth - (TRACK_CONTROLS_WIDTH + TRACK_CONTROLS_GAP)
-    );
+    const staticWidth =
+      TRACK_ROW_PADDING * 2 + TRACK_CONTROLS_WIDTH + TRACK_CONTROLS_GAP;
+    const availableWidthPx = Math.max(1, scrollAreaWidth - staticWidth);
 
     const basePxPerMs =
       availableWidthPx > 1
