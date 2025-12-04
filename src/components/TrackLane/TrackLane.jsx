@@ -98,22 +98,28 @@ const TrackLane = memo(function TrackLane({
   const handleContextMenu = (event) => {
     event.preventDefault();
     event.stopPropagation();
-    
+
     // Menu dimensions for boundary checking
     const menuWidth = 180;
     const menuHeight = 140;
-    
+
     // Calculate position ensuring menu stays within viewport
     // Use clientX/Y which are viewport-relative coordinates
-    const x = Math.max(10, Math.min(
-      event.clientX, 
-      window.innerWidth - menuWidth - 10 // 10px margin
-    ));
-    const y = Math.max(10, Math.min(
-      event.clientY, 
-      window.innerHeight - menuHeight - 10 // 10px margin
-    ));
-    
+    const x = Math.max(
+      10,
+      Math.min(
+        event.clientX,
+        window.innerWidth - menuWidth - 10 // 10px margin
+      )
+    );
+    const y = Math.max(
+      10,
+      Math.min(
+        event.clientY,
+        window.innerHeight - menuHeight - 10 // 10px margin
+      )
+    );
+
     setContextMenu({open: true, x, y});
   };
 
@@ -350,7 +356,7 @@ const TrackLane = memo(function TrackLane({
           </div>
         </div>
       </div>
-      
+
       {contextMenuPortal}
     </>
   );

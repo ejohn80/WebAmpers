@@ -232,138 +232,138 @@ class PlaybackEngine {
    * @param {boolean} [silent=false] - If true, suppresses console logging
    */
   setTrackEffects(
-  trackId,
-  effectsMap,
-  enabledEffectsMapOrSilent = {},
-  silent = false
-) {
-  // Handle backward compatibility
-  let enabledEffectsMap = enabledEffectsMapOrSilent;
-  if (typeof enabledEffectsMapOrSilent === "boolean") {
-    silent = enabledEffectsMapOrSilent;
-    enabledEffectsMap = {};
-  }
-
-  if (!this.version) return;
-
-  const bus = this.trackBuses.get(trackId);
-  if (!bus) return;
-
-  // CRITICAL: Lock master gain IMMEDIATELY to prevent audio leakage
-  let masterGainValue = null;
-  let masterGainLocked = false;
-  
-  try {
-    if (this.master?.gain?.gain) {
-      masterGainValue = this.master.gain.gain.value;
-      
-      // If master is muted (gain near 0), lock it at 0 immediately
-      if (masterGainValue < 0.001) {
-        this.master.gain.gain.value = 0;
-        masterGainLocked = true;
-      }
+    trackId,
+    effectsMap,
+    enabledEffectsMapOrSilent = {},
+    silent = false
+  ) {
+    // Handle backward compatibility
+    let enabledEffectsMap = enabledEffectsMapOrSilent;
+    if (typeof enabledEffectsMapOrSilent === "boolean") {
+      silent = enabledEffectsMapOrSilent;
+      enabledEffectsMap = {};
     }
-  } catch (e) {
-    console.warn("[setTrackEffects] Could not lock master gain");
-  }
 
-  if (!silent)
-    console.log(
-      `[setTrackEffects] Track ${trackId}`,
-      effectsMap,
-      enabledEffectsMap,
-      `Master gain: ${masterGainValue}, locked: ${masterGainLocked}`
-    );
+    if (!this.version) return;
 
-  // Store the effects map
-  const track = this.version.tracks.find((x) => x.id === trackId);
-  if (track) {
-    track.effects = effectsMap;
-    track.enabledEffects = enabledEffectsMap;
-  }
+    const bus = this.trackBuses.get(trackId);
+    if (!bus) return;
 
-  const canUpdateExisting = bus.fxNodes && bus.fxNodes.length > 0;
+    // CRITICAL: Lock master gain IMMEDIATELY to prevent audio leakage
+    let masterGainValue = null;
+    let masterGainLocked = false;
 
-  if (canUpdateExisting) {
-    this._updateExistingEffectNodes(
-      bus.fxNodes,
-      effectsMap,
-      enabledEffectsMap
-    );
-  }
-
-  // 1. SAFELY DISCONNECT
-  const nextNode = this.master?.fxIn || this.master?.gain;
-
-  if (bus.fxOut) {
-    try {
-      if (nextNode) bus.fxOut.disconnect(nextNode);
-    } catch (e) {}
-  } else {
-    try {
-      if (nextNode) bus.pan.disconnect(nextNode);
-    } catch (e) {}
-  }
-
-  // 2. DISPOSE OLD NODES
-  if (bus.fxNodes && Array.isArray(bus.fxNodes)) {
-    bus.fxNodes.forEach((node) => {
-      try {
-        node.dispose();
-      } catch (e) {}
-    });
-  }
-
-  // 3. BUILD NEW CHAIN
-  const fxNodes = this._buildTrackEffectsChain(effectsMap, enabledEffectsMap);
-  bus.fxNodes = fxNodes;
-
-  // 4. RECONNECT
-  try {
-    bus.gain.disconnect();
-  } catch (e) {}
-
-  if (fxNodes.length > 0) {
-    bus.gain.connect(fxNodes[0]);
-    for (let i = 0; i < fxNodes.length - 1; i++) {
-      fxNodes[i].connect(fxNodes[i + 1]);
-    }
-    fxNodes[fxNodes.length - 1].connect(bus.pan);
-    bus.fxOut = bus.pan;
-  } else {
-    bus.gain.connect(bus.pan);
-    bus.fxOut = bus.pan;
-  }
-
-  // Connect Pan to Master - but master gain is still locked at 0 if it was muted
-  const masterDest = this.master?.fxIn || this.master?.gain;
-  if (masterDest) {
-    try {
-      bus.pan.disconnect();
-    } catch (e) {}
-    bus.pan.connect(masterDest);
-  }
-
-  // Apply pan
-  const panValue = effectsMap?.pan
-    ? Math.max(-1, Math.min(1, effectsMap.pan / 100))
-    : 0;
-  bus.pan.pan.value = panValue;
-
-  // Use synchronous value setting to prevent any audio leak
-  if (masterGainValue !== null) {
     try {
       if (this.master?.gain?.gain) {
-        // Cancel any scheduled changes first
-        this.master.gain.gain.cancelScheduledValues(0);
-        // Set value immediately (no ramping)
-        this.master.gain.gain.setValueAtTime(masterGainValue, 0);
+        masterGainValue = this.master.gain.gain.value;
+
+        // If master is muted (gain near 0), lock it at 0 immediately
+        if (masterGainValue < 0.001) {
+          this.master.gain.gain.value = 0;
+          masterGainLocked = true;
+        }
       }
     } catch (e) {
-      console.warn("[setTrackEffects] Could not restore master gain", e);
+      console.warn("[setTrackEffects] Could not lock master gain");
+    }
+
+    if (!silent)
+      console.log(
+        `[setTrackEffects] Track ${trackId}`,
+        effectsMap,
+        enabledEffectsMap,
+        `Master gain: ${masterGainValue}, locked: ${masterGainLocked}`
+      );
+
+    // Store the effects map
+    const track = this.version.tracks.find((x) => x.id === trackId);
+    if (track) {
+      track.effects = effectsMap;
+      track.enabledEffects = enabledEffectsMap;
+    }
+
+    const canUpdateExisting = bus.fxNodes && bus.fxNodes.length > 0;
+
+    if (canUpdateExisting) {
+      this._updateExistingEffectNodes(
+        bus.fxNodes,
+        effectsMap,
+        enabledEffectsMap
+      );
+    }
+
+    // 1. SAFELY DISCONNECT
+    const nextNode = this.master?.fxIn || this.master?.gain;
+
+    if (bus.fxOut) {
+      try {
+        if (nextNode) bus.fxOut.disconnect(nextNode);
+      } catch (e) {}
+    } else {
+      try {
+        if (nextNode) bus.pan.disconnect(nextNode);
+      } catch (e) {}
+    }
+
+    // 2. DISPOSE OLD NODES
+    if (bus.fxNodes && Array.isArray(bus.fxNodes)) {
+      bus.fxNodes.forEach((node) => {
+        try {
+          node.dispose();
+        } catch (e) {}
+      });
+    }
+
+    // 3. BUILD NEW CHAIN
+    const fxNodes = this._buildTrackEffectsChain(effectsMap, enabledEffectsMap);
+    bus.fxNodes = fxNodes;
+
+    // 4. RECONNECT
+    try {
+      bus.gain.disconnect();
+    } catch (e) {}
+
+    if (fxNodes.length > 0) {
+      bus.gain.connect(fxNodes[0]);
+      for (let i = 0; i < fxNodes.length - 1; i++) {
+        fxNodes[i].connect(fxNodes[i + 1]);
+      }
+      fxNodes[fxNodes.length - 1].connect(bus.pan);
+      bus.fxOut = bus.pan;
+    } else {
+      bus.gain.connect(bus.pan);
+      bus.fxOut = bus.pan;
+    }
+
+    // Connect Pan to Master - but master gain is still locked at 0 if it was muted
+    const masterDest = this.master?.fxIn || this.master?.gain;
+    if (masterDest) {
+      try {
+        bus.pan.disconnect();
+      } catch (e) {}
+      bus.pan.connect(masterDest);
+    }
+
+    // Apply pan
+    const panValue = effectsMap?.pan
+      ? Math.max(-1, Math.min(1, effectsMap.pan / 100))
+      : 0;
+    bus.pan.pan.value = panValue;
+
+    // Use synchronous value setting to prevent any audio leak
+    if (masterGainValue !== null) {
+      try {
+        if (this.master?.gain?.gain) {
+          // Cancel any scheduled changes first
+          this.master.gain.gain.cancelScheduledValues(0);
+          // Set value immediately (no ramping)
+          this.master.gain.gain.setValueAtTime(masterGainValue, 0);
+        }
+      } catch (e) {
+        console.warn("[setTrackEffects] Could not restore master gain", e);
+      }
     }
   }
-}
 
   /**
    * Update parameters of existing effect nodes without rebuilding the entire chain.
@@ -1649,77 +1649,79 @@ class PlaybackEngine {
    * @param {Object} effects - The effects configuration object
    */
   applyEffects(effects) {
-  let masterGainValue = null;
-  let masterGainLocked = false;
-  
-  try {
-    if (this.master?.gain?.gain) {
-      masterGainValue = this.master.gain.gain.value;
-      
-      // If master is muted (gain near 0), lock it at 0 immediately
-      if (masterGainValue < 0.001) {
-        this.master.gain.gain.cancelScheduledValues(0);
-        this.master.gain.gain.setValueAtTime(0, 0);
-        masterGainLocked = true;
-      }
-    }
-  } catch (e) {
-    console.warn("[applyEffects] Could not lock master gain");
-  }
+    let masterGainValue = null;
+    let masterGainLocked = false;
 
-  console.log(`[applyEffects] Master gain: ${masterGainValue}, locked: ${masterGainLocked}`);
-
-  // 1. Create the new master chain
-  const newMaster = this._createMasterChain(effects);
-
-  // 2. Set the gain on the NEW master BEFORE reconnecting anything
-  if (masterGainValue !== null) {
-    try {
-      if (newMaster?.gain?.gain) {
-        newMaster.gain.gain.cancelScheduledValues(0);
-        newMaster.gain.gain.setValueAtTime(masterGainValue, 0);
-      }
-    } catch (e) {
-      console.warn("[applyEffects] Could not set gain on new master");
-    }
-  }
-
-  // 3. Reconnect all track buses to the new master
-  this.trackBuses.forEach((bus) => {
-    const oldMasterIn = this.master?.fxIn ?? this.master?.gain;
-    if (oldMasterIn) {
-      try {
-        (bus.fxOut ?? bus.pan).disconnect(oldMasterIn);
-      } catch (e) {}
-    }
-
-    try {
-      (bus.fxOut ?? bus.pan).connect(newMaster.fxIn);
-    } catch (e) {
-      console.warn("[applyEffects] Failed to reconnect track bus:", e);
-    }
-  });
-
-  // 4. Dispose of old master
-  this._disposeMaster();
-
-  // 5. Update reference
-  this.master = newMaster;
-
-  // 6. Final verification that gain is correct
-  if (masterGainValue !== null) {
     try {
       if (this.master?.gain?.gain) {
-        this.master.gain.gain.cancelScheduledValues(0);
-        this.master.gain.gain.setValueAtTime(masterGainValue, 0);
+        masterGainValue = this.master.gain.gain.value;
+
+        // If master is muted (gain near 0), lock it at 0 immediately
+        if (masterGainValue < 0.001) {
+          this.master.gain.gain.cancelScheduledValues(0);
+          this.master.gain.gain.setValueAtTime(0, 0);
+          masterGainLocked = true;
+        }
       }
     } catch (e) {
-      console.warn("[applyEffects] Final gain restore failed");
+      console.warn("[applyEffects] Could not lock master gain");
     }
-  }
 
-  console.log("Master effects applied with gain:", masterGainValue);
-}
+    console.log(
+      `[applyEffects] Master gain: ${masterGainValue}, locked: ${masterGainLocked}`
+    );
+
+    // 1. Create the new master chain
+    const newMaster = this._createMasterChain(effects);
+
+    // 2. Set the gain on the NEW master BEFORE reconnecting anything
+    if (masterGainValue !== null) {
+      try {
+        if (newMaster?.gain?.gain) {
+          newMaster.gain.gain.cancelScheduledValues(0);
+          newMaster.gain.gain.setValueAtTime(masterGainValue, 0);
+        }
+      } catch (e) {
+        console.warn("[applyEffects] Could not set gain on new master");
+      }
+    }
+
+    // 3. Reconnect all track buses to the new master
+    this.trackBuses.forEach((bus) => {
+      const oldMasterIn = this.master?.fxIn ?? this.master?.gain;
+      if (oldMasterIn) {
+        try {
+          (bus.fxOut ?? bus.pan).disconnect(oldMasterIn);
+        } catch (e) {}
+      }
+
+      try {
+        (bus.fxOut ?? bus.pan).connect(newMaster.fxIn);
+      } catch (e) {
+        console.warn("[applyEffects] Failed to reconnect track bus:", e);
+      }
+    });
+
+    // 4. Dispose of old master
+    this._disposeMaster();
+
+    // 5. Update reference
+    this.master = newMaster;
+
+    // 6. Final verification that gain is correct
+    if (masterGainValue !== null) {
+      try {
+        if (this.master?.gain?.gain) {
+          this.master.gain.gain.cancelScheduledValues(0);
+          this.master.gain.gain.setValueAtTime(masterGainValue, 0);
+        }
+      } catch (e) {
+        console.warn("[applyEffects] Final gain restore failed");
+      }
+    }
+
+    console.log("Master effects applied with gain:", masterGainValue);
+  }
 }
 
 // Export the engine class so other modules (hooks/UI) can instantiate it
@@ -1734,7 +1736,7 @@ export default function WebAmpPlayback({version, onEngineReady}) {
   const {setEngineRef, effects} = appCtx;
   const [playing, setPlaying] = useState(false);
   const [ms, setMs] = useState(0);
-  
+
   // Restore persisted master volume / mute from localStorage when possible
   const [masterVol, setMasterVol] = useState(() => {
     try {
@@ -1922,7 +1924,7 @@ export default function WebAmpPlayback({version, onEngineReady}) {
           const currentGain = engine.master.gain.gain.value;
           volumeBeforeScrubRef.current = currentGain;
           prevMasterGainRef.current = currentGain;
-          
+
           // Only mute if we're actually playing
           if (playing) {
             engine.master.gain.gain.value = 0.0001; // virtually silent
@@ -1933,12 +1935,13 @@ export default function WebAmpPlayback({version, onEngineReady}) {
         }
       }
     });
-    
+
     progressStore.setScrubEnd(() => {
       if (mutingDuringScrubRef.current && engine.master) {
         try {
           // Restore the volume that was active before scrubbing
-          const restoreGain = volumeBeforeScrubRef.current ?? savedVolumeRef.current;
+          const restoreGain =
+            volumeBeforeScrubRef.current ?? savedVolumeRef.current;
           engine.master.gain.gain.value = restoreGain;
           prevMasterGainRef.current = restoreGain;
         } catch (e) {
@@ -1946,13 +1949,13 @@ export default function WebAmpPlayback({version, onEngineReady}) {
         }
       }
       mutingDuringScrubRef.current = false;
-      
+
       // if it was playing before scrub, resume playback
       if (wasPlayingRef.current) {
         engine.play().catch(() => {});
       }
     });
-    
+
     return () => {
       progressStore.setScrubStart(null);
       progressStore.setScrubEnd(null);
@@ -1960,42 +1963,46 @@ export default function WebAmpPlayback({version, onEngineReady}) {
   }, [playing, engine]);
 
   useEffect(() => {
-  if (!engine.master) return;
+    if (!engine.master) return;
 
-  let enforcementInterval = null;
+    let enforcementInterval = null;
 
-  // If muted, continuously enforce zero gain
-  if (muted) {
-    const enforceZeroGain = () => {
-      try {
-        if (engine.master?.gain?.gain) {
-          const currentGain = engine.master.gain.gain.value;
-          
-          // If gain drifted above 0, immediately lock it back
-          if (currentGain > 0.0001) {
-            console.warn("[Mute Enforcement] Gain drifted to", currentGain, "- locking to 0");
-            engine.master.gain.gain.cancelScheduledValues(0);
-            engine.master.gain.gain.setValueAtTime(0, 0);
+    // If muted, continuously enforce zero gain
+    if (muted) {
+      const enforceZeroGain = () => {
+        try {
+          if (engine.master?.gain?.gain) {
+            const currentGain = engine.master.gain.gain.value;
+
+            // If gain drifted above 0, immediately lock it back
+            if (currentGain > 0.0001) {
+              console.warn(
+                "[Mute Enforcement] Gain drifted to",
+                currentGain,
+                "- locking to 0"
+              );
+              engine.master.gain.gain.cancelScheduledValues(0);
+              engine.master.gain.gain.setValueAtTime(0, 0);
+            }
           }
+        } catch (e) {
+          console.warn("[Mute Enforcement] Failed:", e);
         }
-      } catch (e) {
-        console.warn("[Mute Enforcement] Failed:", e);
+      };
+
+      // Check every 50ms while muted
+      enforcementInterval = setInterval(enforceZeroGain, 50);
+
+      // Also enforce immediately
+      enforceZeroGain();
+    }
+
+    return () => {
+      if (enforcementInterval) {
+        clearInterval(enforcementInterval);
       }
     };
-
-    // Check every 50ms while muted
-    enforcementInterval = setInterval(enforceZeroGain, 50);
-    
-    // Also enforce immediately
-    enforceZeroGain();
-  }
-
-  return () => {
-    if (enforcementInterval) {
-      clearInterval(enforcementInterval);
-    }
-  };
-}, [muted, engine]);
+  }, [muted, engine]);
 
   // Control handlers for play, pause, stop
   const onPlay = async () => {
@@ -2158,7 +2165,7 @@ export default function WebAmpPlayback({version, onEngineReady}) {
             try {
               localStorage.setItem("webamp.muted", "0");
             } catch (e) {}
-          } 
+          }
           // Mute if reducing to 0
           else if (newVolume === 0 && !muted) {
             setMuted(true);
@@ -2202,7 +2209,7 @@ export default function WebAmpPlayback({version, onEngineReady}) {
   const onToggleMute = () => {
     try {
       if (!engine.master) return;
-      
+
       if (muted) {
         // UNMUTE: restore to saved volume
         const restore = Math.max(0, Math.min(1, savedVolumeRef.current));
@@ -2211,10 +2218,10 @@ export default function WebAmpPlayback({version, onEngineReady}) {
         engine.master.gain.gain.value = restore;
         prevMasterGainRef.current = restore;
         volumeBeforeScrubRef.current = restore;
-        
+
         setMasterVol(restorePercent);
         setMuted(false);
-        
+
         try {
           localStorage.setItem("webamp.muted", "0");
           localStorage.setItem("webamp.masterVol", String(restorePercent));
@@ -2223,14 +2230,14 @@ export default function WebAmpPlayback({version, onEngineReady}) {
         // MUTE: save current volume and set gain to 0
         const currentPercent = masterVol;
         savedVolumeRef.current = Math.max(0, Math.min(1, currentPercent / 100));
-        
+
         engine.master.gain.gain.value = 0;
         prevMasterGainRef.current = 0;
         volumeBeforeScrubRef.current = 0;
-        
+
         setMasterVol(0);
         setMuted(true);
-        
+
         try {
           localStorage.setItem("webamp.muted", "1");
           // Don't change masterVol in storage - keep the user's volume preference
