@@ -24,6 +24,8 @@ import "./playback.css";
 import {AppContext} from "../context/AppContext";
 import PlayPauseButton from "./PlayPauseButton";
 
+const EQ_BANDS = [32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
+
 // === Utility functions ===
 
 // Convert decibels to linear gain value (used for volume control)
@@ -414,25 +416,35 @@ class PlaybackEngine {
         }
 
         // Update EQ3 (Bass)
-        if (node instanceof Tone.EQ3 && effectsMap.bass !== undefined) {
-          if (enabledEffectsMap.bass !== false) {
-            node.low.value = effectsMap.bass;
+        if (
+          node instanceof Tone.EQ3 &&
+          effectsMap.bass !== undefined &&
+          enabledEffectsMap.bass !== false
+        ) {
+          node.low.value = effectsMap.bass;
+        }
+
+        // Full Equalizer
+        if (node instanceof Tone.Filter && node.type === "peaking") {
+          const nodeFreq = node.frequency.value;
+          const matchingBand = EQ_BANDS.find(
+            (f) => Math.abs(f - nodeFreq) < 10
+          );
+
+          if (matchingBand && effectsMap[matchingBand] !== undefined) {
+            node.gain.value = effectsMap[matchingBand];
           }
         }
 
         // Update Distortion
         if (
           node instanceof Tone.Distortion &&
-          effectsMap.distortion !== undefined
+          effectsMap.distortion !== undefined &&
+          enabledEffectsMap.distortion !== false
         ) {
-          if (enabledEffectsMap.distortion !== false) {
-            const amount = Math.max(
-              0,
-              Math.min(1, effectsMap.distortion / 100)
-            );
-            node.distortion = amount;
-            node.wet.value = amount * 0.8;
-          }
+          const amount = Math.max(0, Math.min(1, effectsMap.distortion / 100));
+          node.distortion = amount;
+          node.wet.value = amount * 0.8;
         }
 
         // Update Volume (Gain)
@@ -584,7 +596,28 @@ class PlaybackEngine {
         console.log("[Effects] Added Bass:", effectsMap.bass);
       }
 
-      // Distortion - only add if enabled
+      const hasEQChanges = EQ_BANDS.some(
+        (freq) =>
+          effectsMap[freq] !== undefined && Math.abs(effectsMap[freq]) > 0.01
+      );
+
+      if (hasEQChanges) {
+        EQ_BANDS.forEach((freq) => {
+          const gain = effectsMap[freq];
+          if (gain !== undefined && Math.abs(gain) > 0.01) {
+            const filter = new Tone.Filter({
+              frequency: freq,
+              type: "peaking",
+              Q: 1.0,
+              gain: gain,
+            });
+            nodes.push(filter);
+            console.log(`[Effects] Added EQ ${freq}Hz: ${gain}dB`);
+          }
+        });
+      }
+
+      // Distortion
       if (
         effectsMap.distortion &&
         effectsMap.distortion > 0.01 &&
@@ -932,6 +965,30 @@ class PlaybackEngine {
       }
     }
 
+    const hasEQChanges = EQ_BANDS.some(
+      (freq) => effects[freq] !== undefined && Math.abs(effects[freq]) > 0.01
+    );
+
+    if (hasEQChanges) {
+      try {
+        EQ_BANDS.forEach((freq) => {
+          const gain = effects[freq];
+          if (gain !== undefined && Math.abs(gain) > 0.01) {
+            const filter = new Tone.Filter({
+              frequency: freq,
+              type: "peaking",
+              Q: 1.0,
+              gain: gain,
+              context: context,
+            });
+            chain.push(filter);
+          }
+        });
+      } catch (e) {
+        console.warn("Failed to create EQ filters:", e);
+      }
+    }
+
     // Distortion
     if (effects?.distortion && effects.distortion > 0) {
       try {
@@ -1198,6 +1255,13 @@ class PlaybackEngine {
         wet: wet,
       });
     }
+    // Full EQ
+    EQ_BANDS.forEach((freq) => {
+      const gain = effects?.[freq];
+      if (typeof gain === "number" && Math.abs(gain) > 0.01) {
+        chain.push({type: "peaking", frequency: freq, gain: gain, Q: 1.0});
+      }
+    });
     this.replaceMasterChain(chain);
   }
 
@@ -1405,6 +1469,16 @@ class PlaybackEngine {
                 wet: cfg.wet ?? 0.5,
               }).start(); // IMPORTANT: Must call .start()
               nodes.push(chorus);
+              break;
+            }
+            case "peaking": {
+              const filter = new Tone.Filter({
+                frequency: cfg.frequency ?? 1000,
+                type: "peaking",
+                Q: cfg.Q ?? 1.0,
+                gain: cfg.gain ?? 0,
+              });
+              nodes.push(filter);
               break;
             }
             default:
