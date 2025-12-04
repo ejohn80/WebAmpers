@@ -216,10 +216,15 @@ const Waveform = ({
     const el = containerRef.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
+    const visibleWidth = rect?.width ?? 0;
+    if (!visibleWidth) return;
 
-    // X within the visible area of the container
-    const rel = Math.max(0, Math.min(rect.width, clientX - rect.left));
-    const p = rect.width > 0 ? rel / rect.width : 0;
+    const rel = clamp(clientX - rect.left, 0, visibleWidth);
+    const scrollLeft = el.scrollLeft ?? 0;
+    const scrollWidth = el.scrollWidth ?? visibleWidth;
+    const totalWidth = Math.max(scrollWidth, 1);
+    const absolute = Math.max(0, Math.min(totalWidth, scrollLeft + rel));
+    const p = absolute / totalWidth;
     // If segment timing provided, map within this segment; else map across global length
     if (durationMs && durationMs > 0) {
       return (startOnTimelineMs || 0) + p * durationMs;

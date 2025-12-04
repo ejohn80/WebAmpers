@@ -790,15 +790,30 @@ function AudioPage() {
       }
 
       if (newVersion && engineRef.current) {
-        await engineRef.current.load(newVersion);
+        console.log(`[handleSegmentMove] About to reload engine, preserved playhead: ${preservedMs}ms`);
+        
+        try {
+          await engineRef.current.load(newVersion);
+          console.log(`[handleSegmentMove] Engine load completed`);
+        } catch (loadError) {
+          console.error("Engine load failed:", loadError);
+          throw loadError;
+        }
+        
         const targetMs = Number.isFinite(preservedMs) ? preservedMs : 0;
         const clampedMs = Math.max(
           0,
           Math.min(targetMs, newVersion.lengthMs ?? targetMs)
         );
+        
+        console.log(`[handleSegmentMove] Restoring playhead to ${clampedMs}ms (preserved: ${preservedMs}ms)`);
+        
+        // Seek the engine immediately - this must happen before endScrub is called
+        // so that when playback resumes, it starts from the correct position
         try {
           engineRef.current.seekMs(clampedMs);
           progressStore.setMs(clampedMs);
+          console.log(`[handleSegmentMove] Engine seeked and progressStore updated to ${clampedMs}ms`);
         } catch (seekError) {
           console.warn(
             "Failed to restore playhead after segment move:",
@@ -806,6 +821,8 @@ function AudioPage() {
           );
         }
         console.log("Engine reloaded after segment move");
+      } else {
+        console.warn(`[handleSegmentMove] Skipped engine reload - newVersion: ${!!newVersion}, engineRef.current: ${!!engineRef.current}`);
       }
     } catch (error) {
       console.error("Failed to move segment:", error);

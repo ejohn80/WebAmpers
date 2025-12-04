@@ -1,4 +1,11 @@
-import React, {useContext, useEffect, useMemo, useRef, useState} from "react";
+import React, {
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import * as Tone from "tone";
 import {progressStore} from "./progressStore";
 import {
@@ -1683,6 +1690,21 @@ export default function WebAmpPlayback({version, onEngineReady}) {
     []
   );
 
+  const syncTransportToProgressStore = useCallback(() => {
+    if (!engine || typeof progressStore.getState !== "function") {
+      return;
+    }
+
+    try {
+      const {ms: storedMs} = progressStore.getState() || {};
+      if (!Number.isFinite(storedMs)) return;
+      engine.seekMs(storedMs);
+      setMs(storedMs);
+    } catch (err) {
+      console.warn("Failed to sync transport to playhead:", err);
+    }
+  }, [engine]);
+
   // Attach and clean up engine
   useEffect(() => {
     engineRef.current = engine;
@@ -1716,6 +1738,28 @@ export default function WebAmpPlayback({version, onEngineReady}) {
   useEffect(() => {
     const cleanup = () => {
       progressStore.setSeeker(null);
+    };
+
+    const restorePlayheadAfterLoad = () => {
+      if (!engine || typeof progressStore.getState !== "function") {
+        return;
+      }
+
+      try {
+        const {ms: preservedMs} = progressStore.getState() || {};
+        if (!Number.isFinite(preservedMs)) {
+          return;
+        }
+
+        const maxLen =
+          typeof version?.lengthMs === "number" ? version.lengthMs : preservedMs;
+        const targetMs = Math.max(0, Math.min(preservedMs, maxLen));
+
+        engine.seekMs(targetMs);
+        setMs(targetMs);
+      } catch (err) {
+        console.warn("Failed to restore playhead after engine reload:", err);
+      }
     };
 
     const versionHasTracks = !!(
@@ -1790,6 +1834,7 @@ export default function WebAmpPlayback({version, onEngineReady}) {
                 engine.setMasterEffects(effects);
               }
             }
+            restorePlayheadAfterLoad();
           } catch {}
         })
         .catch((e) => console.error("[UI] engine.load() failed:", e));
@@ -1852,6 +1897,7 @@ export default function WebAmpPlayback({version, onEngineReady}) {
   // Control handlers for play, pause, stop
   const onPlay = async () => {
     try {
+      syncTransportToProgressStore();
       await engine.play();
     } catch (e) {
       console.error("[UI] engine.play() failed:", e);

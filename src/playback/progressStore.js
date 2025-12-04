@@ -4,6 +4,7 @@ let _seeker = null; // function(ms)
 let _scrubStart = null; // function()
 let _scrubEnd = null; // function()
 let _scrubLocked = false;
+let _pendingSeek = null;
 const listeners = new Set();
 
 export const progressStore = {
@@ -29,6 +30,14 @@ export const progressStore = {
 
   setSeeker(fn) {
     _seeker = typeof fn === "function" ? fn : null;
+    if (_seeker && Number.isFinite(_pendingSeek)) {
+      try {
+        _seeker(_pendingSeek);
+      } catch (err) {
+        console.warn("progressStore pending seek error:", err);
+      }
+      _pendingSeek = null;
+    }
   },
 
   requestSeek(ms) {
@@ -43,6 +52,8 @@ export const progressStore = {
       } catch (err) {
         console.warn("progressStore seeker error:", err);
       }
+    } else {
+      _pendingSeek = clamped;
     }
 
     this.setMs(clamped);

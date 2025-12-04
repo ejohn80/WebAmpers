@@ -39,14 +39,18 @@ const SegmentBlock = ({
 
   const finalizeDragPlaybackState = () => {
     if (dragPlayheadMsRef.current === null) return;
-    try {
-      progressStore.requestSeek(dragPlayheadMsRef.current);
-    } catch (err) {
-      console.warn("Failed to restore playhead after drag:", err);
-    }
+    
+    const savedMs = dragPlayheadMsRef.current;
+    console.log(`[SegmentBlock] Finalizing drag, saved playhead was ${savedMs}ms`);
+    
+    // Don't call requestSeek here - the handleSegmentMove will restore the playhead
+    // after the engine reload completes. Just unlock and end the scrub session.
+    
     progressStore.setScrubLocked(false);
     progressStore.endScrub();
     dragPlayheadMsRef.current = null;
+    
+    console.log(`[SegmentBlock] Scrub lock released, endScrub called`);
   };
 
   const handleMouseUp = (e) => {
