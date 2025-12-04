@@ -1,4 +1,5 @@
-import React, {useState, useEffect, memo} from "react"; // Added memo
+import React, {useState, useEffect, memo} from "react";
+import {createPortal} from "react-dom";
 import Waveform from "../Waveform/Waveform";
 import "./TrackLane.css";
 
@@ -96,10 +97,29 @@ const TrackLane = memo(function TrackLane({
 
   const handleContextMenu = (event) => {
     event.preventDefault();
+    event.stopPropagation();
+
+    // Menu dimensions for boundary checking
     const menuWidth = 180;
     const menuHeight = 140;
-    const x = Math.min(event.clientX, window.innerWidth - menuWidth);
-    const y = Math.min(event.clientY, window.innerHeight - menuHeight);
+
+    // Calculate position ensuring menu stays within viewport
+    // Use clientX/Y which are viewport-relative coordinates
+    const x = Math.max(
+      10,
+      Math.min(
+        event.clientX,
+        window.innerWidth - menuWidth - 10 // 10px margin
+      )
+    );
+    const y = Math.max(
+      10,
+      Math.min(
+        event.clientY,
+        window.innerHeight - menuHeight - 10 // 10px margin
+      )
+    );
+
     setContextMenu({open: true, x, y});
   };
 
@@ -176,130 +196,16 @@ const TrackLane = memo(function TrackLane({
       }
     : {};
 
-  return (
-    <div
-      className="tracklane-root"
-      style={{...rowWidthStyle, ...selectionStyle}}
-      onClick={handleTrackClick}
-      onContextMenu={handleContextMenu}
-    >
-      <div className="tracklane-side">
-        {showTitle && (
-          <div className="tracklane-header">
-            <div className="tracklane-title">
-              {track.name ?? "Untitled Track"}
-            </div>
-            <div className="tracklane-track-number">
-              Track {trackIndex + 1} of {totalTracks}
-            </div>
-          </div>
-        )}
-
-        <div className="tracklane-controls-box">
-          <div className="tracklane-controls">
-            <button
-              className={`tl-btn tl-btn-mute ${muted ? "tl-btn--active" : ""}`}
-              onClick={toggleMute}
-              aria-pressed={muted}
-              title={muted ? "Unmute track" : "Mute track"}
-            >
-              {muted ? "Muted" : "Mute"}
-            </button>
-
-            <button
-              className={`tl-btn tl-btn-solo ${soloed ? "tl-btn--active" : ""}`}
-              onClick={toggleSolo}
-              aria-pressed={soloed}
-              title={soloed ? "Unsolo track" : "Solo track"}
-            >
-              {soloed ? "Soloed" : "Solo"}
-            </button>
-
-            <div className="tracklane-divider" />
-
-            <button
-              className="tl-btn tl-btn-delete"
-              onClick={handleDelete}
-              title="Delete track"
-            >
-              Delete
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div className="tracklane-main" style={tracklaneMainStyle}>
-        <div className="tracklane-timeline" style={tracklaneTimelineStyle}>
-          {segments.length === 0 && (
-            <div className="tracklane-empty">
-              No segments — import audio to add one.
-            </div>
-          )}
-
-          {segments.map((seg) => {
-            const audioBuffer = seg.buffer ?? seg.fileBuffer ?? null;
-
-            const startOnTimelineMs = Math.max(0, seg.startOnTimelineMs || 0);
-            const durationMs = Math.max(0, seg.durationMs || 0);
-
-            let positionStyle;
-            if (pxPerMs) {
-              const leftPx = Math.round(startOnTimelineMs * pxPerMs);
-              const widthPx = Math.max(2, Math.round(durationMs * pxPerMs));
-              positionStyle = {
-                left: `${leftPx}px`,
-                width: `${widthPx}px`,
-              };
-            } else {
-              const leftPercent =
-                totalLengthMs > 0
-                  ? (startOnTimelineMs / totalLengthMs) * 100
-                  : 0;
-              const widthPercent =
-                totalLengthMs > 0 ? (durationMs / totalLengthMs) * 100 : 100;
-              positionStyle = {
-                left: `${leftPercent}%`,
-                width: `${widthPercent}%`,
-              };
-            }
-
-            return (
-              <div
-                className="tracklane-segment-positioned"
-                key={seg.id || seg.fileUrl || Math.random()}
-                style={{
-                  position: "absolute",
-                  height: "100%",
-                  ...positionStyle,
-                }}
-              >
-                <div className="tracklane-segment">
-                  <div className="segment-waveform">
-                    {audioBuffer ? (
-                      <Waveform
-                        audioBuffer={audioBuffer}
-                        color={track?.color}
-                        startOnTimelineMs={startOnTimelineMs}
-                        durationMs={durationMs}
-                        showProgress={false}
-                      />
-                    ) : (
-                      <div className="waveform-placeholder">
-                        (No buffer available for this segment)
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {contextMenu.open && (
+  // Render context menu using portal to avoid clipping issues
+  const contextMenuPortal = contextMenu.open
+    ? createPortal(
         <div
           className="tracklane-context-menu"
-          style={{top: `${contextMenu.y}px`, left: `${contextMenu.x}px`}}
+          style={{
+            position: "fixed",
+            top: `${contextMenu.y}px`,
+            left: `${contextMenu.x}px`,
+          }}
           role="menu"
         >
           <button
@@ -324,9 +230,135 @@ const TrackLane = memo(function TrackLane({
           >
             Delete
           </button>
+        </div>,
+        document.body
+      )
+    : null;
+
+  return (
+    <>
+      <div
+        className="tracklane-root"
+        style={{...rowWidthStyle, ...selectionStyle}}
+        onClick={handleTrackClick}
+        onContextMenu={handleContextMenu}
+      >
+        <div className="tracklane-side">
+          {showTitle && (
+            <div className="tracklane-header">
+              <div className="tracklane-title">
+                {track.name ?? "Untitled Track"}
+              </div>
+              <div className="tracklane-track-number">
+                Track {trackIndex + 1} of {totalTracks}
+              </div>
+            </div>
+          )}
+
+          <div className="tracklane-controls-box">
+            <div className="tracklane-controls">
+              <button
+                className={`tl-btn tl-btn-mute ${muted ? "tl-btn--active" : ""}`}
+                onClick={toggleMute}
+                aria-pressed={muted}
+                title={muted ? "Unmute track" : "Mute track"}
+              >
+                {muted ? "Muted" : "Mute"}
+              </button>
+
+              <button
+                className={`tl-btn tl-btn-solo ${soloed ? "tl-btn--active" : ""}`}
+                onClick={toggleSolo}
+                aria-pressed={soloed}
+                title={soloed ? "Unsolo track" : "Solo track"}
+              >
+                {soloed ? "Soloed" : "Solo"}
+              </button>
+
+              <div className="tracklane-divider" />
+
+              <button
+                className="tl-btn tl-btn-delete"
+                onClick={handleDelete}
+                title="Delete track"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
         </div>
-      )}
-    </div>
+
+        <div className="tracklane-main" style={tracklaneMainStyle}>
+          <div className="tracklane-timeline" style={tracklaneTimelineStyle}>
+            {segments.length === 0 && (
+              <div className="tracklane-empty">
+                No segments – import audio to add one.
+              </div>
+            )}
+
+            {segments.map((seg) => {
+              const audioBuffer = seg.buffer ?? seg.fileBuffer ?? null;
+
+              const startOnTimelineMs = Math.max(0, seg.startOnTimelineMs || 0);
+              const durationMs = Math.max(0, seg.durationMs || 0);
+
+              let positionStyle;
+              if (pxPerMs) {
+                const leftPx = Math.round(startOnTimelineMs * pxPerMs);
+                const widthPx = Math.max(2, Math.round(durationMs * pxPerMs));
+                positionStyle = {
+                  left: `${leftPx}px`,
+                  width: `${widthPx}px`,
+                };
+              } else {
+                const leftPercent =
+                  totalLengthMs > 0
+                    ? (startOnTimelineMs / totalLengthMs) * 100
+                    : 0;
+                const widthPercent =
+                  totalLengthMs > 0 ? (durationMs / totalLengthMs) * 100 : 100;
+                positionStyle = {
+                  left: `${leftPercent}%`,
+                  width: `${widthPercent}%`,
+                };
+              }
+
+              return (
+                <div
+                  className="tracklane-segment-positioned"
+                  key={seg.id || seg.fileUrl || Math.random()}
+                  style={{
+                    position: "absolute",
+                    height: "100%",
+                    ...positionStyle,
+                  }}
+                >
+                  <div className="tracklane-segment">
+                    <div className="segment-waveform">
+                      {audioBuffer ? (
+                        <Waveform
+                          audioBuffer={audioBuffer}
+                          color={track?.color}
+                          startOnTimelineMs={startOnTimelineMs}
+                          durationMs={durationMs}
+                          showProgress={false}
+                        />
+                      ) : (
+                        <div className="waveform-placeholder">
+                          (No buffer available for this segment)
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {contextMenuPortal}
+    </>
   );
 });
 
