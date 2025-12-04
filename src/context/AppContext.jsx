@@ -807,6 +807,18 @@ const AppContextProvider = ({children}) => {
     }
   }, [activeSession, engineRef]);
 
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("webamp.masterEffects");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        setEffects(mergeWithDefaults(parsed));
+      }
+    } catch (e) {
+      console.warn("Failed to load master effects:", e);
+    }
+  }, []);
+
   // Apply Master Effect Parameter Values to Engine
   useEffect(() => {
     // Apply effect parameter values to the audio engine (only enabled ones)

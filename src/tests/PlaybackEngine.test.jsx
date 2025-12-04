@@ -12,7 +12,20 @@ const dbToGain = (db) => (typeof db === "number" ? Math.pow(10, db / 20) : 1);
 vi.mock("tone", () => {
   // Simple mock playback time source
   let now = 0;
-  return {
+
+  class MockToneAudioBuffer {
+    constructor(native) {
+      this._native = native;
+    }
+    get() {
+      return this._native || {};
+    }
+  }
+  MockToneAudioBuffer.load = vi
+    .fn()
+    .mockResolvedValue(new MockToneAudioBuffer({}));
+
+  const mock = {
     context: {state: "suspended"},
     start: vi.fn().mockResolvedValue(undefined),
     now: () => now,
@@ -51,23 +64,18 @@ vi.mock("tone", () => {
         this.url = opts.url;
         this.autostart = opts.autostart;
         this._started = false;
+        this._startArgs = null;
       }
       connect() {}
       sync() {}
-      start() {
+      start(time, offset, duration) {
         this._started = true;
+        this._startArgs = {time, offset, duration};
       }
       unsync() {}
       dispose() {}
     },
-    ToneAudioBuffer: class MockToneAudioBuffer {
-      constructor(native) {
-        this._native = native;
-      }
-      get() {
-        return this._native || {};
-      }
-    },
+    ToneAudioBuffer: MockToneAudioBuffer,
     // Very small Transport mock
     Transport: {
       bpm: {value: 120},
@@ -82,16 +90,9 @@ vi.mock("tone", () => {
     },
     // Tone.Destination placeholder
     Destination: {},
-    // helper shorthand for naming used in code (Panner vs Tone.Panner)
-    Panner: class MockPanner {
-      constructor(v = 0) {
-        this.pan = {value: v};
-      }
-      connect() {}
-      disconnect() {}
-      dispose() {}
-    },
   };
+
+  return mock;
 });
 
 // Helper: create a very small "version" object with tracks but no segments.
@@ -273,5 +274,55 @@ describe("PlaybackEngine transport controls", () => {
 
     engine.seekMs(2500);
     expect(Tone.Transport.seconds).toBeCloseTo(2.5 + engine.jogLatencySec, 5);
+  });
+});
+
+describe("PlaybackEngine segment scheduling", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Tone.Transport.seconds = 0;
+  });
+
+  it("schedules segments using second-based offsets", async () => {
+    const engine = new PlaybackEngine({});
+    const version = {
+      bpm: 120,
+      timeSig: [4, 4],
+      lengthMs: 10000,
+      tracks: [
+        {
+          id: "track-1",
+          name: "Track 1",
+          gainDb: 0,
+          pan: 0,
+          mute: false,
+          solo: false,
+          color: "#f00",
+        },
+      ],
+      segments: [
+        {
+          id: "seg-late",
+          trackId: "track-1",
+          fileUrl: {get: () => ({})},
+          startOnTimelineMs: 5000,
+          startInFileMs: 1000,
+          durationMs: 2000,
+          gainDb: 0,
+        },
+      ],
+      loop: {enabled: false},
+      masterChain: [],
+    };
+
+    await engine.load(version);
+
+    const playerEntry = engine.playersBySegment.get("seg-late");
+    expect(playerEntry).toBeDefined();
+    expect(playerEntry.player?._startArgs).toEqual({
+      time: 5,
+      offset: 1,
+      duration: 2,
+    });
   });
 });

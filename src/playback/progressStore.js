@@ -3,6 +3,9 @@ let _lengthMs = 0;
 let _seeker = null; // function(ms)
 let _scrubStart = null; // function()
 let _scrubEnd = null; // function()
+let _scrubLocked = false;
+let _pendingSeek = null;
+let _scrubOptions = null;
 const listeners = new Set();
 
 export const progressStore = {
@@ -28,6 +31,14 @@ export const progressStore = {
 
   setSeeker(fn) {
     _seeker = typeof fn === "function" ? fn : null;
+    if (_seeker && Number.isFinite(_pendingSeek)) {
+      try {
+        _seeker(_pendingSeek);
+      } catch (err) {
+        console.warn("progressStore pending seek error:", err);
+      }
+      _pendingSeek = null;
+    }
   },
 
   requestSeek(ms) {
@@ -42,6 +53,8 @@ export const progressStore = {
       } catch (err) {
         console.warn("progressStore seeker error:", err);
       }
+    } else {
+      _pendingSeek = clamped;
     }
 
     this.setMs(clamped);
@@ -55,10 +68,11 @@ export const progressStore = {
     _scrubEnd = typeof fn === "function" ? fn : null;
   },
 
-  beginScrub() {
+  beginScrub(options = {}) {
+    _scrubOptions = options && typeof options === "object" ? options : {};
     if (_scrubStart) {
       try {
-        _scrubStart();
+        _scrubStart(_scrubOptions);
       } catch (err) {
         console.warn("progressStore scrubStart error:", err);
       }
@@ -66,17 +80,27 @@ export const progressStore = {
   },
 
   endScrub() {
+    const opts = _scrubOptions || {};
     if (_scrubEnd) {
       try {
-        _scrubEnd();
+        _scrubEnd(opts);
       } catch (err) {
         console.warn("progressStore scrubEnd error:", err);
       }
     }
+    _scrubOptions = null;
   },
 
   subscribe(fn) {
     listeners.add(fn);
     return () => listeners.delete(fn);
+  },
+
+  setScrubLocked(lock) {
+    _scrubLocked = !!lock;
+  },
+
+  isScrubLocked() {
+    return _scrubLocked;
   },
 };

@@ -1,4 +1,11 @@
-import React, {useContext, useEffect, useMemo, useRef, useState} from "react";
+import React, {
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import * as Tone from "tone";
 import {progressStore} from "./progressStore";
 import {
@@ -17,6 +24,8 @@ import "./playback.css";
 import {AppContext} from "../context/AppContext";
 import PlayPauseButton from "./PlayPauseButton";
 
+const EQ_BANDS = [32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
+
 // === Utility functions ===
 
 // Convert decibels to linear gain value (used for volume control)
@@ -25,11 +34,8 @@ const dbToGain = (db) => (typeof db === "number" ? Math.pow(10, db / 20) : 1);
 // Clamp a value between two bounds (for panning range)
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
-// Convert milliseconds to beats given a BPM (used for time alignment)
-const msToBeats = (ms, bpm) => (ms / 1000) * (bpm / 60);
-
-// Convert milliseconds to Tone.js "transport time" string format
-const msToToneTime = (ms, bpm) => `${msToBeats(ms, bpm)}i`; // i = immutable numeric time
+// Convert milliseconds to seconds for Tone.js transport scheduling
+const msToToneTime = (ms) => Math.max(0, Number(ms) || 0) / 1000;
 
 const EMPTY_TIMELINE_VERSION_TEMPLATE = Object.freeze({
   bpm: 120,
@@ -190,10 +196,7 @@ class PlaybackEngine {
   /** Define a loop range for the transport */
   setLoop(startMs, endMs) {
     if (!this.version) return;
-    Tone.Transport.setLoopPoints(
-      msToToneTime(startMs, this.version.bpm || 120),
-      msToToneTime(endMs, this.version.bpm || 120)
-    );
+    Tone.Transport.setLoopPoints(msToToneTime(startMs), msToToneTime(endMs));
     Tone.Transport.loop = endMs > startMs;
   }
 
@@ -413,25 +416,35 @@ class PlaybackEngine {
         }
 
         // Update EQ3 (Bass)
-        if (node instanceof Tone.EQ3 && effectsMap.bass !== undefined) {
-          if (enabledEffectsMap.bass !== false) {
-            node.low.value = effectsMap.bass;
+        if (
+          node instanceof Tone.EQ3 &&
+          effectsMap.bass !== undefined &&
+          enabledEffectsMap.bass !== false
+        ) {
+          node.low.value = effectsMap.bass;
+        }
+
+        // Full Equalizer
+        if (node instanceof Tone.Filter && node.type === "peaking") {
+          const nodeFreq = node.frequency.value;
+          const matchingBand = EQ_BANDS.find(
+            (f) => Math.abs(f - nodeFreq) < 10
+          );
+
+          if (matchingBand && effectsMap[matchingBand] !== undefined) {
+            node.gain.value = effectsMap[matchingBand];
           }
         }
 
         // Update Distortion
         if (
           node instanceof Tone.Distortion &&
-          effectsMap.distortion !== undefined
+          effectsMap.distortion !== undefined &&
+          enabledEffectsMap.distortion !== false
         ) {
-          if (enabledEffectsMap.distortion !== false) {
-            const amount = Math.max(
-              0,
-              Math.min(1, effectsMap.distortion / 100)
-            );
-            node.distortion = amount;
-            node.wet.value = amount * 0.8;
-          }
+          const amount = Math.max(0, Math.min(1, effectsMap.distortion / 100));
+          node.distortion = amount;
+          node.wet.value = amount * 0.8;
         }
 
         // Update Volume (Gain)
@@ -583,7 +596,28 @@ class PlaybackEngine {
         console.log("[Effects] Added Bass:", effectsMap.bass);
       }
 
-      // Distortion - only add if enabled
+      const hasEQChanges = EQ_BANDS.some(
+        (freq) =>
+          effectsMap[freq] !== undefined && Math.abs(effectsMap[freq]) > 0.01
+      );
+
+      if (hasEQChanges) {
+        EQ_BANDS.forEach((freq) => {
+          const gain = effectsMap[freq];
+          if (gain !== undefined && Math.abs(gain) > 0.01) {
+            const filter = new Tone.Filter({
+              frequency: freq,
+              type: "peaking",
+              Q: 1.0,
+              gain: gain,
+            });
+            nodes.push(filter);
+            console.log(`[Effects] Added EQ ${freq}Hz: ${gain}dB`);
+          }
+        });
+      }
+
+      // Distortion
       if (
         effectsMap.distortion &&
         effectsMap.distortion > 0.01 &&
@@ -931,6 +965,30 @@ class PlaybackEngine {
       }
     }
 
+    const hasEQChanges = EQ_BANDS.some(
+      (freq) => effects[freq] !== undefined && Math.abs(effects[freq]) > 0.01
+    );
+
+    if (hasEQChanges) {
+      try {
+        EQ_BANDS.forEach((freq) => {
+          const gain = effects[freq];
+          if (gain !== undefined && Math.abs(gain) > 0.01) {
+            const filter = new Tone.Filter({
+              frequency: freq,
+              type: "peaking",
+              Q: 1.0,
+              gain: gain,
+              context: context,
+            });
+            chain.push(filter);
+          }
+        });
+      } catch (e) {
+        console.warn("Failed to create EQ filters:", e);
+      }
+    }
+
     // Distortion
     if (effects?.distortion && effects.distortion > 0) {
       try {
@@ -1197,6 +1255,13 @@ class PlaybackEngine {
         wet: wet,
       });
     }
+    // Full EQ
+    EQ_BANDS.forEach((freq) => {
+      const gain = effects?.[freq];
+      if (typeof gain === "number" && Math.abs(gain) > 0.01) {
+        chain.push({type: "peaking", frequency: freq, gain: gain, Q: 1.0});
+      }
+    });
     this.replaceMasterChain(chain);
   }
 
@@ -1281,11 +1346,8 @@ class PlaybackEngine {
       player.sync();
 
       // Schedule start time in the Transport
-      const startTT = msToToneTime(
-        seg.startOnTimelineMs || 0,
-        version.bpm || 120
-      );
-      player.start(startTT, offsetSec, durSec);
+      const startSec = msToToneTime(seg.startOnTimelineMs || 0);
+      player.start(startSec, offsetSec, durSec);
     }
 
     this._applyMuteSolo();
@@ -1407,6 +1469,16 @@ class PlaybackEngine {
                 wet: cfg.wet ?? 0.5,
               }).start(); // IMPORTANT: Must call .start()
               nodes.push(chorus);
+              break;
+            }
+            case "peaking": {
+              const filter = new Tone.Filter({
+                frequency: cfg.frequency ?? 1000,
+                type: "peaking",
+                Q: cfg.Q ?? 1.0,
+                gain: cfg.gain ?? 0,
+              });
+              nodes.push(filter);
               break;
             }
             default:
@@ -1772,6 +1844,21 @@ export default function WebAmpPlayback({version, onEngineReady}) {
     []
   );
 
+  const syncTransportToProgressStore = useCallback(() => {
+    if (!engine || typeof progressStore.getState !== "function") {
+      return;
+    }
+
+    try {
+      const {ms: storedMs} = progressStore.getState() || {};
+      if (!Number.isFinite(storedMs)) return;
+      engine.seekMs(storedMs);
+      setMs(storedMs);
+    } catch (err) {
+      console.warn("Failed to sync transport to playhead:", err);
+    }
+  }, [engine]);
+
   // Attach and clean up engine
   useEffect(() => {
     engineRef.current = engine;
@@ -1805,6 +1892,30 @@ export default function WebAmpPlayback({version, onEngineReady}) {
   useEffect(() => {
     const cleanup = () => {
       progressStore.setSeeker(null);
+    };
+
+    const restorePlayheadAfterLoad = () => {
+      if (!engine || typeof progressStore.getState !== "function") {
+        return;
+      }
+
+      try {
+        const {ms: preservedMs} = progressStore.getState() || {};
+        if (!Number.isFinite(preservedMs)) {
+          return;
+        }
+
+        const maxLen =
+          typeof version?.lengthMs === "number"
+            ? version.lengthMs
+            : preservedMs;
+        const targetMs = Math.max(0, Math.min(preservedMs, maxLen));
+
+        engine.seekMs(targetMs);
+        setMs(targetMs);
+      } catch (err) {
+        console.warn("Failed to restore playhead after engine reload:", err);
+      }
     };
 
     const versionHasTracks = !!(
@@ -1883,6 +1994,7 @@ export default function WebAmpPlayback({version, onEngineReady}) {
                 engine.setMasterEffects(effects);
               }
             }
+            restorePlayheadAfterLoad();
           } catch {}
         })
         .catch((e) => console.error("[UI] engine.load() failed:", e));
@@ -1916,30 +2028,50 @@ export default function WebAmpPlayback({version, onEngineReady}) {
   }, [engine, version, effects]);
 
   useEffect(() => {
-    progressStore.setScrubStart(() => {
-      wasPlayingRef.current = playing;
-      if (engine.master) {
+    progressStore.setScrubStart((options = {}) => {
+      const shouldPause = options?.pauseTransport !== false;
+      const shouldSilence =
+        options?.silenceDuringScrub !== undefined
+          ? !!options.silenceDuringScrub
+          : shouldPause;
+
+      wasPlayingRef.current = shouldPause && playing;
+
+      if (shouldPause && playing) {
         try {
-          // Store the CURRENT actual gain value
+          engine.pause();
+        } catch (err) {
+          console.warn("Failed to pause engine during scrub:", err);
+        }
+      }
+
+      if (shouldSilence && engine.master?.gain?.gain) {
+        try {
           const currentGain = engine.master.gain.gain.value;
           volumeBeforeScrubRef.current = currentGain;
           prevMasterGainRef.current = currentGain;
 
-          // Only mute if we're actually playing
           if (playing) {
-            engine.master.gain.gain.value = 0.0001; // virtually silent
+            engine.master.gain.gain.value = 0.0001;
             mutingDuringScrubRef.current = true;
           }
         } catch (e) {
-          console.warn("Failed to mute during scrub start:", e);
+          console.warn("Failed to adjust volume during scrub start:", e);
         }
+      } else {
+        mutingDuringScrubRef.current = false;
       }
     });
 
-    progressStore.setScrubEnd(() => {
-      if (mutingDuringScrubRef.current && engine.master) {
+    progressStore.setScrubEnd((options = {}) => {
+      const shouldPause = options?.pauseTransport !== false;
+      const shouldSilence =
+        options?.silenceDuringScrub !== undefined
+          ? !!options.silenceDuringScrub
+          : shouldPause;
+
+      if (shouldSilence && mutingDuringScrubRef.current && engine.master) {
         try {
-          // Restore the volume that was active before scrubbing
           const restoreGain =
             volumeBeforeScrubRef.current ?? savedVolumeRef.current;
           engine.master.gain.gain.value = restoreGain;
@@ -1950,9 +2082,15 @@ export default function WebAmpPlayback({version, onEngineReady}) {
       }
       mutingDuringScrubRef.current = false;
 
-      // if it was playing before scrub, resume playback
-      if (wasPlayingRef.current) {
-        engine.play().catch(() => {});
+      if (shouldPause && wasPlayingRef.current) {
+        engine
+          .play()
+          .catch((err) =>
+            console.warn("Failed to resume engine after scrub:", err)
+          );
+      }
+      if (shouldPause) {
+        wasPlayingRef.current = false;
       }
     });
 
@@ -2007,6 +2145,7 @@ export default function WebAmpPlayback({version, onEngineReady}) {
   // Control handlers for play, pause, stop
   const onPlay = async () => {
     try {
+      syncTransportToProgressStore();
       await engine.play();
     } catch (e) {
       console.error("[UI] engine.play() failed:", e);
