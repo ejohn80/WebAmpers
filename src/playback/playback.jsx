@@ -187,10 +187,7 @@ class PlaybackEngine {
   /** Define a loop range for the transport */
   setLoop(startMs, endMs) {
     if (!this.version) return;
-    Tone.Transport.setLoopPoints(
-      msToToneTime(startMs),
-      msToToneTime(endMs)
-    );
+    Tone.Transport.setLoopPoints(msToToneTime(startMs), msToToneTime(endMs));
     Tone.Transport.loop = endMs > startMs;
   }
 

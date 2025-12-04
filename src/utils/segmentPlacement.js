@@ -204,11 +204,7 @@ export const insertSegmentWithSpacing = (segments = [], candidateSegment) => {
 
   applyStartTime(
     newSegment,
-    resolveSegmentStart(
-      working,
-      newSegment.startOnTimelineMs,
-      segmentDuration
-    )
+    resolveSegmentStart(working, newSegment.startOnTimelineMs, segmentDuration)
   );
 
   working.push(newSegment);

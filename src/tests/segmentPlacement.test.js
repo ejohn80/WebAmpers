@@ -90,7 +90,9 @@ describe("insertSegmentWithSpacing", () => {
     const inserted = result.find((seg) => seg.id === "tiny");
 
     expect(inserted.startOnTimelineMs).toBe(25000);
-    expect(result.find((seg) => seg.id === "first").startOnTimelineMs).toBe(30000);
+    expect(result.find((seg) => seg.id === "first").startOnTimelineMs).toBe(
+      30000
+    );
     expect(result).not.toBe(base);
   });
 });

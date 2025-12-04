@@ -51,21 +51,24 @@ function MainContent({
     setSelectedSegment(null);
   }, []);
 
-  const handleSegmentSelected = useCallback((trackId, segmentId, segmentIndex) => {
-    if (!trackId) {
-      setSelectedSegment(null);
-      return;
-    }
+  const handleSegmentSelected = useCallback(
+    (trackId, segmentId, segmentIndex) => {
+      if (!trackId) {
+        setSelectedSegment(null);
+        return;
+      }
 
-    setSelectedSegment({
-      trackId,
-      segmentId: segmentId ?? null,
-      segmentIndex:
-        Number.isFinite(segmentIndex) && segmentIndex >= 0
-          ? segmentIndex
-          : null,
-    });
-  }, []);
+      setSelectedSegment({
+        trackId,
+        segmentId: segmentId ?? null,
+        segmentIndex:
+          Number.isFinite(segmentIndex) && segmentIndex >= 0
+            ? segmentIndex
+            : null,
+      });
+    },
+    []
+  );
 
   // Deselect when clicking background
   const handleBackgroundClick = () => {
@@ -228,17 +231,20 @@ function MainContent({
         // Get drop position to calculate timeline position
         const rect = e.currentTarget.getBoundingClientRect();
         const dropX = e.clientX - rect.left - timelineMetrics.leftOffsetPx;
-        const pxPerMs = totalLengthMs > 0 ? timelineMetrics.widthPx / totalLengthMs : 0;
-        const timelinePositionMs = pxPerMs > 0 ? Math.max(0, dropX / pxPerMs) : 0;
+        const pxPerMs =
+          totalLengthMs > 0 ? timelineMetrics.widthPx / totalLengthMs : 0;
+        const timelinePositionMs =
+          pxPerMs > 0 ? Math.max(0, dropX / pxPerMs) : 0;
 
         // Determine which track (if any) was targeted
         const dropY = e.clientY - rect.top;
         const trackHeight = 96 * verticalScale;
         const rulerHeight = 40; // Approximate ruler height
         const trackIndex = Math.floor((dropY - rulerHeight) / trackHeight);
-        const targetTrackId = (trackIndex >= 0 && trackIndex < tracks.length) 
-          ? tracks[trackIndex]?.id 
-          : null;
+        const targetTrackId =
+          trackIndex >= 0 && trackIndex < tracks.length
+            ? tracks[trackIndex]?.id
+            : null;
 
         onAssetDrop(dropData.assetId, targetTrackId, timelinePositionMs);
       }

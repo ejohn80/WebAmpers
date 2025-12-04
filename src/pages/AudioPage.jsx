@@ -1,4 +1,10 @@
-import React, {useState, useEffect, useContext, useRef, useCallback} from "react";
+import React, {
+  useState,
+  useEffect,
+  useContext,
+  useRef,
+  useCallback,
+} from "react";
 import "./AudioPage.css";
 import * as Tone from "tone";
 
@@ -181,7 +187,9 @@ function AudioPage() {
         const durationSeconds =
           typeof toneBuffer.duration === "number"
             ? toneBuffer.duration
-            : toneBuffer._buffer?.duration ?? toneBuffer.get?.()?.duration ?? 0;
+            : (toneBuffer._buffer?.duration ??
+              toneBuffer.get?.()?.duration ??
+              0);
 
         const preview = {durationMs: Math.round(durationSeconds * 1000)};
         assetPreviewCacheRef.current.set(assetId, preview);
@@ -537,7 +545,10 @@ function AudioPage() {
     timelinePositionMs = 0
   ) => {
     try {
-      console.log(`Dropping asset ${assetId}`, {targetTrackId, timelinePositionMs});
+      console.log(`Dropping asset ${assetId}`, {
+        targetTrackId,
+        timelinePositionMs,
+      });
 
       // Get the asset from the database first
       const asset = await dbManager.getAsset(assetId);
@@ -591,7 +602,9 @@ function AudioPage() {
           return;
         }
 
-        console.log(`Appending segment to track ${targetTrackId} at ${timelinePositionMs}ms`);
+        console.log(
+          `Appending segment to track ${targetTrackId} at ${timelinePositionMs}ms`
+        );
 
         // Create new segment
         const newSegment = {
@@ -714,7 +727,9 @@ function AudioPage() {
   // Handle segment movement within a track
   const handleSegmentMove = async (trackId, segmentIndex, newPositionMs) => {
     try {
-      console.log(`Moving segment ${segmentIndex} in track ${trackId} to ${newPositionMs}ms`);
+      console.log(
+        `Moving segment ${segmentIndex} in track ${trackId} to ${newPositionMs}ms`
+      );
 
       const track = audioManager.getTrack(trackId);
       if (!track || !track.segments || !track.segments[segmentIndex]) {
@@ -750,9 +765,9 @@ function AudioPage() {
       console.log("[handleSegmentMove] After spacing", {
         segmentId: updatedSegment.id,
         requestedStart: safeNewPosition,
-        appliedStart:
-          normalizedSegments.find((seg) => seg.id === updatedSegment.id)
-            ?.startOnTimelineMs,
+        appliedStart: normalizedSegments.find(
+          (seg) => seg.id === updatedSegment.id
+        )?.startOnTimelineMs,
       });
 
       await dbManager.updateTrack(track);

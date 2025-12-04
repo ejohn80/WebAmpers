@@ -59,7 +59,8 @@ const SegmentBlock = ({
   // Calculate position style
   let positionStyle;
   if (pxPerMs) {
-    const leftPx = Math.round(startOnTimelineMs * pxPerMs) + (isDragging ? dragOffset : 0);
+    const leftPx =
+      Math.round(startOnTimelineMs * pxPerMs) + (isDragging ? dragOffset : 0);
     const widthPx = Math.max(2, Math.round(durationMs * pxPerMs));
     positionStyle = {
       left: `${leftPx}px`,
@@ -67,9 +68,7 @@ const SegmentBlock = ({
     };
   } else {
     const leftPercent =
-      totalLengthMs > 0
-        ? (startOnTimelineMs / totalLengthMs) * 100
-        : 0;
+      totalLengthMs > 0 ? (startOnTimelineMs / totalLengthMs) * 100 : 0;
     const widthPercent =
       totalLengthMs > 0 ? (durationMs / totalLengthMs) * 100 : 100;
     positionStyle = {

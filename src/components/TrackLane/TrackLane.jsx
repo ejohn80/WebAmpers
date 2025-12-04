@@ -509,13 +509,17 @@ const TrackLane = memo(function TrackLane({
                   : totalLengthMs > 0
                     ? `${(dropPreview.startOnTimelineMs / totalLengthMs) * 100}%`
                     : 0;
-                const widthPx = pxPerMs && dropPreview.durationMs
-                  ? Math.max(4, Math.round(dropPreview.durationMs * pxPerMs))
-                  : totalLengthMs > 0 && dropPreview.durationMs
-                    ? `${(dropPreview.durationMs / totalLengthMs) * 100}%`
-                    : 80;
+                const widthPx =
+                  pxPerMs && dropPreview.durationMs
+                    ? Math.max(4, Math.round(dropPreview.durationMs * pxPerMs))
+                    : totalLengthMs > 0 && dropPreview.durationMs
+                      ? `${(dropPreview.durationMs / totalLengthMs) * 100}%`
+                      : 80;
 
-                if (typeof startPx === "number" && typeof widthPx === "number") {
+                if (
+                  typeof startPx === "number" &&
+                  typeof widthPx === "number"
+                ) {
                   return {left: `${startPx}px`, width: `${widthPx}px`};
                 }
 
