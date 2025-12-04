@@ -1,4 +1,11 @@
-import React, {useEffect, useMemo, useRef, useState, useContext} from "react";
+import React, {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useContext,
+  useCallback,
+} from "react";
 import DraggableDiv from "../Generic/DraggableDiv";
 import GlobalPlayhead from "../Generic/GlobalPlayhead";
 import TimelineRuler from "./TimelineRuler";
@@ -38,11 +45,57 @@ function MainContent({
   const [timelineContentWidth, setTimelineContentWidth] = useState(0);
   const [scrollAreaWidth, setScrollAreaWidth] = useState(0);
   const scrollAreaRef = useRef(null);
+  const [selectedSegment, setSelectedSegment] = useState(null);
+
+  const clearSegmentSelection = useCallback(() => {
+    setSelectedSegment(null);
+  }, []);
+
+  const handleSegmentSelected = useCallback((trackId, segmentId, segmentIndex) => {
+    if (!trackId) {
+      setSelectedSegment(null);
+      return;
+    }
+
+    setSelectedSegment({
+      trackId,
+      segmentId: segmentId ?? null,
+      segmentIndex:
+        Number.isFinite(segmentIndex) && segmentIndex >= 0
+          ? segmentIndex
+          : null,
+    });
+  }, []);
 
   // Deselect when clicking background
   const handleBackgroundClick = () => {
-    setSelectedTrackId(null);
+    if (typeof setSelectedTrackId === "function") {
+      setSelectedTrackId(null);
+    }
+    clearSegmentSelection();
   };
+
+  useEffect(() => {
+    if (!selectedSegment) return;
+
+    const track = tracks.find((t) => t?.id === selectedSegment.trackId);
+    if (!track || !Array.isArray(track.segments)) {
+      clearSegmentSelection();
+      return;
+    }
+
+    const hasMatch = track.segments.some((segment, index) => {
+      if (!segment) return false;
+      if (selectedSegment.segmentId) {
+        return segment.id === selectedSegment.segmentId;
+      }
+      return selectedSegment.segmentIndex === index;
+    });
+
+    if (!hasMatch) {
+      clearSegmentSelection();
+    }
+  }, [tracks, selectedSegment, clearSegmentSelection]);
 
   const verticalScale = useMemo(
     () => Math.min(2.25, Math.max(0.6, Math.pow(Math.max(zoom, 0.01), 0.5))),
@@ -271,6 +324,9 @@ function MainContent({
                         totalLengthMs={totalLengthMs}
                         timelineWidth={timelineMetrics.widthPx}
                         rowWidthPx={timelineMetrics.rowWidthPx}
+                        selectedSegment={selectedSegment}
+                        onSegmentSelected={handleSegmentSelected}
+                        onClearSegmentSelection={clearSegmentSelection}
                       />
                     </div>
                   ))}

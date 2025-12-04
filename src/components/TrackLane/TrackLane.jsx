@@ -23,6 +23,9 @@ const TrackLane = memo(function TrackLane({
   rowWidthPx = 0,
   isSelected = false,
   onSelect = () => {},
+  selectedSegment = null,
+  onSegmentSelected = () => {},
+  onClearSegmentSelection = () => {},
 }) {
   if (!track) return null;
 
@@ -178,6 +181,10 @@ const TrackLane = memo(function TrackLane({
 
   const handleTrackClick = (e) => {
     e.stopPropagation();
+    if (typeof onClearSegmentSelection === "function") {
+      onClearSegmentSelection();
+    }
+    setSelectedSegmentIndex(null);
     onSelect(track.id);
   };
 
@@ -341,7 +348,34 @@ const TrackLane = memo(function TrackLane({
 
   const handleSegmentSelect = (segmentIndex) => {
     setSelectedSegmentIndex(segmentIndex);
+    const segment = segments[segmentIndex];
+    if (typeof onSegmentSelected === "function") {
+      onSegmentSelected(track.id, segment?.id ?? null, segmentIndex);
+    }
+    onSelect(track.id);
   };
+
+  useEffect(() => {
+    if (!selectedSegment || selectedSegment.trackId !== track.id) {
+      if (selectedSegmentIndex !== null) {
+        setSelectedSegmentIndex(null);
+      }
+      return;
+    }
+
+    const matchIndex = segments.findIndex((segment, index) => {
+      if (!segment) return false;
+      if (selectedSegment.segmentId) {
+        return segment.id === selectedSegment.segmentId;
+      }
+      return selectedSegment.segmentIndex === index;
+    });
+
+    const nextIndex = matchIndex >= 0 ? matchIndex : null;
+    if (nextIndex !== selectedSegmentIndex) {
+      setSelectedSegmentIndex(nextIndex);
+    }
+  }, [selectedSegment, track.id, segments, selectedSegmentIndex]);
 
   const handleTimelineDragEnter = (e) => {
     if (!getDragAssetFromEvent(e)) return;
