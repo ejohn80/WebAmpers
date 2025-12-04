@@ -1,4 +1,5 @@
-import React, {useState, useEffect, memo, useCallback, useRef} from "react"; // Added memo
+import React, {useState, useEffect, memo, useCallback, useRef} from "react";
+import {createPortal} from "react-dom";
 import SegmentBlock from "./SegmentBlock";
 import "./TrackLane.css";
 import {resolveSegmentStart} from "../../utils/segmentPlacement";
@@ -30,15 +31,6 @@ const TrackLane = memo(function TrackLane({
   if (!track) return null;
 
   const segments = Array.isArray(track.segments) ? track.segments : [];
-  const [selectedSegmentIndex, setSelectedSegmentIndex] = useState(null);
-  const [dropPreview, setDropPreview] = useState(null);
-  const dragHoverDepthRef = useRef(0);
-  const pendingPreviewAssetRef = useRef(null);
-  const segmentsRef = useRef(segments);
-
-  useEffect(() => {
-    segmentsRef.current = segments;
-  }, [segments]);
 
   const getInitialState = () => {
     try {
@@ -53,11 +45,16 @@ const TrackLane = memo(function TrackLane({
 
   const [muted, setMuted] = useState(getInitialState().muted);
   const [soloed, setSoloed] = useState(getInitialState().soloed);
-  const [contextMenu, setContextMenu] = useState({
-    open: false,
-    x: 0,
-    y: 0,
-  });
+  const [contextMenu, setContextMenu] = useState({open: false, x: 0, y: 0});
+  const [selectedSegmentIndex, setSelectedSegmentIndex] = useState(null);
+  const [dropPreview, setDropPreview] = useState(null);
+  const dragHoverDepthRef = useRef(0);
+  const pendingPreviewAssetRef = useRef(null);
+  const segmentsRef = useRef(segments);
+
+  useEffect(() => {
+    segmentsRef.current = segments;
+  }, [segments]);
 
   useEffect(() => {
     try {
@@ -77,6 +74,10 @@ const TrackLane = memo(function TrackLane({
   useEffect(() => {
     setSoloed(!!track.solo);
   }, [track.solo, track.id]);
+
+  const closeContextMenu = useCallback(() => {
+    setContextMenu({open: false, x: 0, y: 0});
+  }, []);
 
   useEffect(() => {
     if (!contextMenu.open) return undefined;
@@ -104,18 +105,17 @@ const TrackLane = memo(function TrackLane({
       document.removeEventListener("pointerdown", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [contextMenu.open]);
-
-  const closeContextMenu = () => {
-    setContextMenu({open: false, x: 0, y: 0});
-  };
+  }, [contextMenu.open, closeContextMenu]);
 
   const handleContextMenu = (event) => {
     event.preventDefault();
+    event.stopPropagation();
+
     const menuWidth = 180;
     const menuHeight = 140;
     const x = Math.min(event.clientX, window.innerWidth - menuWidth);
     const y = Math.min(event.clientY, window.innerHeight - menuHeight);
+
     setContextMenu({open: true, x, y});
   };
 
@@ -159,6 +159,7 @@ const TrackLane = memo(function TrackLane({
   const numericTimelineWidth = Number.isFinite(parsedTimelineWidth)
     ? Math.max(0, parsedTimelineWidth)
     : 0;
+
   const pxPerMs =
     totalLengthMs > 0 && numericTimelineWidth > 0
       ? numericTimelineWidth / totalLengthMs
@@ -434,160 +435,167 @@ const TrackLane = memo(function TrackLane({
     clearDropPreview();
   };
 
-  return (
-    <div
-      className="tracklane-root"
-      style={{...rowWidthStyle, ...selectionStyle}}
-      onClick={handleTrackClick}
-      onContextMenu={handleContextMenu}
-    >
-      <div className="tracklane-side">
-        {showTitle && (
-          <div className="tracklane-header">
-            <div className="tracklane-title">
-              {track.name ?? "Untitled Track"}
-            </div>
-            <div className="tracklane-track-number">
-              Track {trackIndex + 1} of {totalTracks}
-            </div>
-          </div>
-        )}
-
-        <div className="tracklane-controls-box">
-          <div className="tracklane-controls">
+  const contextMenuPortal =
+    contextMenu.open && typeof document !== "undefined"
+      ? createPortal(
+          <div
+            className="tracklane-context-menu"
+            style={{top: `${contextMenu.y}px`, left: `${contextMenu.x}px`}}
+            role="menu"
+          >
             <button
-              className={`tl-btn tl-btn-mute ${muted ? "tl-btn--active" : ""}`}
-              onClick={toggleMute}
-              aria-pressed={muted}
-              title={muted ? "Unmute track" : "Mute track"}
+              className="context-menu-item"
+              onClick={() => handleMenuAction(toggleMute)}
+              role="menuitem"
             >
-              {muted ? "Muted" : "Mute"}
+              {muted ? "Unmute" : "Mute"}
             </button>
-
             <button
-              className={`tl-btn tl-btn-solo ${soloed ? "tl-btn--active" : ""}`}
-              onClick={toggleSolo}
-              aria-pressed={soloed}
-              title={soloed ? "Unsolo track" : "Solo track"}
+              className="context-menu-item"
+              onClick={() => handleMenuAction(toggleSolo)}
+              role="menuitem"
             >
-              {soloed ? "Soloed" : "Solo"}
+              {soloed ? "Unsolo" : "Solo"}
             </button>
-
-            <div className="tracklane-divider" />
-
+            <div className="context-menu-divider" />
             <button
-              className="tl-btn tl-btn-delete"
-              onClick={handleDelete}
-              title="Delete track"
+              className="context-menu-item context-menu-item--danger"
+              onClick={() => handleMenuAction(handleDelete)}
+              role="menuitem"
             >
               Delete
             </button>
+          </div>,
+          document.body
+        )
+      : null;
+
+  return (
+    <>
+      <div
+        className="tracklane-root"
+        style={{...rowWidthStyle, ...selectionStyle}}
+        onClick={handleTrackClick}
+        onContextMenu={handleContextMenu}
+      >
+        <div className="tracklane-side">
+          {showTitle && (
+            <div className="tracklane-header">
+              <div className="tracklane-title">
+                {track.name ?? "Untitled Track"}
+              </div>
+              <div className="tracklane-track-number">
+                Track {trackIndex + 1} of {totalTracks}
+              </div>
+            </div>
+          )}
+
+          <div className="tracklane-controls-box">
+            <div className="tracklane-controls">
+              <button
+                className={`tl-btn tl-btn-mute ${muted ? "tl-btn--active" : ""}`}
+                onClick={toggleMute}
+                aria-pressed={muted}
+                title={muted ? "Unmute track" : "Mute track"}
+              >
+                {muted ? "Muted" : "Mute"}
+              </button>
+
+              <button
+                className={`tl-btn tl-btn-solo ${soloed ? "tl-btn--active" : ""}`}
+                onClick={toggleSolo}
+                aria-pressed={soloed}
+                title={soloed ? "Unsolo track" : "Solo track"}
+              >
+                {soloed ? "Soloed" : "Solo"}
+              </button>
+
+              <div className="tracklane-divider" />
+
+              <button
+                className="tl-btn tl-btn-delete"
+                onClick={handleDelete}
+                title="Delete track"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="tracklane-main" style={tracklaneMainStyle}>
+          <div
+            className={`tracklane-timeline ${dropPreview ? "tracklane-timeline--drop" : ""}`}
+            style={tracklaneTimelineStyle}
+            onDragEnter={handleTimelineDragEnter}
+            onDragLeave={handleTimelineDragLeave}
+            onDragOver={handleTimelineDragOver}
+            onDrop={handleTimelineDrop}
+          >
+            {segments.length === 0 && (
+              <div className="tracklane-empty">
+                No segments — import audio or drag assets here to add segments.
+              </div>
+            )}
+
+            {dropPreview && (
+              <div
+                className={`tracklane-drop-preview ${dropPreview.isLoadingDuration ? "loading" : ""}`}
+                style={(() => {
+                  const startPx = pxPerMs
+                    ? Math.round(dropPreview.startOnTimelineMs * pxPerMs)
+                    : totalLengthMs > 0
+                      ? `${(dropPreview.startOnTimelineMs / totalLengthMs) * 100}%`
+                      : 0;
+                  const widthPx =
+                    pxPerMs && dropPreview.durationMs
+                      ? Math.max(4, Math.round(dropPreview.durationMs * pxPerMs))
+                      : totalLengthMs > 0 && dropPreview.durationMs
+                        ? `${(dropPreview.durationMs / totalLengthMs) * 100}%`
+                        : 80;
+
+                  if (
+                    typeof startPx === "number" &&
+                    typeof widthPx === "number"
+                  ) {
+                    return {left: `${startPx}px`, width: `${widthPx}px`};
+                  }
+
+                  return {
+                    left: typeof startPx === "string" ? startPx : "0%",
+                    width: typeof widthPx === "string" ? widthPx : "10%",
+                  };
+                })()}
+              >
+                <div className="drop-preview-label">
+                  {dropPreview.assetName || "New segment"}
+                </div>
+                <div className="drop-preview-duration">
+                  {dropPreview.isLoadingDuration
+                    ? "Loading…"
+                    : formatDurationLabel(dropPreview.durationMs)}
+                </div>
+              </div>
+            )}
+
+            {segments.map((seg, index) => (
+              <SegmentBlock
+                key={seg.id || seg.fileUrl || `segment-${index}`}
+                segment={seg}
+                trackColor={track?.color}
+                pxPerMs={pxPerMs}
+                totalLengthMs={totalLengthMs}
+                onSegmentMove={handleSegmentMove}
+                segmentIndex={index}
+                isSelected={selectedSegmentIndex === index}
+                onSelect={handleSegmentSelect}
+              />
+            ))}
           </div>
         </div>
       </div>
-
-      <div className="tracklane-main" style={tracklaneMainStyle}>
-        <div
-          className={`tracklane-timeline ${dropPreview ? "tracklane-timeline--drop" : ""}`}
-          style={tracklaneTimelineStyle}
-          onDragEnter={handleTimelineDragEnter}
-          onDragLeave={handleTimelineDragLeave}
-          onDragOver={handleTimelineDragOver}
-          onDrop={handleTimelineDrop}
-        >
-          {segments.length === 0 && (
-            <div className="tracklane-empty">
-              No segments — import audio or drag assets here to add segments.
-            </div>
-          )}
-
-          {dropPreview && (
-            <div
-              className={`tracklane-drop-preview ${dropPreview.isLoadingDuration ? "loading" : ""}`}
-              style={(() => {
-                const startPx = pxPerMs
-                  ? Math.round(dropPreview.startOnTimelineMs * pxPerMs)
-                  : totalLengthMs > 0
-                    ? `${(dropPreview.startOnTimelineMs / totalLengthMs) * 100}%`
-                    : 0;
-                const widthPx =
-                  pxPerMs && dropPreview.durationMs
-                    ? Math.max(4, Math.round(dropPreview.durationMs * pxPerMs))
-                    : totalLengthMs > 0 && dropPreview.durationMs
-                      ? `${(dropPreview.durationMs / totalLengthMs) * 100}%`
-                      : 80;
-
-                if (
-                  typeof startPx === "number" &&
-                  typeof widthPx === "number"
-                ) {
-                  return {left: `${startPx}px`, width: `${widthPx}px`};
-                }
-
-                return {
-                  left: typeof startPx === "string" ? startPx : "0%",
-                  width: typeof widthPx === "string" ? widthPx : "10%",
-                };
-              })()}
-            >
-              <div className="drop-preview-label">
-                {dropPreview.assetName || "New segment"}
-              </div>
-              <div className="drop-preview-duration">
-                {dropPreview.isLoadingDuration
-                  ? "Loading…"
-                  : formatDurationLabel(dropPreview.durationMs)}
-              </div>
-            </div>
-          )}
-
-          {segments.map((seg, index) => (
-            <SegmentBlock
-              key={seg.id || seg.fileUrl || `segment-${index}`}
-              segment={seg}
-              trackColor={track?.color}
-              pxPerMs={pxPerMs}
-              totalLengthMs={totalLengthMs}
-              onSegmentMove={handleSegmentMove}
-              segmentIndex={index}
-              isSelected={selectedSegmentIndex === index}
-              onSelect={handleSegmentSelect}
-            />
-          ))}
-        </div>
-      </div>
-
-      {contextMenu.open && (
-        <div
-          className="tracklane-context-menu"
-          style={{top: `${contextMenu.y}px`, left: `${contextMenu.x}px`}}
-          role="menu"
-        >
-          <button
-            className="context-menu-item"
-            onClick={() => handleMenuAction(toggleMute)}
-            role="menuitem"
-          >
-            {muted ? "Unmute" : "Mute"}
-          </button>
-          <button
-            className="context-menu-item"
-            onClick={() => handleMenuAction(toggleSolo)}
-            role="menuitem"
-          >
-            {soloed ? "Unsolo" : "Solo"}
-          </button>
-          <div className="context-menu-divider" />
-          <button
-            className="context-menu-item context-menu-item--danger"
-            onClick={() => handleMenuAction(handleDelete)}
-            role="menuitem"
-          >
-            Delete
-          </button>
-        </div>
-      )}
-    </div>
+      {contextMenuPortal}
+    </>
   );
 });
 
