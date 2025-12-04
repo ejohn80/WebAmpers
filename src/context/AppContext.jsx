@@ -80,6 +80,12 @@ const AppContextProvider = ({children}) => {
 
   const [engineRef, setEngineRef] = useState(null);
 
+  const masterVolumeStateRef = useRef({
+    volume: 50,
+    muted: false,
+    lastGainValue: 0.5,
+  });
+
   // Effects Menu State
   const [isEffectsMenuOpen, setIsEffectsMenuOpen] = useState(false);
 
@@ -122,16 +128,58 @@ const AppContextProvider = ({children}) => {
     setSelectedTrackActiveEffects([...track.activeEffectsList]);
     setSelectedTrackEnabledEffects({...track.enabledEffects});
 
-    // Use track's enabledEffects from IndexedDB
     const trackEnabled = track.enabledEffects || {};
 
     if (engineRef?.current?.setTrackEffects) {
-      // Pass both the full effects map AND the enabled map
+      // Pre-emptively lock master gain if muted
+      let masterGainBefore = null;
+      let wasMuted = false;
+
+      try {
+        if (engineRef.current.master?.gain?.gain) {
+          masterGainBefore = engineRef.current.master.gain.gain.value;
+
+          // If effectively muted (gain < 0.001), lock it NOW
+          if (masterGainBefore < 0.001) {
+            wasMuted = true;
+            engineRef.current.master.gain.gain.cancelScheduledValues(0);
+            engineRef.current.master.gain.gain.setValueAtTime(0, 0);
+          }
+        }
+      } catch (e) {
+        console.warn(
+          "Could not lock master gain before track effect application"
+        );
+      }
+
+      // Apply track effects
       engineRef.current.setTrackEffects(
         selectedTrackId,
         track.effects,
         trackEnabled
       );
+
+      // Verify and restore master gain
+      if (masterGainBefore !== null) {
+        try {
+          if (engineRef.current.master?.gain?.gain) {
+            engineRef.current.master.gain.gain.cancelScheduledValues(0);
+            engineRef.current.master.gain.gain.setValueAtTime(
+              masterGainBefore,
+              0
+            );
+
+            // Double-check if it was muted
+            if (wasMuted) {
+              engineRef.current.master.gain.gain.setValueAtTime(0, 0);
+            }
+          }
+        } catch (e) {
+          console.warn(
+            "Could not verify master gain after track effect application"
+          );
+        }
+      }
     }
   }, [selectedTrackId, engineRef]);
 
@@ -545,6 +593,14 @@ const AppContextProvider = ({children}) => {
         }
       });
 
+      // Store master volume state
+      let masterGainBefore = null;
+      try {
+        if (engineRef.current.master?.gain?.gain) {
+          masterGainBefore = engineRef.current.master.gain.gain.value;
+        }
+      } catch (e) {}
+
       try {
         if (
           !shallowEqualEffects(enabledEffectsToApply, engineRef.current.effects)
@@ -554,6 +610,13 @@ const AppContextProvider = ({children}) => {
       } catch (e) {
         console.error("Failed to apply master effects to engine:", e);
       }
+
+      // Restore master volume state
+      try {
+        if (masterGainBefore !== null && engineRef.current.master?.gain?.gain) {
+          engineRef.current.master.gain.gain.value = masterGainBefore;
+        }
+      } catch (e) {}
     },
     [engineRef, selectedTrackId]
   );
@@ -619,6 +682,23 @@ const AppContextProvider = ({children}) => {
         loadEffectParametersForSession(activeSession) || createDefaultEffects();
       setEffects(loadedEffectsParams);
 
+      // Preserve master volume when changing sessions
+      let masterGainBefore = null;
+      let wasMuted = false;
+      try {
+        const savedVol = window.localStorage.getItem("webamp.masterVol");
+        const savedMuted = window.localStorage.getItem("webamp.muted");
+        if (savedVol !== null) {
+          masterGainBefore = Math.max(0, Math.min(1, Number(savedVol) / 100));
+        }
+        if (savedMuted !== null) {
+          wasMuted = savedMuted === "1";
+        }
+        if (wasMuted) {
+          masterGainBefore = 0;
+        }
+      } catch (e) {}
+
       // Apply master-level session effects
       if (engineRef?.current) {
         try {
@@ -629,12 +709,34 @@ const AppContextProvider = ({children}) => {
         } catch (e) {
           console.error("[Session Change] Failed to apply master effects:", e);
         }
+
+        // Restore master volume after applying effects
+        if (masterGainBefore !== null) {
+          try {
+            if (engineRef.current.master?.gain?.gain) {
+              engineRef.current.master.gain.gain.value = masterGainBefore;
+            }
+          } catch (e) {
+            console.warn(
+              "Could not restore master volume after session change"
+            );
+          }
+        }
       }
 
       // We need to wait for tracks to be loaded by AudioPage, then apply per-track effects
       // Use an interval to check when tracks are available
       const checkAndApplyTrackEffects = () => {
         if (engineRef?.current && audioManager.tracks?.length > 0) {
+          // Store master volume before applying track effects
+          let masterGainBeforeTrackEffects = null;
+          try {
+            if (engineRef.current.master?.gain?.gain) {
+              masterGainBeforeTrackEffects =
+                engineRef.current.master.gain.gain.value;
+            }
+          } catch (e) {}
+
           try {
             // Reapply effects for all tracks currently present
             audioManager.tracks?.forEach((track) => {
@@ -655,6 +757,17 @@ const AppContextProvider = ({children}) => {
                 );
               }
             });
+
+            // Restore master volume after all track effects
+            if (masterGainBeforeTrackEffects !== null) {
+              try {
+                if (engineRef.current.master?.gain?.gain) {
+                  engineRef.current.master.gain.gain.value =
+                    masterGainBeforeTrackEffects;
+                }
+              } catch (e) {}
+            }
+
             return true; // Successfully applied
           } catch (e) {
             console.error("[Session Change] Failed to apply track effects:", e);

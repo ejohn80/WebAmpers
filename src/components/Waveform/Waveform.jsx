@@ -118,16 +118,65 @@ const Waveform = ({
   startOnTimelineMs = 0,
   durationMs = null,
   showProgress = true,
+  interactive = true,
 }) => {
   const containerRef = useRef(null);
   const draggingRef = useRef(false);
+  const liveSeekFrameRef = useRef(null);
+  const liveSeekValueRef = useRef(null);
   const [resolutionHint, setResolutionHint] = useState(DEFAULT_POINTS);
   const [wavePath, setWavePath] = useState({d: "", width: 0});
   const [{ms, lengthMs}, setProgress] = useState(progressStore.getState());
 
+  const isScrubLocked = () =>
+    typeof progressStore.isScrubLocked === "function"
+      ? progressStore.isScrubLocked()
+      : false;
+
   useEffect(() => {
     return progressStore.subscribe(setProgress);
   }, []);
+
+  const cancelLiveSeek = () => {
+    if (typeof window !== "undefined" && liveSeekFrameRef.current !== null) {
+      window.cancelAnimationFrame(liveSeekFrameRef.current);
+    }
+    liveSeekFrameRef.current = null;
+    liveSeekValueRef.current = null;
+  };
+
+  const flushLiveSeek = () => {
+    if (typeof window !== "undefined" && liveSeekFrameRef.current !== null) {
+      window.cancelAnimationFrame(liveSeekFrameRef.current);
+    }
+    liveSeekFrameRef.current = null;
+    const pending = liveSeekValueRef.current;
+    liveSeekValueRef.current = null;
+    if (typeof pending === "number") {
+      progressStore.requestSeek(pending);
+    }
+  };
+
+  const scheduleLiveSeek = (target) => {
+    if (typeof target !== "number") return;
+    liveSeekValueRef.current = target;
+    if (
+      typeof window === "undefined" ||
+      typeof window.requestAnimationFrame !== "function"
+    ) {
+      flushLiveSeek();
+      return;
+    }
+    if (liveSeekFrameRef.current !== null) return;
+    liveSeekFrameRef.current = window.requestAnimationFrame(() => {
+      liveSeekFrameRef.current = null;
+      const pending = liveSeekValueRef.current;
+      liveSeekValueRef.current = null;
+      if (typeof pending === "number") {
+        progressStore.requestSeek(pending);
+      }
+    });
+  };
 
   useEffect(() => {
     const container = containerRef.current;
@@ -210,10 +259,15 @@ const Waveform = ({
     const el = containerRef.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
+    const visibleWidth = rect?.width ?? 0;
+    if (!visibleWidth) return;
 
-    // X within the visible area of the container
-    const rel = Math.max(0, Math.min(rect.width, clientX - rect.left));
-    const p = rect.width > 0 ? rel / rect.width : 0;
+    const rel = clamp(clientX - rect.left, 0, visibleWidth);
+    const scrollLeft = el.scrollLeft ?? 0;
+    const scrollWidth = el.scrollWidth ?? visibleWidth;
+    const totalWidth = Math.max(scrollWidth, 1);
+    const absolute = Math.max(0, Math.min(totalWidth, scrollLeft + rel));
+    const p = absolute / totalWidth;
     // If segment timing provided, map within this segment; else map across global length
     if (durationMs && durationMs > 0) {
       return (startOnTimelineMs || 0) + p * durationMs;
@@ -225,12 +279,14 @@ const Waveform = ({
   // Scrubbing handlers
   const onMouseDown = (e) => {
     if (e.button !== 0) return; // left button only
+    if (!interactive || isScrubLocked()) return;
     draggingRef.current = true;
-    progressStore.beginScrub();
+    progressStore.beginScrub({pauseTransport: false});
     const target = msAtClientX(e.clientX);
     if (typeof target === "number") {
       // preview only: move the playhead visually without seeking audio
       progressStore.setMs(target); // visual move
+      scheduleLiveSeek(target);
     }
     if (typeof window !== "undefined") {
       window.addEventListener("mousemove", onMouseMove);
@@ -240,20 +296,25 @@ const Waveform = ({
 
   const onMouseMove = (e) => {
     if (!draggingRef.current) return;
+    if (isScrubLocked()) return;
     const target = msAtClientX(e.clientX);
     if (typeof target === "number") {
       progressStore.setMs(target);
+      scheduleLiveSeek(target);
     }
   };
 
   const onMouseUp = (e) => {
     if (!draggingRef.current) return;
     draggingRef.current = false;
+    cancelLiveSeek();
     const target = msAtClientX(e.clientX);
-    if (typeof target === "number") {
-      progressStore.requestSeek(target); // commit seek to engine
+    if (!isScrubLocked()) {
+      if (typeof target === "number") {
+        progressStore.requestSeek(target); // commit seek to engine
+      }
+      progressStore.endScrub();
     }
-    progressStore.endScrub();
     if (typeof window !== "undefined") {
       window.removeEventListener("mousemove", onMouseMove);
       window.removeEventListener("mouseup", onMouseUp);
@@ -278,6 +339,7 @@ const Waveform = ({
         window.removeEventListener("mousemove", onMouseMove);
         window.removeEventListener("mouseup", onMouseUp);
       }
+      cancelLiveSeek();
     },
     []
   );
@@ -285,40 +347,47 @@ const Waveform = ({
   // Touch support
   const onTouchStart = (e) => {
     if (!e.touches || e.touches.length === 0) return;
+    if (!interactive || isScrubLocked()) return;
     draggingRef.current = true;
-    progressStore.beginScrub();
+    progressStore.beginScrub({pauseTransport: false});
     const target = msAtClientX(e.touches[0].clientX);
     if (typeof target === "number") {
       progressStore.setMs(target);
+      scheduleLiveSeek(target);
     }
   };
 
   const onTouchMove = (e) => {
     if (!draggingRef.current || !e.touches || e.touches.length === 0) return;
+    if (isScrubLocked()) return;
     const target = msAtClientX(e.touches[0].clientX);
     if (typeof target === "number") {
       progressStore.setMs(target);
+      scheduleLiveSeek(target);
     }
   };
 
   const onTouchEnd = () => {
     if (!draggingRef.current) return;
     draggingRef.current = false;
+    cancelLiveSeek();
     // finalize at current playhead; engine will have been paused
-    const {ms: current} = progressStore.getState();
-    progressStore.requestSeek(current);
-    progressStore.endScrub();
+    if (!isScrubLocked()) {
+      const {ms: current} = progressStore.getState();
+      progressStore.requestSeek(current);
+      progressStore.endScrub();
+    }
   };
 
   return (
     <div
       ref={containerRef}
       className="waveform-container"
-      onMouseDown={onMouseDown}
-      onTouchStart={onTouchStart}
-      onTouchMove={onTouchMove}
-      onTouchEnd={onTouchEnd}
-      onWheel={onWheel}
+      onMouseDown={interactive ? onMouseDown : undefined}
+      onTouchStart={interactive ? onTouchStart : undefined}
+      onTouchMove={interactive ? onTouchMove : undefined}
+      onTouchEnd={interactive ? onTouchEnd : undefined}
+      onWheel={interactive ? onWheel : undefined}
     >
       {wavePath.d ? (
         <svg
