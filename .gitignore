@@ -34,3 +34,6 @@ uploads/
 
 # Python compiled files
 *.pyc
+MULTI_SEGMENT_IMPLEMENTATION.md
+MULTI_SEGMENT_QUICK_REFERENCE.md
+SEGMENT_DRAG_FIXES.md

@@ -1,5 +1,5 @@
 import React, {useState, useEffect, memo} from "react"; // Added memo
-import Waveform from "../Waveform/Waveform";
+import SegmentBlock from "./SegmentBlock";
 import "./TrackLane.css";
 
 /**
@@ -12,6 +12,8 @@ const TrackLane = memo(function TrackLane({
   onMute,
   onSolo,
   onDelete,
+  onSegmentMove,
+  onAssetDrop,
   trackIndex = 0,
   totalTracks = 1,
   totalLengthMs = 0,
@@ -23,6 +25,7 @@ const TrackLane = memo(function TrackLane({
   if (!track) return null;
 
   const segments = Array.isArray(track.segments) ? track.segments : [];
+  const [selectedSegmentIndex, setSelectedSegmentIndex] = useState(null);
 
   const getInitialState = () => {
     try {
@@ -176,6 +179,50 @@ const TrackLane = memo(function TrackLane({
       }
     : {};
 
+  const handleSegmentMove = (segmentIndex, newPositionMs) => {
+    console.log(`Moving segment ${segmentIndex} to ${newPositionMs}ms`);
+    if (onSegmentMove) {
+      onSegmentMove(track.id, segmentIndex, newPositionMs);
+    }
+  };
+
+  const handleSegmentSelect = (segmentIndex) => {
+    setSelectedSegmentIndex(segmentIndex);
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = "copy";
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    try {
+      const data = e.dataTransfer.getData("application/json");
+      if (!data) return;
+
+      const dropData = JSON.parse(data);
+      if (dropData.type === "asset" && typeof onAssetDrop === "function") {
+        // Calculate drop position within the track
+        const timelineElement = e.currentTarget.querySelector(".tracklane-timeline");
+        if (!timelineElement) return;
+
+        const rect = timelineElement.getBoundingClientRect();
+        const dropX = e.clientX - rect.left;
+        const timelinePositionMs = pxPerMs > 0 ? Math.max(0, dropX / pxPerMs) : 0;
+
+        console.log(`Asset dropped on track ${track.id} at ${timelinePositionMs}ms`);
+
+        onAssetDrop(dropData.assetId, track.id, timelinePositionMs);
+      }
+    } catch (err) {
+      console.error("Error handling track drop:", err);
+    }
+  };
+
   return (
     <div
       className="tracklane-root"
@@ -229,70 +276,31 @@ const TrackLane = memo(function TrackLane({
       </div>
 
       <div className="tracklane-main" style={tracklaneMainStyle}>
-        <div className="tracklane-timeline" style={tracklaneTimelineStyle}>
+        <div 
+          className="tracklane-timeline" 
+          style={tracklaneTimelineStyle}
+          onDragOver={handleDragOver}
+          onDrop={handleDrop}
+        >
           {segments.length === 0 && (
             <div className="tracklane-empty">
-              No segments — import audio to add one.
+              No segments — import audio or drag assets here to add segments.
             </div>
           )}
 
-          {segments.map((seg) => {
-            const audioBuffer = seg.buffer ?? seg.fileBuffer ?? null;
-
-            const startOnTimelineMs = Math.max(0, seg.startOnTimelineMs || 0);
-            const durationMs = Math.max(0, seg.durationMs || 0);
-
-            let positionStyle;
-            if (pxPerMs) {
-              const leftPx = Math.round(startOnTimelineMs * pxPerMs);
-              const widthPx = Math.max(2, Math.round(durationMs * pxPerMs));
-              positionStyle = {
-                left: `${leftPx}px`,
-                width: `${widthPx}px`,
-              };
-            } else {
-              const leftPercent =
-                totalLengthMs > 0
-                  ? (startOnTimelineMs / totalLengthMs) * 100
-                  : 0;
-              const widthPercent =
-                totalLengthMs > 0 ? (durationMs / totalLengthMs) * 100 : 100;
-              positionStyle = {
-                left: `${leftPercent}%`,
-                width: `${widthPercent}%`,
-              };
-            }
-
-            return (
-              <div
-                className="tracklane-segment-positioned"
-                key={seg.id || seg.fileUrl || Math.random()}
-                style={{
-                  position: "absolute",
-                  height: "100%",
-                  ...positionStyle,
-                }}
-              >
-                <div className="tracklane-segment">
-                  <div className="segment-waveform">
-                    {audioBuffer ? (
-                      <Waveform
-                        audioBuffer={audioBuffer}
-                        color={track?.color}
-                        startOnTimelineMs={startOnTimelineMs}
-                        durationMs={durationMs}
-                        showProgress={false}
-                      />
-                    ) : (
-                      <div className="waveform-placeholder">
-                        (No buffer available for this segment)
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+          {segments.map((seg, index) => (
+            <SegmentBlock
+              key={seg.id || seg.fileUrl || `segment-${index}`}
+              segment={seg}
+              trackColor={track?.color}
+              pxPerMs={pxPerMs}
+              totalLengthMs={totalLengthMs}
+              onSegmentMove={handleSegmentMove}
+              segmentIndex={index}
+              isSelected={selectedSegmentIndex === index}
+              onSelect={handleSegmentSelect}
+            />
+          ))}
         </div>
       </div>
 

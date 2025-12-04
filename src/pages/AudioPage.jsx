@@ -490,10 +490,10 @@ function AudioPage() {
     console.log("Export process complete.");
   };
 
-  // Handle dropping an asset from the assets tab to create a new track
-  const handleAssetDrop = async (assetId) => {
+  // Handle dropping an asset from the assets tab to create a new track OR append to existing
+  const handleAssetDrop = async (assetId, targetTrackId = null, timelinePositionMs = 0) => {
     try {
-      console.log(`Dropping asset ${assetId} to create track`);
+      console.log(`Dropping asset ${assetId}`, {targetTrackId, timelinePositionMs});
 
       // Get the asset from the database first
       const asset = await dbManager.getAsset(assetId);
@@ -534,9 +534,56 @@ function AudioPage() {
         return;
       }
 
-      const segmentId = `seg_${Date.now()}`;
+      const segmentId = `seg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       const durationSeconds = audioBuffer.duration;
       const durationMs = Math.round(durationSeconds * 1000);
+
+      // If targetTrackId is provided, append to existing track
+      if (targetTrackId) {
+        const track = audioManager.getTrack(targetTrackId);
+        if (!track) {
+          console.error("Target track not found:", targetTrackId);
+          alert("Target track not found");
+          return;
+        }
+
+        console.log(`Appending segment to track ${targetTrackId} at ${timelinePositionMs}ms`);
+
+        // Create new segment
+        const newSegment = {
+          id: segmentId,
+          assetId,
+          buffer: toneBuffer,
+          offset: 0,
+          duration: durationSeconds,
+          durationMs,
+          startOnTimelineMs: Math.round(timelinePositionMs),
+          startInFileMs: 0,
+        };
+
+        // Add segment to track
+        track.segments.push(newSegment);
+
+        // Update in database
+        await dbManager.updateTrack(track);
+        console.log("Track updated with new segment");
+
+        // Update React state
+        setTracks([...audioManager.tracks]);
+
+        // Rebuild and reload engine
+        const newVersion = buildVersionFromTracks(audioManager.tracks);
+        if (newVersion && engineRef.current) {
+          await engineRef.current.load(newVersion);
+          console.log("Engine reloaded after segment append");
+        }
+
+        console.log("Segment appended to track successfully");
+        return;
+      }
+
+      // Otherwise, create a new track
+      console.log(`Creating new track from asset ${assetId}`);
 
       // Save to database first with current session to get the DB-assigned ID
       const trackData = {
@@ -613,6 +660,73 @@ function AudioPage() {
       console.error("Failed to create track from asset:", error);
       console.error("Error stack:", error.stack);
       alert(`Failed to create track from asset: ${error.message}`);
+    }
+  };
+
+  // Handle segment movement within a track
+  const handleSegmentMove = async (trackId, segmentIndex, newPositionMs) => {
+    try {
+      console.log(`Moving segment ${segmentIndex} in track ${trackId} to ${newPositionMs}ms`);
+
+      const track = audioManager.getTrack(trackId);
+      if (!track || !track.segments || !track.segments[segmentIndex]) {
+        console.error("Track or segment not found");
+        return;
+      }
+
+      const segment = track.segments[segmentIndex];
+      const bufferRef = segment.buffer;
+      const assetId = segment.assetId ?? track.assetId ?? null;
+
+      console.log("[handleSegmentMove] Before update", {
+        segmentId: segment.id,
+        assetId,
+        hasBuffer: !!bufferRef,
+        startOnTimelineMs: segment.startOnTimelineMs,
+        newPositionMs,
+      });
+
+      segment.startOnTimelineMs = Math.round(newPositionMs);
+
+      if (bufferRef && !segment.buffer) {
+        segment.buffer = bufferRef;
+      }
+      if (!segment.assetId && assetId) {
+        segment.assetId = assetId;
+      }
+
+      console.log("[handleSegmentMove] After update", {
+        segmentId: segment.id,
+        assetId: segment.assetId,
+        hasBuffer: !!segment.buffer,
+        startOnTimelineMs: segment.startOnTimelineMs,
+      });
+
+      await dbManager.updateTrack(track);
+      console.log("Segment position updated in database");
+
+      setTracks([...audioManager.tracks]);
+
+      const newVersion = buildVersionFromTracks(audioManager.tracks);
+      if (newVersion) {
+        console.log(
+          "[handleSegmentMove] Version segments",
+          newVersion.segments.map((seg) => ({
+            id: seg.id,
+            trackId: seg.trackId,
+            startOnTimelineMs: seg.startOnTimelineMs,
+            hasFileUrl: !!seg.fileUrl,
+          }))
+        );
+      }
+
+      if (newVersion && engineRef.current) {
+        await engineRef.current.load(newVersion);
+        console.log("Engine reloaded after segment move");
+      }
+    } catch (error) {
+      console.error("Failed to move segment:", error);
+      alert(`Failed to move segment: ${error.message}`);
     }
   };
 
@@ -1040,6 +1154,7 @@ function AudioPage() {
           recording={recording}
           totalLengthMs={version?.lengthMs || 0}
           onAssetDrop={handleAssetDrop}
+          onSegmentMove={handleSegmentMove}
           onMute={(trackId, muted) =>
             handleTrackPropertyUpdate(trackId, "mute", muted, "setTrackMute")
           }

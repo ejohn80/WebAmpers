@@ -1,0 +1,33 @@
+.tracklane-segment-positioned {
+  transition: opacity 0.1s ease;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.tracklane-segment-positioned.dragging {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.tracklane-segment-positioned.selected {
+  outline: 2px solid #17E1FF;
+  outline-offset: -2px;
+}
+
+.tracklane-segment-positioned:hover {
+  outline: 1px solid rgba(23, 225, 255, 0.5);
+  outline-offset: -1px;
+}
+
+.tracklane-segment {
+  height: 100%;
+  width: 100%;
+  position: relative;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.segment-waveform {
+  height: 100%;
+  width: 100%;
+}

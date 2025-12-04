@@ -25,11 +25,8 @@ const dbToGain = (db) => (typeof db === "number" ? Math.pow(10, db / 20) : 1);
 // Clamp a value between two bounds (for panning range)
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
-// Convert milliseconds to beats given a BPM (used for time alignment)
-const msToBeats = (ms, bpm) => (ms / 1000) * (bpm / 60);
-
-// Convert milliseconds to Tone.js "transport time" string format
-const msToToneTime = (ms, bpm) => `${msToBeats(ms, bpm)}i`; // i = immutable numeric time
+// Convert milliseconds to seconds for Tone.js transport scheduling
+const msToToneTime = (ms) => Math.max(0, Number(ms) || 0) / 1000;
 
 const EMPTY_TIMELINE_VERSION_TEMPLATE = Object.freeze({
   bpm: 120,
@@ -191,8 +188,8 @@ class PlaybackEngine {
   setLoop(startMs, endMs) {
     if (!this.version) return;
     Tone.Transport.setLoopPoints(
-      msToToneTime(startMs, this.version.bpm || 120),
-      msToToneTime(endMs, this.version.bpm || 120)
+      msToToneTime(startMs),
+      msToToneTime(endMs)
     );
     Tone.Transport.loop = endMs > startMs;
   }
@@ -1254,11 +1251,8 @@ class PlaybackEngine {
       player.sync();
 
       // Schedule start time in the Transport
-      const startTT = msToToneTime(
-        seg.startOnTimelineMs || 0,
-        version.bpm || 120
-      );
-      player.start(startTT, offsetSec, durSec);
+      const startSec = msToToneTime(seg.startOnTimelineMs || 0);
+      player.start(startSec, offsetSec, durSec);
     }
 
     this._applyMuteSolo();

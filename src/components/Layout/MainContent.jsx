@@ -18,6 +18,7 @@ function MainContent({
   onSolo,
   onDelete,
   onAssetDrop,
+  onSegmentMove,
   totalLengthMs = 0,
 }) {
   const {selectedTrackId, setSelectedTrackId, isEffectsMenuOpen} =
@@ -159,7 +160,7 @@ function MainContent({
   const resetZoom = () => setZoom(1);
   const toggleFollow = () => setFollowPlayhead((v) => !v);
 
-  // Handle asset drop
+  // Handle asset drop - can target empty space OR an existing track
   const handleDrop = (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -170,7 +171,22 @@ function MainContent({
 
       const dropData = JSON.parse(data);
       if (dropData.type === "asset" && onAssetDrop) {
-        onAssetDrop(dropData.assetId);
+        // Get drop position to calculate timeline position
+        const rect = e.currentTarget.getBoundingClientRect();
+        const dropX = e.clientX - rect.left - timelineMetrics.leftOffsetPx;
+        const pxPerMs = totalLengthMs > 0 ? timelineMetrics.widthPx / totalLengthMs : 0;
+        const timelinePositionMs = pxPerMs > 0 ? Math.max(0, dropX / pxPerMs) : 0;
+
+        // Determine which track (if any) was targeted
+        const dropY = e.clientY - rect.top;
+        const trackHeight = 96 * verticalScale;
+        const rulerHeight = 40; // Approximate ruler height
+        const trackIndex = Math.floor((dropY - rulerHeight) / trackHeight);
+        const targetTrackId = (trackIndex >= 0 && trackIndex < tracks.length) 
+          ? tracks[trackIndex]?.id 
+          : null;
+
+        onAssetDrop(dropData.assetId, targetTrackId, timelinePositionMs);
       }
     } catch (err) {
       console.error("Error handling drop:", err);
@@ -248,6 +264,8 @@ function MainContent({
                         onMute={onMute}
                         onSolo={onSolo}
                         onDelete={onDelete}
+                        onSegmentMove={onSegmentMove}
+                        onAssetDrop={onAssetDrop}
                         totalLengthMs={totalLengthMs}
                         timelineWidth={timelineMetrics.widthPx}
                         rowWidthPx={timelineMetrics.rowWidthPx}
