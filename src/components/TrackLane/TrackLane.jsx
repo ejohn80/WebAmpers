@@ -612,7 +612,10 @@ const TrackLane = memo(function TrackLane({
                       : 0;
                   const widthPx =
                     pxPerMs && dropPreview.durationMs
-                      ? Math.max(4, Math.round(dropPreview.durationMs * pxPerMs))
+                      ? Math.max(
+                          4,
+                          Math.round(dropPreview.durationMs * pxPerMs)
+                        )
                       : totalLengthMs > 0 && dropPreview.durationMs
                         ? `${(dropPreview.durationMs / totalLengthMs) * 100}%`
                         : 80;

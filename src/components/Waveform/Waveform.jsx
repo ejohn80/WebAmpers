@@ -160,8 +160,10 @@ const Waveform = ({
   const scheduleLiveSeek = (target) => {
     if (typeof target !== "number") return;
     liveSeekValueRef.current = target;
-    if (typeof window === "undefined" ||
-        typeof window.requestAnimationFrame !== "function") {
+    if (
+      typeof window === "undefined" ||
+      typeof window.requestAnimationFrame !== "function"
+    ) {
       flushLiveSeek();
       return;
     }

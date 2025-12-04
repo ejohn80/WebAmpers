@@ -1832,7 +1832,9 @@ export default function WebAmpPlayback({version, onEngineReady}) {
         }
 
         const maxLen =
-          typeof version?.lengthMs === "number" ? version.lengthMs : preservedMs;
+          typeof version?.lengthMs === "number"
+            ? version.lengthMs
+            : preservedMs;
         const targetMs = Math.max(0, Math.min(preservedMs, maxLen));
 
         engine.seekMs(targetMs);
