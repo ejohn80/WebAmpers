@@ -6,6 +6,7 @@ import {AppContext} from "../../../context/AppContext";
 import {createDefaultEffects} from "../../../context/effectsStorage";
 import {dbManager} from "../../../managers/DBManager";
 import styles from "../Layout.module.css";
+import {DeleteIcon} from "../Svgs.jsx";
 
 function SessionsTab() {
   const {activeSession, setActiveSession, effects, setEffects} =
@@ -281,7 +282,7 @@ function SessionsTab() {
                       className={styles.deleteButton}
                       aria-label="Delete session"
                     >
-                      <FaTrash size={12} />
+                      <DeleteIcon />
                     </button>
                   </li>
                 ))}

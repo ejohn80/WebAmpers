@@ -1,9 +1,11 @@
+/* Assets tab */
 .spinner {
   display: flex;
   justify-content: center;
   color: white;
 }
 
+/* black container on each tab */
 .container {
   background-color: #0f0f0f;
   overflow: hidden;
@@ -15,6 +17,7 @@
   border-radius: 10px;
 }
 
+/* container for asset elements */
 .wrapper {
   max-width: 600px;
   margin: 0 auto;
@@ -50,30 +53,29 @@
 
 .tableHeader {
   display: grid;
-  grid-template-columns: 1fr 60px 70px;
-  padding: 6px 10px;
+  grid-template-columns: 100px 180px 50px;
+  padding: 6px 10px 4px 10px;
   border-bottom: 1px solid #333;
   font-size: 11px;
-  color: #888;
+  color: #a7a7a7;
   font-weight: 500;
-  margin-bottom: 4px;
+  margin-bottom: 2px;
 }
 
 .tableHeader div:first-child {
   text-align: left;
 }
 
-.tableHeader div:nth-child(2),
-.tableHeader div:nth-child(3) {
+.tableHeader div:last-child {
   text-align: right;
 }
 
 .songRow {
   display: grid;
-  grid-template-columns: 1fr 60px 70px;
-  padding: 6px 10px;
+  grid-template-columns: 100px 100px 30px;
+  padding: 3px 0px 3px 10px;
   background-color: #2a2a2a;
-  margin-bottom: 1px;
+  margin-bottom: 2px;
   border-radius: 3px;
   cursor: pointer;
   transition: background-color 0.2s;
@@ -87,9 +89,17 @@
 .songName {
   display: flex;
   align-items: center;
-  gap: 6px;
   font-size: 13px;
-  min-width: 0;
+  width: 150px;
+  font-size: 11px;
+  color: rgb(209, 209, 209);
+}
+
+/* Show text cursor on hover for editable text */
+.songName span:hover {
+  cursor: text;
+  background: rgba(222, 222, 222, 0.05);
+  border-radius: 2px;
 }
 
 .songName span {
@@ -99,20 +109,36 @@
 }
 
 .songDuration {
-  font-size: 12px;
-  color: #aaa;
+  font-size: 11px;
+  color: rgb(209, 209, 209);
   text-align: right;
+}
+
+.editInput {
+  background: #2a2a2a;
+  border: 1px solid #3a3a3a;
+  color: rgb(209, 209, 209);
+  padding: 4px 8px;
+  width: 100%;
+  font-size: 11px;
+  font-family: inherit;
+  outline: none;
+  min-width: 0;
+  box-sizing: border-box;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  font-weight: 500;
+}
+
+.editInput:focus {
+  border-color: #00e5ff;
+  background: #333;
+  box-shadow: 0 0 0 1px rgba(0, 229, 255, 0.3);
 }
 
 .songList {
   flex: 1;
   overflow-y: auto;
-}
-
-.songBitrate {
-  font-size: 12px;
-  color: #aaa;
-  text-align: right;
 }
 
 .importButtonWrapper {
@@ -380,14 +406,17 @@
 .deleteButton {
   background: transparent;
   border: none;
-  color: #888;
   cursor: pointer;
-  padding: 6px;
+  padding: 3px;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 4px;
   transition: all 0.2s;
+  width: 20px;
+  height: 20px;
+  box-sizing: border-box;
+  margin-left: 17px;
 }
 
 .deleteButton:hover {

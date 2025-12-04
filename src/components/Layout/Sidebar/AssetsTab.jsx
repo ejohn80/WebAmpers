@@ -1,11 +1,11 @@
 import {useState, useEffect} from "react";
 import {IoSearch} from "react-icons/io5";
-import {FaPlay, FaTrash} from "react-icons/fa";
 import {MoonLoader} from "react-spinners";
 import {dbManager} from "../../../managers/DBManager";
 import {saveAsset} from "../../../utils/assetUtils";
 import AudioImportButton from "../../AudioImport/AudioImportButton2";
 import styles from "../Layout.module.css";
+import {TrashCan} from "../Svgs.jsx";
 
 const AssetsTab = ({
   onImportSuccess,
@@ -192,7 +192,7 @@ const AssetsTab = ({
         <div className={styles.tableHeader}>
           <div>Name</div>
           <div>Duration</div>
-          <div>Actions</div>
+          <div></div> {/* Empty header for trash can column */}
         </div>
 
         {isLoading ? (
@@ -220,7 +220,6 @@ const AssetsTab = ({
                   }}
                 >
                   <div className={styles.songName}>
-                    <FaPlay size={10} color="#fff" />
                     {editingAssetId === asset.id ? (
                       <input
                         type="text"
@@ -230,30 +229,21 @@ const AssetsTab = ({
                         onKeyDown={(e) => handleRenameKeyDown(e, asset.id)}
                         autoFocus
                         onClick={(e) => e.stopPropagation()}
-                        style={{
-                          background: "#333",
-                          border: "1px solid #555",
-                          color: "#fff",
-                          padding: "2px 4px",
-                          borderRadius: "3px",
-                          width: "100%",
-                          maxWidth: "200px",
-                        }}
+                        className={styles.editInput}
                       />
                     ) : (
                       <span>{asset.name}</span>
                     )}
                   </div>
                   <div className={styles.songDuration}>{asset.duration}</div>
-                  <div className={styles.songBitrate}>
-                    <button
-                      onClick={(e) => handleDeleteAsset(asset.id, e)}
-                      className={styles.deleteButton}
-                      aria-label="Delete asset"
-                    >
-                      <FaTrash size={12} />
-                    </button>
-                  </div>
+
+                  <button
+                    onClick={(e) => handleDeleteAsset(asset.id, e)}
+                    className={styles.deleteButton}
+                    aria-label="Delete asset"
+                  >
+                    <TrashCan />
+                  </button>
                 </div>
               ))
             )}
