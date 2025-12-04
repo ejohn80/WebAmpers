@@ -128,7 +128,7 @@ const SegmentBlock = ({
     dragStartX.current = e.clientX;
     originalPosition.current = startOnTimelineMs;
     dragPlayheadMsRef.current = progressStore.getState().ms;
-    progressStore.beginScrub();
+  progressStore.beginScrub({pauseTransport: true});
     progressStore.setScrubLocked(true);
 
     // Add global listeners

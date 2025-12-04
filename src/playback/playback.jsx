@@ -1869,9 +1869,10 @@ export default function WebAmpPlayback({version, onEngineReady}) {
 
   // Keep scrub handlers updated with current playing state without reloading engine
   useEffect(() => {
-    progressStore.setScrubStart(() => {
-      wasPlayingRef.current = playing;
-      if (playing) {
+    progressStore.setScrubStart((options = {}) => {
+      const shouldPause = options?.pauseTransport !== false;
+      wasPlayingRef.current = shouldPause && playing;
+      if (shouldPause && playing) {
         try {
           engine.pause();
         } catch (err) {
@@ -1879,13 +1880,17 @@ export default function WebAmpPlayback({version, onEngineReady}) {
         }
       }
     });
-    progressStore.setScrubEnd(() => {
-      if (wasPlayingRef.current) {
+    progressStore.setScrubEnd((options = {}) => {
+      const shouldPause = options?.pauseTransport !== false;
+      if (shouldPause && wasPlayingRef.current) {
         engine
           .play()
           .catch((err) =>
             console.warn("Failed to resume engine after scrub:", err)
           );
+      }
+      if (shouldPause) {
+        wasPlayingRef.current = false;
       }
     });
     return () => {

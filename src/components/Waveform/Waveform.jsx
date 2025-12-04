@@ -122,6 +122,8 @@ const Waveform = ({
 }) => {
   const containerRef = useRef(null);
   const draggingRef = useRef(false);
+  const liveSeekFrameRef = useRef(null);
+  const liveSeekValueRef = useRef(null);
   const [resolutionHint, setResolutionHint] = useState(DEFAULT_POINTS);
   const [wavePath, setWavePath] = useState({d: "", width: 0});
   const [{ms, lengthMs}, setProgress] = useState(progressStore.getState());
@@ -134,6 +136,45 @@ const Waveform = ({
   useEffect(() => {
     return progressStore.subscribe(setProgress);
   }, []);
+
+  const cancelLiveSeek = () => {
+    if (typeof window !== "undefined" && liveSeekFrameRef.current !== null) {
+      window.cancelAnimationFrame(liveSeekFrameRef.current);
+    }
+    liveSeekFrameRef.current = null;
+    liveSeekValueRef.current = null;
+  };
+
+  const flushLiveSeek = () => {
+    if (typeof window !== "undefined" && liveSeekFrameRef.current !== null) {
+      window.cancelAnimationFrame(liveSeekFrameRef.current);
+    }
+    liveSeekFrameRef.current = null;
+    const pending = liveSeekValueRef.current;
+    liveSeekValueRef.current = null;
+    if (typeof pending === "number") {
+      progressStore.requestSeek(pending);
+    }
+  };
+
+  const scheduleLiveSeek = (target) => {
+    if (typeof target !== "number") return;
+    liveSeekValueRef.current = target;
+    if (typeof window === "undefined" ||
+        typeof window.requestAnimationFrame !== "function") {
+      flushLiveSeek();
+      return;
+    }
+    if (liveSeekFrameRef.current !== null) return;
+    liveSeekFrameRef.current = window.requestAnimationFrame(() => {
+      liveSeekFrameRef.current = null;
+      const pending = liveSeekValueRef.current;
+      liveSeekValueRef.current = null;
+      if (typeof pending === "number") {
+        progressStore.requestSeek(pending);
+      }
+    });
+  };
 
   useEffect(() => {
     const container = containerRef.current;
@@ -238,11 +279,12 @@ const Waveform = ({
     if (e.button !== 0) return; // left button only
     if (!interactive || isScrubLocked()) return;
     draggingRef.current = true;
-    progressStore.beginScrub();
+    progressStore.beginScrub({pauseTransport: false});
     const target = msAtClientX(e.clientX);
     if (typeof target === "number") {
       // preview only: move the playhead visually without seeking audio
       progressStore.setMs(target); // visual move
+      scheduleLiveSeek(target);
     }
     if (typeof window !== "undefined") {
       window.addEventListener("mousemove", onMouseMove);
@@ -256,12 +298,14 @@ const Waveform = ({
     const target = msAtClientX(e.clientX);
     if (typeof target === "number") {
       progressStore.setMs(target);
+      scheduleLiveSeek(target);
     }
   };
 
   const onMouseUp = (e) => {
     if (!draggingRef.current) return;
     draggingRef.current = false;
+    cancelLiveSeek();
     const target = msAtClientX(e.clientX);
     if (!isScrubLocked()) {
       if (typeof target === "number") {
@@ -293,6 +337,7 @@ const Waveform = ({
         window.removeEventListener("mousemove", onMouseMove);
         window.removeEventListener("mouseup", onMouseUp);
       }
+      cancelLiveSeek();
     },
     []
   );
@@ -302,10 +347,11 @@ const Waveform = ({
     if (!e.touches || e.touches.length === 0) return;
     if (!interactive || isScrubLocked()) return;
     draggingRef.current = true;
-    progressStore.beginScrub();
+    progressStore.beginScrub({pauseTransport: false});
     const target = msAtClientX(e.touches[0].clientX);
     if (typeof target === "number") {
       progressStore.setMs(target);
+      scheduleLiveSeek(target);
     }
   };
 
@@ -315,12 +361,14 @@ const Waveform = ({
     const target = msAtClientX(e.touches[0].clientX);
     if (typeof target === "number") {
       progressStore.setMs(target);
+      scheduleLiveSeek(target);
     }
   };
 
   const onTouchEnd = () => {
     if (!draggingRef.current) return;
     draggingRef.current = false;
+    cancelLiveSeek();
     // finalize at current playhead; engine will have been paused
     if (!isScrubLocked()) {
       const {ms: current} = progressStore.getState();

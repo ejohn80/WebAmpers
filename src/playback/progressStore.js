@@ -5,6 +5,7 @@ let _scrubStart = null; // function()
 let _scrubEnd = null; // function()
 let _scrubLocked = false;
 let _pendingSeek = null;
+let _scrubOptions = null;
 const listeners = new Set();
 
 export const progressStore = {
@@ -67,10 +68,11 @@ export const progressStore = {
     _scrubEnd = typeof fn === "function" ? fn : null;
   },
 
-  beginScrub() {
+  beginScrub(options = {}) {
+    _scrubOptions = options && typeof options === "object" ? options : {};
     if (_scrubStart) {
       try {
-        _scrubStart();
+        _scrubStart(_scrubOptions);
       } catch (err) {
         console.warn("progressStore scrubStart error:", err);
       }
@@ -78,13 +80,15 @@ export const progressStore = {
   },
 
   endScrub() {
+    const opts = _scrubOptions || {};
     if (_scrubEnd) {
       try {
-        _scrubEnd();
+        _scrubEnd(opts);
       } catch (err) {
         console.warn("progressStore scrubEnd error:", err);
       }
     }
+    _scrubOptions = null;
   },
 
   subscribe(fn) {
