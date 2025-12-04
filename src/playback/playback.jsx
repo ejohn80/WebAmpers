@@ -1671,7 +1671,6 @@ export default function WebAmpPlayback({version, onEngineReady}) {
   const wasPlayingRef = useRef(false);
   const prevMasterGainRef = useRef(0.5);
   const savedVolumeRef = useRef(0.5);
-  const mutingDuringScrubRef = useRef(false);
 
   // Create and memoize the engine so it persists across re-renders
   const engine = useMemo(
@@ -1827,24 +1826,21 @@ export default function WebAmpPlayback({version, onEngineReady}) {
   useEffect(() => {
     progressStore.setScrubStart(() => {
       wasPlayingRef.current = playing;
-      if (playing && engine.master) {
+      if (playing) {
         try {
-          prevMasterGainRef.current = engine.master.gain.gain.value;
-          engine.master.gain.gain.value = 0.0001; // virtually silent
-          mutingDuringScrubRef.current = true;
-        } catch {}
+          engine.pause();
+        } catch (err) {
+          console.warn("Failed to pause engine during scrub:", err);
+        }
       }
     });
     progressStore.setScrubEnd(() => {
-      if (mutingDuringScrubRef.current && engine.master) {
-        try {
-          engine.master.gain.gain.value = prevMasterGainRef.current ?? 1;
-        } catch {}
-      }
-      mutingDuringScrubRef.current = false;
-      // if it was playing before scrub, resume playback
       if (wasPlayingRef.current) {
-        engine.play().catch(() => {});
+        engine
+          .play()
+          .catch((err) =>
+            console.warn("Failed to resume engine after scrub:", err)
+          );
       }
     });
     return () => {

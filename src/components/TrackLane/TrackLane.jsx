@@ -342,8 +342,9 @@ const TrackLane = memo(function TrackLane({
   const handleSegmentMove = (segmentIndex, newPositionMs) => {
     console.log(`Moving segment ${segmentIndex} to ${newPositionMs}ms`);
     if (onSegmentMove) {
-      onSegmentMove(track.id, segmentIndex, newPositionMs);
+      return onSegmentMove(track.id, segmentIndex, newPositionMs);
     }
+    return null;
   };
 
   const handleSegmentSelect = (segmentIndex) => {

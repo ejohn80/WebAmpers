@@ -1,5 +1,6 @@
 import React, {useState, useRef, useEffect} from "react";
 import Waveform from "../Waveform/Waveform";
+import {progressStore} from "../../playback/progressStore";
 import "./SegmentBlock.css";
 
 /**
@@ -21,6 +22,7 @@ const SegmentBlock = ({
   const originalPosition = useRef(0);
   const segmentRef = useRef(null);
   const pxPerMsRef = useRef(pxPerMs || 0);
+  const dragPlayheadMsRef = useRef(null);
 
   useEffect(() => {
     pxPerMsRef.current = pxPerMs || 0;
@@ -35,6 +37,18 @@ const SegmentBlock = ({
     setDragOffset(deltaX);
   };
 
+  const finalizeDragPlaybackState = () => {
+    if (dragPlayheadMsRef.current === null) return;
+    try {
+      progressStore.requestSeek(dragPlayheadMsRef.current);
+    } catch (err) {
+      console.warn("Failed to restore playhead after drag:", err);
+    }
+    progressStore.setScrubLocked(false);
+    progressStore.endScrub();
+    dragPlayheadMsRef.current = null;
+  };
+
   const handleMouseUp = (e) => {
     const deltaX = e.clientX - dragStartX.current;
     const currentPxPerMs = pxPerMsRef.current;
@@ -45,8 +59,13 @@ const SegmentBlock = ({
     const snapMs = 10;
     const snappedPositionMs = Math.round(newPositionMs / snapMs) * snapMs;
 
+    let movePromise = null;
     if (onSegmentMove) {
-      onSegmentMove(segmentIndex, snappedPositionMs);
+      try {
+        movePromise = onSegmentMove(segmentIndex, snappedPositionMs);
+      } catch (err) {
+        console.error("Segment move failed:", err);
+      }
     }
 
     setIsDragging(false);
@@ -54,6 +73,16 @@ const SegmentBlock = ({
 
     document.removeEventListener("mousemove", handleMouseMove);
     document.removeEventListener("mouseup", handleMouseUp);
+
+    const finish = () => {
+      finalizeDragPlaybackState();
+    };
+
+    if (movePromise && typeof movePromise.finally === "function") {
+      movePromise.finally(finish);
+    } else {
+      finish();
+    }
   };
 
   // Calculate position style
@@ -94,6 +123,9 @@ const SegmentBlock = ({
     setIsDragging(true);
     dragStartX.current = e.clientX;
     originalPosition.current = startOnTimelineMs;
+    dragPlayheadMsRef.current = progressStore.getState().ms;
+    progressStore.beginScrub();
+    progressStore.setScrubLocked(true);
 
     // Add global listeners
     document.addEventListener("mousemove", handleMouseMove);
@@ -105,6 +137,7 @@ const SegmentBlock = ({
     return () => {
       document.removeEventListener("mousemove", handleMouseMove);
       document.removeEventListener("mouseup", handleMouseUp);
+      finalizeDragPlaybackState();
     };
   }, []);
 

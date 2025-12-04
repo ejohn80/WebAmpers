@@ -726,6 +726,7 @@ function AudioPage() {
 
   // Handle segment movement within a track
   const handleSegmentMove = async (trackId, segmentIndex, newPositionMs) => {
+    const {ms: preservedMs} = progressStore.getState();
     try {
       console.log(
         `Moving segment ${segmentIndex} in track ${trackId} to ${newPositionMs}ms`
@@ -790,6 +791,20 @@ function AudioPage() {
 
       if (newVersion && engineRef.current) {
         await engineRef.current.load(newVersion);
+        const targetMs = Number.isFinite(preservedMs) ? preservedMs : 0;
+        const clampedMs = Math.max(
+          0,
+          Math.min(targetMs, newVersion.lengthMs ?? targetMs)
+        );
+        try {
+          engineRef.current.seekMs(clampedMs);
+          progressStore.setMs(clampedMs);
+        } catch (seekError) {
+          console.warn(
+            "Failed to restore playhead after segment move:",
+            seekError
+          );
+        }
         console.log("Engine reloaded after segment move");
       }
     } catch (error) {

@@ -118,12 +118,18 @@ const Waveform = ({
   startOnTimelineMs = 0,
   durationMs = null,
   showProgress = true,
+  interactive = true,
 }) => {
   const containerRef = useRef(null);
   const draggingRef = useRef(false);
   const [resolutionHint, setResolutionHint] = useState(DEFAULT_POINTS);
   const [wavePath, setWavePath] = useState({d: "", width: 0});
   const [{ms, lengthMs}, setProgress] = useState(progressStore.getState());
+
+  const isScrubLocked = () =>
+    typeof progressStore.isScrubLocked === "function"
+      ? progressStore.isScrubLocked()
+      : false;
 
   useEffect(() => {
     return progressStore.subscribe(setProgress);
@@ -225,6 +231,7 @@ const Waveform = ({
   // Scrubbing handlers
   const onMouseDown = (e) => {
     if (e.button !== 0) return; // left button only
+    if (!interactive || isScrubLocked()) return;
     draggingRef.current = true;
     progressStore.beginScrub();
     const target = msAtClientX(e.clientX);
@@ -240,6 +247,7 @@ const Waveform = ({
 
   const onMouseMove = (e) => {
     if (!draggingRef.current) return;
+    if (isScrubLocked()) return;
     const target = msAtClientX(e.clientX);
     if (typeof target === "number") {
       progressStore.setMs(target);
@@ -250,10 +258,12 @@ const Waveform = ({
     if (!draggingRef.current) return;
     draggingRef.current = false;
     const target = msAtClientX(e.clientX);
-    if (typeof target === "number") {
-      progressStore.requestSeek(target); // commit seek to engine
+    if (!isScrubLocked()) {
+      if (typeof target === "number") {
+        progressStore.requestSeek(target); // commit seek to engine
+      }
+      progressStore.endScrub();
     }
-    progressStore.endScrub();
     if (typeof window !== "undefined") {
       window.removeEventListener("mousemove", onMouseMove);
       window.removeEventListener("mouseup", onMouseUp);
@@ -285,6 +295,7 @@ const Waveform = ({
   // Touch support
   const onTouchStart = (e) => {
     if (!e.touches || e.touches.length === 0) return;
+    if (!interactive || isScrubLocked()) return;
     draggingRef.current = true;
     progressStore.beginScrub();
     const target = msAtClientX(e.touches[0].clientX);
@@ -295,6 +306,7 @@ const Waveform = ({
 
   const onTouchMove = (e) => {
     if (!draggingRef.current || !e.touches || e.touches.length === 0) return;
+    if (isScrubLocked()) return;
     const target = msAtClientX(e.touches[0].clientX);
     if (typeof target === "number") {
       progressStore.setMs(target);
@@ -305,20 +317,22 @@ const Waveform = ({
     if (!draggingRef.current) return;
     draggingRef.current = false;
     // finalize at current playhead; engine will have been paused
-    const {ms: current} = progressStore.getState();
-    progressStore.requestSeek(current);
-    progressStore.endScrub();
+    if (!isScrubLocked()) {
+      const {ms: current} = progressStore.getState();
+      progressStore.requestSeek(current);
+      progressStore.endScrub();
+    }
   };
 
   return (
     <div
       ref={containerRef}
       className="waveform-container"
-      onMouseDown={onMouseDown}
-      onTouchStart={onTouchStart}
-      onTouchMove={onTouchMove}
-      onTouchEnd={onTouchEnd}
-      onWheel={onWheel}
+      onMouseDown={interactive ? onMouseDown : undefined}
+      onTouchStart={interactive ? onTouchStart : undefined}
+      onTouchMove={interactive ? onTouchMove : undefined}
+      onTouchEnd={interactive ? onTouchEnd : undefined}
+      onWheel={interactive ? onWheel : undefined}
     >
       {wavePath.d ? (
         <svg

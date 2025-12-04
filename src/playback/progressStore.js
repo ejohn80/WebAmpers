@@ -3,6 +3,7 @@ let _lengthMs = 0;
 let _seeker = null; // function(ms)
 let _scrubStart = null; // function()
 let _scrubEnd = null; // function()
+let _scrubLocked = false;
 const listeners = new Set();
 
 export const progressStore = {
@@ -78,5 +79,13 @@ export const progressStore = {
   subscribe(fn) {
     listeners.add(fn);
     return () => listeners.delete(fn);
+  },
+
+  setScrubLocked(lock) {
+    _scrubLocked = !!lock;
+  },
+
+  isScrubLocked() {
+    return _scrubLocked;
   },
 };
