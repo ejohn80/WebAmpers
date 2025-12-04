@@ -13,6 +13,10 @@ const TrackLane = memo(function TrackLane({
   onMute,
   onSolo,
   onDelete,
+  onCutTrack,
+  onCopyTrack,
+  onPasteTrack,
+  hasClipboard = false,
   trackIndex = 0,
   totalTracks = 1,
   totalLengthMs = 0,
@@ -99,9 +103,12 @@ const TrackLane = memo(function TrackLane({
     event.preventDefault();
     event.stopPropagation();
 
+    // Select this track when opening the context menu
+    onSelect?.(track.id);
+
     // Menu dimensions for boundary checking
     const menuWidth = 180;
-    const menuHeight = 140;
+    const menuHeight = 220;
 
     // Calculate position ensuring menu stays within viewport
     // Use clientX/Y which are viewport-relative coordinates
@@ -151,8 +158,11 @@ const TrackLane = memo(function TrackLane({
     }
   };
 
-  const handleMenuAction = (action) => {
-    action();
+  const handleMenuAction = (action, disabled) => {
+    if (disabled) return;
+    if (typeof action === "function") {
+      action();
+    }
     closeContextMenu();
   };
 
@@ -221,6 +231,37 @@ const TrackLane = memo(function TrackLane({
             role="menuitem"
           >
             {soloed ? "Unsolo" : "Solo"}
+          </button>
+          <div className="context-menu-divider" />
+          <button
+            className={`context-menu-item${
+              onCutTrack ? "" : " context-menu-item--disabled"
+            }`}
+            onClick={() => handleMenuAction(onCutTrack, !onCutTrack)}
+            role="menuitem"
+            disabled={!onCutTrack}
+          >
+            Cut
+          </button>
+          <button
+            className={`context-menu-item${
+              onCopyTrack ? "" : " context-menu-item--disabled"
+            }`}
+            onClick={() => handleMenuAction(onCopyTrack, !onCopyTrack)}
+            role="menuitem"
+            disabled={!onCopyTrack}
+          >
+            Copy
+          </button>
+          <button
+            className={`context-menu-item${
+              hasClipboard ? "" : " context-menu-item--disabled"
+            }`}
+            onClick={() => handleMenuAction(onPasteTrack, !hasClipboard)}
+            role="menuitem"
+            disabled={!hasClipboard}
+          >
+            Paste
           </button>
           <div className="context-menu-divider" />
           <button

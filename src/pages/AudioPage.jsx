@@ -1040,6 +1040,10 @@ function AudioPage() {
           recording={recording}
           totalLengthMs={version?.lengthMs || 0}
           onAssetDrop={handleAssetDrop}
+          onCutTrack={handleCutTrack}
+          onCopyTrack={handleCopyTrack}
+          onPasteTrack={handlePasteTrack}
+          hasClipboard={clipboardManager.hasClipboard()}
           onMute={(trackId, muted) =>
             handleTrackPropertyUpdate(trackId, "mute", muted, "setTrackMute")
           }

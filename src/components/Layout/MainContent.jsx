@@ -17,6 +17,10 @@ function MainContent({
   onMute,
   onSolo,
   onDelete,
+  onCutTrack,
+  onCopyTrack,
+  onPasteTrack,
+  hasClipboard = false,
   onAssetDrop,
   totalLengthMs = 0,
 }) {
@@ -248,6 +252,10 @@ function MainContent({
                         onMute={onMute}
                         onSolo={onSolo}
                         onDelete={onDelete}
+                        onCutTrack={onCutTrack}
+                        onCopyTrack={onCopyTrack}
+                        onPasteTrack={onPasteTrack}
+                        hasClipboard={hasClipboard}
                         totalLengthMs={totalLengthMs}
                         timelineWidth={timelineMetrics.widthPx}
                         rowWidthPx={timelineMetrics.rowWidthPx}
