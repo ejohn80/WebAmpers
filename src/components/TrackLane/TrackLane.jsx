@@ -1,7 +1,18 @@
-import React, {useState, useEffect, memo} from "react";
+import React, {useState, useEffect, memo, useCallback, useRef} from "react";
 import {createPortal} from "react-dom";
-import Waveform from "../Waveform/Waveform";
+import SegmentBlock from "./SegmentBlock";
 import "./TrackLane.css";
+import {resolveSegmentStart} from "../../utils/segmentPlacement";
+
+const createContextMenuState = (overrides = {}) => ({
+  open: false,
+  x: 0,
+  y: 0,
+  target: "track",
+  segmentIndex: null,
+  segmentId: null,
+  ...overrides,
+});
 
 /**
  * TrackLane
@@ -13,6 +24,9 @@ const TrackLane = memo(function TrackLane({
   onMute,
   onSolo,
   onDelete,
+  onSegmentMove,
+  onAssetDrop,
+  requestAssetPreview,
   trackIndex = 0,
   totalTracks = 1,
   totalLengthMs = 0,
@@ -20,6 +34,10 @@ const TrackLane = memo(function TrackLane({
   rowWidthPx = 0,
   isSelected = false,
   onSelect = () => {},
+  selectedSegment = null,
+  onSegmentSelected = () => {},
+  onClearSegmentSelection = () => {},
+  onSegmentDelete = () => {},
 }) {
   if (!track) return null;
 
@@ -38,11 +56,16 @@ const TrackLane = memo(function TrackLane({
 
   const [muted, setMuted] = useState(getInitialState().muted);
   const [soloed, setSoloed] = useState(getInitialState().soloed);
-  const [contextMenu, setContextMenu] = useState({
-    open: false,
-    x: 0,
-    y: 0,
-  });
+  const [contextMenu, setContextMenu] = useState(createContextMenuState());
+  const [selectedSegmentIndex, setSelectedSegmentIndex] = useState(null);
+  const [dropPreview, setDropPreview] = useState(null);
+  const dragHoverDepthRef = useRef(0);
+  const pendingPreviewAssetRef = useRef(null);
+  const segmentsRef = useRef(segments);
+
+  useEffect(() => {
+    segmentsRef.current = segments;
+  }, [segments]);
 
   useEffect(() => {
     try {
@@ -62,6 +85,10 @@ const TrackLane = memo(function TrackLane({
   useEffect(() => {
     setSoloed(!!track.solo);
   }, [track.solo, track.id]);
+
+  const closeContextMenu = useCallback(() => {
+    setContextMenu(createContextMenuState());
+  }, []);
 
   useEffect(() => {
     if (!contextMenu.open) return undefined;
@@ -89,38 +116,58 @@ const TrackLane = memo(function TrackLane({
       document.removeEventListener("pointerdown", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [contextMenu.open]);
+  }, [contextMenu.open, closeContextMenu]);
 
-  const closeContextMenu = () => {
-    setContextMenu({open: false, x: 0, y: 0});
-  };
-
-  const handleContextMenu = (event) => {
+  const openContextMenuAt = (event, overrides = {}) => {
     event.preventDefault();
     event.stopPropagation();
 
-    // Menu dimensions for boundary checking
-    const menuWidth = 180;
-    const menuHeight = 140;
+    const menuWidth = 200;
+    const menuHeight = 160;
+    const x = Math.min(event.clientX, window.innerWidth - menuWidth);
+    const y = Math.min(event.clientY, window.innerHeight - menuHeight);
 
-    // Calculate position ensuring menu stays within viewport
-    // Use clientX/Y which are viewport-relative coordinates
-    const x = Math.max(
-      10,
-      Math.min(
-        event.clientX,
-        window.innerWidth - menuWidth - 10 // 10px margin
-      )
-    );
-    const y = Math.max(
-      10,
-      Math.min(
-        event.clientY,
-        window.innerHeight - menuHeight - 10 // 10px margin
-      )
-    );
+    setContextMenu(createContextMenuState({open: true, x, y, ...overrides}));
+  };
 
-    setContextMenu({open: true, x, y});
+  const handleContextMenu = (event) => {
+    openContextMenuAt(event, {target: "track"});
+  };
+
+  const handleSegmentContextMenu = (segmentIndex, event) => {
+    const segment = segments[segmentIndex];
+    if (!segment) return;
+
+    if (typeof onSegmentSelected === "function") {
+      onSegmentSelected(track.id, segment?.id ?? null, segmentIndex);
+    }
+    setSelectedSegmentIndex(segmentIndex);
+
+    openContextMenuAt(event, {
+      target: "segment",
+      segmentIndex,
+      segmentId: segment?.id ?? null,
+    });
+  };
+
+  const handleSegmentDeleteAction = async () => {
+    if (contextMenu.segmentIndex === null) return;
+
+    try {
+      await onSegmentDelete(
+        track.id,
+        contextMenu.segmentId,
+        contextMenu.segmentIndex
+      );
+      setSelectedSegmentIndex(null);
+      if (typeof onClearSegmentSelection === "function") {
+        onClearSegmentSelection();
+      }
+    } catch (error) {
+      console.warn("Segment delete failed:", error);
+    } finally {
+      closeContextMenu();
+    }
   };
 
   const toggleMute = () => {
@@ -163,6 +210,7 @@ const TrackLane = memo(function TrackLane({
   const numericTimelineWidth = Number.isFinite(parsedTimelineWidth)
     ? Math.max(0, parsedTimelineWidth)
     : 0;
+
   const pxPerMs =
     totalLengthMs > 0 && numericTimelineWidth > 0
       ? numericTimelineWidth / totalLengthMs
@@ -185,6 +233,10 @@ const TrackLane = memo(function TrackLane({
 
   const handleTrackClick = (e) => {
     e.stopPropagation();
+    if (typeof onClearSegmentSelection === "function") {
+      onClearSegmentSelection();
+    }
+    setSelectedSegmentIndex(null);
     onSelect(track.id);
   };
 
@@ -196,44 +248,290 @@ const TrackLane = memo(function TrackLane({
       }
     : {};
 
-  // Render context menu using portal to avoid clipping issues
-  const contextMenuPortal = contextMenu.open
-    ? createPortal(
-        <div
-          className="tracklane-context-menu"
-          style={{
-            position: "fixed",
-            top: `${contextMenu.y}px`,
-            left: `${contextMenu.x}px`,
-          }}
-          role="menu"
-        >
-          <button
-            className="context-menu-item"
-            onClick={() => handleMenuAction(toggleMute)}
-            role="menuitem"
+  const getDragAssetFromEvent = useCallback((event) => {
+    if (event?.dataTransfer) {
+      try {
+        const payload = event.dataTransfer.getData("application/json");
+        if (payload) {
+          const parsed = JSON.parse(payload);
+          if (parsed?.type === "asset") {
+            return parsed;
+          }
+        }
+      } catch (err) {
+        // Ignore malformed payloads
+      }
+    }
+
+    if (typeof window !== "undefined" && window.__WEBAMP_DRAG_ASSET__) {
+      return window.__WEBAMP_DRAG_ASSET__;
+    }
+
+    return null;
+  }, []);
+
+  const ensurePreviewDuration = useCallback(
+    (assetId) => {
+      if (!assetId || typeof requestAssetPreview !== "function") {
+        return;
+      }
+
+      if (pendingPreviewAssetRef.current === assetId) {
+        return;
+      }
+
+      pendingPreviewAssetRef.current = assetId;
+      requestAssetPreview(assetId)
+        .then((info) => {
+          setDropPreview((prev) => {
+            if (!prev || prev.assetId !== assetId) return prev;
+
+            const safeDuration = Number.isFinite(info?.durationMs)
+              ? Math.max(0, Math.round(info.durationMs))
+              : 0;
+
+            if (!safeDuration) {
+              return {...prev, isLoadingDuration: false};
+            }
+
+            const rawStart =
+              prev.rawStartOnTimelineMs ?? prev.startOnTimelineMs ?? 0;
+            const latestSegments = segmentsRef.current ?? segments;
+            const resolved = resolveSegmentStart(
+              latestSegments,
+              rawStart,
+              safeDuration
+            );
+            const snapMs = 10;
+            const snapped = Math.round(resolved / snapMs) * snapMs;
+
+            return {
+              ...prev,
+              durationMs: safeDuration,
+              isLoadingDuration: false,
+              startOnTimelineMs: snapped,
+            };
+          });
+        })
+        .catch((error) => {
+          console.error("Failed to fetch asset preview:", error);
+          setDropPreview((prev) =>
+            prev && prev.assetId === assetId
+              ? {...prev, isLoadingDuration: false}
+              : prev
+          );
+        })
+        .finally(() => {
+          if (pendingPreviewAssetRef.current === assetId) {
+            pendingPreviewAssetRef.current = null;
+          }
+        });
+    },
+    [requestAssetPreview, segments]
+  );
+
+  const formatDurationLabel = (ms) => {
+    if (!ms) return "";
+    const totalSeconds = Math.max(0, Math.round(ms / 1000));
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = (totalSeconds % 60).toString().padStart(2, "0");
+    return `${minutes}:${seconds}`;
+  };
+
+  const clearDropPreview = useCallback(() => {
+    dragHoverDepthRef.current = 0;
+    pendingPreviewAssetRef.current = null;
+    setDropPreview(null);
+  }, []);
+
+  const getTimelinePositionFromEvent = (event) => {
+    const timelineElement = event.currentTarget;
+    if (!timelineElement) return 0;
+
+    const rect = timelineElement.getBoundingClientRect();
+    const dropX = event.clientX - rect.left;
+    const pxPerMsValue = pxPerMs && Number.isFinite(pxPerMs) ? pxPerMs : 0;
+    return pxPerMsValue > 0 ? Math.max(0, dropX / pxPerMsValue) : 0;
+  };
+
+  const updateDropPreview = useCallback(
+    (event, assetData) => {
+      if (!assetData) return;
+
+      const rawMs = getTimelinePositionFromEvent(event);
+
+      dragHoverDepthRef.current = Math.max(dragHoverDepthRef.current, 1);
+
+      setDropPreview((prev) => {
+        const sameAsset = prev && prev.assetId === assetData.assetId;
+        const existingDuration =
+          (sameAsset && prev.durationMs) || assetData.durationMs || 0;
+        const durationMs = Number.isFinite(existingDuration)
+          ? Math.max(0, Math.round(existingDuration))
+          : 0;
+        const resolvedMs = resolveSegmentStart(segments, rawMs, durationMs);
+        const snapMs = 10;
+        const snappedMs = Math.round(resolvedMs / snapMs) * snapMs;
+        return {
+          assetId: assetData.assetId,
+          assetName: assetData.name,
+          rawStartOnTimelineMs: rawMs,
+          startOnTimelineMs: snappedMs,
+          durationMs,
+          isLoadingDuration: durationMs === 0,
+        };
+      });
+
+      ensurePreviewDuration(assetData.assetId);
+    },
+    [segments, pxPerMs, ensurePreviewDuration]
+  );
+
+  useEffect(() => {
+    clearDropPreview();
+  }, [track.id, clearDropPreview]);
+
+  const handleSegmentMove = (segmentIndex, newPositionMs) => {
+    console.log(`Moving segment ${segmentIndex} to ${newPositionMs}ms`);
+    if (onSegmentMove) {
+      return onSegmentMove(track.id, segmentIndex, newPositionMs);
+    }
+    return null;
+  };
+
+  const handleSegmentSelect = (segmentIndex) => {
+    setSelectedSegmentIndex(segmentIndex);
+    const segment = segments[segmentIndex];
+    if (typeof onSegmentSelected === "function") {
+      onSegmentSelected(track.id, segment?.id ?? null, segmentIndex);
+    }
+    onSelect(track.id);
+  };
+
+  useEffect(() => {
+    if (!selectedSegment || selectedSegment.trackId !== track.id) {
+      if (selectedSegmentIndex !== null) {
+        setSelectedSegmentIndex(null);
+      }
+      return;
+    }
+
+    const matchIndex = segments.findIndex((segment, index) => {
+      if (!segment) return false;
+      if (selectedSegment.segmentId) {
+        return segment.id === selectedSegment.segmentId;
+      }
+      return selectedSegment.segmentIndex === index;
+    });
+
+    const nextIndex = matchIndex >= 0 ? matchIndex : null;
+    if (nextIndex !== selectedSegmentIndex) {
+      setSelectedSegmentIndex(nextIndex);
+    }
+  }, [selectedSegment, track.id, segments, selectedSegmentIndex]);
+
+  const handleTimelineDragEnter = (e) => {
+    if (!getDragAssetFromEvent(e)) return;
+    dragHoverDepthRef.current += 1;
+  };
+
+  const handleTimelineDragLeave = () => {
+    if (dragHoverDepthRef.current > 0) {
+      dragHoverDepthRef.current -= 1;
+    }
+    if (dragHoverDepthRef.current <= 0) {
+      clearDropPreview();
+    }
+  };
+
+  const handleTimelineDragOver = (e) => {
+    const assetData = getDragAssetFromEvent(e);
+    if (!assetData) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = "copy";
+
+    updateDropPreview(e, assetData);
+  };
+
+  const handleTimelineDrop = (e) => {
+    const assetData = getDragAssetFromEvent(e);
+    if (!assetData || typeof onAssetDrop !== "function") {
+      clearDropPreview();
+      return;
+    }
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    const snapMs = 10;
+    const fallbackStart = resolveSegmentStart(
+      segments,
+      getTimelinePositionFromEvent(e),
+      dropPreview && dropPreview.assetId === assetData.assetId
+        ? dropPreview.durationMs
+        : 0
+    );
+    const snappedFallback = Math.round(fallbackStart / snapMs) * snapMs;
+
+    const startMs =
+      dropPreview && dropPreview.assetId === assetData.assetId
+        ? dropPreview.startOnTimelineMs
+        : snappedFallback;
+
+    console.log(`Asset dropped on track ${track.id} at ${startMs}ms`);
+
+    onAssetDrop(assetData.assetId, track.id, Math.max(0, startMs));
+    clearDropPreview();
+  };
+
+  const contextMenuPortal =
+    contextMenu.open && typeof document !== "undefined"
+      ? createPortal(
+          <div
+            className="tracklane-context-menu"
+            style={{top: `${contextMenu.y}px`, left: `${contextMenu.x}px`}}
+            role="menu"
           >
-            {muted ? "Unmute" : "Mute"}
-          </button>
-          <button
-            className="context-menu-item"
-            onClick={() => handleMenuAction(toggleSolo)}
-            role="menuitem"
-          >
-            {soloed ? "Unsolo" : "Solo"}
-          </button>
-          <div className="context-menu-divider" />
-          <button
-            className="context-menu-item context-menu-item--danger"
-            onClick={() => handleMenuAction(handleDelete)}
-            role="menuitem"
-          >
-            Delete
-          </button>
-        </div>,
-        document.body
-      )
-    : null;
+            <button
+              className="context-menu-item"
+              onClick={() => handleMenuAction(toggleMute)}
+              role="menuitem"
+            >
+              {muted ? "Unmute" : "Mute"}
+            </button>
+            {contextMenu.target === "segment" && (
+              <>
+                <button
+                  className="context-menu-item context-menu-item--danger"
+                  onClick={handleSegmentDeleteAction}
+                  role="menuitem"
+                >
+                  Delete Segment
+                </button>
+                <div className="context-menu-divider" />
+              </>
+            )}
+            <button
+              className="context-menu-item"
+              onClick={() => handleMenuAction(toggleSolo)}
+              role="menuitem"
+            >
+              {soloed ? "Unsolo" : "Solo"}
+            </button>
+            <div className="context-menu-divider" />
+            <button
+              className="context-menu-item context-menu-item--danger"
+              onClick={() => handleMenuAction(handleDelete)}
+              role="menuitem"
+            >
+              Delete Track
+            </button>
+          </div>,
+          document.body
+        )
+      : null;
 
   return (
     <>
@@ -289,74 +587,80 @@ const TrackLane = memo(function TrackLane({
         </div>
 
         <div className="tracklane-main" style={tracklaneMainStyle}>
-          <div className="tracklane-timeline" style={tracklaneTimelineStyle}>
+          <div
+            className={`tracklane-timeline ${dropPreview ? "tracklane-timeline--drop" : ""}`}
+            style={tracklaneTimelineStyle}
+            onDragEnter={handleTimelineDragEnter}
+            onDragLeave={handleTimelineDragLeave}
+            onDragOver={handleTimelineDragOver}
+            onDrop={handleTimelineDrop}
+          >
             {segments.length === 0 && (
               <div className="tracklane-empty">
-                No segments – import audio to add one.
+                No segments — import audio or drag assets here to add segments.
               </div>
             )}
 
-            {segments.map((seg) => {
-              const audioBuffer = seg.buffer ?? seg.fileBuffer ?? null;
+            {dropPreview && (
+              <div
+                className={`tracklane-drop-preview ${dropPreview.isLoadingDuration ? "loading" : ""}`}
+                style={(() => {
+                  const startPx = pxPerMs
+                    ? Math.round(dropPreview.startOnTimelineMs * pxPerMs)
+                    : totalLengthMs > 0
+                      ? `${(dropPreview.startOnTimelineMs / totalLengthMs) * 100}%`
+                      : 0;
+                  const widthPx =
+                    pxPerMs && dropPreview.durationMs
+                      ? Math.max(
+                          4,
+                          Math.round(dropPreview.durationMs * pxPerMs)
+                        )
+                      : totalLengthMs > 0 && dropPreview.durationMs
+                        ? `${(dropPreview.durationMs / totalLengthMs) * 100}%`
+                        : 80;
 
-              const startOnTimelineMs = Math.max(0, seg.startOnTimelineMs || 0);
-              const durationMs = Math.max(0, seg.durationMs || 0);
+                  if (
+                    typeof startPx === "number" &&
+                    typeof widthPx === "number"
+                  ) {
+                    return {left: `${startPx}px`, width: `${widthPx}px`};
+                  }
 
-              let positionStyle;
-              if (pxPerMs) {
-                const leftPx = Math.round(startOnTimelineMs * pxPerMs);
-                const widthPx = Math.max(2, Math.round(durationMs * pxPerMs));
-                positionStyle = {
-                  left: `${leftPx}px`,
-                  width: `${widthPx}px`,
-                };
-              } else {
-                const leftPercent =
-                  totalLengthMs > 0
-                    ? (startOnTimelineMs / totalLengthMs) * 100
-                    : 0;
-                const widthPercent =
-                  totalLengthMs > 0 ? (durationMs / totalLengthMs) * 100 : 100;
-                positionStyle = {
-                  left: `${leftPercent}%`,
-                  width: `${widthPercent}%`,
-                };
-              }
-
-              return (
-                <div
-                  className="tracklane-segment-positioned"
-                  key={seg.id || seg.fileUrl || Math.random()}
-                  style={{
-                    position: "absolute",
-                    height: "100%",
-                    ...positionStyle,
-                  }}
-                >
-                  <div className="tracklane-segment">
-                    <div className="segment-waveform">
-                      {audioBuffer ? (
-                        <Waveform
-                          audioBuffer={audioBuffer}
-                          color={track?.color}
-                          startOnTimelineMs={startOnTimelineMs}
-                          durationMs={durationMs}
-                          showProgress={false}
-                        />
-                      ) : (
-                        <div className="waveform-placeholder">
-                          (No buffer available for this segment)
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                  return {
+                    left: typeof startPx === "string" ? startPx : "0%",
+                    width: typeof widthPx === "string" ? widthPx : "10%",
+                  };
+                })()}
+              >
+                <div className="drop-preview-label">
+                  {dropPreview.assetName || "New segment"}
                 </div>
-              );
-            })}
+                <div className="drop-preview-duration">
+                  {dropPreview.isLoadingDuration
+                    ? "Loading…"
+                    : formatDurationLabel(dropPreview.durationMs)}
+                </div>
+              </div>
+            )}
+
+            {segments.map((seg, index) => (
+              <SegmentBlock
+                key={seg.id || seg.fileUrl || `segment-${index}`}
+                segment={seg}
+                trackColor={track?.color}
+                pxPerMs={pxPerMs}
+                totalLengthMs={totalLengthMs}
+                onSegmentMove={handleSegmentMove}
+                segmentIndex={index}
+                isSelected={selectedSegmentIndex === index}
+                onSelect={handleSegmentSelect}
+                onSegmentContextMenu={handleSegmentContextMenu}
+              />
+            ))}
           </div>
         </div>
       </div>
-
       {contextMenuPortal}
     </>
   );

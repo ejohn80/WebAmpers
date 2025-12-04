@@ -1,4 +1,11 @@
-import React, {useContext, useEffect, useMemo, useRef, useState} from "react";
+import React, {
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import * as Tone from "tone";
 import {progressStore} from "./progressStore";
 import {
@@ -25,11 +32,8 @@ const dbToGain = (db) => (typeof db === "number" ? Math.pow(10, db / 20) : 1);
 // Clamp a value between two bounds (for panning range)
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
-// Convert milliseconds to beats given a BPM (used for time alignment)
-const msToBeats = (ms, bpm) => (ms / 1000) * (bpm / 60);
-
-// Convert milliseconds to Tone.js "transport time" string format
-const msToToneTime = (ms, bpm) => `${msToBeats(ms, bpm)}i`; // i = immutable numeric time
+// Convert milliseconds to seconds for Tone.js transport scheduling
+const msToToneTime = (ms) => Math.max(0, Number(ms) || 0) / 1000;
 
 const EMPTY_TIMELINE_VERSION_TEMPLATE = Object.freeze({
   bpm: 120,
@@ -190,10 +194,7 @@ class PlaybackEngine {
   /** Define a loop range for the transport */
   setLoop(startMs, endMs) {
     if (!this.version) return;
-    Tone.Transport.setLoopPoints(
-      msToToneTime(startMs, this.version.bpm || 120),
-      msToToneTime(endMs, this.version.bpm || 120)
-    );
+    Tone.Transport.setLoopPoints(msToToneTime(startMs), msToToneTime(endMs));
     Tone.Transport.loop = endMs > startMs;
   }
 
@@ -1281,11 +1282,8 @@ class PlaybackEngine {
       player.sync();
 
       // Schedule start time in the Transport
-      const startTT = msToToneTime(
-        seg.startOnTimelineMs || 0,
-        version.bpm || 120
-      );
-      player.start(startTT, offsetSec, durSec);
+      const startSec = msToToneTime(seg.startOnTimelineMs || 0);
+      player.start(startSec, offsetSec, durSec);
     }
 
     this._applyMuteSolo();
@@ -1772,6 +1770,21 @@ export default function WebAmpPlayback({version, onEngineReady}) {
     []
   );
 
+  const syncTransportToProgressStore = useCallback(() => {
+    if (!engine || typeof progressStore.getState !== "function") {
+      return;
+    }
+
+    try {
+      const {ms: storedMs} = progressStore.getState() || {};
+      if (!Number.isFinite(storedMs)) return;
+      engine.seekMs(storedMs);
+      setMs(storedMs);
+    } catch (err) {
+      console.warn("Failed to sync transport to playhead:", err);
+    }
+  }, [engine]);
+
   // Attach and clean up engine
   useEffect(() => {
     engineRef.current = engine;
@@ -1805,6 +1818,30 @@ export default function WebAmpPlayback({version, onEngineReady}) {
   useEffect(() => {
     const cleanup = () => {
       progressStore.setSeeker(null);
+    };
+
+    const restorePlayheadAfterLoad = () => {
+      if (!engine || typeof progressStore.getState !== "function") {
+        return;
+      }
+
+      try {
+        const {ms: preservedMs} = progressStore.getState() || {};
+        if (!Number.isFinite(preservedMs)) {
+          return;
+        }
+
+        const maxLen =
+          typeof version?.lengthMs === "number"
+            ? version.lengthMs
+            : preservedMs;
+        const targetMs = Math.max(0, Math.min(preservedMs, maxLen));
+
+        engine.seekMs(targetMs);
+        setMs(targetMs);
+      } catch (err) {
+        console.warn("Failed to restore playhead after engine reload:", err);
+      }
     };
 
     const versionHasTracks = !!(
@@ -1883,6 +1920,7 @@ export default function WebAmpPlayback({version, onEngineReady}) {
                 engine.setMasterEffects(effects);
               }
             }
+            restorePlayheadAfterLoad();
           } catch {}
         })
         .catch((e) => console.error("[UI] engine.load() failed:", e));
@@ -1916,30 +1954,50 @@ export default function WebAmpPlayback({version, onEngineReady}) {
   }, [engine, version, effects]);
 
   useEffect(() => {
-    progressStore.setScrubStart(() => {
-      wasPlayingRef.current = playing;
-      if (engine.master) {
+    progressStore.setScrubStart((options = {}) => {
+      const shouldPause = options?.pauseTransport !== false;
+      const shouldSilence =
+        options?.silenceDuringScrub !== undefined
+          ? !!options.silenceDuringScrub
+          : shouldPause;
+
+      wasPlayingRef.current = shouldPause && playing;
+
+      if (shouldPause && playing) {
         try {
-          // Store the CURRENT actual gain value
+          engine.pause();
+        } catch (err) {
+          console.warn("Failed to pause engine during scrub:", err);
+        }
+      }
+
+      if (shouldSilence && engine.master?.gain?.gain) {
+        try {
           const currentGain = engine.master.gain.gain.value;
           volumeBeforeScrubRef.current = currentGain;
           prevMasterGainRef.current = currentGain;
 
-          // Only mute if we're actually playing
           if (playing) {
-            engine.master.gain.gain.value = 0.0001; // virtually silent
+            engine.master.gain.gain.value = 0.0001;
             mutingDuringScrubRef.current = true;
           }
         } catch (e) {
-          console.warn("Failed to mute during scrub start:", e);
+          console.warn("Failed to adjust volume during scrub start:", e);
         }
+      } else {
+        mutingDuringScrubRef.current = false;
       }
     });
 
-    progressStore.setScrubEnd(() => {
-      if (mutingDuringScrubRef.current && engine.master) {
+    progressStore.setScrubEnd((options = {}) => {
+      const shouldPause = options?.pauseTransport !== false;
+      const shouldSilence =
+        options?.silenceDuringScrub !== undefined
+          ? !!options.silenceDuringScrub
+          : shouldPause;
+
+      if (shouldSilence && mutingDuringScrubRef.current && engine.master) {
         try {
-          // Restore the volume that was active before scrubbing
           const restoreGain =
             volumeBeforeScrubRef.current ?? savedVolumeRef.current;
           engine.master.gain.gain.value = restoreGain;
@@ -1950,9 +2008,15 @@ export default function WebAmpPlayback({version, onEngineReady}) {
       }
       mutingDuringScrubRef.current = false;
 
-      // if it was playing before scrub, resume playback
-      if (wasPlayingRef.current) {
-        engine.play().catch(() => {});
+      if (shouldPause && wasPlayingRef.current) {
+        engine
+          .play()
+          .catch((err) =>
+            console.warn("Failed to resume engine after scrub:", err)
+          );
+      }
+      if (shouldPause) {
+        wasPlayingRef.current = false;
       }
     });
 
@@ -2007,6 +2071,7 @@ export default function WebAmpPlayback({version, onEngineReady}) {
   // Control handlers for play, pause, stop
   const onPlay = async () => {
     try {
+      syncTransportToProgressStore();
       await engine.play();
     } catch (e) {
       console.error("[UI] engine.play() failed:", e);

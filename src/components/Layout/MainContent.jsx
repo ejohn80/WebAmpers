@@ -1,4 +1,11 @@
-import React, {useEffect, useMemo, useRef, useState, useContext} from "react";
+import React, {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useContext,
+  useCallback,
+} from "react";
 import DraggableDiv from "../Generic/DraggableDiv";
 import GlobalPlayhead from "../Generic/GlobalPlayhead";
 import TimelineRuler from "./TimelineRuler";
@@ -11,6 +18,7 @@ import "./MainContent.css";
 
 const TRACK_CONTROLS_WIDTH = 180;
 const TRACK_CONTROLS_GAP = 12;
+const TRACK_ROW_PADDING = 8; // Keep in sync with --track-row-padding in CSS
 
 function MainContent({
   tracks = [],
@@ -18,6 +26,9 @@ function MainContent({
   onSolo,
   onDelete,
   onAssetDrop,
+  onSegmentMove,
+  onSegmentDelete = () => {},
+  requestAssetPreview,
   totalLengthMs = 0,
 }) {
   const {selectedTrackId, setSelectedTrackId, isEffectsMenuOpen} =
@@ -36,11 +47,60 @@ function MainContent({
   const [timelineContentWidth, setTimelineContentWidth] = useState(0);
   const [scrollAreaWidth, setScrollAreaWidth] = useState(0);
   const scrollAreaRef = useRef(null);
+  const [selectedSegment, setSelectedSegment] = useState(null);
+
+  const clearSegmentSelection = useCallback(() => {
+    setSelectedSegment(null);
+  }, []);
+
+  const handleSegmentSelected = useCallback(
+    (trackId, segmentId, segmentIndex) => {
+      if (!trackId) {
+        setSelectedSegment(null);
+        return;
+      }
+
+      setSelectedSegment({
+        trackId,
+        segmentId: segmentId ?? null,
+        segmentIndex:
+          Number.isFinite(segmentIndex) && segmentIndex >= 0
+            ? segmentIndex
+            : null,
+      });
+    },
+    []
+  );
 
   // Deselect when clicking background
   const handleBackgroundClick = () => {
-    setSelectedTrackId(null);
+    if (typeof setSelectedTrackId === "function") {
+      setSelectedTrackId(null);
+    }
+    clearSegmentSelection();
   };
+
+  useEffect(() => {
+    if (!selectedSegment) return;
+
+    const track = tracks.find((t) => t?.id === selectedSegment.trackId);
+    if (!track || !Array.isArray(track.segments)) {
+      clearSegmentSelection();
+      return;
+    }
+
+    const hasMatch = track.segments.some((segment, index) => {
+      if (!segment) return false;
+      if (selectedSegment.segmentId) {
+        return segment.id === selectedSegment.segmentId;
+      }
+      return selectedSegment.segmentIndex === index;
+    });
+
+    if (!hasMatch) {
+      clearSegmentSelection();
+    }
+  }, [tracks, selectedSegment, clearSegmentSelection]);
 
   const verticalScale = useMemo(
     () => Math.min(2.25, Math.max(0.6, Math.pow(Math.max(zoom, 0.01), 0.5))),
@@ -56,17 +116,18 @@ function MainContent({
   );
 
   const timelineMetrics = useMemo(() => {
-    const leftOffsetPx = TRACK_CONTROLS_WIDTH + TRACK_CONTROLS_GAP;
+    const leftOffsetPx =
+      TRACK_ROW_PADDING + TRACK_CONTROLS_WIDTH + TRACK_CONTROLS_GAP;
     const minimumTimelineWidth = Math.max(
       1,
-      Math.round(scrollAreaWidth - leftOffsetPx)
+      Math.round(scrollAreaWidth - (leftOffsetPx + TRACK_ROW_PADDING))
     );
     const widthPx = Math.max(
       1,
       Math.round(timelineContentWidth),
       minimumTimelineWidth
     );
-    const rowWidthPx = widthPx + leftOffsetPx;
+    const rowWidthPx = widthPx + leftOffsetPx + TRACK_ROW_PADDING;
     return {widthPx, leftOffsetPx, rowWidthPx};
   }, [timelineContentWidth, scrollAreaWidth]);
 
@@ -111,10 +172,9 @@ function MainContent({
   useEffect(() => {
     const lengthMs = Math.max(1, totalLengthMs || 0);
     const visibleWindowMs = Math.max(1, Math.min(lengthMs, DEFAULT_VISIBLE_MS));
-    const availableWidthPx = Math.max(
-      1,
-      scrollAreaWidth - (TRACK_CONTROLS_WIDTH + TRACK_CONTROLS_GAP)
-    );
+    const staticWidth =
+      TRACK_ROW_PADDING * 2 + TRACK_CONTROLS_WIDTH + TRACK_CONTROLS_GAP;
+    const availableWidthPx = Math.max(1, scrollAreaWidth - staticWidth);
 
     const basePxPerMs =
       availableWidthPx > 1
@@ -159,7 +219,7 @@ function MainContent({
   const resetZoom = () => setZoom(1);
   const toggleFollow = () => setFollowPlayhead((v) => !v);
 
-  // Handle asset drop
+  // Handle asset drop - can target empty space OR an existing track
   const handleDrop = (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -170,7 +230,25 @@ function MainContent({
 
       const dropData = JSON.parse(data);
       if (dropData.type === "asset" && onAssetDrop) {
-        onAssetDrop(dropData.assetId);
+        // Get drop position to calculate timeline position
+        const rect = e.currentTarget.getBoundingClientRect();
+        const dropX = e.clientX - rect.left - timelineMetrics.leftOffsetPx;
+        const pxPerMs =
+          totalLengthMs > 0 ? timelineMetrics.widthPx / totalLengthMs : 0;
+        const timelinePositionMs =
+          pxPerMs > 0 ? Math.max(0, dropX / pxPerMs) : 0;
+
+        // Determine which track (if any) was targeted
+        const dropY = e.clientY - rect.top;
+        const trackHeight = 96 * verticalScale;
+        const rulerHeight = 40; // Approximate ruler height
+        const trackIndex = Math.floor((dropY - rulerHeight) / trackHeight);
+        const targetTrackId =
+          trackIndex >= 0 && trackIndex < tracks.length
+            ? tracks[trackIndex]?.id
+            : null;
+
+        onAssetDrop(dropData.assetId, targetTrackId, timelinePositionMs);
       }
     } catch (err) {
       console.error("Error handling drop:", err);
@@ -248,9 +326,16 @@ function MainContent({
                         onMute={onMute}
                         onSolo={onSolo}
                         onDelete={onDelete}
+                        onSegmentMove={onSegmentMove}
+                        requestAssetPreview={requestAssetPreview}
+                        onAssetDrop={onAssetDrop}
                         totalLengthMs={totalLengthMs}
                         timelineWidth={timelineMetrics.widthPx}
                         rowWidthPx={timelineMetrics.rowWidthPx}
+                        selectedSegment={selectedSegment}
+                        onSegmentSelected={handleSegmentSelected}
+                        onClearSegmentSelection={clearSegmentSelection}
+                        onSegmentDelete={onSegmentDelete}
                       />
                     </div>
                   ))}
