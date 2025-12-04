@@ -1,4 +1,4 @@
-import React, {useState, useEffect, useContext, useRef} from "react";
+import React, {useState, useEffect, useContext, useRef, useCallback} from "react";
 import "./AudioPage.css";
 import * as Tone from "tone";
 
@@ -13,6 +13,7 @@ import {AppContext} from "../context/AppContext";
 import {progressStore} from "../playback/progressStore";
 import {saveAsset} from "../utils/assetUtils";
 import {clipboardManager} from "../managers/ClipboardManager.js";
+import {insertSegmentWithSpacing} from "../utils/segmentPlacement";
 
 const MIN_WIDTH = 0;
 const MAX_WIDTH = 300;
@@ -47,6 +48,7 @@ function AudioPage() {
 
   const engineRef = React.useRef(null);
   const lastSessionRef = useRef(null);
+  const assetPreviewCacheRef = useRef(new Map());
 
   // Keyboard shortcuts for cut/copy/paste
   useEffect(() => {
@@ -153,6 +155,44 @@ function AudioPage() {
 
     return null;
   };
+
+  const getAssetPreviewInfo = useCallback(
+    async (assetId) => {
+      if (!assetId) return null;
+
+      if (assetPreviewCacheRef.current.has(assetId)) {
+        return assetPreviewCacheRef.current.get(assetId);
+      }
+
+      try {
+        let toneBuffer = assetBufferCache.get(assetId);
+
+        if (!toneBuffer) {
+          const asset = await dbManager.getAsset(assetId);
+          if (!asset) return null;
+          toneBuffer = await buildToneBufferFromAssetRecord(asset);
+          if (toneBuffer) {
+            assetBufferCache.set(assetId, toneBuffer);
+          }
+        }
+
+        if (!toneBuffer) return null;
+
+        const durationSeconds =
+          typeof toneBuffer.duration === "number"
+            ? toneBuffer.duration
+            : toneBuffer._buffer?.duration ?? toneBuffer.get?.()?.duration ?? 0;
+
+        const preview = {durationMs: Math.round(durationSeconds * 1000)};
+        assetPreviewCacheRef.current.set(assetId, preview);
+        return preview;
+      } catch (error) {
+        console.error("Failed to load asset preview info:", error);
+        return null;
+      }
+    },
+    [buildToneBufferFromAssetRecord]
+  );
 
   // Helper function to generate a unique copy name
   const generateCopyName = (baseName) => {
@@ -491,7 +531,11 @@ function AudioPage() {
   };
 
   // Handle dropping an asset from the assets tab to create a new track OR append to existing
-  const handleAssetDrop = async (assetId, targetTrackId = null, timelinePositionMs = 0) => {
+  const handleAssetDrop = async (
+    assetId,
+    targetTrackId = null,
+    timelinePositionMs = 0
+  ) => {
     try {
       console.log(`Dropping asset ${assetId}`, {targetTrackId, timelinePositionMs});
 
@@ -561,8 +605,12 @@ function AudioPage() {
           startInFileMs: 0,
         };
 
-        // Add segment to track
-        track.segments.push(newSegment);
+        // Add segment to track with automatic spacing
+        const positionedSegments = insertSegmentWithSpacing(
+          track.segments,
+          newSegment
+        );
+        track.segments = positionedSegments;
 
         // Update in database
         await dbManager.updateTrack(track);
@@ -678,28 +726,33 @@ function AudioPage() {
       const bufferRef = segment.buffer;
       const assetId = segment.assetId ?? track.assetId ?? null;
 
-      console.log("[handleSegmentMove] Before update", {
-        segmentId: segment.id,
-        assetId,
-        hasBuffer: !!bufferRef,
-        startOnTimelineMs: segment.startOnTimelineMs,
-        newPositionMs,
-      });
+      const safeNewPosition = Math.max(0, Math.round(newPositionMs));
 
-      segment.startOnTimelineMs = Math.round(newPositionMs);
+      const updatedSegment = {
+        ...segment,
+        startOnTimelineMs: safeNewPosition,
+        startOnTimeline: safeNewPosition / 1000,
+        buffer: bufferRef || segment.buffer,
+        assetId: segment.assetId || assetId,
+      };
 
-      if (bufferRef && !segment.buffer) {
-        segment.buffer = bufferRef;
-      }
-      if (!segment.assetId && assetId) {
-        segment.assetId = assetId;
-      }
+      const remainingSegments = track.segments.filter(
+        (_seg, idx) => idx !== segmentIndex
+      );
 
-      console.log("[handleSegmentMove] After update", {
-        segmentId: segment.id,
-        assetId: segment.assetId,
-        hasBuffer: !!segment.buffer,
-        startOnTimelineMs: segment.startOnTimelineMs,
+      const normalizedSegments = insertSegmentWithSpacing(
+        remainingSegments,
+        updatedSegment
+      );
+
+      track.segments = normalizedSegments;
+
+      console.log("[handleSegmentMove] After spacing", {
+        segmentId: updatedSegment.id,
+        requestedStart: safeNewPosition,
+        appliedStart:
+          normalizedSegments.find((seg) => seg.id === updatedSegment.id)
+            ?.startOnTimelineMs,
       });
 
       await dbManager.updateTrack(track);
@@ -1153,6 +1206,7 @@ function AudioPage() {
           tracks={tracks}
           recording={recording}
           totalLengthMs={version?.lengthMs || 0}
+          requestAssetPreview={getAssetPreviewInfo}
           onAssetDrop={handleAssetDrop}
           onSegmentMove={handleSegmentMove}
           onMute={(trackId, muted) =>

@@ -19,6 +19,7 @@ function MainContent({
   onDelete,
   onAssetDrop,
   onSegmentMove,
+  requestAssetPreview,
   totalLengthMs = 0,
 }) {
   const {selectedTrackId, setSelectedTrackId, isEffectsMenuOpen} =
@@ -265,6 +266,7 @@ function MainContent({
                         onSolo={onSolo}
                         onDelete={onDelete}
                         onSegmentMove={onSegmentMove}
+                        requestAssetPreview={requestAssetPreview}
                         onAssetDrop={onAssetDrop}
                         totalLengthMs={totalLengthMs}
                         timelineWidth={timelineMetrics.widthPx}

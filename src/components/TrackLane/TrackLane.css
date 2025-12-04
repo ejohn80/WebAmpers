@@ -141,6 +141,44 @@
   will-change: transform;
 }
 
+.tracklane-timeline--drop {
+  outline: 2px dashed rgba(23, 225, 255, 0.35);
+  outline-offset: -4px;
+}
+
+.tracklane-drop-preview {
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  border-radius: 4px;
+  background: rgba(23, 225, 255, 0.15);
+  border: 1px dashed rgba(23, 225, 255, 0.8);
+  color: #17e1ff;
+  font-size: 11px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  pointer-events: none;
+  padding: 4px;
+  z-index: 2;
+}
+
+.tracklane-drop-preview.loading {
+  opacity: 0.8;
+}
+
+.drop-preview-label {
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.drop-preview-duration {
+  font-size: 10px;
+  opacity: 0.8;
+}
+
 .tracklane-segment-positioned {
   /* Positioned absolutely within timeline */
   position: absolute;

@@ -125,6 +125,20 @@ const AssetsTab = ({
     }
   };
 
+  const setGlobalDragAsset = (asset) => {
+    if (typeof window === "undefined") return;
+    window.__WEBAMP_DRAG_ASSET__ = {
+      type: "asset",
+      assetId: asset.id,
+      name: asset.name,
+    };
+  };
+
+  const clearGlobalDragAsset = () => {
+    if (typeof window === "undefined") return;
+    delete window.__WEBAMP_DRAG_ASSET__;
+  };
+
   const handleDragStart = (event, asset) => {
     // Store asset data in drag event
     event.dataTransfer.setData(
@@ -136,7 +150,14 @@ const AssetsTab = ({
       })
     );
     event.dataTransfer.effectAllowed = "copy";
+    setGlobalDragAsset(asset);
   };
+
+  const handleDragEnd = () => {
+    clearGlobalDragAsset();
+  };
+
+  useEffect(() => () => clearGlobalDragAsset(), []);
 
   const handleDoubleClick = (asset) => {
     setEditingAssetId(asset.id);
@@ -214,6 +235,7 @@ const AssetsTab = ({
                   className={styles.songRow}
                   draggable={editingAssetId !== asset.id}
                   onDragStart={(e) => handleDragStart(e, asset)}
+                  onDragEnd={handleDragEnd}
                   onDoubleClick={() => handleDoubleClick(asset)}
                   style={{
                     cursor: editingAssetId === asset.id ? "text" : "grab",
