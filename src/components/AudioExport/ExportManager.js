@@ -19,9 +19,6 @@ class ExportManager {
   /**
    * Apply master effects to the mixed buffer using Tone.Offline rendering
    */
-  /**
-   * Apply master effects to the mixed buffer using Tone.Offline rendering
-   */
   async applyMasterEffects(buffer, effects = {}) {
     if (!effects || Object.keys(effects).length === 0) {
       return buffer;
@@ -246,8 +243,38 @@ class ExportManager {
           if (anySolo && !track.solo) continue;
 
           const effects = track.effects || {};
-          // Reusing from playback
-          const effectsChain = tempEngine._buildEffectsChain(effects, context);
+          const enabledEffects = track.enabledEffects || {};
+
+          // IMPORTANT: Filter effects to only include enabled ones
+          const filteredEffects = {};
+          Object.keys(effects).forEach((key) => {
+            // Pan is always enabled (not part of toggle system)
+            if (key === "pan") {
+              filteredEffects[key] = effects[key];
+            } else if (enabledEffects[key] !== false) {
+              // Only include effect if it's explicitly enabled (or not set, defaulting to enabled)
+              filteredEffects[key] = effects[key];
+            }
+          });
+
+          console.log(
+            `[Export] Track ${track.id} - Original effects:`,
+            effects
+          );
+          console.log(
+            `[Export] Track ${track.id} - Enabled map:`,
+            enabledEffects
+          );
+          console.log(
+            `[Export] Track ${track.id} - Filtered effects:`,
+            filteredEffects
+          );
+
+          // Build effects chain with filtered effects
+          const effectsChain = tempEngine._buildEffectsChain(
+            filteredEffects,
+            context
+          );
 
           for (const segment of track.segments || []) {
             try {
@@ -376,7 +403,7 @@ class ExportManager {
     const format = options.format || "mp3";
     const filename = options.filename || `export.${format}`;
 
-    // Mix all tracks
+    // Mix all tracks (now respects enabledEffects)
     let mixedBuffer = await this.mixTracks(tracks, totalLengthMs);
 
     // Apply master effects to the mixed buffer using Tone.Offline

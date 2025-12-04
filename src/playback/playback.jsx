@@ -83,6 +83,7 @@ class PlaybackEngine {
   }
 
   /** Load a new project ("version") into the playback engine */
+  /** Load a new project ("version") into the playback engine */
   async load(version) {
     await this.ensureAudioUnlocked();
 
@@ -120,9 +121,9 @@ class PlaybackEngine {
         this.setTrackPan(t.id, t.effects.pan);
       }
 
-      // Apply other effects
+      // Apply other effects - FIXED: Pass empty enabled map and silent flag
       if (t.effects) {
-        this.setTrackEffects(t.id, t.effects, true);
+        this.setTrackEffects(t.id, t.effects, t.enabledEffects || {}, true);
       }
     });
 
@@ -215,6 +216,8 @@ class PlaybackEngine {
    *
    * @param {string} trackId - The unique identifier of the track
    * @param {Object} effectsMap - Effects configuration object containing effect parameters
+   * @param {Object} enabledEffectsMap - Map of which effects are enabled (true/false for each effect)
+   * @param {boolean} [silent=false] - If true, suppresses console logging
    * @param {number} [effectsMap.pitch] - Pitch shift in semitones (-12 to +12)
    * @param {number} [effectsMap.reverb] - Reverb amount (0-100)
    * @param {number} [effectsMap.delay] - Delay amount (0-100)
@@ -228,28 +231,67 @@ class PlaybackEngine {
    * @param {number} [effectsMap.chorus] - Chorus amount (0-100)
    * @param {boolean} [silent=false] - If true, suppresses console logging
    */
-  setTrackEffects(trackId, effectsMap, silent = false) {
+  setTrackEffects(
+    trackId,
+    effectsMap,
+    enabledEffectsMapOrSilent = {},
+    silent = false
+  ) {
+    // Handle backward compatibility
+    let enabledEffectsMap = enabledEffectsMapOrSilent;
+    if (typeof enabledEffectsMapOrSilent === "boolean") {
+      silent = enabledEffectsMapOrSilent;
+      enabledEffectsMap = {};
+    }
+
     if (!this.version) return;
 
     const bus = this.trackBuses.get(trackId);
     if (!bus) return;
 
-    if (!silent) console.log(`[setTrackEffects] Track ${trackId}`, effectsMap);
+    // CRITICAL: Lock master gain IMMEDIATELY to prevent audio leakage
+    let masterGainValue = null;
+    let masterGainLocked = false;
+
+    try {
+      if (this.master?.gain?.gain) {
+        masterGainValue = this.master.gain.gain.value;
+
+        // If master is muted (gain near 0), lock it at 0 immediately
+        if (masterGainValue < 0.001) {
+          this.master.gain.gain.value = 0;
+          masterGainLocked = true;
+        }
+      }
+    } catch (e) {
+      console.warn("[setTrackEffects] Could not lock master gain");
+    }
+
+    if (!silent)
+      console.log(
+        `[setTrackEffects] Track ${trackId}`,
+        effectsMap,
+        enabledEffectsMap,
+        `Master gain: ${masterGainValue}, locked: ${masterGainLocked}`
+      );
 
     // Store the effects map
     const track = this.version.tracks.find((x) => x.id === trackId);
     if (track) {
       track.effects = effectsMap;
+      track.enabledEffects = enabledEffectsMap;
     }
 
     const canUpdateExisting = bus.fxNodes && bus.fxNodes.length > 0;
 
     if (canUpdateExisting) {
-      // Try to update existing effect parameters smoothly
-      this._updateExistingEffectNodes(bus.fxNodes, effectsMap);
+      this._updateExistingEffectNodes(
+        bus.fxNodes,
+        effectsMap,
+        enabledEffectsMap
+      );
     }
 
-    // If we can't update smoothly, rebuild the chain
     // 1. SAFELY DISCONNECT
     const nextNode = this.master?.fxIn || this.master?.gain;
 
@@ -272,8 +314,8 @@ class PlaybackEngine {
       });
     }
 
-    // 3. BUILD NEW CHAIN (excluding pan)
-    const fxNodes = this._buildTrackEffectsChain(effectsMap);
+    // 3. BUILD NEW CHAIN
+    const fxNodes = this._buildTrackEffectsChain(effectsMap, enabledEffectsMap);
     bus.fxNodes = fxNodes;
 
     // 4. RECONNECT
@@ -282,22 +324,18 @@ class PlaybackEngine {
     } catch (e) {}
 
     if (fxNodes.length > 0) {
-      // Chain: Gain -> Effects -> Pan
       bus.gain.connect(fxNodes[0]);
-
       for (let i = 0; i < fxNodes.length - 1; i++) {
         fxNodes[i].connect(fxNodes[i + 1]);
       }
-
       fxNodes[fxNodes.length - 1].connect(bus.pan);
       bus.fxOut = bus.pan;
     } else {
-      // No effects: Gain -> Pan
       bus.gain.connect(bus.pan);
       bus.fxOut = bus.pan;
     }
 
-    // Connect Pan to Master
+    // Connect Pan to Master - but master gain is still locked at 0 if it was muted
     const masterDest = this.master?.fxIn || this.master?.gain;
     if (masterDest) {
       try {
@@ -306,10 +344,25 @@ class PlaybackEngine {
       bus.pan.connect(masterDest);
     }
 
+    // Apply pan
     const panValue = effectsMap?.pan
       ? Math.max(-1, Math.min(1, effectsMap.pan / 100))
       : 0;
     bus.pan.pan.value = panValue;
+
+    // Use synchronous value setting to prevent any audio leak
+    if (masterGainValue !== null) {
+      try {
+        if (this.master?.gain?.gain) {
+          // Cancel any scheduled changes first
+          this.master.gain.gain.cancelScheduledValues(0);
+          // Set value immediately (no ramping)
+          this.master.gain.gain.setValueAtTime(masterGainValue, 0);
+        }
+      } catch (e) {
+        console.warn("[setTrackEffects] Could not restore master gain", e);
+      }
+    }
   }
 
   /**
@@ -319,24 +372,32 @@ class PlaybackEngine {
    * @private
    * @param {Array<Tone.AudioNode>} fxNodes - Array of existing Tone.js effect nodes
    * @param {Object} effectsMap - New effect parameter values to apply
+   * @param {Object} enabledEffectsMap - Map of which effects are enabled
    * @returns {boolean} True if update was successful, false if chain needs rebuilding
    */
-  _updateExistingEffectNodes(fxNodes, effectsMap) {
+  _updateExistingEffectNodes(fxNodes, effectsMap, enabledEffectsMap = {}) {
     if (!fxNodes || fxNodes.length === 0) return false;
 
     try {
+      // We need to check if any effects have been enabled/disabled
+      // If enabled state has changed, we need to rebuild the chain
+      // For now, let's just update parameters for enabled effects
       fxNodes.forEach((node) => {
         // Update Pitch Shift
         if (node instanceof Tone.PitchShift && effectsMap.pitch !== undefined) {
-          node.pitch = effectsMap.pitch;
+          if (enabledEffectsMap.pitch !== false) {
+            node.pitch = effectsMap.pitch;
+          }
         }
 
         // Update Reverb
         if (node instanceof Tone.Freeverb && effectsMap.reverb !== undefined) {
-          const wet = Math.max(0, Math.min(1, effectsMap.reverb / 100));
-          const roomSize = 0.1 + 0.85 * wet;
-          node.wet.value = wet;
-          node.roomSize.value = roomSize;
+          if (enabledEffectsMap.reverb !== false) {
+            const wet = Math.max(0, Math.min(1, effectsMap.reverb / 100));
+            const roomSize = 0.1 + 0.85 * wet;
+            node.wet.value = wet;
+            node.roomSize.value = roomSize;
+          }
         }
 
         // Update Delay
@@ -344,14 +405,18 @@ class PlaybackEngine {
           node instanceof Tone.FeedbackDelay &&
           effectsMap.delay !== undefined
         ) {
-          const wet = Math.max(0, Math.min(1, effectsMap.delay / 100));
-          node.wet.value = wet;
-          node.feedback.value = 0.3 + 0.4 * wet;
+          if (enabledEffectsMap.delay !== false) {
+            const wet = Math.max(0, Math.min(1, effectsMap.delay / 100));
+            node.wet.value = wet;
+            node.feedback.value = 0.3 + 0.4 * wet;
+          }
         }
 
         // Update EQ3 (Bass)
         if (node instanceof Tone.EQ3 && effectsMap.bass !== undefined) {
-          node.low.value = effectsMap.bass;
+          if (enabledEffectsMap.bass !== false) {
+            node.low.value = effectsMap.bass;
+          }
         }
 
         // Update Distortion
@@ -359,37 +424,46 @@ class PlaybackEngine {
           node instanceof Tone.Distortion &&
           effectsMap.distortion !== undefined
         ) {
-          const amount = Math.max(0, Math.min(1, effectsMap.distortion / 100));
-          node.distortion = amount;
-          node.wet.value = amount * 0.8;
+          if (enabledEffectsMap.distortion !== false) {
+            const amount = Math.max(
+              0,
+              Math.min(1, effectsMap.distortion / 100)
+            );
+            node.distortion = amount;
+            node.wet.value = amount * 0.8;
+          }
         }
 
         // Update Volume (Gain)
         if (node instanceof Tone.Gain && effectsMap.volume !== undefined) {
-          let gain = Math.max(0, Math.min(2, effectsMap.volume / 100));
-          if (gain < 0.001) gain = 0.0001;
+          if (enabledEffectsMap.volume !== false) {
+            let gain = Math.max(0, Math.min(2, effectsMap.volume / 100));
+            if (gain < 0.001) gain = 0.0001;
 
-          // Smooth ramp to avoid clicks
-          const now = Tone.now();
-          node.gain.cancelScheduledValues(now);
-          node.gain.linearRampToValueAtTime(gain, now + 0.05);
+            // Smooth ramp to avoid clicks
+            const now = Tone.now();
+            node.gain.cancelScheduledValues(now);
+            node.gain.linearRampToValueAtTime(gain, now + 0.05);
+          }
         }
-
-        // DON'T update Panner here - it's not in the effects chain
 
         // Update Tremolo
         if (node instanceof Tone.Tremolo && effectsMap.tremolo !== undefined) {
-          const wet = Math.max(0, Math.min(1, effectsMap.tremolo / 100));
-          node.frequency.value = 0.1 + wet * 19.9;
-          node.depth.value = wet;
-          node.wet.value = wet;
+          if (enabledEffectsMap.tremolo !== false) {
+            const wet = Math.max(0, Math.min(1, effectsMap.tremolo / 100));
+            node.frequency.value = 0.1 + wet * 19.9;
+            node.depth.value = wet;
+            node.wet.value = wet;
+          }
         }
 
         // Update Vibrato
         if (node instanceof Tone.Vibrato && effectsMap.vibrato !== undefined) {
-          const wet = Math.max(0, Math.min(1, effectsMap.vibrato / 100));
-          node.frequency.value = 0.1 + wet * 19.9;
-          node.depth.value = wet;
+          if (enabledEffectsMap.vibrato !== false) {
+            const wet = Math.max(0, Math.min(1, effectsMap.vibrato / 100));
+            node.frequency.value = 0.1 + wet * 19.9;
+            node.depth.value = wet;
+          }
         }
 
         // Update High-pass Filter
@@ -398,7 +472,9 @@ class PlaybackEngine {
           node.type === "highpass" &&
           effectsMap.highpass !== undefined
         ) {
-          node.frequency.value = effectsMap.highpass;
+          if (enabledEffectsMap.highpass !== false) {
+            node.frequency.value = effectsMap.highpass;
+          }
         }
 
         // Update Low-pass Filter
@@ -407,13 +483,17 @@ class PlaybackEngine {
           node.type === "lowpass" &&
           effectsMap.lowpass !== undefined
         ) {
-          node.frequency.value = effectsMap.lowpass;
+          if (enabledEffectsMap.lowpass !== false) {
+            node.frequency.value = effectsMap.lowpass;
+          }
         }
 
         // Update Chorus
         if (node instanceof Tone.Chorus && effectsMap.chorus !== undefined) {
-          const wet = Math.max(0, Math.min(1, effectsMap.chorus / 100));
-          node.wet.value = wet;
+          if (enabledEffectsMap.chorus !== false) {
+            const wet = Math.max(0, Math.min(1, effectsMap.chorus / 100));
+            node.wet.value = wet;
+          }
         }
       });
 
@@ -431,9 +511,10 @@ class PlaybackEngine {
    *
    * @private
    * @param {Object} effectsMap - Effects configuration object
+   * @param {Object} enabledEffectsMap - Map of which effects are enabled (true/false)
    * @returns {Array<Tone.AudioNode>} Array of connected Tone.js effect nodes
    */
-  _buildTrackEffectsChain(effectsMap) {
+  _buildTrackEffectsChain(effectsMap, enabledEffectsMap = {}) {
     const nodes = [];
 
     if (!effectsMap || typeof effectsMap !== "object") {
@@ -441,8 +522,12 @@ class PlaybackEngine {
     }
 
     try {
-      // Pitch Shift
-      if (effectsMap.pitch && Math.abs(effectsMap.pitch) > 0.01) {
+      // Pitch Shift - only add if enabled
+      if (
+        effectsMap.pitch &&
+        Math.abs(effectsMap.pitch) > 0.01 &&
+        enabledEffectsMap.pitch !== false
+      ) {
         const pitchShift = new Tone.PitchShift({
           pitch: effectsMap.pitch,
         });
@@ -450,8 +535,12 @@ class PlaybackEngine {
         console.log("[Effects] Added PitchShift:", effectsMap.pitch);
       }
 
-      // Reverb
-      if (effectsMap.reverb && effectsMap.reverb > 0.01) {
+      // Reverb - only add if enabled
+      if (
+        effectsMap.reverb &&
+        effectsMap.reverb > 0.01 &&
+        enabledEffectsMap.reverb !== false
+      ) {
         const wet = Math.max(0, Math.min(1, effectsMap.reverb / 100));
         const roomSize = 0.1 + 0.85 * wet;
         const reverb = new Tone.Freeverb({
@@ -463,8 +552,12 @@ class PlaybackEngine {
         console.log("[Effects] Added Reverb:", effectsMap.reverb);
       }
 
-      // Delay
-      if (effectsMap.delay && effectsMap.delay > 0.01) {
+      // Delay - only add if enabled
+      if (
+        effectsMap.delay &&
+        effectsMap.delay > 0.01 &&
+        enabledEffectsMap.delay !== false
+      ) {
         const wet = Math.max(0, Math.min(1, effectsMap.delay / 100));
         const delay = new Tone.FeedbackDelay({
           delayTime: "8n",
@@ -475,8 +568,12 @@ class PlaybackEngine {
         console.log("[Effects] Added Delay:", effectsMap.delay);
       }
 
-      // Bass Boost (EQ)
-      if (effectsMap.bass && Math.abs(effectsMap.bass) > 0.01) {
+      // Bass Boost (EQ) - only add if enabled
+      if (
+        effectsMap.bass &&
+        Math.abs(effectsMap.bass) > 0.01 &&
+        enabledEffectsMap.bass !== false
+      ) {
         const eq = new Tone.EQ3({
           low: effectsMap.bass,
           mid: 0,
@@ -486,8 +583,12 @@ class PlaybackEngine {
         console.log("[Effects] Added Bass:", effectsMap.bass);
       }
 
-      // Distortion
-      if (effectsMap.distortion && effectsMap.distortion > 0.01) {
+      // Distortion - only add if enabled
+      if (
+        effectsMap.distortion &&
+        effectsMap.distortion > 0.01 &&
+        enabledEffectsMap.distortion !== false
+      ) {
         const amount = Math.max(0, Math.min(1, effectsMap.distortion / 100));
         const distortion = new Tone.Distortion({
           distortion: amount,
@@ -497,10 +598,11 @@ class PlaybackEngine {
         console.log("[Effects] Added Distortion:", effectsMap.distortion);
       }
 
-      // CRITICAL FIX: Volume - Always add if not exactly 100
+      // CRITICAL FIX: Volume - Always add if not exactly 100 and enabled
       if (
         effectsMap.volume !== undefined &&
-        Math.abs(effectsMap.volume - 100) > 0.01
+        Math.abs(effectsMap.volume - 100) > 0.01 &&
+        enabledEffectsMap.volume !== false
       ) {
         let gain = Math.max(0, Math.min(2, effectsMap.volume / 100));
         if (gain < 0.001) {
@@ -518,8 +620,12 @@ class PlaybackEngine {
 
       // Pan is NOT in the effects chain - it's handled by track bus
 
-      // Tremolo
-      if (effectsMap.tremolo && effectsMap.tremolo > 0.01) {
+      // Tremolo - only add if enabled
+      if (
+        effectsMap.tremolo &&
+        effectsMap.tremolo > 0.01 &&
+        enabledEffectsMap.tremolo !== false
+      ) {
         const wet = Math.max(0, Math.min(1, effectsMap.tremolo / 100));
         const tremolo = new Tone.Tremolo({
           frequency: 0.1 + wet * 19.9,
@@ -530,8 +636,12 @@ class PlaybackEngine {
         console.log("[Effects] Added Tremolo:", effectsMap.tremolo);
       }
 
-      // Vibrato
-      if (effectsMap.vibrato && effectsMap.vibrato > 0.01) {
+      // Vibrato - only add if enabled
+      if (
+        effectsMap.vibrato &&
+        effectsMap.vibrato > 0.01 &&
+        enabledEffectsMap.vibrato !== false
+      ) {
         const wet = Math.max(0, Math.min(1, effectsMap.vibrato / 100));
         const vibrato = new Tone.Vibrato({
           frequency: 0.1 + wet * 19.9,
@@ -541,8 +651,12 @@ class PlaybackEngine {
         console.log("[Effects] Added Vibrato:", effectsMap.vibrato);
       }
 
-      // High-pass Filter
-      if (effectsMap.highpass && effectsMap.highpass > 20) {
+      // High-pass Filter - only add if enabled
+      if (
+        effectsMap.highpass &&
+        effectsMap.highpass > 20 &&
+        enabledEffectsMap.highpass !== false
+      ) {
         const highpass = new Tone.Filter({
           frequency: effectsMap.highpass,
           type: "highpass",
@@ -551,8 +665,12 @@ class PlaybackEngine {
         console.log("[Effects] Added Highpass:", effectsMap.highpass);
       }
 
-      // Low-pass Filter
-      if (effectsMap.lowpass && effectsMap.lowpass < 20000) {
+      // Low-pass Filter - only add if enabled
+      if (
+        effectsMap.lowpass &&
+        effectsMap.lowpass < 20000 &&
+        enabledEffectsMap.lowpass !== false
+      ) {
         const lowpass = new Tone.Filter({
           frequency: effectsMap.lowpass,
           type: "lowpass",
@@ -561,8 +679,12 @@ class PlaybackEngine {
         console.log("[Effects] Added Lowpass:", effectsMap.lowpass);
       }
 
-      // Chorus
-      if (effectsMap.chorus && effectsMap.chorus > 0.01) {
+      // Chorus - only add if enabled
+      if (
+        effectsMap.chorus &&
+        effectsMap.chorus > 0.01 &&
+        enabledEffectsMap.chorus !== false
+      ) {
         const wet = Math.max(0, Math.min(1, effectsMap.chorus / 100));
         const chorus = new Tone.Chorus({
           frequency: 1.5,
@@ -576,7 +698,11 @@ class PlaybackEngine {
         console.log("[Effects] Added Chorus:", effectsMap.chorus);
       }
 
-      console.log(`[Effects] Built chain with ${nodes.length} nodes`);
+      console.log(
+        `[Effects] Built chain with ${nodes.length} nodes (enabled map:`,
+        enabledEffectsMap,
+        ")"
+      );
     } catch (e) {
       console.error("Error building track effects chain:", e);
     }
@@ -1526,28 +1652,78 @@ class PlaybackEngine {
    * @param {Object} effects - The effects configuration object
    */
   applyEffects(effects) {
-    // 1. Create the new master chain with the new effects
+    let masterGainValue = null;
+    let masterGainLocked = false;
+
+    try {
+      if (this.master?.gain?.gain) {
+        masterGainValue = this.master.gain.gain.value;
+
+        // If master is muted (gain near 0), lock it at 0 immediately
+        if (masterGainValue < 0.001) {
+          this.master.gain.gain.cancelScheduledValues(0);
+          this.master.gain.gain.setValueAtTime(0, 0);
+          masterGainLocked = true;
+        }
+      }
+    } catch (e) {
+      console.warn("[applyEffects] Could not lock master gain");
+    }
+
+    console.log(
+      `[applyEffects] Master gain: ${masterGainValue}, locked: ${masterGainLocked}`
+    );
+
+    // 1. Create the new master chain
     const newMaster = this._createMasterChain(effects);
 
-    // 2. Reconnect all existing track buses to the new master input
+    // 2. Set the gain on the NEW master BEFORE reconnecting anything
+    if (masterGainValue !== null) {
+      try {
+        if (newMaster?.gain?.gain) {
+          newMaster.gain.gain.cancelScheduledValues(0);
+          newMaster.gain.gain.setValueAtTime(masterGainValue, 0);
+        }
+      } catch (e) {
+        console.warn("[applyEffects] Could not set gain on new master");
+      }
+    }
+
+    // 3. Reconnect all track buses to the new master
     this.trackBuses.forEach((bus) => {
-      // Find the old connection point and disconnect it
       const oldMasterIn = this.master?.fxIn ?? this.master?.gain;
       if (oldMasterIn) {
-        (bus.fxOut ?? bus.pan).disconnect(oldMasterIn);
+        try {
+          (bus.fxOut ?? bus.pan).disconnect(oldMasterIn);
+        } catch (e) {}
       }
 
-      // Connect to the new master input
-      (bus.fxOut ?? bus.pan).connect(newMaster.fxIn);
+      try {
+        (bus.fxOut ?? bus.pan).connect(newMaster.fxIn);
+      } catch (e) {
+        console.warn("[applyEffects] Failed to reconnect track bus:", e);
+      }
     });
 
-    // 3. Dispose of the old master chain
+    // 4. Dispose of old master
     this._disposeMaster();
 
-    // 4. Update the internal reference
+    // 5. Update reference
     this.master = newMaster;
 
-    console.log("Master effects applied.");
+    // 6. Final verification that gain is correct
+    if (masterGainValue !== null) {
+      try {
+        if (this.master?.gain?.gain) {
+          this.master.gain.gain.cancelScheduledValues(0);
+          this.master.gain.gain.setValueAtTime(masterGainValue, 0);
+        }
+      } catch (e) {
+        console.warn("[applyEffects] Final gain restore failed");
+      }
+    }
+
+    console.log("Master effects applied with gain:", masterGainValue);
   }
 }
 
@@ -1563,6 +1739,7 @@ export default function WebAmpPlayback({version, onEngineReady}) {
   const {setEngineRef, effects} = appCtx;
   const [playing, setPlaying] = useState(false);
   const [ms, setMs] = useState(0);
+
   // Restore persisted master volume / mute from localStorage when possible
   const [masterVol, setMasterVol] = useState(() => {
     try {
@@ -1582,9 +1759,10 @@ export default function WebAmpPlayback({version, onEngineReady}) {
   });
   const [draggingVol, setDraggingVol] = useState(false);
   const wasPlayingRef = useRef(false);
-  const prevMasterGainRef = useRef(0.5);
-  const savedVolumeRef = useRef(0.5);
-  const mutingDuringScrubRef = useRef(false);
+  const prevMasterGainRef = useRef(0.5); // The actual gain value (0-1) before scrubbing
+  const savedVolumeRef = useRef(0.5); // The user's desired volume (0-1) when not muted
+  const mutingDuringScrubRef = useRef(false); // Flag to track if we're muting during scrub
+  const volumeBeforeScrubRef = useRef(0.5); // Store the volume specifically before scrubbing starts
 
   // Create and memoize the engine so it persists across re-renders
   const engine = useMemo(
@@ -1691,10 +1869,14 @@ export default function WebAmpPlayback({version, onEngineReady}) {
                 if (m !== null) initMuted = m === "1";
               } catch (e) {}
 
-              prevMasterGainRef.current = initVol;
+              // Store the actual desired volume
               savedVolumeRef.current = initVol;
+              volumeBeforeScrubRef.current = initVol;
+              prevMasterGainRef.current = initVol;
 
-              engine.master.gain.gain.value = initMuted ? 0 : initVol;
+              // Apply the correct gain (0 if muted, otherwise the volume)
+              const actualGain = initMuted ? 0 : initVol;
+              engine.master.gain.gain.value = actualGain;
 
               setMasterVol(Math.round(initVol * 100));
               setMuted(initMuted);
@@ -1734,37 +1916,96 @@ export default function WebAmpPlayback({version, onEngineReady}) {
     }
 
     return cleanup;
-  }, [engine, version]);
+  }, [engine, version, effects]);
 
-  // Keep scrub handlers updated with current playing state without reloading engine
   useEffect(() => {
     progressStore.setScrubStart(() => {
       wasPlayingRef.current = playing;
-      if (playing && engine.master) {
+      if (engine.master) {
         try {
-          prevMasterGainRef.current = engine.master.gain.gain.value;
-          engine.master.gain.gain.value = 0.0001; // virtually silent
-          mutingDuringScrubRef.current = true;
-        } catch {}
+          // Store the CURRENT actual gain value
+          const currentGain = engine.master.gain.gain.value;
+          volumeBeforeScrubRef.current = currentGain;
+          prevMasterGainRef.current = currentGain;
+
+          // Only mute if we're actually playing
+          if (playing) {
+            engine.master.gain.gain.value = 0.0001; // virtually silent
+            mutingDuringScrubRef.current = true;
+          }
+        } catch (e) {
+          console.warn("Failed to mute during scrub start:", e);
+        }
       }
     });
+
     progressStore.setScrubEnd(() => {
       if (mutingDuringScrubRef.current && engine.master) {
         try {
-          engine.master.gain.gain.value = prevMasterGainRef.current ?? 1;
-        } catch {}
+          // Restore the volume that was active before scrubbing
+          const restoreGain =
+            volumeBeforeScrubRef.current ?? savedVolumeRef.current;
+          engine.master.gain.gain.value = restoreGain;
+          prevMasterGainRef.current = restoreGain;
+        } catch (e) {
+          console.warn("Failed to restore volume after scrub:", e);
+        }
       }
       mutingDuringScrubRef.current = false;
+
       // if it was playing before scrub, resume playback
       if (wasPlayingRef.current) {
         engine.play().catch(() => {});
       }
     });
+
     return () => {
       progressStore.setScrubStart(null);
       progressStore.setScrubEnd(null);
     };
   }, [playing, engine]);
+
+  useEffect(() => {
+    if (!engine.master) return;
+
+    let enforcementInterval = null;
+
+    // If muted, continuously enforce zero gain
+    if (muted) {
+      const enforceZeroGain = () => {
+        try {
+          if (engine.master?.gain?.gain) {
+            const currentGain = engine.master.gain.gain.value;
+
+            // If gain drifted above 0, immediately lock it back
+            if (currentGain > 0.0001) {
+              console.warn(
+                "[Mute Enforcement] Gain drifted to",
+                currentGain,
+                "- locking to 0"
+              );
+              engine.master.gain.gain.cancelScheduledValues(0);
+              engine.master.gain.gain.setValueAtTime(0, 0);
+            }
+          }
+        } catch (e) {
+          console.warn("[Mute Enforcement] Failed:", e);
+        }
+      };
+
+      // Check every 50ms while muted
+      enforcementInterval = setInterval(enforceZeroGain, 50);
+
+      // Also enforce immediately
+      enforceZeroGain();
+    }
+
+    return () => {
+      if (enforcementInterval) {
+        clearInterval(enforcementInterval);
+      }
+    };
+  }, [muted, engine]);
 
   // Control handlers for play, pause, stop
   const onPlay = async () => {
@@ -1916,19 +2157,40 @@ export default function WebAmpPlayback({version, onEngineReady}) {
         try {
           const linear = Math.max(0, Math.min(1, newVolume / 100));
           savedVolumeRef.current = linear;
-          prevMasterGainRef.current = linear;
 
+          // Unmute if increasing volume from 0
           if (muted && newVolume > 0) {
             setMuted(false);
+            prevMasterGainRef.current = linear;
+            if (engine.master) {
+              engine.master.gain.gain.value = linear;
+            }
+            try {
+              localStorage.setItem("webamp.muted", "0");
+            } catch (e) {}
           }
-
-          if (newVolume === 0 && !muted) {
+          // Mute if reducing to 0
+          else if (newVolume === 0 && !muted) {
             setMuted(true);
+            prevMasterGainRef.current = 0;
+            if (engine.master) {
+              engine.master.gain.gain.value = 0;
+            }
+            try {
+              localStorage.setItem("webamp.muted", "1");
+            } catch (e) {}
+          }
+          // Normal volume adjustment (not muted)
+          else if (!muted) {
+            prevMasterGainRef.current = linear;
+            if (engine.master) {
+              engine.master.gain.gain.value = linear;
+            }
           }
 
-          if (engine.master) {
-            engine.master.gain.gain.value = muted ? 0 : linear;
-          }
+          try {
+            localStorage.setItem("webamp.masterVol", String(newVolume));
+          } catch (e) {}
         } catch (err) {
           console.warn("master volume set failed:", err);
         }
@@ -1947,37 +2209,42 @@ export default function WebAmpPlayback({version, onEngineReady}) {
     hasNoTracks,
   ]);
 
-  // Toggle mute while preserving slider value
   const onToggleMute = () => {
     try {
       if (!engine.master) return;
+
       if (muted) {
-        // unmute to last saved volume
-        const restore = Math.max(
-          0,
-          Math.min(1, savedVolumeRef.current ?? masterVol / 100)
-        );
+        // UNMUTE: restore to saved volume
+        const restore = Math.max(0, Math.min(1, savedVolumeRef.current));
         const restorePercent = Math.round(restore * 100);
 
         engine.master.gain.gain.value = restore;
         prevMasterGainRef.current = restore;
-        setMasterVol(restorePercent); // Update slider position
+        volumeBeforeScrubRef.current = restore;
+
+        setMasterVol(restorePercent);
         setMuted(false);
+
         try {
           localStorage.setItem("webamp.muted", "0");
           localStorage.setItem("webamp.masterVol", String(restorePercent));
         } catch (e) {}
       } else {
-        // save current volume and mute
-        savedVolumeRef.current = Math.max(0, Math.min(1, masterVol / 100));
-        try {
-          localStorage.setItem("webamp.muted", "1");
-        } catch (e) {}
+        // MUTE: save current volume and set gain to 0
+        const currentPercent = masterVol;
+        savedVolumeRef.current = Math.max(0, Math.min(1, currentPercent / 100));
 
         engine.master.gain.gain.value = 0;
         prevMasterGainRef.current = 0;
-        setMasterVol(0); // Set slider to 0 when muting
+        volumeBeforeScrubRef.current = 0;
+
+        setMasterVol(0);
         setMuted(true);
+
+        try {
+          localStorage.setItem("webamp.muted", "1");
+          // Don't change masterVol in storage - keep the user's volume preference
+        } catch (e) {}
       }
     } catch (err) {
       console.warn("toggle mute failed:", err);
@@ -2064,7 +2331,7 @@ export default function WebAmpPlayback({version, onEngineReady}) {
         </div>
       </div>
 
-      {/* Volume section - unchanged, stays enabled */}
+      {/* Volume section - with fixed state management */}
       <div className="volume-section">
         <button
           type="button"
@@ -2098,18 +2365,38 @@ export default function WebAmpPlayback({version, onEngineReady}) {
               try {
                 const linear = Math.max(0, Math.min(1, v / 100));
                 savedVolumeRef.current = linear;
-                prevMasterGainRef.current = linear;
 
+                // Auto-unmute when dragging volume up from 0
                 if (muted && v > 0) {
                   setMuted(false);
+                  prevMasterGainRef.current = linear;
+                  volumeBeforeScrubRef.current = linear;
+                  if (engine.master) {
+                    engine.master.gain.gain.value = linear;
+                  }
+                  try {
+                    localStorage.setItem("webamp.muted", "0");
+                  } catch (e) {}
                 }
-
-                if (v === 0 && !muted) {
+                // Auto-mute when dragging to 0
+                else if (v === 0 && !muted) {
                   setMuted(true);
+                  prevMasterGainRef.current = 0;
+                  volumeBeforeScrubRef.current = 0;
+                  if (engine.master) {
+                    engine.master.gain.gain.value = 0;
+                  }
+                  try {
+                    localStorage.setItem("webamp.muted", "1");
+                  } catch (e) {}
                 }
-
-                if (engine.master) {
-                  engine.master.gain.gain.value = muted ? 0 : linear;
+                // Normal volume change when not muted
+                else if (!muted) {
+                  prevMasterGainRef.current = linear;
+                  volumeBeforeScrubRef.current = linear;
+                  if (engine.master) {
+                    engine.master.gain.gain.value = linear;
+                  }
                 }
               } catch (err) {
                 console.warn("master volume set failed:", err);
@@ -2122,13 +2409,6 @@ export default function WebAmpPlayback({version, onEngineReady}) {
                 localStorage.setItem("webamp.masterVol", String(masterVol));
                 localStorage.setItem("webamp.muted", muted ? "1" : "0");
               } catch (e) {}
-
-              if (masterVol === 0 && !muted) {
-                setMuted(true);
-                if (engine.master) {
-                  engine.master.gain.gain.value = 0;
-                }
-              }
             }}
             onMouseLeave={() => setDraggingVol(false)}
             onTouchStart={() => setDraggingVol(true)}
@@ -2138,10 +2418,6 @@ export default function WebAmpPlayback({version, onEngineReady}) {
                 localStorage.setItem("webamp.masterVol", String(masterVol));
                 localStorage.setItem("webamp.muted", muted ? "1" : "0");
               } catch (e) {}
-
-              if (masterVol === 0 && !muted) {
-                setMuted(true);
-              }
             }}
             className="volume-input"
           />

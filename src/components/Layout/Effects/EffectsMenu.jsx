@@ -115,7 +115,7 @@ function EffectsMenu() {
 
         <div className={styles.footer}>
           <button className={styles.cancelButton} onClick={closeEffectsMenu}>
-            Cancel
+            Close
           </button>
         </div>
       </div>

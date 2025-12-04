@@ -1,10 +1,11 @@
-import {useState, useEffect} from "react";
+import {useState, useEffect, useContext} from "react";
 import DraggableDiv from "../Generic/DraggableDiv";
 import AssetsTab from "./Sidebar/AssetsTab";
 import EffectsTab from "./Sidebar/EffectsTab";
 import SessionsTab from "./Sidebar/SessionsTab";
+import {AppContext} from "../../context/AppContext";
 import React from "react";
-// import styles from './Layout.module.css';
+import "./Sidebar.css";
 
 /**
  * Sidebar component for the application layout.
@@ -43,6 +44,7 @@ function Sidebar({
   assetBufferCache,
 }) {
   const [currentTab, setCurrentTab] = useState(getInitialTab);
+  const {closeEffectsMenu} = useContext(AppContext); // Get closeEffectsMenu from context
 
   const tabs = [
     {
@@ -72,6 +74,10 @@ function Sidebar({
   ];
 
   const handleTabClick = (key) => {
+    // Close effects menu when switching to any tab except effects
+    if (key !== "effects") {
+      closeEffectsMenu();
+    }
     setCurrentTab(key);
   };
 

@@ -26,6 +26,7 @@
     var(--timeline-left-offset) + var(--timeline-content-width, 100%)
   );
   position: relative;
+  contain: layout style;
 }
 
 .tracklane-main {
@@ -136,6 +137,8 @@
   border-radius: 4px;
   display: flex;
   flex-direction: column;
+  contain: strict;
+  will-change: transform;
 }
 
 .tracklane-segment-positioned {
@@ -160,30 +163,6 @@
   display: flex;
   flex-direction: column;
   flex: 1 1 auto;
-}
-
-.segment-meta {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  width: 100%;
-  margin-bottom: 8px;
-  flex-shrink: 0;
-}
-
-.segment-name {
-  font-size: 11px;
-  color: #9a9a9a;
-  font-weight: 500;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.segment-duration {
-  font-size: 11px;
-  color: #a9a9a9;
-  white-space: nowrap;
 }
 
 .segment-waveform {
