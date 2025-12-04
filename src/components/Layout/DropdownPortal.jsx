@@ -34,6 +34,11 @@ function DropdownPortal({
   onExportComplete,
   onImportSuccess,
   onImportError,
+  onCutTrack,
+  onCopyTrack,
+  onPasteTrack,
+  selectedTrackId,
+  hasClipboard,
 }) {
   const navigate = useNavigate();
   const {userData, closeEffectsMenu} = useContext(AppContext); // closes effects menu
@@ -42,6 +47,9 @@ function DropdownPortal({
   const [position, setPosition] = useState({top: 0, left: 0});
 
   const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Tooltip state
+  const [tooltip, setTooltip] = useState({show: false, text: "", x: 0, y: 0});
 
   const fileButtonRef = useRef(null);
   const editButtonRef = useRef(null);
@@ -95,6 +103,43 @@ function DropdownPortal({
     if (!dropdown.contains(relatedTarget)) {
       setActiveDropdown(null);
     }
+  };
+
+  // Handle Cut/Copy/Paste actions
+  const handleCut = (e) => {
+    e.preventDefault();
+    if (!selectedTrackId) return;
+    onCutTrack?.();
+    setActiveDropdown(null);
+  };
+
+  const handleCopy = (e) => {
+    e.preventDefault();
+    if (!selectedTrackId) return;
+    onCopyTrack?.();
+    setActiveDropdown(null);
+  };
+
+  const handlePaste = (e) => {
+    e.preventDefault();
+    if (!hasClipboard) return;
+    onPasteTrack?.();
+    setActiveDropdown(null);
+  };
+
+  // Tooltip handlers
+  const handleMouseEnter = (text, event) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    setTooltip({
+      show: true,
+      text,
+      x: rect.left + rect.width / 2,
+      y: rect.bottom + 5,
+    });
+  };
+
+  const handleMouseLeave = () => {
+    setTooltip({show: false, text: "", x: 0, y: 0});
   };
 
   useEffect(() => {
@@ -354,7 +399,7 @@ function DropdownPortal({
         }}
         onMouseLeave={handleDropdownMouseLeave}
       >
-        {/* ALL DISABLED */}
+        {/* DISABLED - Undo */}
         <a
           href="#"
           className="dropdown-item-disabled"
@@ -372,6 +417,8 @@ function DropdownPortal({
             <span>Undo</span>
           </span>
         </a>
+
+        {/* DISABLED - Redo */}
         <a
           href="#"
           className="dropdown-item-disabled"
@@ -389,10 +436,20 @@ function DropdownPortal({
             <span>Redo</span>
           </span>
         </a>
+
+        {/* ENABLED/DISABLED - Cut (depends on track selection) */}
         <a
           href="#"
-          className="dropdown-item-disabled"
-          onClick={(e) => e.preventDefault()}
+          className={!selectedTrackId ? "dropdown-item-disabled" : ""}
+          onClick={handleCut}
+          onMouseEnter={(e) =>
+            !selectedTrackId &&
+            handleMouseEnter("Please select a track first", e)
+          }
+          onMouseLeave={handleMouseLeave}
+          style={{
+            cursor: selectedTrackId ? "pointer" : "not-allowed",
+          }}
         >
           <span
             style={{
@@ -406,10 +463,20 @@ function DropdownPortal({
             <span>Cut</span>
           </span>
         </a>
+
+        {/* ENABLED/DISABLED - Copy (depends on track selection) */}
         <a
           href="#"
-          className="dropdown-item-disabled"
-          onClick={(e) => e.preventDefault()}
+          className={!selectedTrackId ? "dropdown-item-disabled" : ""}
+          onClick={handleCopy}
+          onMouseEnter={(e) =>
+            !selectedTrackId &&
+            handleMouseEnter("Please select a track first", e)
+          }
+          onMouseLeave={handleMouseLeave}
+          style={{
+            cursor: selectedTrackId ? "pointer" : "not-allowed",
+          }}
         >
           <span
             style={{
@@ -423,10 +490,19 @@ function DropdownPortal({
             <span>Copy</span>
           </span>
         </a>
+
+        {/* ENABLED/DISABLED - Paste (depends on clipboard) */}
         <a
           href="#"
-          className="dropdown-item-disabled"
-          onClick={(e) => e.preventDefault()}
+          className={!hasClipboard ? "dropdown-item-disabled" : ""}
+          onClick={handlePaste}
+          onMouseEnter={(e) =>
+            !hasClipboard && handleMouseEnter("No track copied or cut", e)
+          }
+          onMouseLeave={handleMouseLeave}
+          style={{
+            cursor: hasClipboard ? "pointer" : "not-allowed",
+          }}
         >
           <span
             style={{
@@ -440,6 +516,8 @@ function DropdownPortal({
             <span>Paste</span>
           </span>
         </a>
+
+        {/* DISABLED - Delete */}
         <a
           href="#"
           className="dropdown-item-disabled"
@@ -710,6 +788,31 @@ function DropdownPortal({
       {/* Dropdowns rendered via portal */}
       {activeDropdown &&
         ReactDOM.createPortal(dropdownContent[activeDropdown], document.body)}
+
+      {/* Tooltip rendered via portal */}
+      {tooltip.show &&
+        ReactDOM.createPortal(
+          <div
+            style={{
+              position: "fixed",
+              left: `${tooltip.x}px`,
+              top: `${tooltip.y}px`,
+              transform: "translateX(-50%)",
+              backgroundColor: "rgba(0, 0, 0, 0.9)",
+              color: "#fff",
+              padding: "6px 12px",
+              borderRadius: "4px",
+              fontSize: "12px",
+              whiteSpace: "nowrap",
+              pointerEvents: "none",
+              zIndex: 100000,
+              boxShadow: "0 2px 8px rgba(0, 0, 0, 0.3)",
+            }}
+          >
+            {tooltip.text}
+          </div>,
+          document.body
+        )}
     </>
   );
 }

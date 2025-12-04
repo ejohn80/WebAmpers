@@ -53,6 +53,8 @@
   background: red;
   pointer-events: none;
   z-index: 10;
+  will-change: transform;
+  transform: translate3d(0, 0, 0);
 }
 
 /* Rail that matches the timeline area (to the right of track controls) */
