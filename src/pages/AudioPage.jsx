@@ -1314,6 +1314,10 @@ function AudioPage() {
           onAssetDrop={handleAssetDrop}
           onSegmentMove={handleSegmentMove}
           onSegmentDelete={handleSegmentDelete}
+          onCutTrack={handleCutTrack}
+          onCopyTrack={handleCopyTrack}
+          onPasteTrack={handlePasteTrack}
+          hasClipboard={clipboardManager.hasClipboard()}
           onMute={(trackId, muted) =>
             handleTrackPropertyUpdate(trackId, "mute", muted, "setTrackMute")
           }

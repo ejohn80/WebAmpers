@@ -264,6 +264,15 @@
   background: rgba(255, 255, 255, 0.08);
 }
 
+.context-menu-item--disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.context-menu-item--disabled:hover {
+  background: transparent;
+}
+
 .context-menu-item--danger {
   color: #ff7474;
 }

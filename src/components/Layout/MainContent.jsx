@@ -25,6 +25,10 @@ function MainContent({
   onMute,
   onSolo,
   onDelete,
+  onCutTrack,
+  onCopyTrack,
+  onPasteTrack,
+  hasClipboard = false,
   onAssetDrop,
   onSegmentMove,
   onSegmentDelete = () => {},
@@ -329,6 +333,10 @@ function MainContent({
                         onSegmentMove={onSegmentMove}
                         requestAssetPreview={requestAssetPreview}
                         onAssetDrop={onAssetDrop}
+                        onCutTrack={onCutTrack}
+                        onCopyTrack={onCopyTrack}
+                        onPasteTrack={onPasteTrack}
+                        hasClipboard={hasClipboard}
                         totalLengthMs={totalLengthMs}
                         timelineWidth={timelineMetrics.widthPx}
                         rowWidthPx={timelineMetrics.rowWidthPx}

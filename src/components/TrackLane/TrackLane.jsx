@@ -27,6 +27,10 @@ const TrackLane = memo(function TrackLane({
   onSegmentMove,
   onAssetDrop,
   requestAssetPreview,
+  onCutTrack,
+  onCopyTrack,
+  onPasteTrack,
+  hasClipboard = false,
   trackIndex = 0,
   totalTracks = 1,
   totalLengthMs = 0,
@@ -122,8 +126,11 @@ const TrackLane = memo(function TrackLane({
     event.preventDefault();
     event.stopPropagation();
 
+    // Select this track when opening the context menu
+    onSelect?.(track.id);
+
     const menuWidth = 200;
-    const menuHeight = 160;
+    const menuHeight = 220;
     const x = Math.min(event.clientX, window.innerWidth - menuWidth);
     const y = Math.min(event.clientY, window.innerHeight - menuHeight);
 
@@ -198,8 +205,11 @@ const TrackLane = memo(function TrackLane({
     }
   };
 
-  const handleMenuAction = (action) => {
-    action();
+  const handleMenuAction = (action, disabled) => {
+    if (disabled) return;
+    if (typeof action === "function") {
+      action();
+    }
     closeContextMenu();
   };
 
@@ -519,6 +529,37 @@ const TrackLane = memo(function TrackLane({
               role="menuitem"
             >
               {soloed ? "Unsolo" : "Solo"}
+            </button>
+            <div className="context-menu-divider" />
+            <button
+              className={`context-menu-item${
+                onCutTrack ? "" : " context-menu-item--disabled"
+              }`}
+              onClick={() => handleMenuAction(onCutTrack, !onCutTrack)}
+              role="menuitem"
+              disabled={!onCutTrack}
+            >
+              Cut
+            </button>
+            <button
+              className={`context-menu-item${
+                onCopyTrack ? "" : " context-menu-item--disabled"
+              }`}
+              onClick={() => handleMenuAction(onCopyTrack, !onCopyTrack)}
+              role="menuitem"
+              disabled={!onCopyTrack}
+            >
+              Copy
+            </button>
+            <button
+              className={`context-menu-item${
+                hasClipboard ? "" : " context-menu-item--disabled"
+              }`}
+              onClick={() => handleMenuAction(onPasteTrack, !hasClipboard)}
+              role="menuitem"
+              disabled={!hasClipboard}
+            >
+              Paste
             </button>
             <div className="context-menu-divider" />
             <button
