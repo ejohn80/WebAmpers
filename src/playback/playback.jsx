@@ -388,7 +388,11 @@ class PlaybackEngine {
         }
 
         // Update EQ3 (Bass)
-        if (node instanceof Tone.EQ3 && effectsMap.bass !== undefined) {
+        if (
+          node instanceof Tone.EQ3 &&
+          effectsMap.bass !== undefined &&
+          enabledEffectsMap.bass !== false
+        ) {
           node.low.value = effectsMap.bass;
         }
 
@@ -407,16 +411,12 @@ class PlaybackEngine {
         // Update Distortion
         if (
           node instanceof Tone.Distortion &&
-          effectsMap.distortion !== undefined
+          effectsMap.distortion !== undefined &&
+          enabledEffectsMap.distortion !== false
         ) {
-          if (enabledEffectsMap.distortion !== false) {
-            const amount = Math.max(
-              0,
-              Math.min(1, effectsMap.distortion / 100)
-            );
-            node.distortion = amount;
-            node.wet.value = amount * 0.8;
-          }
+          const amount = Math.max(0, Math.min(1, effectsMap.distortion / 100));
+          node.distortion = amount;
+          node.wet.value = amount * 0.8;
         }
 
         // Update Volume (Gain)
@@ -590,7 +590,11 @@ class PlaybackEngine {
       }
 
       // Distortion
-      if (effectsMap.distortion && effectsMap.distortion > 0.01) {
+      if (
+        effectsMap.distortion &&
+        effectsMap.distortion > 0.01 &&
+        enabledEffectsMap.distortion !== false
+      ) {
         const amount = Math.max(0, Math.min(1, effectsMap.distortion / 100));
         const distortion = new Tone.Distortion({
           distortion: amount,
@@ -958,11 +962,7 @@ class PlaybackEngine {
     }
 
     // Distortion
-    if (
-      effects?.distortion &&
-      effects.distortion > 0 &&
-      enabledEffectsMap.distortion !== false
-    ) {
+    if (effects?.distortion && effects.distortion > 0) {
       try {
         const amount = Math.max(0, Math.min(1, effects.distortion / 100));
         const distortion = new Tone.Distortion({
