@@ -4,6 +4,16 @@ import SegmentBlock from "./SegmentBlock";
 import "./TrackLane.css";
 import {resolveSegmentStart} from "../../utils/segmentPlacement";
 
+const createContextMenuState = (overrides = {}) => ({
+  open: false,
+  x: 0,
+  y: 0,
+  target: "track",
+  segmentIndex: null,
+  segmentId: null,
+  ...overrides,
+});
+
 /**
  * TrackLane
  * Renders a single track container with proportional waveform sizing
@@ -27,6 +37,7 @@ const TrackLane = memo(function TrackLane({
   selectedSegment = null,
   onSegmentSelected = () => {},
   onClearSegmentSelection = () => {},
+  onSegmentDelete = () => {},
 }) {
   if (!track) return null;
 
@@ -45,7 +56,7 @@ const TrackLane = memo(function TrackLane({
 
   const [muted, setMuted] = useState(getInitialState().muted);
   const [soloed, setSoloed] = useState(getInitialState().soloed);
-  const [contextMenu, setContextMenu] = useState({open: false, x: 0, y: 0});
+  const [contextMenu, setContextMenu] = useState(createContextMenuState());
   const [selectedSegmentIndex, setSelectedSegmentIndex] = useState(null);
   const [dropPreview, setDropPreview] = useState(null);
   const dragHoverDepthRef = useRef(0);
@@ -76,7 +87,7 @@ const TrackLane = memo(function TrackLane({
   }, [track.solo, track.id]);
 
   const closeContextMenu = useCallback(() => {
-    setContextMenu({open: false, x: 0, y: 0});
+    setContextMenu(createContextMenuState());
   }, []);
 
   useEffect(() => {
@@ -107,16 +118,56 @@ const TrackLane = memo(function TrackLane({
     };
   }, [contextMenu.open, closeContextMenu]);
 
-  const handleContextMenu = (event) => {
+  const openContextMenuAt = (event, overrides = {}) => {
     event.preventDefault();
     event.stopPropagation();
 
-    const menuWidth = 180;
-    const menuHeight = 140;
+    const menuWidth = 200;
+    const menuHeight = 160;
     const x = Math.min(event.clientX, window.innerWidth - menuWidth);
     const y = Math.min(event.clientY, window.innerHeight - menuHeight);
 
-    setContextMenu({open: true, x, y});
+    setContextMenu(createContextMenuState({open: true, x, y, ...overrides}));
+  };
+
+  const handleContextMenu = (event) => {
+    openContextMenuAt(event, {target: "track"});
+  };
+
+  const handleSegmentContextMenu = (segmentIndex, event) => {
+    const segment = segments[segmentIndex];
+    if (!segment) return;
+
+    if (typeof onSegmentSelected === "function") {
+      onSegmentSelected(track.id, segment?.id ?? null, segmentIndex);
+    }
+    setSelectedSegmentIndex(segmentIndex);
+
+    openContextMenuAt(event, {
+      target: "segment",
+      segmentIndex,
+      segmentId: segment?.id ?? null,
+    });
+  };
+
+  const handleSegmentDeleteAction = async () => {
+    if (contextMenu.segmentIndex === null) return;
+
+    try {
+      await onSegmentDelete(
+        track.id,
+        contextMenu.segmentId,
+        contextMenu.segmentIndex
+      );
+      setSelectedSegmentIndex(null);
+      if (typeof onClearSegmentSelection === "function") {
+        onClearSegmentSelection();
+      }
+    } catch (error) {
+      console.warn("Segment delete failed:", error);
+    } finally {
+      closeContextMenu();
+    }
   };
 
   const toggleMute = () => {
@@ -450,6 +501,18 @@ const TrackLane = memo(function TrackLane({
             >
               {muted ? "Unmute" : "Mute"}
             </button>
+            {contextMenu.target === "segment" && (
+              <>
+                <button
+                  className="context-menu-item context-menu-item--danger"
+                  onClick={handleSegmentDeleteAction}
+                  role="menuitem"
+                >
+                  Delete Segment
+                </button>
+                <div className="context-menu-divider" />
+              </>
+            )}
             <button
               className="context-menu-item"
               onClick={() => handleMenuAction(toggleSolo)}
@@ -463,7 +526,7 @@ const TrackLane = memo(function TrackLane({
               onClick={() => handleMenuAction(handleDelete)}
               role="menuitem"
             >
-              Delete
+              Delete Track
             </button>
           </div>,
           document.body
@@ -589,6 +652,7 @@ const TrackLane = memo(function TrackLane({
                 segmentIndex={index}
                 isSelected={selectedSegmentIndex === index}
                 onSelect={handleSegmentSelect}
+                onSegmentContextMenu={handleSegmentContextMenu}
               />
             ))}
           </div>

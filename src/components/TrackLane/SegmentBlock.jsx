@@ -17,6 +17,7 @@ const SegmentBlock = ({
   segmentIndex,
   isSelected = false,
   onSelect,
+  onSegmentContextMenu = null,
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState(0);
@@ -189,6 +190,11 @@ const SegmentBlock = ({
         ...positionStyle,
       }}
       onMouseDown={handleMouseDown}
+      onContextMenu={
+        onSegmentContextMenu
+          ? (e) => onSegmentContextMenu(segmentIndex, e)
+          : undefined
+      }
     >
       <div className="tracklane-segment">
         <div className="segment-waveform">

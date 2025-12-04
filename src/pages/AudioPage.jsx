@@ -830,6 +830,52 @@ function AudioPage() {
     }
   };
 
+  const handleSegmentDelete = async (trackId, segmentId, segmentIndex) => {
+    const {ms: preservedMs} = progressStore.getState();
+    try {
+      const track = audioManager.getTrack(trackId);
+      if (!track || !Array.isArray(track.segments)) {
+        console.warn("Track not found or has no segments");
+        return;
+      }
+
+      const segmentsBefore = track.segments.length;
+      track.segments = track.segments.filter((seg, idx) => {
+        if (Number.isFinite(segmentIndex)) {
+          return idx !== segmentIndex;
+        }
+        return seg.id !== segmentId;
+      });
+
+      if (track.segments.length === segmentsBefore) {
+        console.warn("No segment removed; aborting delete");
+        return;
+      }
+
+      await dbManager.updateTrack(track);
+      setTracks([...audioManager.tracks]);
+
+      const newVersion = buildVersionFromTracks(audioManager.tracks);
+      if (newVersion && engineRef.current) {
+        await engineRef.current.load(newVersion);
+        const targetMs = Number.isFinite(preservedMs) ? preservedMs : 0;
+        const clampedMs = Math.max(
+          0,
+          Math.min(targetMs, newVersion.lengthMs ?? targetMs)
+        );
+        try {
+          engineRef.current.seekMs(clampedMs);
+          progressStore.setMs(clampedMs);
+        } catch (seekError) {
+          console.warn("Failed to restore playhead after segment delete", seekError);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to delete segment:", error);
+      alert(`Failed to delete segment: ${error.message}`);
+    }
+  };
+
   // Handle track deletion with proper cleanup
   const handleDeleteTrack = async (trackId) => {
     try {
@@ -1256,6 +1302,7 @@ function AudioPage() {
           requestAssetPreview={getAssetPreviewInfo}
           onAssetDrop={handleAssetDrop}
           onSegmentMove={handleSegmentMove}
+          onSegmentDelete={handleSegmentDelete}
           onMute={(trackId, muted) =>
             handleTrackPropertyUpdate(trackId, "mute", muted, "setTrackMute")
           }

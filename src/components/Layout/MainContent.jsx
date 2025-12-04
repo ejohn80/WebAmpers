@@ -27,6 +27,7 @@ function MainContent({
   onDelete,
   onAssetDrop,
   onSegmentMove,
+  onSegmentDelete = () => {},
   requestAssetPreview,
   totalLengthMs = 0,
 }) {
@@ -334,6 +335,7 @@ function MainContent({
                         selectedSegment={selectedSegment}
                         onSegmentSelected={handleSegmentSelected}
                         onClearSegmentSelection={clearSegmentSelection}
+                        onSegmentDelete={onSegmentDelete}
                       />
                     </div>
                   ))}
