@@ -143,6 +143,7 @@ class AudioManager {
           if (typeof s.startInFileMs === "number")
             seg.startInFileMs = s.startInFileMs;
           if (s.id) seg.id = s.id;
+          seg.assetId = s?.assetId ?? audioData.assetId ?? null;
           builtSegments.push(seg);
         } catch (e) {
           console.warn("Failed to rebuild segment, skipping:", e);
@@ -159,11 +160,13 @@ class AudioManager {
       segment.durationMs = durationMs;
       segment.startOnTimelineMs = 0;
       segment.startInFileMs = 0;
+      segment.assetId = audioData.assetId ?? null;
       builtSegments = [segment];
     }
 
     const trackEffects = audioData.effects || createDefaultEffects();
     const trackActiveEffectsList = audioData.activeEffectsList || [];
+    const trackEnabledEffects = audioData.enabledEffects || {};
 
     // Create the new track
     const track = new AudioTrack({
@@ -179,7 +182,14 @@ class AudioManager {
       mute: audioData.mute ?? false,
       solo: audioData.solo ?? false,
       effects: trackEffects,
+      enabledEffects: trackEnabledEffects,
       activeEffectsList: trackActiveEffectsList,
+    });
+
+    console.log(`[AudioManager] Creating track from audioData:`, {
+      id: audioData.id,
+      hasEnabledEffects: !!audioData.enabledEffects,
+      enabledEffects: audioData.enabledEffects,
     });
 
     // Add buffer reference at track level for compatibility

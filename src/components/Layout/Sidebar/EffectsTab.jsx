@@ -7,6 +7,7 @@ import {
   ResetAllButtonDisabled,
   PlusSignIcon,
   XIcon,
+  DeleteEffectsIcon,
 } from "../Svgs.jsx";
 
 function EffectsTab() {
@@ -15,11 +16,15 @@ function EffectsTab() {
     updateEffect,
     resetEffect,
     resetAllEffects,
+    deleteAllEffects,
     openEffectsMenu,
     closeEffectsMenu,
     isEffectsMenuOpen,
     removeEffect,
     activeEffects,
+    enabledEffects, // Changed from enabledEffectsByTrack to enabledEffects
+    toggleEffect,
+    toggleAllEffects,
     selectedTrackId,
   } = useContext(AppContext);
 
@@ -32,7 +37,7 @@ function EffectsTab() {
   const effectConfigs = [
     {
       name: "pitch",
-      label: "Pitch Shift",
+      label: "Pitch",
       min: -12,
       max: 12,
       step: 0.1,
@@ -165,33 +170,36 @@ function EffectsTab() {
     }
   };
 
-  const getCurrentValue = (config) => {
-    const effectName = config.name;
+  const getCurrentValue = useCallback(
+    (config) => {
+      const effectName = config.name;
 
-    // Priority 1: If actively dragging, use local value
-    if (
-      draggingSlider === effectName &&
-      localValues[effectName] !== undefined
-    ) {
-      return localValues[effectName];
-    }
+      // Priority 1: If actively dragging, use local value
+      if (
+        draggingSlider === effectName &&
+        localValues[effectName] !== undefined
+      ) {
+        return localValues[effectName];
+      }
 
-    // Priority 2: If we have a local value (from recent change), use it
-    if (localValues[effectName] !== undefined) {
-      return localValues[effectName];
-    }
+      // Priority 2: If we have a local value (from recent change), use it
+      if (localValues[effectName] !== undefined) {
+        return localValues[effectName];
+      }
 
-    // Priority 3: Use the track's persisted value
-    if (
-      selectedTrackEffects &&
-      selectedTrackEffects[effectName] !== undefined
-    ) {
-      return selectedTrackEffects[effectName];
-    }
+      // Priority 3: Use the track's persisted value
+      if (
+        selectedTrackEffects &&
+        selectedTrackEffects[effectName] !== undefined
+      ) {
+        return selectedTrackEffects[effectName];
+      }
 
-    // Priority 4: Default value
-    return config.default;
-  };
+      // Priority 4: Default value
+      return config.default;
+    },
+    [draggingSlider, localValues, selectedTrackEffects]
+  );
 
   // Update local state immediately and debounce the persist
   const handleChange = useCallback(
@@ -208,13 +216,50 @@ function EffectsTab() {
 
       // Debounce the actual update
       updateTimeoutRef.current[name] = setTimeout(() => {
-        // console.log(`[EffectsTab] Triggering updateEffect for ${name}=${value}`);
         updateEffect(name, value);
         delete updateTimeoutRef.current[name];
       }, 100);
     },
     [updateEffect]
   );
+
+  // Check if effect is at default value
+  const isAtDefaultValue = useCallback(
+    (config) => {
+      const currentValue = getCurrentValue(config);
+
+      return Math.abs(currentValue - config.default) < 0.01;
+    },
+    [getCurrentValue]
+  );
+
+  // Check if ALL effects are at their default values
+  const areAllEffectsAtDefault = useCallback(() => {
+    return activeEffectConfigs.every((config) => isAtDefaultValue(config));
+  }, [activeEffectConfigs, isAtDefaultValue]);
+
+  // Handle reset all with immediate local state update
+  const handleResetAll = useCallback(() => {
+    if (areAllEffectsAtDefault()) return;
+
+    // Clear all pending timeouts
+    Object.keys(updateTimeoutRef.current).forEach((key) => {
+      clearTimeout(updateTimeoutRef.current[key]);
+      delete updateTimeoutRef.current[key];
+    });
+
+    // Build new local values with all defaults
+    const newLocalValues = {};
+    activeEffectConfigs.forEach((config) => {
+      newLocalValues[config.name] = config.default;
+    });
+
+    // Update local state immediately for instant visual feedback
+    setLocalValues(newLocalValues);
+
+    // Call resetAllEffects which will persist the changes
+    resetAllEffects();
+  }, [activeEffectConfigs, resetAllEffects, areAllEffectsAtDefault]);
 
   const handleSliderStart = useCallback((name) => {
     setDraggingSlider(name);
@@ -232,21 +277,30 @@ function EffectsTab() {
     return ((currentValue - config.min) / (config.max - config.min)) * 100;
   };
 
-  // Check if effect is at default value
-  const isAtDefaultValue = (config) => {
-    const currentValue = getCurrentValue(config);
-    return Math.abs(currentValue - config.default) < 0.01;
-  };
+  // Use enabledEffects from context (comes from track's enabledEffects in IndexedDB)
+  const trackEnabled = enabledEffects || {};
 
-  // Check if ALL effects are at their default values
-  const areAllEffectsAtDefault = () => {
-    return activeEffectConfigs.every((config) => isAtDefaultValue(config));
-  };
+  // Check if effect is enabled (default to true if not set)
+  const isEffectEnabled = (effectId) => trackEnabled[effectId] !== false;
+
+  // Check if any effects are enabled (for master toggle) - exclude pan
+  const areAnyEffectsEnabled = activeEffectConfigs
+    .filter((config) => config.name !== "pan")
+    .some((config) => isEffectEnabled(config.name));
+
+  // Check if all effects are enabled - exclude pan
+  // const areAllEffectsEnabled =
+  //   activeEffectConfigs.filter((config) => config.name !== "pan").length > 0 &&
+  //   activeEffectConfigs
+  //     .filter((config) => config.name !== "pan")
+  //     .every((config) => isEffectEnabled(config.name));
+
+  // Check if there are any active effects
+  const hasActiveEffects = activeEffectConfigs.length > 0;
 
   // Clear local values when track changes
   useEffect(() => {
     if (selectedTrackId !== lastTrackIdRef.current) {
-      // console.log(`[EffectsTab] Track changed, clearing local values`);
       setLocalValues({});
       lastTrackIdRef.current = selectedTrackId;
     }
@@ -311,14 +365,66 @@ function EffectsTab() {
         </span>
       </button>
 
+      {/* Master Toggle and Reset All Buttons - Side by Side */}
+      {hasActiveEffects && (
+        <div className={styles.toggleResetRow}>
+          {/* Enable/Disable All Button - Left Side */}
+          <button
+            className={styles.masterToggleButton}
+            onClick={toggleAllEffects}
+          >
+            <span className={styles.masterToggleContent}>
+              <span>Effects</span>
+              <div
+                className={`${styles.toggleSwitch} ${areAnyEffectsEnabled ? styles.toggleOn : styles.toggleOff}`}
+              >
+                <div className={styles.toggleSlider}></div>
+              </div>
+            </span>
+          </button>
+
+          {/* Reset All Effects Button - Right Side */}
+          <button
+            className={`${styles.resetAllButton} ${
+              areAllEffectsAtDefault() ? styles.resetAllButtonDisabled : ""
+            }`}
+            onClick={areAllEffectsAtDefault() ? undefined : handleResetAll}
+            disabled={areAllEffectsAtDefault()}
+          >
+            <span className={styles.resetAllButtonContent}>
+              {areAllEffectsAtDefault() ? (
+                <ResetAllButtonDisabled />
+              ) : (
+                <ResetAllButtonEnabled />
+              )}
+              <span style={{marginTop: "2px"}}>Reset All</span>
+            </span>
+          </button>
+        </div>
+      )}
+
+      {/* Effect sliders - only show active effects in addition order */}
       <div className={styles.effectsList}>
         {activeEffectConfigs.map((config) => {
           const currentValue = getCurrentValue(config);
           const fillPercentage = getSliderFillPercentage(config, currentValue);
           const isDefault = isAtDefaultValue(config);
 
+          // Pan should always be considered enabled since it's not part of the toggle system
+          const isEnabled =
+            config.name === "pan" ? true : isEffectEnabled(config.name);
+
+          // For pan, we don't show disabled styling even if master toggle is off
+          const shouldShowDisabled = config.name === "pan" ? false : !isEnabled;
+
           return (
-            <div key={config.name} className={styles.effectItem}>
+            <div
+              key={config.name}
+              className={`${styles.effectItem} ${
+                shouldShowDisabled ? styles.effectDisabled : ""
+              }`}
+            >
+              {/* Close button in top right */}
               <button
                 className={styles.closeEffectButton}
                 onClick={() => removeEffect(config.name)}
@@ -327,21 +433,41 @@ function EffectsTab() {
                 <XIcon />
               </button>
 
+              {/* Individual Toggle Switch - don't show for pan */}
+              {config.name !== "pan" && (
+                <button
+                  className={styles.effectToggleButton}
+                  onClick={() => toggleEffect(config.name)}
+                  aria-label={`${isEnabled ? "Disable" : "Enable"} ${config.label} effect`}
+                >
+                  <div
+                    className={`${styles.toggleSwitch} ${
+                      isEffectEnabled(config.name)
+                        ? styles.toggleOn
+                        : styles.toggleOff
+                    }`}
+                  >
+                    <div className={styles.toggleSlider}></div>
+                  </div>
+                </button>
+              )}
+
               <div className={styles.header}>
                 <span className={styles.label}>{config.label}</span>
                 <div className={styles.description}>{config.description}</div>
               </div>
 
+              {/* Custom Slider - pan should never be disabled */}
               <div
                 className={`${styles.sliderContainer} ${
                   draggingSlider === config.name ? styles.dragging : ""
-                }`}
+                } ${config.name !== "pan" && !isEnabled ? styles.sliderDisabled : ""}`}
               >
                 <div className={styles.sliderTrack}></div>
                 <div
                   className={`${styles.sliderFill} ${
                     isDefault ? styles.default : styles.changed
-                  }`}
+                  } ${config.name !== "pan" && !isEnabled ? styles.sliderFillDisabled : ""}`}
                   style={{width: `${fillPercentage}%`}}
                 ></div>
                 <div
@@ -349,7 +475,7 @@ function EffectsTab() {
                     draggingSlider === config.name
                       ? styles.sliderKnobWrapperDragging
                       : ""
-                  }`}
+                  } ${config.name !== "pan" && !isEnabled ? styles.sliderKnobDisabled : ""}`}
                   style={{left: `${fillPercentage}%`}}
                 >
                   <EffectsSliderKnob />
@@ -366,11 +492,18 @@ function EffectsTab() {
                   onTouchStart={() => handleSliderStart(config.name)}
                   onTouchEnd={() => handleSliderEnd(config.name)}
                   className={styles.sliderInput}
+                  disabled={config.name !== "pan" && !isEnabled} // Pan is never disabled
                 />
               </div>
 
               <div className={styles.bottomRow}>
-                <span className={styles.value}>
+                <span
+                  className={`${styles.value} ${
+                    config.name !== "pan" && !isEnabled
+                      ? styles.valueDisabled
+                      : ""
+                  }`}
+                >
                   {currentValue.toFixed(config.step < 1 ? 1 : 0)}
                   {config.unit}
                 </span>
@@ -378,17 +511,21 @@ function EffectsTab() {
                   <button
                     className={`${styles.button} ${
                       isDefault ? styles.buttonDisabled : ""
-                    }`}
-                    onClick={() => {
-                      if (!isDefault) {
-                        setLocalValues((prev) => ({
-                          ...prev,
-                          [config.name]: config.default,
-                        }));
-                        resetEffect(config.name, config.default);
-                      }
-                    }}
-                    disabled={isDefault}
+                    } ${config.name !== "pan" && !isEnabled ? styles.buttonDisabled : ""}`}
+                    onClick={
+                      isDefault || (config.name !== "pan" && !isEnabled)
+                        ? undefined
+                        : () => {
+                            setLocalValues((prev) => ({
+                              ...prev,
+                              [config.name]: config.default,
+                            }));
+                            resetEffect(config.name, config.default);
+                          }
+                    }
+                    disabled={
+                      isDefault || (config.name !== "pan" && !isEnabled)
+                    }
                   >
                     Reset
                   </button>
@@ -405,29 +542,17 @@ function EffectsTab() {
         )}
       </div>
 
+      {/* Delete All Effects Button */}
       <button
-        className={`${styles.resetAllButton} ${
-          areAllEffectsAtDefault() ? styles.resetAllButtonDisabled : ""
+        className={`${styles.deleteAllButton} ${
+          !hasActiveEffects ? styles.deleteAllButtonDisabled : ""
         }`}
-        onClick={() => {
-          if (!areAllEffectsAtDefault()) {
-            const defaults = {};
-            activeEffectConfigs.forEach((config) => {
-              defaults[config.name] = config.default;
-            });
-            setLocalValues(defaults);
-            resetAllEffects();
-          }
-        }}
-        disabled={areAllEffectsAtDefault()}
+        onClick={!hasActiveEffects ? undefined : deleteAllEffects}
+        disabled={!hasActiveEffects}
       >
-        <span className={styles.resetAllButtonContent}>
-          {areAllEffectsAtDefault() ? (
-            <ResetAllButtonDisabled />
-          ) : (
-            <ResetAllButtonEnabled />
-          )}
-          <span style={{marginTop: "2px"}}>Reset All Effects</span>
+        <span className={styles.deleteAllButtonContent}>
+          <DeleteEffectsIcon />
+          <span>Delete All</span>
         </span>
       </button>
     </div>

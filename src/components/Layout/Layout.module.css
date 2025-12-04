@@ -138,7 +138,6 @@
   color: #00e5ff;
 }
 
-/* Effect item needs relative positioning for absolute close button */
 .effectItem {
   margin-bottom: 20px;
   padding: 12px;
@@ -146,7 +145,8 @@
   border-radius: 6px;
   border: 2px solid #333239;
   overflow: visible;
-  position: relative; /* Important for absolute positioning of close button */
+  position: relative;
+  box-sizing: border-box;
 }
 
 /* Close effect button styles */
@@ -173,20 +173,12 @@
   border: none;
 }
 
-.header {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  margin-bottom: 8px;
-  padding-right: 30px;
-}
-
 .effectsList {
   flex: 1;
   flex-grow: 1;
   overflow-y: auto;
   margin-bottom: 15px;
-  padding-right: 8px;
+  padding-right: 0px;
   min-height: 0;
 }
 
@@ -252,8 +244,7 @@
 }
 
 .resetAllButton {
-  padding: 10px 20px;
-  margin-top: 10px;
+  padding: 10px 16px;
   background: #172528;
   color: #17e1ff;
   border: none;
@@ -264,6 +255,8 @@
   transition: all 0.2s;
   line-height: 1;
   flex-shrink: 0;
+  flex: 1;
+  min-height: 40px;
 }
 
 .resetAllButtonContent {
@@ -289,6 +282,47 @@
 .resetAllButtonDisabled:hover {
   background: #313131 !important;
   transform: none !important;
+}
+
+/* Delete All Button */
+.deleteAllButton {
+  padding: 10px 20px;
+  margin-top: 8px;
+  background: rgba(238, 32, 53, 0.15);
+  color: #fe5656;
+  border: none;
+  border-radius: 6px;
+  font-weight: bold;
+  cursor: pointer;
+  width: 100%;
+  transition: background-color 0.2s;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.deleteAllButton:hover {
+  background: rgba(220, 53, 69, 0.3);
+}
+
+/* Disabled state for delete all button */
+.deleteAllButtonDisabled {
+  background: #2a2a2a !important;
+  color: #666666 !important;
+  cursor: not-allowed !important;
+  opacity: 0.5;
+}
+
+.deleteAllButtonDisabled:hover {
+  background: #313131 !important;
+  transform: none !important;
+}
+
+.deleteAllButtonContent {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  line-height: 1;
 }
 
 /* Projects Tab */
@@ -548,7 +582,7 @@
 }
 
 .addEffectsButton {
-  padding: 12px 20px;
+  padding: 10px 20px;
   margin-bottom: 16px;
   background: #172528;
   color: #17e1ff;
@@ -568,90 +602,226 @@
   transform: translateY(-1px);
 }
 
-/* Dropdown Effects Menu */
-.effectsMenuDropdown {
-  background: #1e1d20;
-  border: 1px solid #333239;
-  border-radius: 8px;
-  margin-bottom: 16px;
-  max-height: 400px;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-
-.effectsDropdownHeader {
-  padding: 12px 16px;
-  border-bottom: 1px solid #333239;
-  color: #9c9c9c;
-  font-size: 13px;
-  font-weight: 500;
-}
-
-.effectsDropdownList {
-  overflow-y: auto;
-  max-height: 350px;
-}
-
-.effectDropdownItem {
-  width: 100%;
-  padding: 12px 16px;
-  background: transparent;
-  border: none;
-  border-bottom: 1px solid #333239;
-  color: #e5e5e5;
-  text-align: left;
+/* Toggle Switch Styles */
+.toggleSwitch {
+  width: 31px;
+  height: 15px;
+  background: #333239;
+  border-radius: 5px;
+  position: relative;
   cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.toggleSwitch.toggleOn {
+  background: #11a1b7;
+}
+
+.toggleSwitch.toggleOff {
+  background: #4e4e4e;
+}
+
+.toggleSlider {
+  position: absolute;
+  top: 2px;
+  left: 3.5px; /* Add this */
+  width: 10px;
+  height: 10px;
+  background: white;
+  border-radius: 2px;
+  transition: all 0.3s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.toggleOn .toggleSlider {
+  transform: translateX(14.5px);
+}
+
+.toggleOff .toggleSlider {
+  transform: translateX(0);
+}
+
+/* Individual Effect Toggle Button */
+.effectToggleButton {
+  position: absolute;
+  top: 8.5px;
+  right: 33px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Master Toggle Button */
+.masterToggleButton {
+  background: #262529;
+  color: #e5e5e5;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  width: 50%;
   transition: all 0.2s ease;
   display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: 1;
+  min-height: 40px;
+}
+
+.masterToggleButton:hover {
+  background: #2a2a2a;
+  /* border-color: #17e1ff; */
+}
+
+.header {
+  display: flex;
   flex-direction: column;
-  gap: 4px;
+  align-items: flex-start;
+  margin-bottom: 8px;
+  padding-right: 30px;
+  /* border: 1px solid red; */
 }
 
-.effectDropdownItem:last-child {
-  border-bottom: none;
+/* Disabled Effect Styles */
+.effectDisabled {
+  opacity: 0.7;
+  border-color: #555 !important;
 }
 
-.effectDropdownItem:hover:not(:disabled) {
-  background: rgba(23, 225, 255, 0.08);
+.effectDisabled .label {
+  color: #888 !important;
 }
 
-.effectDropdownItemDisabled {
-  opacity: 0.4;
-  cursor: not-allowed;
+.effectDisabled .description {
+  color: #666 !important;
 }
 
-.effectDropdownName {
-  font-size: 13px;
-  font-weight: 600;
+/* Disabled Slider Styles */
+.sliderDisabled .sliderTrack {
+  background: #2a2a2a !important;
+  outline-color: #555 !important;
+}
+
+.sliderDisabled .sliderFill {
+  background: #666 !important;
+}
+
+.sliderDisabled .sliderFillDisabled {
+  background: #555 !important;
+}
+
+.valueDisabled {
+  color: #666 !important;
+}
+
+/* Master toggle button text */
+.masterToggleContent {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14;
+  font-weight: bold;
   color: #e5e5e5;
+  width: 100%;
+  gap: 8px;
 }
 
-.effectDropdownDescription {
-  font-size: 12px;
-  color: #888;
-}
+/* Toggle and Reset Row - Side by Side Layout */
+.toggleResetRow {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  margin-bottom: 15px;
 
-.effectsDropdownList::-webkit-scrollbar {
-  width: 6px;
-}
+  /* Dropdown Effects Menu */
+  .effectsMenuDropdown {
+    background: #1e1d20;
+    border: 1px solid #333239;
+    border-radius: 8px;
+    margin-bottom: 16px;
+    max-height: 400px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
 
-.effectsDropdownList::-webkit-scrollbar-track {
-  background: #1e1d20;
-}
+  .effectsDropdownHeader {
+    padding: 12px 16px;
+    border-bottom: 1px solid #333239;
+    color: #9c9c9c;
+    font-size: 13px;
+    font-weight: 500;
+  }
 
-.effectsDropdownList::-webkit-scrollbar-thumb {
-  background: #333239;
-  border-radius: 3px;
-}
+  .effectsDropdownList {
+    overflow-y: auto;
+    max-height: 350px;
+  }
 
-.effectsDropdownList::-webkit-scrollbar-thumb:hover {
-  background: #5c5b62;
-}
+  .effectDropdownItem {
+    width: 100%;
+    padding: 12px 16px;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid #333239;
+    color: #e5e5e5;
+    text-align: left;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
 
-.noEffectsMessage {
-  text-align: center;
-  padding: 40px 20px;
-  color: #888;
-  font-size: 14px;
+  .effectDropdownItem:last-child {
+    border-bottom: none;
+  }
+
+  .effectDropdownItem:hover:not(:disabled) {
+    background: rgba(23, 225, 255, 0.08);
+  }
+
+  .effectDropdownItemDisabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .effectDropdownName {
+    font-size: 13px;
+    font-weight: 600;
+    color: #e5e5e5;
+  }
+
+  .effectDropdownDescription {
+    font-size: 12px;
+    color: #888;
+  }
+
+  .effectsDropdownList::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .effectsDropdownList::-webkit-scrollbar-track {
+    background: #1e1d20;
+  }
+
+  .effectsDropdownList::-webkit-scrollbar-thumb {
+    background: #333239;
+    border-radius: 3px;
+  }
+
+  .effectsDropdownList::-webkit-scrollbar-thumb:hover {
+    background: #5c5b62;
+  }
+
+  .noEffectsMessage {
+    text-align: center;
+    padding: 40px 20px;
+    color: #888;
+    font-size: 14px;
+  }
 }

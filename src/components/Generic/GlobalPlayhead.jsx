@@ -1,20 +1,39 @@
-import React, {useEffect, useState} from "react";
+import React, {useEffect, useRef} from "react";
 import {progressStore} from "../../playback/progressStore";
 
 /**
  * GlobalPlayhead
- * Renders a single vertical red bar spanning the tracks area, positioned by global ms.
+ * Renders a single vertical red bar spanning the tracks area.
+ * Optimized: Uses direct DOM manipulation to avoid React render cycles during playback.
  */
 export default function GlobalPlayhead({totalLengthMs = 0, timelineWidth = 0}) {
-  const [{ms, lengthMs}, setProgress] = useState(progressStore.getState());
+  const playheadRef = useRef(null);
 
-  useEffect(() => progressStore.subscribe(setProgress), []);
+  useEffect(() => {
+    // Subscribe to the store without triggering React state updates
+    const unsubscribe = progressStore.subscribe(({ms, lengthMs}) => {
+      if (!playheadRef.current) return;
+      if (timelineWidth <= 0) return;
 
-  const denom = totalLengthMs > 0 ? totalLengthMs : lengthMs || 0;
-  const p = denom > 0 ? Math.max(0, Math.min(1, ms / denom)) : 0;
-  const leftPx = Math.round(p * Math.max(0, timelineWidth));
+      const denom = totalLengthMs > 0 ? totalLengthMs : lengthMs || 0;
+
+      // Calculate position
+      const p = denom > 0 ? Math.max(0, Math.min(1, ms / denom)) : 0;
+      const leftPx = p * timelineWidth;
+      playheadRef.current.style.transform = `translate3d(${leftPx}px, 0, 0)`;
+    });
+
+    return unsubscribe;
+  }, [totalLengthMs, timelineWidth]);
 
   if (!timelineWidth) return null;
 
-  return <div className="global-playhead" style={{left: `${leftPx}px`}} />;
+  // Initial style sets left to 0, movement is handled by transform in the effect
+  return (
+    <div
+      ref={playheadRef}
+      className="global-playhead"
+      style={{left: 0, willChange: "transform"}}
+    />
+  );
 }

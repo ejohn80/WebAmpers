@@ -30,38 +30,55 @@ const EQ_PRESETS = {
   acoustic: {name: "Acoustic", values: [3, 2, 1, 1, 2, 2, 2, 3, 2, 1]},
 };
 
-const VerticalSlider = ({value, onChange, min, max}) => {
+const VerticalSlider = ({value, onChange, onChangeComplete, min, max}) => {
   const trackRef = useRef(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [tempValue, setTempValue] = useState(value);
+
+  useEffect(() => {
+    if (!isDragging) {
+      setTempValue(value);
+    }
+  }, [value, isDragging]);
 
   const calculateValue = useCallback(
     (clientY) => {
-      if (!trackRef.current) return value;
+      if (!trackRef.current) return tempValue;
       const rect = trackRef.current.getBoundingClientRect();
       const percentage = 1 - (clientY - rect.top) / rect.height;
       const clamped = Math.max(0, Math.min(1, percentage));
       return min + clamped * (max - min);
     },
-    [min, max, value]
+    [min, max, tempValue]
   );
 
   const handleMouseDown = (e) => {
     e.preventDefault();
     setIsDragging(true);
     const newValue = calculateValue(e.clientY);
-    onChange(Math.round(newValue * 2) / 2);
+    const rounded = Math.round(newValue * 2) / 2;
+    setTempValue(rounded);
+    onChange(rounded, true); // true = preview mode
   };
 
   const handleMouseMove = useCallback(
     (e) => {
       if (!isDragging) return;
       const newValue = calculateValue(e.clientY);
-      onChange(Math.round(newValue * 2) / 2);
+      const rounded = Math.round(newValue * 2) / 2;
+      setTempValue(rounded);
+      // Only update visual, not audio engine
+      onChange(rounded, true); // true = preview mode
     },
     [isDragging, calculateValue, onChange]
   );
 
-  const handleMouseUp = useCallback(() => setIsDragging(false), []);
+  const handleMouseUp = useCallback(() => {
+    setIsDragging(false);
+    if (onChangeComplete) {
+      onChangeComplete(tempValue);
+    }
+  }, [tempValue, onChangeComplete]);
 
   useEffect(() => {
     if (!isDragging) return;
@@ -73,8 +90,9 @@ const VerticalSlider = ({value, onChange, min, max}) => {
     };
   }, [isDragging, handleMouseMove, handleMouseUp]);
 
-  const percentage = ((value - min) / (max - min)) * 100;
-  const isChanged = value !== 0;
+  const displayValue = isDragging ? tempValue : value;
+  const percentage = ((displayValue - min) / (max - min)) * 100;
+  const isChanged = displayValue !== 0;
 
   return (
     <div
@@ -86,8 +104,8 @@ const VerticalSlider = ({value, onChange, min, max}) => {
         <div
           className={`${styles.verticalSliderFill} ${isChanged ? styles.changed : styles.default}`}
           style={{
-            bottom: value >= 0 ? "50%" : `${percentage}%`,
-            height: `${(Math.abs(value) / (max - min)) * 100}%`,
+            bottom: displayValue >= 0 ? "50%" : `${percentage}%`,
+            height: `${(Math.abs(displayValue) / (max - min)) * 100}%`,
           }}
         />
         <div
@@ -209,7 +227,8 @@ const Equalizer = ({isOpen, onClose, initialPosition = {x: 100, y: 100}}) => {
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({x: 0, y: 0});
   const [trackName, setTrackName] = useState("Master");
-  const panelRef = useRef(null);
+
+  const pendingChangesRef = useRef(new Map());
 
   // Update track name display
   useEffect(() => {
@@ -252,71 +271,104 @@ const Equalizer = ({isOpen, onClose, initialPosition = {x: 100, y: 100}}) => {
     }
   }, [selectedTrackId, masterEffects]);
 
-  const handleBandChange = useCallback(
+  // Apply all pending EQ changes at once
+  const applyPendingChanges = useCallback(async () => {
+    if (pendingChangesRef.current.size === 0) return;
+
+    console.log("[EQ] Applying batched changes:", pendingChangesRef.current);
+
+    if (selectedTrackId) {
+      // Update track-specific EQ
+      const track = audioManager?.getTrack(selectedTrackId);
+      if (track) {
+        // Build new effects object with all pending changes
+        const newEffects = {...track.effects};
+        pendingChangesRef.current.forEach((value, freq) => {
+          newEffects[freq] = value;
+        });
+
+        track.effects = newEffects;
+
+        // Update engine ONCE with all changes
+        if (engineRef?.current?.setTrackEffects) {
+          try {
+            engineRef.current.setTrackEffects(
+              selectedTrackId,
+              newEffects,
+              track.enabledEffects || {},
+              false
+            );
+          } catch (e) {
+            console.error("Failed to apply track EQ:", e);
+          }
+        }
+
+        // Persist to DB
+        try {
+          await dbManager.updateTrack(track);
+        } catch (e) {
+          console.error("Failed to persist track EQ:", e);
+        }
+      }
+    } else {
+      // Update master EQ
+      const newMasterEffects = {...masterEffects};
+      pendingChangesRef.current.forEach((value, freq) => {
+        newMasterEffects[freq] = value;
+      });
+
+      setMasterEffects(newMasterEffects);
+
+      // Apply to engine ONCE with all changes
+      if (engineRef?.current?.applyEffects) {
+        try {
+          engineRef.current.applyEffects(newMasterEffects);
+        } catch (e) {
+          console.error("Failed to apply master EQ:", e);
+        }
+      }
+
+      // Persist master effects
+      try {
+        localStorage.setItem(
+          "webamp.masterEffects",
+          JSON.stringify(newMasterEffects)
+        );
+      } catch (e) {
+        console.error("Failed to persist master EQ:", e);
+      }
+    }
+
+    pendingChangesRef.current.clear();
+  }, [selectedTrackId, masterEffects, engineRef, setMasterEffects]);
+
+  const handleBandChange = useCallback((index, value, isPreview = false) => {
+    const freq = EQ_BANDS[index].freq;
+
+    // Always update UI immediately
+    setBandValues((prev) => {
+      const next = [...prev];
+      next[index] = value;
+      return next;
+    });
+
+    if (isPreview) {
+      // don't apply to engine
+      pendingChangesRef.current.set(freq, value);
+    }
+  }, []);
+
+  const handleBandChangeComplete = useCallback(
     async (index, value) => {
       const freq = EQ_BANDS[index].freq;
 
-      // Update UI immediately
-      setBandValues((prev) => {
-        const next = [...prev];
-        next[index] = value;
-        return next;
-      });
+      // Store this final value
+      pendingChangesRef.current.set(freq, value);
 
-      if (selectedTrackId) {
-        // Update track-specific EQ
-        const track = audioManager?.getTrack(selectedTrackId);
-        if (track) {
-          track.effects = {
-            ...track.effects,
-            [freq]: value,
-          };
-
-          // Update engine
-          if (engineRef?.current?.setTrackEffects) {
-            try {
-              engineRef.current.setTrackEffects(selectedTrackId, track.effects);
-            } catch (e) {
-              console.error("Failed to apply track EQ:", e);
-            }
-          }
-
-          // Persist to DB
-          try {
-            await dbManager.updateTrack(track);
-          } catch (e) {
-            console.error("Failed to persist track EQ:", e);
-          }
-        }
-      } else {
-        // Update master EQ
-        const newMasterEffects = {
-          ...masterEffects,
-          [freq]: value,
-        };
-        setMasterEffects(newMasterEffects);
-
-        // Apply to engine
-        if (engineRef?.current?.applyEffects) {
-          try {
-            engineRef.current.applyEffects(newMasterEffects);
-          } catch (e) {
-            console.error("Failed to apply master EQ:", e);
-          }
-        }
-
-        // Persist master effects
-        try {
-          localStorage.setItem(
-            "webamp.masterEffects",
-            JSON.stringify(newMasterEffects)
-          );
-        } catch (e) {
-          console.error("Failed to persist master EQ:", e);
-        }
-      }
+      // Apply all pending changes to the audio engine
+      await applyPendingChanges();
     },
-    [selectedTrackId, masterEffects, engineRef, setMasterEffects]
+    [applyPendingChanges]
   );
 
   const handlePresetChange = useCallback(
@@ -339,10 +391,15 @@ const Equalizer = ({isOpen, onClose, initialPosition = {x: 100, y: 100}}) => {
             track.effects = newEffects;
             setBandValues(preset.values);
 
-            // Update engine
+            // Update engine ONCE
             if (engineRef?.current?.setTrackEffects) {
               try {
-                engineRef.current.setTrackEffects(selectedTrackId, newEffects);
+                engineRef.current.setTrackEffects(
+                  selectedTrackId,
+                  newEffects,
+                  track.enabledEffects || {},
+                  false
+                );
               } catch (e) {
                 console.error("Failed to apply preset to track:", e);
               }
@@ -365,7 +422,7 @@ const Equalizer = ({isOpen, onClose, initialPosition = {x: 100, y: 100}}) => {
           setMasterEffects(newMasterEffects);
           setBandValues(preset.values);
 
-          // Update engine
+          // Update engine ONCE
           if (engineRef?.current?.applyEffects) {
             try {
               engineRef.current.applyEffects(newMasterEffects);
@@ -434,6 +491,7 @@ const Equalizer = ({isOpen, onClose, initialPosition = {x: 100, y: 100}}) => {
   }, [isDragging, handleMouseMove, handleMouseUp]);
 
   const isModified = bandValues.some((v) => v !== 0);
+  const panelRef = useRef(null);
 
   if (!isOpen) return null;
 
@@ -475,7 +533,10 @@ const Equalizer = ({isOpen, onClose, initialPosition = {x: 100, y: 100}}) => {
               </div>
               <VerticalSlider
                 value={bandValues[index]}
-                onChange={(val) => handleBandChange(index, val)}
+                onChange={(val, isPreview) =>
+                  handleBandChange(index, val, isPreview)
+                }
+                onChangeComplete={(val) => handleBandChangeComplete(index, val)}
                 min={-12}
                 max={12}
               />

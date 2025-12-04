@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from "react";
+import React, {useState, useEffect, memo} from "react"; // Added memo
 import Waveform from "../Waveform/Waveform";
 import "./TrackLane.css";
 
@@ -6,7 +6,7 @@ import "./TrackLane.css";
  * TrackLane
  * Renders a single track container with proportional waveform sizing
  */
-function TrackLane({
+const TrackLane = memo(function TrackLane({
   track,
   showTitle = true,
   onMute,
@@ -14,7 +14,7 @@ function TrackLane({
   onDelete,
   trackIndex = 0,
   totalTracks = 1,
-  totalLengthMs = 0, // Total timeline length for proportional sizing
+  totalLengthMs = 0,
   timelineWidth = 0,
   rowWidthPx = 0,
   isSelected = false,
@@ -37,7 +37,6 @@ function TrackLane({
 
   const [muted, setMuted] = useState(getInitialState().muted);
   const [soloed, setSoloed] = useState(getInitialState().soloed);
-  // Track a custom context menu for right-click actions on the track lane
   const [contextMenu, setContextMenu] = useState({
     open: false,
     x: 0,
@@ -63,7 +62,6 @@ function TrackLane({
     setSoloed(!!track.solo);
   }, [track.solo, track.id]);
 
-  // Close the menu on outside click or Escape while it is open
   useEffect(() => {
     if (!contextMenu.open) return undefined;
 
@@ -92,12 +90,10 @@ function TrackLane({
     };
   }, [contextMenu.open]);
 
-  // Helper to close and reset the context menu state
   const closeContextMenu = () => {
     setContextMenu({open: false, x: 0, y: 0});
   };
 
-  // Open the context menu at the pointer location, clamped to the viewport
   const handleContextMenu = (event) => {
     event.preventDefault();
     const menuWidth = 180;
@@ -135,7 +131,6 @@ function TrackLane({
     }
   };
 
-  // Run the selected menu action and close the menu
   const handleMenuAction = (action) => {
     action();
     closeContextMenu();
@@ -234,7 +229,6 @@ function TrackLane({
       </div>
 
       <div className="tracklane-main" style={tracklaneMainStyle}>
-        {/* Timeline ruler - shows full timeline length */}
         <div className="tracklane-timeline" style={tracklaneTimelineStyle}>
           {segments.length === 0 && (
             <div className="tracklane-empty">
@@ -280,15 +274,6 @@ function TrackLane({
                 }}
               >
                 <div className="tracklane-segment">
-                  <div className="segment-meta">
-                    <div className="segment-name">
-                      {seg.id ?? seg.fileUrl ?? "segment"}
-                    </div>
-                    <div className="segment-duration">
-                      {seg.durationMs ? `${Math.round(seg.durationMs)} ms` : ""}
-                    </div>
-                  </div>
-
                   <div className="segment-waveform">
                     {audioBuffer ? (
                       <Waveform
@@ -343,6 +328,6 @@ function TrackLane({
       )}
     </div>
   );
-}
+});
 
 export default TrackLane;
