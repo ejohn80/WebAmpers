@@ -223,7 +223,7 @@ const Equalizer = ({isOpen, onClose, initialPosition = {x: 100, y: 100}}) => {
 
   const [selectedPreset, setSelectedPreset] = useState("flat");
   const [position, setPosition] = useState(initialPosition);
-  const [bandValues, setBandValues] = useState(EQ_BANDS.map((b) => 0));
+  const [bandValues, setBandValues] = useState(EQ_BANDS.map((_) => 0));
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({x: 0, y: 0});
   const [trackName, setTrackName] = useState("Master");
@@ -242,7 +242,7 @@ const Equalizer = ({isOpen, onClose, initialPosition = {x: 100, y: 100}}) => {
 
   // Detect preset from current values
   useEffect(() => {
-    const matchingPreset = Object.entries(EQ_PRESETS).find(([key, preset]) =>
+    const matchingPreset = Object.entries(EQ_PRESETS).find(([_, preset]) =>
       preset.values.every((val, i) => val === bandValues[i])
     );
 
@@ -262,7 +262,7 @@ const Equalizer = ({isOpen, onClose, initialPosition = {x: 100, y: 100}}) => {
         const values = EQ_BANDS.map((b) => track.effects[b.freq] ?? 0);
         setBandValues(values);
       } else {
-        setBandValues(EQ_BANDS.map((b) => 0));
+        setBandValues(EQ_BANDS.map((_) => 0));
       }
     } else {
       // Load master EQ values
