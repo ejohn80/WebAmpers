@@ -5,6 +5,14 @@ import {PlaybackEngine} from "../../playback/playback";
 import * as Tone from "tone";
 import PythonApiClient from "../../backend/PythonApiClient";
 
+import lamejs from "lamejs";
+import MPEGMode from "lamejs/src/js/MPEGMode";
+import Lame from "lamejs/src/js/Lame";
+import BitStream from "lamejs/src/js/BitStream";
+window.MPEGMode = MPEGMode;
+window.Lame = Lame;
+window.BitStream = BitStream;
+
 const EQ_BANDS = [32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
 
 class ExportManager {
@@ -419,6 +427,50 @@ class ExportManager {
     return new Blob([bufferArray], {type: "audio/wav"});
   }
 
+  encodeMp3(audioBuffer, bitrate = 192) {
+    const sampleRate = audioBuffer.sampleRate;
+    const numChannels = audioBuffer.numberOfChannels;
+
+    const left = audioBuffer.getChannelData(0);
+    const right = numChannels > 1 ? audioBuffer.getChannelData(1) : left;
+
+    const leftInt16 = new Int16Array(left.length);
+    const rightInt16 = new Int16Array(right.length);
+
+    for (let i = 0; i < left.length; i++) {
+      leftInt16[i] = left[i] * 32767;
+      rightInt16[i] = right[i] * 32767;
+    }
+
+    // Encode
+    const mp3Encoder = new lamejs.Mp3Encoder(numChannels, sampleRate, bitrate);
+    const mp3Chunks = [];
+    const chunkSize = 1152;
+
+    for (let i = 0; i < leftInt16.length; i += chunkSize) {
+      const leftChunk = leftInt16.subarray(i, i + chunkSize);
+      const rightChunk = rightInt16.subarray(i, i + chunkSize);
+
+      const mp3Chunk =
+        numChannels === 1
+          ? mp3Encoder.encodeBuffer(leftChunk)
+          : mp3Encoder.encodeBuffer(leftChunk, rightChunk);
+
+      if (mp3Chunk.length > 0) {
+        mp3Chunks.push(mp3Chunk);
+      }
+    }
+
+    // Flush remaining data
+    const finalChunk = mp3Encoder.flush();
+    if (finalChunk.length > 0) {
+      mp3Chunks.push(finalChunk);
+    }
+
+    // Turn to blob
+    return new Blob(mp3Chunks, {type: "audio/mp3"});
+  }
+
   /**
    * Export mixed audio from multiple tracks with effects applied
    */
@@ -454,19 +506,33 @@ class ExportManager {
         URL.revokeObjectURL(url);
         return {success: true, format: "wav"};
       }
-
-      case "mp3":
+      case "mp3": {
+        const bitrate = parseInt(options.bitrate) || 192;
+        const mp3Blob = this.encodeMp3(mixedBuffer, bitrate);
+        this.pythonApi.downloadBlob(mp3Blob, filename);
+        return {success: true, format: "mp3"};
+      }
       case "ogg": {
-        const wavBlob = this.createWavBlob(mixedBuffer);
-        const wavFile = new File([wavBlob], "temp.wav", {type: "audio/wav"});
+        const bitrate = parseInt(options.bitrate) || 192;
+        const mp3Blob = this.encodeMp3(mixedBuffer, bitrate);
 
-        const resultBlob = await this.pythonApi.exportAudio(wavFile, {
-          format: format,
-          sampleRate: mixedBuffer.sampleRate,
-          bitrate: options.bitrate,
-        });
-        this.pythonApi.downloadBlob(resultBlob, filename);
-        return {success: true, format};
+        // Check size
+        const sizeMB = mp3Blob.size / (1024 * 1024);
+        console.log(`Compressed MP3 size: ${sizeMB.toFixed(2)}MB`);
+
+        if (sizeMB > 30) {
+          throw new Error(
+            `File too large even after compression: ${sizeMB.toFixed(1)}MB`
+          );
+        }
+
+        const mp3File = new File([mp3Blob], "temp.mp3", {type: "audio/mp3"});
+
+        // Backend converts MP3 → OGG (to circumvent the 32MB limit)
+        const oggBlob = await this.pythonApi.convertFormat(mp3File, "ogg");
+
+        this.pythonApi.downloadBlob(oggBlob, filename);
+        return {success: true, format: "ogg"};
       }
 
       default:
