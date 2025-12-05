@@ -10,8 +10,10 @@
   position: relative;
   --track-controls-width: 180px;
   --track-controls-gap: 12px;
+  --track-row-padding: 8px;
   --timeline-left-offset: calc(
-    var(--track-controls-width) + var(--track-controls-gap)
+    var(--track-row-padding, 0px) + var(--track-controls-width) +
+      var(--track-controls-gap)
   );
 }
 
