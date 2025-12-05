@@ -14,6 +14,7 @@ function Header({
   onPasteTrack,
   selectedTrackId,
   hasClipboard,
+  onSamplerRecording,
 }) {
   const navigate = useNavigate();
   const {userData, loading} = useUserData();
@@ -36,6 +37,7 @@ function Header({
             onPasteTrack={onPasteTrack}
             selectedTrackId={selectedTrackId}
             hasClipboard={hasClipboard}
+            onSamplerRecording={onSamplerRecording}
           />
         </div>
 
