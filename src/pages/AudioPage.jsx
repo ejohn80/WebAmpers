@@ -106,6 +106,158 @@ function AudioPage() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [selectedTrackId]); // Re-bind when selected track changes
 
+  /**
+   * Handle saving a sampler recording as a new track
+   * @param {Object} recordingData - Data from the Sampler component
+   * @param {Array} recordingData.events - Array of note events with timestamps
+   * @param {number} recordingData.duration - Total duration in ms
+   * @param {string} recordingData.instrument - 'piano' or 'drum'
+   * @param {Blob} recordingData.audioBlob - Recorded audio as WebM blob
+   * @param {string} recordingData.name - Suggested name for the track
+   */
+  const handleSamplerRecording = async (recordingData) => {
+    if (!activeSession) {
+      console.error("No active session for sampler recording");
+      alert("Please create or select a session first");
+      return;
+    }
+
+    const {audioBlob, duration, instrument, name} = recordingData;
+
+    if (!audioBlob || audioBlob.size === 0) {
+      console.warn("No audio recorded");
+      alert("No audio was recorded. Play some notes while recording!");
+      return;
+    }
+
+    try {
+      const formatDuration = (ms) => {
+        const totalSeconds = Math.floor(ms / 1000);
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        return `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+      };
+      console.log(`[AudioPage] Processing sampler recording: ${name}`);
+
+      // Convert blob to ArrayBuffer and decode
+      const arrayBuffer = await audioBlob.arrayBuffer();
+      const audioBuffer =
+        await Tone.context.rawContext.decodeAudioData(arrayBuffer);
+
+      // Create ToneAudioBuffer
+      const toneBuffer = new Tone.ToneAudioBuffer(audioBuffer);
+
+      // Serialize buffer for DB storage
+      const serializedBuffer = {
+        numberOfChannels: audioBuffer.numberOfChannels,
+        length: audioBuffer.length,
+        sampleRate: audioBuffer.sampleRate,
+        duration: audioBuffer.duration,
+        channels: [],
+      };
+
+      for (let i = 0; i < audioBuffer.numberOfChannels; i++) {
+        serializedBuffer.channels.push(audioBuffer.getChannelData(i));
+      }
+
+      // Generate unique track name
+      const trackName = name;
+      const segmentId = `seg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const durationMs = Math.round(audioBuffer.duration * 1000);
+
+      // Save as asset first
+      const assetData = {
+        name: trackName,
+        duration: formatDuration(audioBuffer.duration * 1000),
+        size: audioBlob.size,
+        sampleRate: audioBuffer.sampleRate,
+        channels: audioBuffer.numberOfChannels,
+        buffer: serializedBuffer,
+      };
+
+      const assetId = await dbManager.addAsset(assetData);
+      console.log(`[AudioPage] Sampler recording saved as asset ${assetId}`);
+
+      // Cache the buffer
+      assetBufferCache.set(assetId, toneBuffer);
+
+      // Create track data for DB
+      const trackData = {
+        name: trackName,
+        color: instrument === "piano" ? "#45B7D1" : "#FFA07A", // Blue for piano, coral for drums
+        assetId: assetId,
+        enabledEffects: {},
+        segments: [
+          {
+            id: segmentId,
+            assetId,
+            offset: 0,
+            duration: audioBuffer.duration,
+            durationMs,
+            startOnTimelineMs: 0,
+            startInFileMs: 0,
+          },
+        ],
+        volume: 0,
+        pan: 0,
+        mute: false,
+        solo: false,
+      };
+
+      // Save track to DB
+      const dbId = await dbManager.addTrack(trackData, activeSession);
+      console.log(`[AudioPage] Sampler track saved with ID: ${dbId}`);
+
+      // Create track for audioManager
+      const newTrack = {
+        id: dbId,
+        name: trackName,
+        color: trackData.color,
+        buffer: toneBuffer,
+        assetId: assetId,
+        enabledEffects: {},
+        segments: [
+          {
+            id: segmentId,
+            assetId,
+            buffer: toneBuffer,
+            offset: 0,
+            duration: audioBuffer.duration,
+            durationMs,
+            startOnTimelineMs: 0,
+            startInFileMs: 0,
+          },
+        ],
+        volume: 0,
+        pan: 0,
+        mute: false,
+        solo: false,
+      };
+
+      // Add to audioManager
+      audioManager.addTrackFromBuffer(newTrack);
+      console.log(`[AudioPage] Track added to audioManager`);
+
+      setTracks([...audioManager.tracks]);
+
+      // Asset refresh
+      setAssetsRefreshTrigger((prev) => prev + 1);
+
+      const newVersion = buildVersionFromTracks(audioManager.tracks);
+      if (newVersion && engineRef.current) {
+        await engineRef.current.load(newVersion);
+        console.log("[AudioPage] Engine reloaded after sampler recording");
+      }
+
+      console.log(
+        `[AudioPage] Sampler recording saved successfully as "${trackName}"`
+      );
+    } catch (error) {
+      console.error("Failed to save sampler recording:", error);
+      alert(`Failed to save recording: ${error.message}`);
+    }
+  };
+
   // Helper function to deserialize audio buffer from DB format
   const deserializeAudioBuffer = (serializedBuffer) => {
     const audioBuffer = Tone.context.createBuffer(
@@ -1288,6 +1440,7 @@ function AudioPage() {
         onPasteTrack={handlePasteTrack}
         selectedTrackId={selectedTrackId}
         hasClipboard={clipboardManager.hasClipboard()}
+        onSamplerRecording={handleSamplerRecording}
       />
 
       <div className="main-content-area" style={mainContentStyle}>
