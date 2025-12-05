@@ -1,10 +1,4 @@
-import React, {
-  useState,
-  useEffect,
-  useContext,
-  useRef,
-  useCallback,
-} from "react";
+import React, {useState, useEffect, useContext, useRef} from "react";
 import "./AudioPage.css";
 import * as Tone from "tone";
 
@@ -13,6 +7,7 @@ import Sidebar from "../components/Layout/Sidebar";
 import MainContent from "../components/Layout/MainContent";
 import Footer from "../components/Layout/Footer";
 import {audioManager} from "../managers/AudioManager";
+import WebAmpPlayback from "../playback/playback.jsx";
 import {dbManager} from "../managers/DBManager";
 import {AppContext} from "../context/AppContext";
 import {progressStore} from "../playback/progressStore";
@@ -21,6 +16,7 @@ import {clipboardManager} from "../managers/ClipboardManager.js";
 
 const MIN_WIDTH = 0;
 const MAX_WIDTH = 300;
+
 // Buffer cache to share audio buffers across tracks from the same asset
 const assetBufferCache = new Map(); // assetId -> Tone.ToneAudioBuffer
 
@@ -34,6 +30,7 @@ const EMPTY_VERSION = {
   loop: {enabled: false},
   masterChain: [],
 };
+
 function AudioPage() {
   const {
     setEngineRef,
@@ -46,11 +43,8 @@ function AudioPage() {
   const [tracks, setTracks] = useState(audioManager.tracks);
   const [audioData, setAudioData] = useState(null);
   const [recording, setRecording] = useState({stream: null, startTs: 0});
-  const [trimBuffer, setTrimBuffer] = useState([]);
-  const [selection, setSelection] = useState(null);
-  const [selectMode, setSelectMode] = useState(false);
-  const [editAction, setEditAction] = useState("trim"); // "trim" or "cut"
   const [assetsRefreshTrigger, setAssetsRefreshTrigger] = useState(0);
+
   const engineRef = React.useRef(null);
   const lastSessionRef = useRef(null);
 
@@ -216,27 +210,15 @@ function AudioPage() {
 
       (track.segments || []).forEach((s) => {
         const fileUrl = s.buffer ?? s.fileUrl ?? null;
-        // Prefer explicit millisecond fields from editing (cut/trim) over legacy fields
         const startOnTimelineMs =
-          typeof s.startOnTimelineMs === "number"
-            ? s.startOnTimelineMs
-            : s.startOnTimeline
-              ? Math.round(s.startOnTimeline * 1000)
-              : 0;
-
-        const startInFileMs =
-          typeof s.startInFileMs === "number"
-            ? s.startInFileMs
-            : s.offset
-              ? Math.round(s.offset * 1000)
-              : 0;
-
-        const durationMs =
-          typeof s.durationMs === "number" && s.durationMs > 0
-            ? s.durationMs
-            : s.duration
-              ? Math.round(s.duration * 1000)
-              : 0;
+          s.startOnTimelineMs ??
+          (s.startOnTimeline ? Math.round(s.startOnTimeline * 1000) : 0);
+        const startInFileMs = s.offset
+          ? Math.round(s.offset * 1000)
+          : (s.startInFileMs ?? 0);
+        const durationMs = s.duration
+          ? Math.round(s.duration * 1000)
+          : (s.durationMs ?? 0);
 
         vs.segments.push({
           id: s.id ?? `seg_${Math.random().toString(36).slice(2, 8)}`,
@@ -684,9 +666,10 @@ function AudioPage() {
       const deleted = audioManager.deleteTrack(trackId);
 
       if (deleted) {
-        // Clean up database
+        // Delete from database
         try {
           await dbManager.deleteTrack(trackId);
+          console.log(`Track ${trackId} deleted from database`);
         } catch (e) {
           console.warn("Failed to delete track from DB:", e);
         }
@@ -713,7 +696,7 @@ function AudioPage() {
 
           if (engineRef.current) {
             try {
-              await engineRef.current.load(emptyVersion);
+              await engineRef.current.load(EMPTY_VERSION);
               console.log("Engine loaded with empty version");
             } catch (e) {
               console.error("Failed to load empty version:", e);
@@ -1025,7 +1008,7 @@ function AudioPage() {
     <div className="app-container">
       <Header
         tracks={tracks}
-        totalLengthMs={timelineLengthMs}
+        totalLengthMs={version?.lengthMs || 0}
         onImportSuccess={handleFileDropdownImport}
         onImportError={handleImportError}
         onExportComplete={handleExportComplete}
@@ -1055,16 +1038,10 @@ function AudioPage() {
         <MainContent
           tracks={tracks}
           recording={recording}
-          totalLengthMs={timelineLengthMs}
-          selection={selection}
-          onSelectionChange={setSelection}
-          selectMode={selectMode}
-          confirmEdit={confirmEdit}
-          onAssetDrop={handleAssetDrop}
-          onTrimCancel={cancelEditMode}
+          totalLengthMs={version?.lengthMs || 0}
           selectedTrackId={selectedTrackId}
           setSelectedTrackId={setSelectedTrackId}
-          onTrimTrackSelect={handleTrackSelection}
+          onAssetDrop={handleAssetDrop}
           onMute={(trackId, muted) =>
             handleTrackPropertyUpdate(trackId, "mute", muted, "setTrackMute")
           }
