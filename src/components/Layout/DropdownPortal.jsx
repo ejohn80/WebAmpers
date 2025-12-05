@@ -42,8 +42,7 @@ function DropdownPortal({
   hasClipboard,
 }) {
   const navigate = useNavigate();
-  const {userData, closeEffectsMenu, theme, setTheme} =
-    useContext(AppContext); // closes effects menu
+  const {userData, closeEffectsMenu, theme, setTheme} = useContext(AppContext); // closes effects menu
 
   const [activeDropdown, setActiveDropdown] = useState(null);
   const [activeSubmenu, setActiveSubmenu] = useState(null);
@@ -642,7 +641,9 @@ function DropdownPortal({
                   }}
                 >
                   {option.label}
-                  {theme === option.id && <span className="submenu-check">✓</span>}
+                  {theme === option.id && (
+                    <span className="submenu-check">✓</span>
+                  )}
                 </button>
               ))}
             </div>
