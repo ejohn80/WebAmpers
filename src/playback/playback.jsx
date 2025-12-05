@@ -2428,20 +2428,20 @@ export default function WebAmpPlayback({version, onEngineReady}) {
           <button
             onClick={goToStart}
             className="transport-button"
-          disabled={hasNoTracks}
-          title={hasNoTracks ? "No tracks loaded" : "Go to start"}
-        >
-          <FaStepBackward />
-        </button>
+            disabled={hasNoTracks}
+            title={hasNoTracks ? "No tracks loaded" : "Go to start"}
+          >
+            <FaStepBackward />
+          </button>
 
           <button
             onClick={skipBack10}
             className="transport-button"
-          disabled={hasNoTracks}
-          title={hasNoTracks ? "No tracks loaded" : "Skip backward 10s"}
-        >
-          <FaBackward />
-        </button>
+            disabled={hasNoTracks}
+            title={hasNoTracks ? "No tracks loaded" : "Skip backward 10s"}
+          >
+            <FaBackward />
+          </button>
 
           <PlayPauseButton
             isPlaying={playing}
@@ -2452,20 +2452,20 @@ export default function WebAmpPlayback({version, onEngineReady}) {
           <button
             onClick={skipFwd10}
             className="transport-button"
-          disabled={hasNoTracks}
-          title={hasNoTracks ? "No tracks loaded" : "Skip forward 10s"}
-        >
-          <FaForward />
-        </button>
+            disabled={hasNoTracks}
+            title={hasNoTracks ? "No tracks loaded" : "Skip forward 10s"}
+          >
+            <FaForward />
+          </button>
 
           <button
             onClick={goToEnd}
             className="transport-button"
-          disabled={hasNoTracks}
-          title={hasNoTracks ? "No tracks loaded" : "Go to end"}
-        >
-          <FaStepForward />
-        </button>
+            disabled={hasNoTracks}
+            title={hasNoTracks ? "No tracks loaded" : "Go to end"}
+          >
+            <FaStepForward />
+          </button>
         </div>
       </div>
 
