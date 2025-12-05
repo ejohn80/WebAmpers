@@ -37,3 +37,49 @@
   align-items: center;
   justify-content: flex-end;
 }
+
+.rec-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--rec-pill-border, #3a393f);
+  background: var(--rec-pill-bg, #2f2e34);
+  color: var(--rec-pill-text, #e5e5e5);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.rec-button:hover {
+  background: var(--rec-pill-hover, #3a3a40);
+}
+
+.rec-button.recording {
+  background: var(--rec-pill-active-bg, #d45252);
+  border-color: var(--rec-pill-active-bg, #d45252);
+  color: var(--rec-pill-active-text, #ffffff);
+}
+
+.rec-button:disabled {
+  background: var(--rec-pill-disabled, #3a3a3a);
+  color: var(--rec-pill-disabled-text, #888);
+  cursor: not-allowed;
+}
+
+.rec-indicator {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--rec-indicator, #d45252);
+  border: 1px solid var(--rec-indicator-border, transparent);
+  flex-shrink: 0;
+}
+
+.rec-button.recording .rec-indicator {
+  background: var(--rec-indicator-active, #ffffff);
+  border-radius: 3px;
+  border-color: var(--rec-indicator-active, #ffffff);
+}

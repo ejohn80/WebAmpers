@@ -9,16 +9,18 @@ import React, {
 import * as Tone from "tone";
 import {progressStore} from "./progressStore";
 import {
-  RewindIcon,
-  ForwardIcon,
-  GoToStartIcon,
   SoundOffIcon,
   VolumeKnob,
-  GoToEndIcon,
   SoundOnLowIcon,
   SoundOnMediumIcon,
   SoundOnHighIcon,
 } from "../components/Layout/Svgs.jsx";
+import {
+  FaStepBackward,
+  FaBackward,
+  FaForward,
+  FaStepForward,
+} from "react-icons/fa";
 
 import "./playback.css";
 import {AppContext} from "../context/AppContext";
@@ -2426,20 +2428,20 @@ export default function WebAmpPlayback({version, onEngineReady}) {
           <button
             onClick={goToStart}
             className="transport-button"
-            disabled={hasNoTracks}
-            title={hasNoTracks ? "No tracks loaded" : "Go to start"}
-          >
-            <GoToStartIcon />
-          </button>
+          disabled={hasNoTracks}
+          title={hasNoTracks ? "No tracks loaded" : "Go to start"}
+        >
+          <FaStepBackward />
+        </button>
 
           <button
             onClick={skipBack10}
             className="transport-button"
-            disabled={hasNoTracks}
-            title={hasNoTracks ? "No tracks loaded" : "Skip backward 10s"}
-          >
-            <RewindIcon />
-          </button>
+          disabled={hasNoTracks}
+          title={hasNoTracks ? "No tracks loaded" : "Skip backward 10s"}
+        >
+          <FaBackward />
+        </button>
 
           <PlayPauseButton
             isPlaying={playing}
@@ -2450,20 +2452,20 @@ export default function WebAmpPlayback({version, onEngineReady}) {
           <button
             onClick={skipFwd10}
             className="transport-button"
-            disabled={hasNoTracks}
-            title={hasNoTracks ? "No tracks loaded" : "Skip forward 10s"}
-          >
-            <ForwardIcon />
-          </button>
+          disabled={hasNoTracks}
+          title={hasNoTracks ? "No tracks loaded" : "Skip forward 10s"}
+        >
+          <FaForward />
+        </button>
 
           <button
             onClick={goToEnd}
             className="transport-button"
-            disabled={hasNoTracks}
-            title={hasNoTracks ? "No tracks loaded" : "Go to end"}
-          >
-            <GoToEndIcon />
-          </button>
+          disabled={hasNoTracks}
+          title={hasNoTracks ? "No tracks loaded" : "Go to end"}
+        >
+          <FaStepForward />
+        </button>
         </div>
       </div>
 
