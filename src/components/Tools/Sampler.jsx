@@ -1,30 +1,24 @@
-import React, {
-  useState,
-  useEffect,
-  useRef,
-  useCallback,
-  useMemo,
-} from "react";
+import React, {useState, useEffect, useRef, useCallback, useMemo} from "react";
 import * as Tone from "tone";
 import styles from "./Sampler.module.css";
 
 const PIANO_SOUNDS = {
-  "A0": "A0.mp3",
-  "A1": "A1.mp3",
-  "A2": "A2.mp3",
-  "A3": "A3.mp3",
-  "A4": "A4.mp3",
-  "A5": "A5.mp3",
-  "A6": "A6.mp3",
-  "A7": "A7.mp3",
-  "C1": "C1.mp3",
-  "C2": "C2.mp3",
-  "C3": "C3.mp3",
-  "C4": "C4.mp3",
-  "C5": "C5.mp3",
-  "C6": "C6.mp3",
-  "C7": "C7.mp3",
-  "C8": "C8.mp3",
+  A0: "A0.mp3",
+  A1: "A1.mp3",
+  A2: "A2.mp3",
+  A3: "A3.mp3",
+  A4: "A4.mp3",
+  A5: "A5.mp3",
+  A6: "A6.mp3",
+  A7: "A7.mp3",
+  C1: "C1.mp3",
+  C2: "C2.mp3",
+  C3: "C3.mp3",
+  C4: "C4.mp3",
+  C5: "C5.mp3",
+  C6: "C6.mp3",
+  C7: "C7.mp3",
+  C8: "C8.mp3",
   "D#1": "Ds1.mp3",
   "D#2": "Ds2.mp3",
   "D#3": "Ds3.mp3",
@@ -43,30 +37,30 @@ const PIANO_SOUNDS = {
 
 // Piano key configuration for UI - 1 octave
 const PIANO_KEYS = [
-  { note: "C4", label: "C", key: "a", isBlack: false },
-  { note: "C#4", label: "C#", key: "w", isBlack: true, offset: 1 },
-  { note: "D4", label: "D", key: "s", isBlack: false },
-  { note: "D#4", label: "D#", key: "e", isBlack: true, offset: 2 },
-  { note: "E4", label: "E", key: "d", isBlack: false },
-  { note: "F4", label: "F", key: "f", isBlack: false },
-  { note: "F#4", label: "F#", key: "t", isBlack: true, offset: 4 },
-  { note: "G4", label: "G", key: "g", isBlack: false },
-  { note: "G#4", label: "G#", key: "y", isBlack: true, offset: 5 },
-  { note: "A4", label: "A", key: "h", isBlack: false },
-  { note: "A#4", label: "A#", key: "u", isBlack: true, offset: 6 },
-  { note: "B4", label: "B", key: "j", isBlack: false },
+  {note: "C4", label: "C", key: "a", isBlack: false},
+  {note: "C#4", label: "C#", key: "w", isBlack: true, offset: 1},
+  {note: "D4", label: "D", key: "s", isBlack: false},
+  {note: "D#4", label: "D#", key: "e", isBlack: true, offset: 2},
+  {note: "E4", label: "E", key: "d", isBlack: false},
+  {note: "F4", label: "F", key: "f", isBlack: false},
+  {note: "F#4", label: "F#", key: "t", isBlack: true, offset: 4},
+  {note: "G4", label: "G", key: "g", isBlack: false},
+  {note: "G#4", label: "G#", key: "y", isBlack: true, offset: 5},
+  {note: "A4", label: "A", key: "h", isBlack: false},
+  {note: "A#4", label: "A#", key: "u", isBlack: true, offset: 6},
+  {note: "B4", label: "B", key: "j", isBlack: false},
 ];
 
 // Drum pad configuration - 8 pads in a 4x2 grid
 const DRUM_PADS = [
-  { note: "C1", label: "Kick", key: "a", file: "kick-plain" },
-  { note: "D1", label: "Snare", key: "s", file: "snare-acoustic01" },
-  { note: "E1", label: "Hi-Hat", key: "d", file: "hihat-plain" },
-  { note: "F1", label: "Open HH", key: "f", file: "openhat-tight" },
-  { note: "G1", label: "Tom", key: "g", file: "tom-acoustic01" },
-  { note: "A1", label: "Clap", key: "h", file: "clap-analog" },
-  { note: "B1", label: "Kick 2", key: "j", file: "kick-thump" },
-  { note: "C2", label: "Snare 2", key: "k", file: "snare-808" },
+  {note: "C1", label: "Kick", key: "a", file: "kick-plain"},
+  {note: "D1", label: "Snare", key: "s", file: "snare-acoustic01"},
+  {note: "E1", label: "Hi-Hat", key: "d", file: "hihat-plain"},
+  {note: "F1", label: "Open HH", key: "f", file: "openhat-tight"},
+  {note: "G1", label: "Tom", key: "g", file: "tom-acoustic01"},
+  {note: "A1", label: "Clap", key: "h", file: "clap-analog"},
+  {note: "B1", label: "Kick 2", key: "j", file: "kick-thump"},
+  {note: "C2", label: "Snare 2", key: "k", file: "snare-808"},
 ];
 
 // Drum sound file mappings
@@ -83,7 +77,7 @@ const Sampler = ({
   isOpen,
   onClose,
   onSaveRecording,
-  initialPosition = { x: 100, y: 100 },
+  initialPosition = {x: 100, y: 100},
 }) => {
   const [instrument, setInstrument] = useState("piano"); // 'piano' | 'drum'
   const [activeKeys, setActiveKeys] = useState(new Set());
@@ -92,7 +86,7 @@ const Sampler = ({
   const [isLoaded, setIsLoaded] = useState(false);
   const [position, setPosition] = useState(initialPosition);
   const [isDragging, setIsDragging] = useState(false);
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [dragOffset, setDragOffset] = useState({x: 0, y: 0});
 
   const panelRef = useRef(null);
   const pianoSamplerRef = useRef(null);
@@ -346,7 +340,7 @@ const Sampler = ({
       return;
     }
 
-    let audioBlob = recordedBlobRef.current; 
+    let audioBlob = recordedBlobRef.current;
 
     // Stop recording if still active
     if (isRecording) {
@@ -378,7 +372,7 @@ const Sampler = ({
     recordedEventsRef.current = [];
     setRecordingTime(0);
     recordingStartTimeRef.current = null;
-    recordedBlobRef.current = null; 
+    recordedBlobRef.current = null;
   }, [isRecording, recordingTime, instrument, onSaveRecording]);
 
   const handleDiscardRecording = useCallback(async () => {
@@ -405,12 +399,12 @@ const Sampler = ({
     const totalSeconds = Math.floor(ms / 1000);
     const minutes = Math.floor(totalSeconds / 60);
     const seconds = totalSeconds % 60;
-    
+
     if (showCentiseconds) {
       const centiseconds = Math.floor((ms % 1000) / 10);
       return `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}.${centiseconds.toString().padStart(2, "0")}`;
     }
-    
+
     return `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
   };
 
@@ -418,20 +412,19 @@ const Sampler = ({
   const handleMouseDown = (e) => {
     // Allow dragging from loading overlay
     const isLoadingOverlay = e.target.closest(`.${styles.loadingOverlay}`);
-    
+
     if (
-      !isLoadingOverlay && (
-        e.target.closest(`.${styles.keyboardContainer}`) ||
+      !isLoadingOverlay &&
+      (e.target.closest(`.${styles.keyboardContainer}`) ||
         e.target.closest(`.${styles.instrumentSelector}`) ||
         e.target.closest(`.${styles.recordingControls}`) ||
-        e.target.closest(`.${styles.closeButton}`)
-      )
+        e.target.closest(`.${styles.closeButton}`))
     ) {
       return;
     }
     setIsDragging(true);
     const rect = panelRef.current.getBoundingClientRect();
-    setDragOffset({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+    setDragOffset({x: e.clientX - rect.left, y: e.clientY - rect.top});
   };
 
   const handleMouseMove = useCallback(
@@ -462,28 +455,26 @@ const Sampler = ({
     }
   }, [isDragging, handleMouseMove, handleMouseUp]);
 
-  const whiteKeys = useMemo(
-    () => PIANO_KEYS.filter((k) => !k.isBlack),
-    []
-  );
-  const blackKeys = useMemo(
-    () => PIANO_KEYS.filter((k) => k.isBlack),
-    []
+  const whiteKeys = useMemo(() => PIANO_KEYS.filter((k) => !k.isBlack), []);
+  const blackKeys = useMemo(() => PIANO_KEYS.filter((k) => k.isBlack), []);
+
+  const getBlackKeyPosition = useCallback(
+    (keyIndex) => {
+      const whiteKeyWidth = 100 / whiteKeys.length;
+      const positions = {
+        1: 1.075, // C# after C
+        2: 2.05, // D# after D
+        4: 4, // F# after F
+        5: 4.975, // G# after G
+        6: 5.925, // A# after A
+      };
+      return positions[keyIndex] * whiteKeyWidth;
+    },
+    [whiteKeys.length]
   );
 
-  const getBlackKeyPosition = useCallback((keyIndex) => {
-    const whiteKeyWidth = 100 / whiteKeys.length;
-    const positions = {
-      1: 1.075, // C# after C
-      2: 2.05, // D# after D
-      4: 4, // F# after F
-      5: 4.975, // G# after G
-      6: 5.925, // A# after A
-    };
-    return positions[keyIndex] * whiteKeyWidth;
-  }, [whiteKeys.length]);
-
-  const hasRecordedEvents = recordedEventsRef.current.length > 0 || recordingTime > 0;
+  const hasRecordedEvents =
+    recordedEventsRef.current.length > 0 || recordingTime > 0;
 
   if (!isOpen) return null;
 
@@ -491,7 +482,7 @@ const Sampler = ({
     <div
       ref={panelRef}
       className={`${styles.samplerPanel} ${isDragging ? styles.dragging : ""}`}
-      style={{ left: position.x, top: position.y }}
+      style={{left: position.x, top: position.y}}
       onMouseDown={handleMouseDown}
     >
       <div className={styles.header}>
@@ -564,7 +555,7 @@ const Sampler = ({
               <div
                 key={pianoKey.note}
                 className={`${styles.pianoKey} ${styles.black} ${activeKeys.has(pianoKey.key) ? styles.active : ""}`}
-                style={{ left: `${getBlackKeyPosition(pianoKey.offset)}%` }}
+                style={{left: `${getBlackKeyPosition(pianoKey.offset)}%`}}
                 onMouseDown={(e) => {
                   e.stopPropagation();
                   setActiveKeys((prev) => new Set([...prev, pianoKey.key]));
@@ -638,7 +629,9 @@ const Sampler = ({
           <button
             className={`${styles.recordButton} ${isRecording ? styles.recording : ""}`}
             onClick={toggleRecording}
-            title={isRecording ? "Stop Recording (Space)" : "Start Recording (Space)"}
+            title={
+              isRecording ? "Stop Recording (Space)" : "Start Recording (Space)"
+            }
           >
             <div className={styles.recordButtonInner} />
           </button>
