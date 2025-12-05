@@ -160,8 +160,8 @@
   right: 8px;
   width: 17px;
   height: 17px;
-  background: var(--effect-card-bg, #1e1d20);
-  border: none;
+  background: var(--close-effect-bg, #1e1d20);
+  border: 1px solid var(--close-effect-border, #333239);
   border-radius: 4px;
   display: flex;
   align-items: center;
@@ -170,11 +170,13 @@
   transition: all 0.2s ease;
   z-index: 2;
   padding: 0;
+  color: var(--close-effect-icon, #e5e5e5);
 }
 
 .closeEffectButton:hover {
-  background: #dd4b4b;
-  border: none;
+  background: var(--close-effect-hover, #dd4b4b);
+  border: 1px solid var(--close-effect-hover, #dd4b4b);
+  color: var(--close-effect-hover-icon, #ffffff);
 }
 
 .effectsList {

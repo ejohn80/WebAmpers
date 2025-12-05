@@ -119,6 +119,11 @@
   --effects-cancel-text: #888;
   --effects-cancel-hover-bg: #333239;
   --effects-cancel-hover-text: #e5e5e5;
+  --close-effect-bg: #1e1d20;
+  --close-effect-border: #333239;
+  --close-effect-hover: #dd4b4b;
+  --close-effect-icon: #e5e5e5;
+  --close-effect-hover-icon: #ffffff;
   --project-item-bg: #2b2b2b;
   --project-item-border: #3a3a3a;
   --project-item-text: #ffffff;
@@ -243,6 +248,11 @@
   --effects-cancel-text: #5c6270;
   --effects-cancel-hover-bg: #e2e9f5;
   --effects-cancel-hover-text: #1f1f2a;
+  --close-effect-bg: #eef2f8;
+  --close-effect-border: #dbe0ea;
+  --close-effect-hover: #ff5c5c;
+  --close-effect-icon: #1f1f2a;
+  --close-effect-hover-icon: #ffffff;
   --project-item-bg: #f2f5fa;
   --project-item-border: #dbe0ea;
   --project-item-text: #1f1f2a;

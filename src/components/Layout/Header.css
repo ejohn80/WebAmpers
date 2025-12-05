@@ -28,6 +28,39 @@
   position: relative;
 }
 
+/* Ensure header icons follow the active text color (works for light mode) */
+.FETS-container svg {
+  color: var(--menu-text);
+}
+.FETS-container svg path,
+.FETS-container svg polyline,
+.FETS-container svg line,
+.FETS-container svg rect,
+.FETS-container svg circle {
+  stroke: currentColor !important;
+}
+.FETS-container svg path[fill]:not([fill="none"]),
+.FETS-container svg rect[fill]:not([fill="none"]),
+.FETS-container svg circle[fill]:not([fill="none"]) {
+  fill: currentColor !important;
+}
+
+.dropdown-content svg {
+  color: var(--menu-text);
+}
+.dropdown-content svg path,
+.dropdown-content svg polyline,
+.dropdown-content svg line,
+.dropdown-content svg rect,
+.dropdown-content svg circle {
+  stroke: currentColor !important;
+}
+.dropdown-content svg path[fill]:not([fill="none"]),
+.dropdown-content svg rect[fill]:not([fill="none"]),
+.dropdown-content svg circle[fill]:not([fill="none"]) {
+  fill: currentColor !important;
+}
+
 /* File and Edit buttons styling */
 .dropdown-btn {
   background: var(--panel-bg);
