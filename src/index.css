@@ -132,6 +132,29 @@
   --project-active-bg: #2f3f42;
   --project-active-border: #00e5ff;
   --project-delete-hover: #ff4444;
+  --eq-panel-bg: #1e1d20;
+  --eq-panel-border: #333239;
+  --eq-header-bg: linear-gradient(180deg, #252428 0%, #1e1d20 100%);
+  --eq-curve-bg: #0f0f0f;
+  --eq-divider: #333239;
+  --eq-text: #e5e5e5;
+  --eq-muted: #888;
+  --eq-strong: #00e5ff;
+  --eq-knob: linear-gradient(180deg, #e5e5e5 0%, #b0b0b0 100%);
+  --eq-knob-border: #888;
+  --eq-scroll-track: #1e1d20;
+  --eq-scroll-thumb: #333239;
+  --eq-scroll-thumb-hover: #5c5b62;
+  --eq-select-bg: #2a2a2a;
+  --eq-select-border: #3a3a3a;
+  --eq-select-hover: #4a4a4a;
+  --eq-select-text: #e5e5e5;
+  --eq-select-option-bg: #2a2a2a;
+  --eq-select-option-text: #e5e5e5;
+  --eq-reset-bg: #172528;
+  --eq-reset-hover: #1e3034;
+  --eq-reset-text: #17e1ff;
+  --eq-footer-bg: #1a191c;
 }
 
 .theme-light {
@@ -261,6 +284,29 @@
   --project-active-bg: #dce8fb;
   --project-active-border: #17e1ff;
   --project-delete-hover: #ff8a8a;
+  --eq-panel-bg: #ffffff;
+  --eq-panel-border: #dbe0ea;
+  --eq-header-bg: linear-gradient(180deg, #eef2f8 0%, #ffffff 100%);
+  --eq-curve-bg: #f4f6fb;
+  --eq-divider: #dbe0ea;
+  --eq-text: #1f1f2a;
+  --eq-muted: #5c6270;
+  --eq-strong: #00e5ff;
+  --eq-knob: linear-gradient(180deg, #f7f7f8 0%, #d1d5dc 100%);
+  --eq-knob-border: #aeb4c0;
+  --eq-scroll-track: #eef2f8;
+  --eq-scroll-thumb: #c7d0df;
+  --eq-scroll-thumb-hover: #a8b4c9;
+  --eq-select-bg: #eef2f8;
+  --eq-select-border: #dbe0ea;
+  --eq-select-hover: #e2e9f5;
+  --eq-select-text: #1f1f2a;
+  --eq-select-option-bg: #ffffff;
+  --eq-select-option-text: #1f1f2a;
+  --eq-reset-bg: #eef2f8;
+  --eq-reset-hover: #e2e9f5;
+  --eq-reset-text: #00e5ff;
+  --eq-footer-bg: #f1f4f9;
 }
 
 html,
