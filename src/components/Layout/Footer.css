@@ -1,10 +1,11 @@
 /* Footer Styles */
 .footer {
-  background-color: #262529;
-  border-top: 2px solid #333239;
+  background-color: var(--footer-bg);
+  border-top: 2px solid var(--footer-border);
   box-sizing: border-box;
   height: 40px;
   overflow: visible;
+  color: var(--section-text);
 }
 
 .footer-container {

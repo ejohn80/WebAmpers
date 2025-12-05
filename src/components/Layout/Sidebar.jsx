@@ -102,8 +102,12 @@ function Sidebar({
               flex: 1,
               padding: "10px 0",
               border: "none",
-              background: currentTab === key ? "#17E1FF" : "#193338",
-              color: currentTab === key ? "#193338" : "#17E1FF",
+              background: currentTab === key
+                ? "var(--sidebar-tab-active-bg, #17E1FF)"
+                : "var(--sidebar-tab-bg, #193338)",
+              color: currentTab === key
+                ? "var(--sidebar-tab-active-text, #193338)"
+                : "var(--sidebar-tab-text, #17E1FF)",
               fontWeight: currentTab === key ? "bold" : "bold",
               cursor: "pointer",
               transition: "background 0.2s, color 0.2s",

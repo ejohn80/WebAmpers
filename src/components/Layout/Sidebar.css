@@ -3,6 +3,7 @@
   height: 100%;
   scrollbar-width: thin;
   scrollbar-color: #333239 #1e1d20;
+  background: var(--panel-bg);
 }
 
 /* Webkit browsers (Chrome, Safari, Edge) */
