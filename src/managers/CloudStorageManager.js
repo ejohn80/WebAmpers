@@ -22,7 +22,6 @@ class CloudStorageManager {
    */
   async _decodeMp3(mp3Blob) {
     const arrayBuffer = await mp3Blob.arrayBuffer();
-    const Tone = await import('tone');
     const audioContext = Tone.context.rawContext;
     return audioContext.decodeAudioData(arrayBuffer);
   }
@@ -77,7 +76,7 @@ class CloudStorageManager {
         }
 
         // Compress to MP3 using ExportManager (use lower bitrate for smaller files)
-        const mp3Blob = this.exportManager.encodeMp3(nativeBuffer, 96);
+        const mp3Blob = this.exportManager.encodeMp3(nativeBuffer, 192);
         
         // Upload MP3 to Firebase
         const assetRef = ref(storage, `${folder}/assets/${assetId}.mp3`);
@@ -85,7 +84,6 @@ class CloudStorageManager {
         
         const mp3Url = await getDownloadURL(assetRef);
         
-        // Store metadata without the full buffer
         assetMetadata.push({
           id: asset.id,
           name: asset.name,
@@ -93,24 +91,23 @@ class CloudStorageManager {
           size: asset.size,
           sampleRate: asset.sampleRate,
           channels: asset.channels,
-          mp3Url: mp3Url, // Reference to MP3 file
+          mp3Url: mp3Url,
           mp3Size: mp3Blob.size
         });
         
-        console.log(`Compressed asset ${assetId}: ${(asset.size / 1024).toFixed(1)}KB → ${(mp3Blob.size / 1024).toFixed(1)}KB`);
       } catch (e) {
         console.warn(`Failed to save asset ${assetId}:`, e);
       }
     }
 
-    // Save session metadata (much smaller now)
+    // Save session metadata
     const metadata = new Blob(
       [
         JSON.stringify(
           {
             session,
             tracks,
-            assets: assetMetadata, // Only metadata, not buffers
+            assets: assetMetadata,
             exportedAt: new Date().toISOString()
           },
           null,
@@ -129,7 +126,7 @@ class CloudStorageManager {
   // -----------------------------------------------
   // LOAD: session + tracks + assets (decompress MP3)
   // -----------------------------------------------
-  async loadFromFirebase(userId, folderName, clearExisting = true) {
+  async loadFromFirebase(userId, folderName) {
     const folder = `${this.STORAGE_PATH}/${userId}/saves/${folderName}`;
     const metaRef = ref(storage, `${folder}/metadata.json`);
 
@@ -140,11 +137,36 @@ class CloudStorageManager {
 
     console.log(`Loading: ${tracks.length} tracks, ${assets.length} assets`);
 
+    // Extract project name from folder name (remove timestamp)
+    const projectName = folderName.replace(/_\d+$/, '');
+
     // Download and decode MP3 assets
     const assetIdMap = new Map();
     for (const assetMeta of assets) {
       try {
         const oldId = assetMeta.id;
+        
+        // Get base name by removing (2), (3) etc suffix
+        const getBaseName = (name) => {
+          return name.replace(/\s*\(\d+\)$/, '').trim();
+        };
+        
+        const baseNameToFind = getBaseName(assetMeta.name);
+        
+        // Check if this exact asset already exists
+        const existingAssets = await dbManager.getAllAssets();
+        
+        const existingAsset = existingAssets.find(a => {
+          const existingBaseName = getBaseName(a.name);
+          const nameMatch = existingBaseName === baseNameToFind;
+          
+          return nameMatch;
+        });
+        
+        if (existingAsset) {
+          assetIdMap.set(oldId, existingAsset.id);
+          continue;
+        }
         
         // Download MP3 file
         const mp3Response = await fetch(assetMeta.mp3Url);
@@ -167,9 +189,9 @@ class CloudStorageManager {
           serializedBuffer.channels.push(Array.from(channelData));
         }
         
-        // Store asset in IndexedDB with serialized buffer
+        // Store asset in IndexedDB with BASE NAME
         const assetToStore = {
-          name: assetMeta.name,
+          name: baseNameToFind,
           duration: assetMeta.duration,
           size: assetMeta.size,
           sampleRate: assetMeta.sampleRate,
@@ -180,21 +202,21 @@ class CloudStorageManager {
         
         const newAssetId = await dbManager.addAsset(assetToStore);
         assetIdMap.set(oldId, newAssetId);
-        console.log(`Asset recreated: ${oldId} → ${newAssetId} (from MP3)`);
+        console.log(`✓ Asset created: ${oldId} → ${newAssetId}`);
       } catch (e) {
         console.error("Failed to recreate asset:", e);
       }
     }
 
-    // Create a new session with the loaded session name
-    const newSessionId = await dbManager.createSession(session.name, {
+    // Create a new session with the project name
+    const newSessionId = await dbManager.createSession(projectName, {
       effects: session.effects || {pitch: 0, volume: 100, reverb: 0}
     });
 
     // Recreate tracks with the new session ID and updated asset IDs
     for (const track of tracks) {
       const clean = { ...track };
-      delete clean.id; // Let DB assign new ID
+      delete clean.id;
       clean.sessionId = newSessionId;
       
       if (clean.assetId && assetIdMap.has(clean.assetId)) {
@@ -213,12 +235,11 @@ class CloudStorageManager {
       await dbManager.addTrack(clean, newSessionId);
     }
 
-    // Set the newly created session as active
     localStorage.setItem("webamp.activeSession", String(newSessionId));
 
     return {
       sessionId: newSessionId,
-      sessionName: session.name,
+      sessionName: projectName,
       tracks: tracks.length,
       assets: assets.length
     };
@@ -253,7 +274,9 @@ class CloudStorageManager {
           size: meta.size,
           // url
         });
-      } catch (_) {}
+      } catch (e) {
+        console.log(e);
+      }
     }
   
     return out.sort((a, b) => new Date(b.savedAt) - new Date(a.savedAt));

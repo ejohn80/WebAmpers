@@ -5,6 +5,7 @@ import { RxCross2 } from "react-icons/rx";
 import { useCloudStorage } from "../hooks/useCloudStorage";
 import styles from "./SaveLoadModal.module.css";
 import { AppContext } from "../context/AppContext";
+import { formatDate, formatSize } from "../utils/formatUtils";
 
 /**
  * Modal component for saving and loading sessions from Firebase
@@ -17,7 +18,6 @@ function SaveLoadModal({ isOpen, onClose, onLoadComplete, mode = "save" }) {
     error,
     isAuthenticated,
     saveSession,
-    quickSave,
     loadSession,
     listSaves,
     deleteSave,
@@ -29,11 +29,11 @@ function SaveLoadModal({ isOpen, onClose, onLoadComplete, mode = "save" }) {
 
   const { refreshDB } = useContext(AppContext);
 
-  // Load saves list when modal opens in load mode
   useEffect(() => {
     if (isOpen && mode === "load" && isAuthenticated) {
       listSaves();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, mode, isAuthenticated]);
 
   // Clear errors when closing
@@ -58,13 +58,6 @@ function SaveLoadModal({ isOpen, onClose, onLoadComplete, mode = "save" }) {
     }
   };
 
-  const handleQuickSave = async () => {
-    const url = await quickSave();
-    if (url) {
-      onClose();
-    }
-  };
-
   const handleLoad = async (fileName) => {
     const stats = await loadSession(fileName);
     if (stats) {
@@ -73,10 +66,9 @@ function SaveLoadModal({ isOpen, onClose, onLoadComplete, mode = "save" }) {
       // Notify parent with the new session ID
       onLoadComplete?.(stats);
       
-      // Trigger DB refresh for all components
+      // Trigger DB (for assets and sessions to update)
       refreshDB()
 
-      // Close modal - parent will handle switching to the new session
       onClose();
     }
   };
@@ -87,17 +79,6 @@ function SaveLoadModal({ isOpen, onClose, onLoadComplete, mode = "save" }) {
       return;
     }
     await deleteSave(fileName);
-  };
-
-  const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString() + " " + date.toLocaleTimeString();
-  };
-
-  const formatSize = (bytes) => {
-    if (bytes < 1024) return bytes + " B";
-    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
-    return (bytes / (1024 * 1024)).toFixed(1) + " MB";
   };
 
   if (!isOpen) return null;
@@ -180,7 +161,7 @@ function SaveLoadModal({ isOpen, onClose, onLoadComplete, mode = "save" }) {
                       <div className={styles.saveInfo}>
                         <span className={styles.saveName}>{save.projectName}</span>
                         <span className={styles.saveMeta}>
-                          {formatDate(save.savedAt)} • {formatSize(save.size)}
+                          {formatDate(save.savedAt)} - {formatSize(save.size)}
                         </span>
                       </div>
                       <div className={styles.saveActions}>
@@ -207,7 +188,7 @@ function SaveLoadModal({ isOpen, onClose, onLoadComplete, mode = "save" }) {
             </div>
           )}
 
-          {/* Error Display */}
+          {/* Errors */}
           {(error || localError) && (
             <div className={styles.error}>
               {error || localError}

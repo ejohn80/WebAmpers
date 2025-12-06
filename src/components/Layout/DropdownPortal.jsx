@@ -41,7 +41,6 @@ function DropdownPortal({
   selectedTrackId,
   hasClipboard,
   onSamplerRecording,
-  onSessionLoad,
 }) {
   const navigate = useNavigate();
   const {userData, closeEffectsMenu, setActiveSession} = useContext(AppContext); // closes effects menu
