@@ -1464,60 +1464,93 @@ function AudioPage() {
         assetBufferCache.set(trackData.assetId, toneBuffer);
       }
 
-      // We always base playback on the full asset buffer,
-      // but we can restrict the pasted segment via offset + duration.
       const {buffer: serializedBuffer} = asset;
       const audioBuffer = toneBuffer.get();
       const fullDurationMs = audioBuffer.duration * 1000;
 
-      // ---- Figure out which *part* of the file this clipboard entry represents ----
-      let clipStartMs = 0;
-      let clipDurationMs = fullDurationMs;
+      const clipboardSegments = Array.isArray(trackData.segments)
+        ? trackData.segments
+        : [];
 
-      // Preferred: explicit region stored on the clipboard track
+      // Prefer explicit region (single cut)
       const hasTopLevelRegion =
         typeof trackData.clipStartInFileMs === "number" &&
         typeof trackData.clipDurationMs === "number" &&
         trackData.clipDurationMs > 0;
 
-      if (hasTopLevelRegion) {
-        clipStartMs = Math.max(0, trackData.clipStartInFileMs);
-        clipDurationMs = Math.min(
-          trackData.clipDurationMs,
-          Math.max(1, fullDurationMs - clipStartMs)
-        );
-      } else {
-        // Fallback: infer region from the first segment in the clipboard track.
-        const primarySeg =
-          Array.isArray(trackData.segments) && trackData.segments.length > 0
-            ? trackData.segments[0]
-            : null;
-
-        if (primarySeg) {
-          const segStartInFileMs =
-            typeof primarySeg.startInFileMs === "number"
-              ? primarySeg.startInFileMs
-              : primarySeg.offset
-                ? Math.round(primarySeg.offset * 1000)
-                : 0;
-
-          const segDurationMs =
-            typeof primarySeg.durationMs === "number"
-              ? primarySeg.durationMs
-              : primarySeg.duration
-                ? Math.round(primarySeg.duration * 1000)
-                : fullDurationMs;
-
-          clipStartMs = Math.max(0, Math.min(segStartInFileMs, fullDurationMs));
-          clipDurationMs = Math.max(
-            1,
-            Math.min(segDurationMs, fullDurationMs - clipStartMs)
-          );
+      const baseSegments = (() => {
+        if (hasTopLevelRegion) {
+          return [
+            {
+              id:
+                clipboardSegments[0]?.id ??
+                `seg_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+              startOnTimelineMs: 0,
+              startInFileMs: Math.max(0, trackData.clipStartInFileMs),
+              durationMs: Math.max(
+                1,
+                Math.min(trackData.clipDurationMs, fullDurationMs)
+              ),
+            },
+          ];
         }
-      }
 
-      const clipStartSec = clipStartMs / 1000;
-      const clipDurationSec = clipDurationMs / 1000;
+        if (clipboardSegments.length > 0) {
+          return clipboardSegments;
+        }
+
+        // Fallback: full asset as one segment
+        return [
+          {
+            id: `seg_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+            startOnTimelineMs: 0,
+            startInFileMs: 0,
+            durationMs: Math.round(fullDurationMs),
+          },
+        ];
+      })();
+
+      const normalizedSegments = baseSegments.map((seg, idx) => {
+        const startOnTimelineMs = Math.max(
+          0,
+          Math.round(seg.startOnTimelineMs ?? 0)
+        );
+        const startInFileMs = Math.max(
+          0,
+          Math.round(
+            typeof seg.startInFileMs === "number"
+              ? seg.startInFileMs
+              : seg.offset
+                ? seg.offset * 1000
+                : 0
+          )
+        );
+        const durationMs = Math.max(
+          1,
+          Math.round(
+            typeof seg.durationMs === "number"
+              ? seg.durationMs
+              : typeof seg.duration === "number"
+                ? seg.duration * 1000
+                : fullDurationMs
+          )
+        );
+
+        return {
+          id:
+            seg.id ??
+            `seg_${Date.now()}_${idx}_${Math.random()
+              .toString(36)
+              .slice(2, 6)}`,
+          startOnTimelineMs,
+          startOnTimeline: startOnTimelineMs / 1000,
+          startInFileMs,
+          offset: startInFileMs / 1000,
+          durationMs,
+          duration: durationMs / 1000,
+          assetId: trackData.assetId,
+        };
+      });
 
       // Generate a unique copy name
       const copyName = generateCopyName(trackData.name);
@@ -1533,25 +1566,15 @@ function AudioPage() {
         solo: trackData.solo ?? false,
         effects: trackData.effects || {},
         activeEffectsList: trackData.activeEffectsList || [],
-        segments: [
-          {
-            id: `seg_${Date.now()}`,
-            // DB serialization of the *full* buffer is kept the same
-            buffer: {
-              numberOfChannels: audioBuffer.numberOfChannels,
-              length: audioBuffer.length,
-              sampleRate: audioBuffer.sampleRate,
-              duration: audioBuffer.duration,
-              channels: serializedBuffer.channels,
-            },
-            // but we restrict playback to the clipped window:
-            offset: clipStartSec,
-            duration: clipDurationSec,
-            durationMs: Math.round(clipDurationMs),
-            startOnTimelineMs: 0,
-            startInFileMs: clipStartMs,
-          },
-        ],
+        segments: normalizedSegments.map((seg) => ({
+          id: seg.id,
+          offset: seg.offset,
+          duration: seg.duration,
+          durationMs: seg.durationMs,
+          startOnTimelineMs: seg.startOnTimelineMs,
+          startInFileMs: seg.startInFileMs,
+          assetId: trackData.assetId,
+        })),
       };
 
       // Save to database
@@ -1571,17 +1594,10 @@ function AudioPage() {
         solo: newTrackData.solo,
         effects: newTrackData.effects,
         activeEffectsList: newTrackData.activeEffectsList,
-        segments: [
-          {
-            id: `seg_${Date.now()}`,
-            buffer: toneBuffer,
-            offset: clipStartSec,
-            duration: clipDurationSec,
-            durationMs: Math.round(clipDurationMs),
-            startOnTimelineMs: 0,
-            startInFileMs: clipStartMs,
-          },
-        ],
+        segments: normalizedSegments.map((seg) => ({
+          ...seg,
+          buffer: toneBuffer,
+        })),
       };
 
       // Add to audioManager
@@ -1597,11 +1613,25 @@ function AudioPage() {
         console.log("Engine reloaded after paste");
       }
 
-      console.log(
-        `Track pasted: ${copyName}, region ${clipStartMs}ms → ${
-          clipStartMs + clipDurationMs
-        }ms`
-      );
+      const summaryStart =
+        normalizedSegments.length === 1
+          ? normalizedSegments[0].startInFileMs
+          : null;
+      const summaryEnd =
+        normalizedSegments.length === 1
+          ? normalizedSegments[0].startInFileMs +
+            (normalizedSegments[0].durationMs ?? 0)
+          : null;
+
+      if (summaryStart !== null && summaryEnd !== null) {
+        console.log(
+          `Track pasted: ${copyName}, region ${summaryStart}ms → ${summaryEnd}ms`
+        );
+      } else {
+        console.log(
+          `Track pasted: ${copyName} with ${normalizedSegments.length} segment(s)`
+        );
+      }
     } catch (error) {
       console.error("Error while pasting track:", error);
       alert("Failed to paste track. See console for details.");
