@@ -18,6 +18,7 @@ import {
   UndoIcon,
   RedoIcon,
   CutIcon,
+  TrimIcon,
   CopyIcon,
   PasteIcon,
   DeleteIcon,
@@ -411,6 +412,8 @@ function DropdownPortal({
           top: position.top,
           left: position.left,
           zIndex: 99999,
+          display: "flex",
+          flexDirection: "column",
         }}
         onMouseLeave={handleDropdownMouseLeave}
       >
