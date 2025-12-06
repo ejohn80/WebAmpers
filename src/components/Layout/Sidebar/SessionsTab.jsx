@@ -11,7 +11,7 @@ import { audioManager } from "../../../managers/AudioManager";
 import * as Tone from "tone";
 
 function SessionsTab() {
-  const {activeSession, setActiveSession, effects, setEffects} =
+  const {activeSession, setActiveSession, effects, setEffects, dbRefreshTrigger} =
     useContext(AppContext);
 
   const [isLoading, setIsLoading] = useState(true);
@@ -114,6 +114,10 @@ function SessionsTab() {
   
     loadSessionTracks();
   }, [activeSession, hasInitialized]);
+
+  useEffect(() => {
+    loadSessions();
+  }, [dbRefreshTrigger]);
 
   // Load sessions from IndexedDB
   const loadSessions = useCallback(async () => {

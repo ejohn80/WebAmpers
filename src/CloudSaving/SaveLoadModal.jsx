@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import { MoonLoader } from "react-spinners";
 import { FaTrash, FaDownload, FaSave } from "react-icons/fa";
 import { RxCross2 } from "react-icons/rx";
 import { useCloudStorage } from "../hooks/useCloudStorage";
 import styles from "./SaveLoadModal.module.css";
+import { AppContext } from "../context/AppContext";
 
 /**
  * Modal component for saving and loading sessions from Firebase
@@ -25,6 +26,8 @@ function SaveLoadModal({ isOpen, onClose, onLoadComplete, mode = "save" }) {
 
   const [projectName, setProjectName] = useState("");
   const [localError, setLocalError] = useState(null);
+
+  const { refreshDB } = useContext(AppContext);
 
   // Load saves list when modal opens in load mode
   useEffect(() => {
@@ -70,6 +73,9 @@ function SaveLoadModal({ isOpen, onClose, onLoadComplete, mode = "save" }) {
       // Notify parent with the new session ID
       onLoadComplete?.(stats);
       
+      // Trigger DB refresh for all components
+      refreshDB()
+
       // Close modal - parent will handle switching to the new session
       onClose();
     }
@@ -117,7 +123,6 @@ function SaveLoadModal({ isOpen, onClose, onLoadComplete, mode = "save" }) {
             /* Save Tab */
             <div className={styles.saveSection}>
               <div className={styles.inputGroup}>
-                <label>Project Name</label>
                 <input
                   type="text"
                   placeholder="Enter project name..."
