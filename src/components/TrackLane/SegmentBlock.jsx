@@ -204,8 +204,9 @@ const SegmentBlock = ({
             <Waveform
               audioBuffer={audioBuffer}
               color={trackColor}
-              startOnTimelineMs={startOnTimelineMs}
-              durationMs={durationMs}
+              startOnTimelineMs={segment.startOnTimelineMs ?? 0}
+              durationMs={segment.durationMs ?? Math.round((segment.duration || 0) * 1000)}
+              startInFileMs={segment.startInFileMs ?? 0}
               showProgress={false}
             />
           ) : (

@@ -34,16 +34,10 @@ function MainContent({
   onSegmentDelete = () => {},
   requestAssetPreview,
   totalLengthMs = 0,
-  selection,
-  onSelectionChange,
-  selectMode = false,
-  confirmEdit,
-  onTrimCancel,
-  selectedTrackId,
-  setSelectedTrackId,
-  onTrimTrackSelect,
+  onCutSegmentRange,
 }) {
-  const {isEffectsMenuOpen} = useContext(AppContext);
+  const {selectedTrackId, setSelectedTrackId, isEffectsMenuOpen} =
+    useContext(AppContext);
 
   // Default visible window length (in ms) before horizontal scrolling is needed
   // Timeline scale is driven by pixels-per-second instead of a fixed window length
@@ -59,6 +53,8 @@ function MainContent({
   const [scrollAreaWidth, setScrollAreaWidth] = useState(0);
   const scrollAreaRef = useRef(null);
   const [selectedSegment, setSelectedSegment] = useState(null);
+  const [cutBox, setCutBox] = useState(null);
+  const suppressBackgroundClickRef = useRef(false);
 
   const clearSegmentSelection = useCallback(() => {
     setSelectedSegment(null);
@@ -68,6 +64,7 @@ function MainContent({
     (trackId, segmentId, segmentIndex) => {
       if (!trackId) {
         setSelectedSegment(null);
+        setCutBox(null);
         return;
       }
 
@@ -79,8 +76,10 @@ function MainContent({
             ? segmentIndex
             : null,
       });
+      // selecting a segment should clear any existing cut selection
+      setCutBox(null);
     },
-    []
+    [setCutBox]
   );
 
   // Deselect when clicking background
@@ -89,6 +88,7 @@ function MainContent({
       setSelectedTrackId(null);
     }
     clearSegmentSelection();
+    setCutBox(null);
   };
 
   useEffect(() => {
@@ -118,164 +118,6 @@ function MainContent({
     [zoom]
   );
 
-  // Ref to the global playhead timeline bar (used for click-to-seek)
-  const playheadRailRef = useRef(null);
-
-  // Stores information while dragging a left/right trim handle
-  const trimDragStateRef = useRef(null);
-
-  // Convert a mouse X coordinate → timeline milliseconds.
-  // This accounts for scroll, track-control width, and full timeline width.
-  const msFromClientX = (clientX) => {
-    const rail = playheadRailRef.current;
-    const scrollArea = scrollAreaRef.current;
-    if (!rail || !scrollArea || !totalLengthMs) return 0;
-
-    // Full width of JUST the timeline (no track controls)
-    const timelineWidth =
-      timelineContentWidth ||
-      rail.scrollWidth ||
-      rail.offsetWidth ||
-      scrollArea.clientWidth;
-
-    if (timelineWidth <= 0) return 0;
-
-    // How far the mouse is from the left edge of the scroll area
-    const areaRect = scrollArea.getBoundingClientRect();
-    const clampedX = Math.max(areaRect.left, Math.min(areaRect.right, clientX));
-    const xInViewport = clampedX - areaRect.left;
-
-    // Position along the entire row (controls + timeline)
-    const scrollLeft = scrollArea.scrollLeft || 0;
-    const xOnRow = scrollLeft + xInViewport;
-
-    // Subtract the fixed controls panel width to get into timeline space
-    const leftOffsetPx = TRACK_CONTROLS_WIDTH + TRACK_CONTROLS_GAP;
-    let xOnTimeline = xOnRow - leftOffsetPx;
-
-    // Clamp to [0, timelineWidth]
-    xOnTimeline = Math.max(0, Math.min(xOnTimeline, timelineWidth));
-
-    const ratio = xOnTimeline / timelineWidth;
-    const ms = ratio * totalLengthMs;
-
-    return Math.max(0, Math.min(totalLengthMs, Math.round(ms)));
-  };
-
-  // Click behavior on the main timeline.
-  // - In trim mode: clicking does nothing (only handles can move)
-  // - Outside trim mode: clicking seeks playhead position (red line)
-  const handlePlayheadRailMouseDown = (e) => {
-    if (e.button !== 0) return; // left-click only
-
-    // In trim mode we don't want clicks on the rail to do anything.
-    // (Selection is controlled only by the yellow handles.)
-    if (selectMode) {
-      e.preventDefault();
-      return;
-    }
-
-    // Normal (non-trim) mode: click-to-seek on the global timeline.
-    const target = msFromClientX(e.clientX);
-    if (typeof target !== "number") return;
-
-    // Move the red line immediately and seek audio there.
-    progressStore.beginScrub();
-    progressStore.setMs(target); // visual playhead move
-    progressStore.requestSeek(target); // jump playback
-    progressStore.endScrub();
-  };
-
-  // Start dragging a trim handle ("left" or "right").
-  // Save initial data so dragging can adjust the correct boundary.
-  const startHandleDrag = (side, e) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    if (
-      !selection ||
-      typeof selection.startMs !== "number" ||
-      typeof selection.endMs !== "number"
-    ) {
-      return;
-    }
-
-    const selStart = Math.min(selection.startMs, selection.endMs);
-    const selEnd = Math.max(selection.startMs, selection.endMs);
-
-    trimDragStateRef.current = {
-      side, // "left" or "right"
-      startClientX: e.clientX, // mouse x at drag start
-      initialStartMs: selStart, // selection at drag start
-      initialEndMs: selEnd,
-    };
-
-    setDraggingHandle(side);
-  };
-
-  // Handle dragging of trim handles.
-  // Converts mouse movement → updated trim start/end.
-  // Enforces clamping and minimum trim length.
-  useEffect(() => {
-    if (!draggingHandle) return;
-
-    const handleMove = (e) => {
-      if (!onSelectionChange || !totalLengthMs) return;
-      const state = trimDragStateRef.current;
-      if (!state) return;
-
-      const {side, startClientX, initialStartMs, initialEndMs} = state;
-
-      // How many pixels the mouse moved since drag started
-      const deltaPx = e.clientX - startClientX;
-
-      // Map pixels -> ms using the current timeline width
-      const timelineWidthPx = timelineContentWidth || 1;
-      const msPerPx = totalLengthMs / timelineWidthPx;
-
-      const MIN_LEN = 10;
-      let startMs = initialStartMs;
-      let endMs = initialEndMs;
-
-      if (side === "left") {
-        let nextStart = initialStartMs + deltaPx * msPerPx;
-        // Clamp inside [0, initialEndMs - MIN_LEN]
-        nextStart = Math.max(0, Math.min(nextStart, initialEndMs - MIN_LEN));
-        startMs = nextStart;
-      } else if (side === "right") {
-        let nextEnd = initialEndMs + deltaPx * msPerPx;
-        // Clamp inside [initialStartMs + MIN_LEN, totalLengthMs]
-        nextEnd = Math.max(
-          initialStartMs + MIN_LEN,
-          Math.min(nextEnd, totalLengthMs)
-        );
-        endMs = nextEnd;
-      }
-
-      onSelectionChange({startMs, endMs});
-    };
-
-    const handleUp = () => {
-      setDraggingHandle(null);
-      trimDragStateRef.current = null;
-    };
-
-    window.addEventListener("mousemove", handleMove);
-    window.addEventListener("mouseup", handleUp);
-    return () => {
-      window.removeEventListener("mousemove", handleMove);
-      window.removeEventListener("mouseup", handleUp);
-    };
-  }, [draggingHandle, onSelectionChange, totalLengthMs, timelineContentWidth]);
-
-  const timelineStyle = useMemo(
-    () => ({
-      "--timeline-content-width": `${Math.max(1, timelineContentWidth)}px`,
-      "--track-height": `${Math.round(96 * verticalScale)}px`,
-    }),
-    [timelineContentWidth, verticalScale]
-  );
-
   const timelineMetrics = useMemo(() => {
     const leftOffsetPx =
       TRACK_ROW_PADDING + TRACK_CONTROLS_WIDTH + TRACK_CONTROLS_GAP;
@@ -291,6 +133,71 @@ function MainContent({
     const rowWidthPx = widthPx + leftOffsetPx + TRACK_ROW_PADDING;
     return {widthPx, leftOffsetPx, rowWidthPx};
   }, [timelineContentWidth, scrollAreaWidth]);
+
+  const handleTrackSelected = useCallback(
+    (trackId) => {
+      if (typeof setSelectedTrackId === "function") {
+        setSelectedTrackId(trackId);
+      }
+      // whenever the user selects any track, clear the yellow box
+      setCutBox(null);
+    },
+    [setSelectedTrackId]
+  );
+
+  // Convert a mouse X coordinate → timeline milliseconds.
+  // This accounts for scroll, track-control width, and full timeline width.
+  const msFromClientX = useCallback(
+    (clientX) => {
+      const scrollArea = scrollAreaRef.current;
+      if (!scrollArea || !totalLengthMs) return 0;
+
+      const rect = scrollArea.getBoundingClientRect();
+
+      // Clamp mouse X inside the scroll area
+      const clampedX = Math.max(rect.left, Math.min(rect.right, clientX));
+      const xInViewport = clampedX - rect.left;
+
+      const scrollLeft = scrollArea.scrollLeft || 0;
+      const xOnRow = scrollLeft + xInViewport;
+
+      // Move into “timeline only” space (skip track controls)
+      let xOnTimeline = xOnRow - timelineMetrics.leftOffsetPx;
+
+      // Clamp to timeline
+      xOnTimeline = Math.max(0, Math.min(timelineMetrics.widthPx, xOnTimeline));
+
+      const ratio =
+        timelineMetrics.widthPx > 0
+          ? xOnTimeline / timelineMetrics.widthPx
+          : 0;
+
+      const ms = ratio * totalLengthMs;
+      return Math.round(Math.max(0, Math.min(totalLengthMs, ms)));
+    },
+    [totalLengthMs, timelineMetrics]
+  );
+
+  const timelineStyle = useMemo(
+    () => ({
+      "--timeline-content-width": `${Math.max(1, timelineContentWidth)}px`,
+      "--track-height": `${Math.round(96 * verticalScale)}px`,
+    }),
+    [timelineContentWidth, verticalScale]
+  );
+
+  // Helper: convert ms → x-position in pixels
+  const msToTimelineX = useCallback(
+    (ms) => {
+      if (!totalLengthMs || !timelineMetrics.widthPx) {
+        return timelineMetrics.leftOffsetPx || 0;
+      }
+      const clampedMs = Math.max(0, Math.min(totalLengthMs, ms));
+      const ratio = clampedMs / totalLengthMs;
+      return timelineMetrics.leftOffsetPx + ratio * timelineMetrics.widthPx;
+    },
+    [timelineMetrics, totalLengthMs]
+  );
 
   // === OPTIMIZED SCROLLING LOGIC ===
   // This replaces the old state-based scrolling.
@@ -416,10 +323,170 @@ function MainContent({
     }
   };
 
+  // Handle Ctrl + Click + Drag to create a cut range on the selected segment
+  const handleTracksMouseDown = (e) => {
+    // Only Ctrl + left button
+    if (!(e.ctrlKey && e.button === 0)) return;
+
+    // Eat this event so TrackLane's drag handler never sees it
+    e.preventDefault();
+    e.stopPropagation();
+    if (
+      e.nativeEvent &&
+      typeof e.nativeEvent.stopImmediatePropagation === "function"
+    ) {
+      e.nativeEvent.stopImmediatePropagation();
+    }
+
+    const container = e.currentTarget;
+    const containerRect = container.getBoundingClientRect();
+
+    // Find which track-wrapper the mouse is over
+    const wrappers = Array.from(
+      container.getElementsByClassName("track-wrapper")
+    );
+    let trackIndex = -1;
+    let trackTopPx = 0;
+    let trackHeightPx = 0;
+
+    for (let i = 0; i < wrappers.length; i++) {
+      const wRect = wrappers[i].getBoundingClientRect();
+      if (e.clientY >= wRect.top && e.clientY <= wRect.bottom) {
+        trackIndex = i;
+        trackTopPx = wRect.top - containerRect.top;
+        trackHeightPx = wRect.height;
+        break;
+      }
+    }
+
+    if (trackIndex < 0 || trackIndex >= tracks.length) return;
+    const track = tracks[trackIndex];
+    if (!track || !Array.isArray(track.segments) || track.segments.length === 0)
+      return;
+
+    // Time where mouse went down
+    const rawStartMs = msFromClientX(e.clientX);
+
+    // Find segment on this track that contains that time
+    let segmentIndex = -1;
+    let seg = null;
+    for (let i = 0; i < track.segments.length; i++) {
+      const s = track.segments[i];
+      if (!s) continue;
+      const segStartMs =
+        s.startOnTimelineMs ??
+        Math.round((s.startOnTimeline ?? 0) * 1000);
+      const segDurMs =
+        s.durationMs ??
+        Math.round((s.duration ?? 0) * 1000);
+      const segEndMs = segStartMs + Math.max(0, segDurMs);
+      if (rawStartMs >= segStartMs && rawStartMs <= segEndMs) {
+        segmentIndex = i;
+        seg = s;
+        break;
+      }
+    }
+
+    if (segmentIndex === -1 || !seg) {
+      // Ctrl-drag on empty part of track: do nothing
+      return;
+    }
+
+    // Prevent the "click" after drag from clearing our selection once
+    suppressBackgroundClickRef.current = true;
+
+    const segStartMs =
+      seg.startOnTimelineMs ??
+      Math.round((seg.startOnTimeline ?? 0) * 1000);
+    const segDurMs =
+      seg.durationMs ??
+      Math.round((seg.duration ?? 0) * 1000);
+    const segEndMs = segStartMs + Math.max(0, segDurMs);
+
+    const startMs = Math.max(segStartMs, Math.min(segEndMs, rawStartMs));
+
+    // Update selection so the rest of the UI knows which segment is active
+    if (typeof setSelectedTrackId === "function") {
+      setSelectedTrackId(track.id);
+    }
+    setSelectedSegment({
+      trackId: track.id,
+      segmentId: seg.id ?? null,
+      segmentIndex,
+    });
+
+    // Start the cut box, store the actual row top/height in pixels
+    setCutBox({
+      trackId: track.id,
+      segmentIndex,
+      startMs,
+      endMs: startMs,
+      isDragging: true,
+      topPx: trackTopPx,
+      heightPx: trackHeightPx,
+    });
+
+    const handleMove = (moveEvt) => {
+      const rawMs = msFromClientX(moveEvt.clientX);
+      const clamped = Math.max(segStartMs, Math.min(segEndMs, rawMs));
+      setCutBox((prev) =>
+        prev && prev.isDragging ? {...prev, endMs: clamped} : prev
+      );
+    };
+
+    const handleUp = (upEvt) => {
+      document.removeEventListener("mousemove", handleMove);
+      document.removeEventListener("mouseup", handleUp);
+
+      const rawMs = msFromClientX(upEvt.clientX);
+      const clamped = Math.max(segStartMs, Math.min(segEndMs, rawMs));
+
+      setCutBox((prev) =>
+        prev
+          ? {
+              ...prev,
+              endMs: clamped,
+              isDragging: false,
+            }
+          : prev
+      );
+    };
+
+    document.addEventListener("mousemove", handleMove);
+    document.addEventListener("mouseup", handleUp);
+  };
+
+  const handleScrollAreaClick = (e) => {
+    if (suppressBackgroundClickRef.current) {
+      suppressBackgroundClickRef.current = false;
+      e.preventDefault();
+      e.stopPropagation();
+      return; // don't clear selection after an Ctrl-drag
+    }
+    handleBackgroundClick();
+  };
+
+  // “Cut” button that actually calls your handler
+  const handleCutBoxApply = useCallback(() => {
+    if (!cutBox || !onCutSegmentRange) return;
+
+    const {trackId, segmentIndex, startMs, endMs} = cutBox;
+    if (trackId == null || segmentIndex == null) return;
+    if (startMs === endMs) return;
+
+    onCutSegmentRange(trackId, segmentIndex, startMs, endMs);
+    setCutBox(null);
+  }, [cutBox, onCutSegmentRange]);
+
   const handleDragOver = (e) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = "copy";
   };
+
+  const handleClearSegmentSelection = useCallback(() => {
+    clearSegmentSelection();
+    setCutBox(null);
+  }, [clearSegmentSelection]);
 
   return (
     <DraggableDiv
@@ -437,7 +504,7 @@ function MainContent({
       <div
         className="timeline-scroll-area"
         ref={scrollAreaRef}
-        onClick={handleBackgroundClick}
+        onClick={handleScrollAreaClick}
         onDrop={handleDrop}
         onDragOver={handleDragOver}
       >
@@ -457,13 +524,9 @@ function MainContent({
             >
               <div
                 className="global-playhead-rail"
-                ref={playheadRailRef}
-                onMouseDown={handlePlayheadRailMouseDown}
                 style={{
                   left: `${timelineMetrics.leftOffsetPx}px`,
                   width: `${timelineMetrics.widthPx}px`,
-                  // Always allow clicks; we gate trim logic inside the handler
-                  pointerEvents: "auto",
                 }}
               >
                 <GlobalPlayhead
@@ -473,7 +536,10 @@ function MainContent({
               </div>
               <div
                 className="tracks-relative"
-                style={{width: `${timelineMetrics.rowWidthPx}px`}}
+                style={{
+                  width: `${timelineMetrics.rowWidthPx}px`,
+                  position: "relative",
+                }}
               >
                 {/* Full-height red playhead that runs through all tracks */}
                 <div
@@ -489,9 +555,54 @@ function MainContent({
                   />
                 </div>
 
+                {/* CUT BOX OVERLAY */}
+                {cutBox && (() => {
+                  const startX = msToTimelineX(cutBox.startMs);
+                  const endX = msToTimelineX(cutBox.endMs);
+                  const left = Math.min(startX, endX);
+                  const width = Math.max(2, Math.abs(endX - startX));
+                  const top = cutBox.topPx ?? 0;
+                  const height = cutBox.heightPx ?? Math.round(96 * verticalScale);
+
+                  return (
+                    <div
+                      className="cut-selection-overlay"
+                      style={{
+                        position: "absolute",
+                        zIndex: 20,
+                        pointerEvents: "auto",
+                        left: `${left}px`,
+                        top: `${top}px`,
+                        width: `${width}px`,
+                        height: `${height}px`,
+                        border: "1px solid #e6c200",
+                        backgroundColor: "rgba(255, 255, 153, 0.6)", // light yellow
+                        boxSizing: "border-box",
+                      }}
+                    >
+                      {!cutBox.isDragging && (
+                        <button
+                          type="button"
+                          className="cut-selection-button"
+                          style={{
+                            position: "absolute",
+                            right: 4,
+                            top: 4,
+                            pointerEvents: "auto",
+                          }}
+                          onClick={handleCutBoxApply}
+                        >
+                          Cut
+                        </button>
+                      )}
+                    </div>
+                  );
+                })()}
+
                 <div
                   className="tracks-container"
                   style={{width: `${timelineMetrics.rowWidthPx}px`}}
+                  onMouseDownCapture={handleTracksMouseDown}
                 >
                   {tracks.map((track, index) => (
                     <div key={track.id} className="track-wrapper">
@@ -500,11 +611,12 @@ function MainContent({
                         trackIndex={index}
                         totalTracks={tracks.length}
                         isSelected={track.id === selectedTrackId}
-                        onSelect={(id) => setSelectedTrackId(id)}
+                        onSelect={handleTrackSelected}
                         showTitle={true}
                         onMute={onMute}
                         onSolo={onSolo}
                         onDelete={onDelete}
+                        onSelectTrack={() => handleTrackSelected(track.id)}
                         onSegmentMove={onSegmentMove}
                         requestAssetPreview={requestAssetPreview}
                         onAssetDrop={onAssetDrop}
@@ -517,7 +629,7 @@ function MainContent({
                         rowWidthPx={timelineMetrics.rowWidthPx}
                         selectedSegment={selectedSegment}
                         onSegmentSelected={handleSegmentSelected}
-                        onClearSegmentSelection={clearSegmentSelection}
+                        onClearSegmentSelection={handleClearSegmentSelection}
                         onSegmentDelete={onSegmentDelete}
                       />
                     </div>
