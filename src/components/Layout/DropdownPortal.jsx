@@ -44,7 +44,8 @@ function DropdownPortal({
   onSamplerRecording,
 }) {
   const navigate = useNavigate();
-  const {userData, closeEffectsMenu, setActiveSession, theme, setTheme} = useContext(AppContext); // closes effects menu
+  const {userData, closeEffectsMenu, setActiveSession, theme, setTheme} =
+    useContext(AppContext); // closes effects menu
 
   const [activeDropdown, setActiveDropdown] = useState(null);
   const [activeSubmenu, setActiveSubmenu] = useState(null);
