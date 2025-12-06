@@ -450,79 +450,149 @@ function AudioPage() {
   lastSessionRef.current = activeSession;
 
   const loadSessionTracks = async () => {
-    try {
-      const savedTracks = await dbManager.getAllTracks(activeSession);
-      console.log(
-        `[AudioPage] Found ${savedTracks.length} tracks for session ${activeSession}`
-      );
+  try {
+    const savedTracks = await dbManager.getAllTracks(activeSession);
+    console.log(
+      `[AudioPage] Found ${savedTracks.length} tracks for session ${activeSession}`
+    );
 
-      // Clear current tracks
-      audioManager.clearAllTracks();
+    // Clear current tracks
+    audioManager.clearAllTracks();
 
-      const localAssetBufferCache = new Map();
-      const getToneBufferForAsset = async (assetId) => {
-        // ... [keep existing buffer loading logic]
-      };
-
-      // Reconstruct tracks from DB
-      const trackPromises = savedTracks.map(async (savedTrack) => {
-        // ... [keep existing track reconstruction logic]
-      });
-
-      // Wait for all tracks to be reconstructed
-      await Promise.all(trackPromises);
-
-      setTracks([...audioManager.tracks]);
-
-      // BUILD VERSION ONCE
-      const newVersion = buildVersionFromTracks(audioManager.tracks);
-      
-      if (engineRef.current) {
-        try {
-          if (newVersion) {
-            // CRITICAL: Load engine once with all tracks
-            await engineRef.current.load(newVersion);
-            
-            // THEN apply effects in a single batch operation
-            // This prevents multiple redundant rebuilds
-            if (audioManager.tracks && audioManager.tracks.length > 0) {
-              console.log(`[AudioPage] Applying effects for ${audioManager.tracks.length} tracks in batch`);
-              
-              // Use a microtask to ensure engine load is complete
-              await new Promise(resolve => setTimeout(resolve, 0));
-              
-              // Apply all track effects at once
-              audioManager.tracks.forEach((track) => {
-                if (!track?.id || !engineRef.current) return;
-                
-                const trackEnabled = track.enabledEffects || {};
-                const trackEffects = track.effects || {};
-                
-                // Silent mode = true to prevent excessive logging
-                if (engineRef.current.setTrackEffects) {
-                  engineRef.current.setTrackEffects(
-                    track.id,
-                    trackEffects,
-                    trackEnabled,
-                    true // silent mode
-                  );
-                }
-              });
-              
-              console.log('[AudioPage] Batch effect application complete');
-            }
-          } else {
-            await engineRef.current.load(EMPTY_VERSION);
-          }
-          console.log("[AudioPage] Engine reloaded");
-        } catch (e) {
-          console.error("Failed to reload engine:", e);
-        }
+    const localAssetBufferCache = new Map();
+    
+    const getToneBufferForAsset = async (assetId) => {
+      if (localAssetBufferCache.has(assetId)) {
+        return localAssetBufferCache.get(assetId);
       }
-    } catch (error) {
-      console.error("Failed to load session tracks:", error);
+
+      if (assetBufferCache.has(assetId)) {
+        const cached = assetBufferCache.get(assetId);
+        localAssetBufferCache.set(assetId, cached);
+        return cached;
+      }
+
+      try {
+        const asset = await dbManager.getAsset(assetId);
+        if (!asset) return null;
+
+        const toneBuffer = await buildToneBufferFromAssetRecord(asset);
+        if (toneBuffer) {
+          assetBufferCache.set(assetId, toneBuffer);
+          localAssetBufferCache.set(assetId, toneBuffer);
+        }
+        return toneBuffer;
+      } catch (error) {
+        console.error(`Failed to load buffer for asset ${assetId}:`, error);
+        return null;
+      }
+    };
+
+    // Reconstruct tracks from DB
+    const trackPromises = savedTracks.map(async (savedTrack) => {
+      try {
+        let toneBuffer = null;
+        if (savedTrack.assetId) {
+          toneBuffer = await getToneBufferForAsset(savedTrack.assetId);
+        }
+
+        if (!toneBuffer && savedTrack.segments?.[0]?.buffer) {
+          const serializedBuffer = savedTrack.segments[0].buffer;
+          if (serializedBuffer?.channels) {
+            toneBuffer = createToneBufferFromSerialized(serializedBuffer);
+          }
+        }
+
+        if (!toneBuffer) {
+          console.warn(`No buffer available for track ${savedTrack.id}`);
+          return;
+        }
+
+        const reconstructedSegments = (savedTrack.segments || []).map((seg) => ({
+          ...seg,
+          buffer: toneBuffer,
+          assetId: seg.assetId ?? savedTrack.assetId,
+        }));
+
+        const trackData = {
+          ...savedTrack,
+          buffer: toneBuffer,
+          segments: reconstructedSegments,
+          effects: savedTrack.effects || {},
+          enabledEffects: savedTrack.enabledEffects || {},
+          activeEffectsList: savedTrack.activeEffectsList || [],
+        };
+
+        audioManager.addTrackFromBuffer(trackData);
+      } catch (error) {
+        console.error(`Failed to reconstruct track ${savedTrack.id}:`, error);
+      }
+    });
+
+    // Wait for all tracks to be reconstructed
+    await Promise.all(trackPromises);
+
+    setTracks([...audioManager.tracks]);
+
+    // BUILD VERSION ONCE
+    const newVersion = buildVersionFromTracks(audioManager.tracks);
+    
+    if (engineRef.current) {
+      try {
+        if (newVersion) {
+          // Load engine with all tracks
+          await engineRef.current.load(newVersion);
+          
+          // Wait for engine to fully initialize
+          await new Promise(resolve => setTimeout(resolve, 50));
+          
+          // Now apply track effects one by one
+          // This is necessary because the engine needs to apply the per-track effects
+          // after loading the session structure
+          for (const track of audioManager.tracks) {
+            if (!track?.id || !engineRef.current) continue;
+            
+            const trackEnabled = track.enabledEffects || {};
+            const trackEffects = track.effects || {};
+            
+            // Skip if no effects to apply
+            const hasEffects = Object.keys(trackEffects).some(
+              key => trackEffects[key] !== undefined && 
+                     trackEffects[key] !== 0 && 
+                     trackEffects[key] !== 100
+            );
+            
+            if (!hasEffects) continue;
+            
+            console.log(`[AudioPage] Applying effects for track ${track.id}:`, {
+              effects: trackEffects,
+              enabled: trackEnabled
+            });
+            
+            // Apply with silent mode to reduce log spam
+            if (engineRef.current.setTrackEffects) {
+              engineRef.current.setTrackEffects(
+                track.id,
+                trackEffects,
+                trackEnabled,
+                true // silent mode
+              );
+            }
+          }
+          
+          console.log('[AudioPage] All track effects applied');
+        } else {
+          await engineRef.current.load(EMPTY_VERSION);
+        }
+        console.log("[AudioPage] Engine reloaded");
+      } catch (e) {
+        console.error("Failed to reload engine:", e);
+      }
     }
-  };
+  } catch (error) {
+    console.error("Failed to load session tracks:", error);
+  }
+};
 
   loadSessionTracks();
 }, [activeSession]);
