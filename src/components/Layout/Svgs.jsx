@@ -118,6 +118,26 @@ export function CutIcon() {
   );
 }
 
+export function TrimIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="17"
+      height="16"
+      viewBox="0 0 20 19"
+      fill="none"
+    >
+      <path
+        d="M2 1L13.5 12.5M6.5 12.5L18 1M1 15C1 13.3432 2.34315 12 4 12C5.65685 12 7 13.3432 7 15C7 16.6568 5.65685 18 4 18C2.34315 18 1 16.6568 1 15ZM13 15C13 13.3432 14.3431 12 16 12C17.6569 12 19 13.3432 19 15C19 16.6568 17.6569 18 16 18C14.3431 18 13 16.6568 13 15Z"
+        stroke="#E5E5E5"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export function CopyIcon() {
   return (
     <svg

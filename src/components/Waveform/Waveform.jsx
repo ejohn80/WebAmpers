@@ -25,12 +25,30 @@ const unwrapAudioBuffer = (candidate) => {
   return null;
 };
 
-const computePeaks = (audioBuffer, targetPoints) => {
+const computePeaks = (
+  audioBuffer,
+  targetPoints,
+  startSample = 0,
+  endSample = null
+) => {
   if (!audioBuffer) return [];
-  const length = audioBuffer.length ?? 0;
-  if (!length || !audioBuffer.numberOfChannels) return [];
+  const totalLength = audioBuffer.length ?? 0;
+  if (!totalLength || !audioBuffer.numberOfChannels) return [];
 
-  const points = clamp(targetPoints, MIN_POINTS, Math.min(MAX_POINTS, length));
+  const safeStart = Math.max(0, Math.min(startSample || 0, totalLength));
+  const safeEnd = Math.max(
+    safeStart + 1,
+    Math.min(endSample ?? totalLength, totalLength)
+  );
+  const regionLength = safeEnd - safeStart;
+  if (!regionLength) return [];
+
+  const points = clamp(
+    targetPoints,
+    MIN_POINTS,
+    Math.min(MAX_POINTS, regionLength)
+  );
+
   const channelData = [];
   for (let ch = 0; ch < audioBuffer.numberOfChannels; ch++) {
     try {
@@ -40,26 +58,25 @@ const computePeaks = (audioBuffer, targetPoints) => {
       break;
     }
   }
-
   if (!channelData.length) return [];
 
   const peaks = new Array(points);
   for (let point = 0; point < points; point++) {
-    const start = Math.floor((point / points) * length);
+    const start = safeStart + Math.floor((point / points) * regionLength);
     const end =
       point === points - 1
-        ? length
-        : Math.floor(((point + 1) / points) * length);
+        ? safeEnd
+        : safeStart + Math.floor(((point + 1) / points) * regionLength);
 
     let min = 1.0;
     let max = -1.0;
 
-    if (start >= length) {
+    if (start >= safeEnd) {
       peaks[point] = {min: 0, max: 0};
       continue;
     }
 
-    const boundedEnd = Math.max(start + 1, Math.min(end, length));
+    const boundedEnd = Math.max(start + 1, Math.min(end, safeEnd));
     for (let sampleIdx = start; sampleIdx < boundedEnd; sampleIdx++) {
       for (let ch = 0; ch < channelData.length; ch++) {
         const sample = channelData[ch][sampleIdx] ?? 0;
@@ -117,6 +134,7 @@ const Waveform = ({
   color = "#ffffff",
   startOnTimelineMs = 0,
   durationMs = null,
+  startInFileMs = 0,
   showProgress = true,
   interactive = true,
 }) => {
@@ -220,9 +238,33 @@ const Waveform = ({
       MAX_POINTS
     );
 
+    // Decide which part of the buffer to visualize
+    const sampleRate = native.sampleRate || 44100;
+    let regionStartSample = 0;
+    let regionEndSample = native.length ?? 0;
+
+    if (durationMs && durationMs > 0) {
+      const startSec = (startInFileMs || 0) / 1000;
+      const durSec = durationMs / 1000;
+      regionStartSample = Math.max(
+        0,
+        Math.min(Math.floor(startSec * sampleRate), native.length ?? 0)
+      );
+      const regionLenSamples = Math.max(1, Math.floor(durSec * sampleRate));
+      regionEndSample = Math.max(
+        regionStartSample + 1,
+        Math.min(regionStartSample + regionLenSamples, native.length ?? 0)
+      );
+    }
+
     const compute = () => {
       if (cancelled) return;
-      const peaks = computePeaks(native, targetPoints);
+      const peaks = computePeaks(
+        native,
+        targetPoints,
+        regionStartSample,
+        regionEndSample
+      );
       const nextPath = buildWavePath(peaks);
       if (!cancelled) {
         setWavePath(nextPath);
@@ -241,7 +283,7 @@ const Waveform = ({
     return () => {
       cancelled = true;
     };
-  }, [audioBuffer, resolutionHint]);
+  }, [audioBuffer, resolutionHint, durationMs, startInFileMs]);
 
   // Compute playhead position within this segment if we have segment timing,
   // otherwise fall back to global percentage (legacy behavior)
