@@ -50,10 +50,16 @@ function AudioPage() {
   const [audioData, setAudioData] = useState(null);
   const [recording, setRecording] = useState({stream: null, startTs: 0});
   const [assetsRefreshTrigger, setAssetsRefreshTrigger] = useState(0);
+  const [hasClipboardFlag, setHasClipboardFlag] = useState(() =>
+    clipboardManager.hasClipboard()
+  );
 
   const engineRef = React.useRef(null);
   const lastSessionRef = useRef(null);
   const assetPreviewCacheRef = useRef(new Map());
+  const refreshClipboardFlag = useCallback(() => {
+    setHasClipboardFlag(clipboardManager.hasClipboard());
+  }, []);
 
   // Keyboard shortcuts for cut/copy/paste
   useEffect(() => {
@@ -89,6 +95,7 @@ function AudioPage() {
         e.preventDefault();
         if (clipboardManager.hasClipboard()) {
           handlePasteTrack();
+          refreshClipboardFlag();
         }
       }
 
@@ -103,7 +110,7 @@ function AudioPage() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [selectedTrackId]); // Re-bind when selected track changes
+  }, [selectedTrackId, refreshClipboardFlag]);
 
   /**
    * Handle saving a sampler recording as a new track
@@ -1039,6 +1046,7 @@ function AudioPage() {
       };
 
       clipboardManager.setClipboard(clipTrack, "cut");
+      refreshClipboardFlag();
 
       // Persist to DB
       await dbManager.updateTrack(track);
@@ -1368,6 +1376,7 @@ function AudioPage() {
 
     // Copy to clipboard
     clipboardManager.setClipboard(track, "cut");
+    refreshClipboardFlag();
 
     // Delete the track
     await handleDeleteTrack(selectedTrackId);
@@ -1405,6 +1414,7 @@ function AudioPage() {
 
     // Copy to clipboard
     clipboardManager.setClipboard(track, "copy");
+    refreshClipboardFlag();
 
     console.log(`Track copied to clipboard: ${track.name}`);
   };
@@ -1649,6 +1659,7 @@ function AudioPage() {
     if (clipboardManager.isAssetInClipboard(assetId)) {
       console.log(`Clearing clipboard - referenced deleted asset ${assetId}`);
       clipboardManager.clearClipboard();
+      refreshClipboardFlag();
     }
   };
 
@@ -1720,7 +1731,7 @@ function AudioPage() {
         onCopyTrack={handleCopyTrack}
         onPasteTrack={handlePasteTrack}
         selectedTrackId={selectedTrackId}
-        hasClipboard={clipboardManager.hasClipboard()}
+        hasClipboard={hasClipboardFlag}
         onSamplerRecording={handleSamplerRecording}
       />
 
@@ -1751,7 +1762,7 @@ function AudioPage() {
           onCutTrack={handleCutTrack}
           onCopyTrack={handleCopyTrack}
           onPasteTrack={handlePasteTrack}
-          hasClipboard={clipboardManager.hasClipboard()}
+          hasClipboard={hasClipboardFlag}
           onMute={(trackId, muted) =>
             handleTrackPropertyUpdate(trackId, "mute", muted, "setTrackMute")
           }
