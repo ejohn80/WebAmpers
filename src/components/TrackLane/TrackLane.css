@@ -318,3 +318,68 @@
 .tracklane-side .tracklane-header {
   display: none; /* hide the old position */
 }
+
+/* Add this to your TrackLane.css */
+
+.tracklane-title-overlay {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 10;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(8px);
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  pointer-events: none; /* allows clicking through to waveform */
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: calc(100% - 16px); /* prevent overflow */
+  /* Ensure it responds to parent width changes */
+  transform: translate3d(0, 0, 0);
+  will-change: transform;
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
+}
+
+/* Hide track name overlay when timeline is very narrow */
+.tracklane-timeline[data-narrow="true"] .tracklane-title-overlay {
+  display: none;
+}
+
+/* Shrink track name overlay for medium width */
+.tracklane-timeline[data-medium="true"] .tracklane-title-overlay {
+  padding: 4px 6px;
+}
+
+.tracklane-timeline[data-medium="true"]
+  .tracklane-title-overlay
+  .tracklane-title {
+  font-size: 11px;
+}
+
+.tracklane-title-overlay .tracklane-title {
+  font-weight: 600;
+  color: var(--app-text);
+  font-size: 14px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.tracklane-title-overlay .tracklane-track-number {
+  font-size: 10px;
+  color: var(--muted-text);
+  font-weight: 400;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+/* Remove the header from tracklane-side since we moved it */
+/* Comment out or remove these rules from .tracklane-side if you want */
+.tracklane-side .tracklane-header {
+  display: none; /* hide the old position */
+}

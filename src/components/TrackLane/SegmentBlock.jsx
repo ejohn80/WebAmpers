@@ -131,10 +131,13 @@ const SegmentBlock = ({
 
   // Calculate position style
   let positionStyle;
+  let segmentWidthPx = 0;
+
   if (pxPerMs) {
     const leftPx =
       Math.round(startOnTimelineMs * pxPerMs) + (isDragging ? dragOffset : 0);
     const widthPx = Math.max(2, Math.round(durationMs * pxPerMs));
+    segmentWidthPx = widthPx;
     positionStyle = {
       left: `${leftPx}px`,
       width: `${widthPx}px`,
@@ -149,6 +152,9 @@ const SegmentBlock = ({
       width: `${widthPercent}%`,
     };
   }
+
+  // Determine if overlay should be shown based on width
+  const showOverlay = segmentWidthPx === 0 || segmentWidthPx >= 60;
 
   const handleMouseDown = (e) => {
     if (e.button !== 0) return;
@@ -200,11 +206,28 @@ const SegmentBlock = ({
       }
     >
       <div className="tracklane-segment">
-        {/* Segment name overlay */}
-        <div className="segment-name-overlay">
-          <div className="segment-name">{segmentName}</div>
-          <div className="segment-duration">{formatDuration(durationMs)}</div>
-        </div>
+        {/* Segment name overlay - only show if segment is wide enough */}
+        {showOverlay && (
+          <div
+            className="segment-name-overlay"
+            style={{
+              // Shrink overlay content for narrower segments
+              ...(segmentWidthPx > 0 && segmentWidthPx < 100
+                ? {
+                    padding: "3px 6px",
+                    fontSize: "10px",
+                  }
+                : {}),
+            }}
+          >
+            <div className="segment-name">{segmentName}</div>
+            {segmentWidthPx >= 80 && (
+              <div className="segment-duration">
+                {formatDuration(durationMs)}
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="segment-waveform">
           {audioBuffer ? (
