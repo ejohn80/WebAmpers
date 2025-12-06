@@ -63,11 +63,92 @@
 .global-playhead-rail {
   position: absolute;
   top: 0;
-  bottom: 0;
+  height: 32px;
   left: var(--timeline-left-offset);
   width: var(--timeline-content-width, 100%);
-  pointer-events: none;
+  pointer-events: auto;
   z-index: 10;
+}
+
+/* Full-height rail behind all tracks, only for drawing the red playhead */
+.global-playhead-rail-full {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  pointer-events: none; /* don't block clicking on tracks */
+  z-index: 9; /* under handles & timeline header, above track bg */
+}
+
+/* Trim selection side handles */
+.trim-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 24px;
+  background: rgba(255, 215, 0, 0.95);
+  border-radius: 3px;
+  cursor: ew-resize;
+  z-index: 15;
+}
+
+/* Center each handle on its percentage position */
+.trim-handle-left,
+.trim-handle-right {
+  transform: translateX(-50%);
+}
+
+/* Trim controls (✓ / ✕) */
+.trim-controls {
+  position: absolute;
+  top: 4px; /* tweak if you want it higher/lower */
+  transform: translateX(-66px); /* small offset to the right of the handle */
+  display: flex;
+  gap: 4px;
+  z-index: 40;
+}
+
+.trim-btn {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: none;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+.trim-confirm {
+  background: #26a269; /* green */
+  color: #fff;
+}
+
+.trim-cancel {
+  background: #c01c28; /* red */
+  color: #fff;
+}
+
+/* When trim mode is active, all tracks get a subtle highlight + pointer cursor */
+.track-wrapper-trim-hover {
+  cursor: pointer;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.28) inset;
+  transition:
+    box-shadow 0.12s ease-out,
+    background-color 0.12s ease-out;
+}
+
+/* Slightly stronger highlight on hover */
+.track-wrapper-trim-hover:hover {
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.45) inset;
+}
+
+/* Selected track during trim (this already existed, but we’ll now use it) */
+.track-wrapper-trim-selected {
+  outline: 2px solid #ffcc33;
+  outline-offset: -2px;
+  background-color: rgba(255, 204, 51, 0.06);
 }
 
 /* Timeline ruler overlay */
@@ -211,6 +292,18 @@
 .track-wrapper:last-child {
   border-bottom: none;
   padding-bottom: 0;
+}
+
+/* Yellow overlay covering the entire selected track (single-track trim) */
+.track-trim-highlight {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgba(255, 215, 0, 0.16);
+  border-left: 2px solid rgba(255, 215, 0, 0.9);
+  border-right: 2px solid rgba(255, 215, 0, 0.9);
+  pointer-events: none;
+  z-index: 14;
 }
 
 .empty-state {
