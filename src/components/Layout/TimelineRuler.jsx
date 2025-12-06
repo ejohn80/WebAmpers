@@ -1,4 +1,5 @@
-import React, {useMemo} from "react";
+import React, {useEffect, useMemo, useRef} from "react";
+import {progressStore} from "../../playback/progressStore";
 
 /**
  * TimelineRuler
@@ -9,6 +10,7 @@ export default function TimelineRuler({
   timelineWidth = 0,
   timelineLeftOffsetPx = 0,
 }) {
+  const playheadMarkerRef = useRef(null);
   const {
     majorTicks,
     minorTicks,
@@ -106,6 +108,26 @@ export default function TimelineRuler({
     };
   }, [totalLengthMs, timelineWidth]);
 
+  useEffect(() => {
+    const node = playheadMarkerRef.current;
+    if (!node || timelineWidth <= 0) return undefined;
+
+    const updatePosition = ({ms, lengthMs}) => {
+      const denom = totalLengthMs > 0 ? totalLengthMs : lengthMs || 0;
+      const p = denom > 0 ? Math.max(0, Math.min(1, ms / denom)) : 0;
+      const leftPx = p * timelineWidth;
+      node.style.transform = `translateX(${leftPx}px) translateX(-50%)`;
+    };
+
+    const initialState =
+      typeof progressStore.getState === "function"
+        ? progressStore.getState()
+        : {ms: 0, lengthMs: totalLengthMs};
+    updatePosition(initialState);
+    const unsubscribe = progressStore.subscribe(updatePosition);
+    return unsubscribe;
+  }, [timelineWidth, totalLengthMs]);
+
   const fmt = (ms) => {
     const s = Math.floor(ms / 1000);
     const m = Math.floor(s / 60);
@@ -168,6 +190,11 @@ export default function TimelineRuler({
           <div className="timeline-tick-label">{fmt(t)}</div>
         </div>
       ))}
+      <div
+        ref={playheadMarkerRef}
+        className="timeline-playhead-marker"
+        aria-hidden="true"
+      />
     </div>
   );
 }

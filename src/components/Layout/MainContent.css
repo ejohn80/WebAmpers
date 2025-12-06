@@ -86,6 +86,20 @@
   overflow: visible;
 }
 
+.timeline-playhead-marker {
+  position: absolute;
+  top: 0;
+  width: 0;
+  height: 0;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-top: 12px solid var(--timeline-playhead-color, #f44336);
+  transform: translate(-50%, -14px);
+  pointer-events: none;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.35));
+  z-index: 50;
+}
+
 .timeline-pre-highlight {
   position: absolute;
   top: 0;
