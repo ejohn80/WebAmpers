@@ -7,14 +7,16 @@
 
 /* black container on each tab */
 .container {
-  background-color: #0f0f0f;
+  background-color: var(--sidebar-panel-bg, #0f0f0f);
   overflow: hidden;
   padding: 12px;
-  color: #ffffff;
+  color: var(--sidebar-panel-text, #ffffff);
   height: 100%;
   display: flex;
   flex-direction: column;
   border-radius: 10px;
+  border: 1px solid var(--sidebar-panel-border, #333);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.25);
 }
 
 /* container for asset elements */
@@ -29,7 +31,7 @@
 }
 
 .searchBar {
-  background-color: #2a2a2a;
+  background-color: var(--sidebar-panel-surface, #2a2a2a);
   border-radius: 6px;
   padding: 6px 10px;
   display: flex;
@@ -41,23 +43,23 @@
 .searchInput {
   background-color: transparent;
   border: none;
-  color: #ffffff;
+  color: var(--sidebar-panel-text, #ffffff);
   font-size: 13px;
   outline: none;
   width: 100%;
 }
 
 .searchInput::placeholder {
-  color: #888;
+  color: var(--sidebar-panel-muted, #888);
 }
 
 .tableHeader {
   display: grid;
   grid-template-columns: 100px 180px 50px;
   padding: 6px 10px 4px 10px;
-  border-bottom: 1px solid #333;
+  border-bottom: 1px solid var(--sidebar-panel-border, #333);
   font-size: 11px;
-  color: #a7a7a7;
+  color: var(--sidebar-panel-muted, #a7a7a7);
   font-weight: 500;
   margin-bottom: 2px;
 }
@@ -74,7 +76,7 @@
   display: grid;
   grid-template-columns: 100px 100px 30px;
   padding: 3px 0px 3px 10px;
-  background-color: #2a2a2a;
+  background-color: var(--sidebar-panel-surface, #2a2a2a);
   margin-bottom: 2px;
   border-radius: 3px;
   cursor: pointer;
@@ -83,7 +85,7 @@
 }
 
 .songRow:hover {
-  background-color: #333;
+  background-color: var(--sidebar-panel-hover, #333);
 }
 
 .songName {
@@ -110,7 +112,7 @@
 
 .songDuration {
   font-size: 11px;
-  color: rgb(209, 209, 209);
+  color: var(--sidebar-panel-muted, rgb(209, 209, 209));
   text-align: right;
 }
 
@@ -139,6 +141,7 @@
 .songList {
   flex: 1;
   overflow-y: auto;
+  background: var(--sidebar-panel-bg, #0f0f0f);
 }
 
 .importButtonWrapper {
@@ -167,12 +170,13 @@
 .effectItem {
   margin-bottom: 20px;
   padding: 12px;
-  background: #1e1d20;
+  background: var(--effect-card-bg, #1e1d20);
   border-radius: 6px;
-  border: 2px solid #333239;
+  border: 2px solid var(--effect-card-border, #333239);
   overflow: visible;
   position: relative;
   box-sizing: border-box;
+  color: var(--effect-card-text, #e5e5e5);
 }
 
 /* Close effect button styles */
@@ -182,8 +186,8 @@
   right: 8px;
   width: 17px;
   height: 17px;
-  background: #1e1d20;
-  border: none;
+  background: var(--close-effect-bg, #1e1d20);
+  border: 1px solid var(--close-effect-border, #333239);
   border-radius: 4px;
   display: flex;
   align-items: center;
@@ -192,11 +196,13 @@
   transition: all 0.2s ease;
   z-index: 2;
   padding: 0;
+  color: var(--close-effect-icon, #e5e5e5);
 }
 
 .closeEffectButton:hover {
-  background: #dd4b4b;
-  border: none;
+  background: var(--close-effect-hover, #dd4b4b);
+  border: 1px solid var(--close-effect-hover, #dd4b4b);
+  color: var(--close-effect-hover-icon, #ffffff);
 }
 
 .effectsList {
@@ -218,7 +224,7 @@
 
 .value {
   font-size: 13px;
-  color: #aaa;
+  color: var(--effect-card-value, #aaa);
   font-family: monospace;
 }
 
@@ -230,7 +236,7 @@
 
 .description {
   font-size: 11px;
-  color: #888;
+  color: var(--effect-card-muted, #888);
   margin-top: 2px;
   float: left;
 }
@@ -238,14 +244,14 @@
 .label {
   font-size: 14px;
   font-weight: 600;
-  color: #e5e5e5;
+  color: var(--effect-card-text, #e5e5e5);
 }
 
 .button {
   padding: 4px 10px;
   font-size: 11px;
-  background: #172528;
-  color: #17e1ff;
+  background: var(--effect-btn-bg, #172528);
+  color: var(--effect-btn-text, #17e1ff);
   border: none;
   border-radius: 4px;
   cursor: pointer;
@@ -253,7 +259,7 @@
 }
 
 .button:hover {
-  background: #1e3034;
+  background: var(--effect-btn-hover, #1e3034);
 }
 
 /* Disabled state for reset buttons */
@@ -271,8 +277,8 @@
 
 .resetAllButton {
   padding: 10px 16px;
-  background: #172528;
-  color: #17e1ff;
+  background: var(--effect-btn-bg, #172528);
+  color: var(--effect-btn-text, #17e1ff);
   border: none;
   border-radius: 6px;
   font-weight: bold;
@@ -294,7 +300,7 @@
 }
 
 .resetAllButton:hover {
-  background: #1e3135;
+  background: var(--effect-btn-hover, #1e3034);
 }
 
 /* Disabled state for reset all button */
@@ -381,26 +387,26 @@
 
 .projectItem {
   margin-bottom: 8px;
-  border: 1px solid #3a3a3a;
+  border: 1px solid var(--project-item-border, #3a3a3a);
   padding: 12px;
   border-radius: 6px;
-  background: #2b2b2b;
+  background: var(--project-item-bg, #2b2b2b);
   cursor: pointer;
   transition: all 0.2s;
-  color: #fff;
+  color: var(--project-item-text, #fff);
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
 
 .projectItem:hover {
-  background: #3a3a3a;
-  border-color: #4a4a4a;
+  background: var(--project-item-hover-bg, #3a3a3a);
+  border-color: var(--project-item-hover-border, #4a4a4a);
 }
 
 .activeProject {
-  border: 2px solid #00e5ff !important;
-  background: #2f3f42;
+  border: 2px solid var(--project-active-border, #00e5ff) !important;
+  background: var(--project-active-bg, #2f3f42);
 }
 
 .deleteButton {
@@ -420,7 +426,7 @@
 }
 
 .deleteButton:hover {
-  background: #ff4444;
+  background: var(--project-delete-hover, #ff4444);
   color: #fff;
 }
 
@@ -613,9 +619,9 @@
 .addEffectsButton {
   padding: 10px 20px;
   margin-bottom: 16px;
-  background: #172528;
-  color: #17e1ff;
-  border: 2px solid #23393d;
+  background: var(--sidebar-cta-bg, #172528);
+  color: var(--sidebar-cta-text, #17e1ff);
+  border: 2px solid var(--sidebar-cta-border, #23393d);
   border-radius: 6px;
   font-weight: bold;
   cursor: pointer;
@@ -626,8 +632,8 @@
 }
 
 .addEffectsButton:hover {
-  background: #1e3135;
-  border-color: #17e1ff;
+  background: var(--sidebar-cta-hover, #1e3135);
+  border-color: var(--sidebar-cta-text, #17e1ff);
   transform: translateY(-1px);
 }
 
@@ -687,8 +693,8 @@
 
 /* Master Toggle Button */
 .masterToggleButton {
-  background: #262529;
-  color: #e5e5e5;
+  background: var(--master-toggle-bg, #262529);
+  color: var(--master-toggle-text, #e5e5e5);
   border: none;
   border-radius: 6px;
   cursor: pointer;
@@ -702,7 +708,7 @@
 }
 
 .masterToggleButton:hover {
-  background: #2a2a2a;
+  background: var(--master-toggle-hover, #2a2a2a);
   /* border-color: #17e1ff; */
 }
 
@@ -754,7 +760,7 @@
   justify-content: center;
   font-size: 14;
   font-weight: bold;
-  color: #e5e5e5;
+  color: var(--effect-btn-text, #17e1ff);
   width: 100%;
   gap: 8px;
 }

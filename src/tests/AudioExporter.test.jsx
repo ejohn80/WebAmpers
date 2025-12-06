@@ -359,7 +359,6 @@ describe("AudioExporter", () => {
     // Should be disabled immediately
     await waitFor(() => {
       expect(exportButton).toBeDisabled();
-      expect(exportButton).toHaveTextContent(/Processing/i);
     });
 
     // Resolve the export

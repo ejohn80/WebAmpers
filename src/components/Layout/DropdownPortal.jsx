@@ -6,6 +6,8 @@ import {useNavigate} from "react-router-dom";
 
 import AudioExportButton from "../AudioExport/AudioExportButton";
 import AudioImportButton from "../AudioImport/AudioImportButton";
+import Equalizer from "../Tools/Equalizer";
+import Sampler from "../Tools/Sampler";
 
 import "./Header.css";
 import {
@@ -39,14 +41,18 @@ function DropdownPortal({
   onPasteTrack,
   selectedTrackId,
   hasClipboard,
+  onSamplerRecording,
 }) {
   const navigate = useNavigate();
-  const {userData, closeEffectsMenu} = useContext(AppContext); // closes effects menu
+  const {userData, closeEffectsMenu, theme, setTheme} = useContext(AppContext); // closes effects menu
 
   const [activeDropdown, setActiveDropdown] = useState(null);
+  const [activeSubmenu, setActiveSubmenu] = useState(null);
   const [position, setPosition] = useState({top: 0, left: 0});
 
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isEQOpen, setIsEQOpen] = useState(false);
+  const [isSamplerOpen, setIsSamplerOpen] = useState(false);
 
   // Tooltip state
   const [tooltip, setTooltip] = useState({show: false, text: "", x: 0, y: 0});
@@ -215,6 +221,12 @@ function DropdownPortal({
     };
   }, []);
 
+  useEffect(() => {
+    if (!activeDropdown) {
+      setActiveSubmenu(null);
+    }
+  }, [activeDropdown]);
+
   const enterFullScreen = () => {
     let element = document.documentElement;
     setIsFullscreen(true);
@@ -258,6 +270,11 @@ function DropdownPortal({
         document.msFullscreenElement // IE/Edge
     );
   };
+
+  const themeOptions = [
+    {id: "dark", label: "Dark Mode"},
+    {id: "light", label: "Light Mode"},
+  ];
 
   const dropdownContent = {
     file: (
@@ -550,27 +567,23 @@ function DropdownPortal({
         }}
         onMouseLeave={handleDropdownMouseLeave}
       >
-        {/* ALL DISABLED */}
         <a
           href="#"
-          className="dropdown-item-disabled"
-          onClick={(e) => e.preventDefault()}
+          onClick={(e) => {
+            e.preventDefault();
+            setIsEQOpen((prev) => !prev);
+          }}
         >
-          Tool 1
+          Equalizer
         </a>
         <a
           href="#"
-          className="dropdown-item-disabled"
-          onClick={(e) => e.preventDefault()}
+          onClick={(e) => {
+            e.preventDefault();
+            setIsSamplerOpen((prev) => !prev);
+          }}
         >
-          Tool 2
-        </a>
-        <a
-          href="#"
-          className="dropdown-item-disabled"
-          onClick={(e) => e.preventDefault()}
-        >
-          Tool 3
+          Sampler
         </a>
       </div>
     ),
@@ -587,58 +600,53 @@ function DropdownPortal({
         }}
         onMouseLeave={handleDropdownMouseLeave}
       >
-        {/* ALL DISABLED */}
-        <a
-          href="#"
-          className="dropdown-item-disabled"
-          onClick={(e) => e.preventDefault()}
+        <div
+          className={`dropdown-item-with-submenu${
+            activeSubmenu === "themes" ? " open" : ""
+          }`}
+          onMouseEnter={() => setActiveSubmenu("themes")}
+          onMouseLeave={() => setActiveSubmenu(null)}
         >
-          <span
-            style={{
-              display: "flex",
-              alignItems: "center",
-              width: "100%",
-              gap: "8px",
-            }}
+          <a
+            href="#"
+            onClick={(e) => e.preventDefault()}
+            className="dropdown-item-with-arrow"
           >
-            <SoundQualityIcon />
-            <span>Sound Quality</span>
-          </span>
-        </a>
-        <a
-          href="#"
-          className="dropdown-item-disabled"
-          onClick={(e) => e.preventDefault()}
-        >
-          <span
-            style={{
-              display: "flex",
-              alignItems: "center",
-              width: "100%",
-              gap: "8px",
-            }}
-          >
-            <ThemesIcon />
-            <span>Themes</span>
-          </span>
-        </a>
-        <a
-          href="#"
-          className="dropdown-item-disabled"
-          onClick={(e) => e.preventDefault()}
-        >
-          <span
-            style={{
-              display: "flex",
-              alignItems: "center",
-              width: "100%",
-              gap: "8px",
-            }}
-          >
-            <ColorAccessibilityIcon />
-            <span>Color Accessibility</span>
-          </span>
-        </a>
+            <span
+              style={{
+                display: "flex",
+                alignItems: "center",
+                width: "100%",
+                gap: "8px",
+              }}
+            >
+              <ThemesIcon />
+              <span>Themes</span>
+            </span>
+          </a>
+          {activeSubmenu === "themes" && (
+            <div className="dropdown-submenu">
+              {themeOptions.map((option) => (
+                <button
+                  key={option.id}
+                  className={`submenu-item${
+                    theme === option.id ? " active" : ""
+                  }`}
+                  onClick={() => {
+                    setTheme(option.id);
+                    setActiveSubmenu(null);
+                    setActiveDropdown(null);
+                  }}
+                >
+                  {option.label}
+                  {theme === option.id && (
+                    <span className="submenu-check">✓</span>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         <a
           href="#"
           onClick={() =>
@@ -658,9 +666,9 @@ function DropdownPortal({
           </span>
         </a>
         <a
-          href="#"
-          className="dropdown-item-disabled"
-          onClick={(e) => e.preventDefault()}
+          href="https://github.com/ejohn80/WebAmpers/blob/main/README.md"
+          target="_blank"
+          rel="noreferrer"
         >
           About
         </a>
@@ -784,7 +792,34 @@ function DropdownPortal({
           </div>
         )}
       </div>
-
+      {isEQOpen && (
+        <Equalizer
+          isOpen={true}
+          onClose={() => setIsEQOpen(false)}
+          onEQChange={(eqSettings, values) => {
+            console.log("EQ changed:", eqSettings, values);
+          }}
+          style={{
+            position: "fixed",
+            top: "100px",
+            left: "100px",
+            zIndex: 999999,
+          }}
+        />
+      )}
+      {isSamplerOpen && (
+        <Sampler
+          isOpen={isSamplerOpen}
+          onClose={() => setIsSamplerOpen(false)}
+          onSaveRecording={onSamplerRecording}
+          style={{
+            position: "fixed",
+            top: "100px",
+            left: "100px",
+            zIndex: 999999,
+          }}
+        />
+      )}
       {/* Dropdowns rendered via portal */}
       {activeDropdown &&
         ReactDOM.createPortal(dropdownContent[activeDropdown], document.body)}

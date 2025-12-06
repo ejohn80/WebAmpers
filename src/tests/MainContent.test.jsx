@@ -69,6 +69,10 @@ const setScrollAreaWidth = (width) => {
   ResizeObserverStub.callback?.();
 };
 
+const TRACK_CONTROLS_WIDTH = 180;
+const TRACK_CONTROLS_GAP = 12;
+const TRACK_ROW_PADDING = 8; // Keep in sync with MainContent constants
+
 const mockAppContextValue = {
   // MainContent needs this property to avoid the TypeError
   isEffectsMenuOpen: false,
@@ -118,8 +122,10 @@ describe("MainContent multi-track layout", () => {
     rowWidths.forEach((width) => expect(width).toBeCloseTo(900, 5));
 
     const timelineWidths = recentCalls.map(([props]) => props.timelineWidth);
+    const staticWidth =
+      TRACK_CONTROLS_WIDTH + TRACK_CONTROLS_GAP + TRACK_ROW_PADDING * 2;
     timelineWidths.forEach((width) =>
-      expect(width).toBeCloseTo(900 - (180 + 12), 5)
+      expect(width).toBeCloseTo(900 - staticWidth, 5)
     );
 
     expect(screen.getAllByTestId("mock-tracklane")).toHaveLength(2);
@@ -137,12 +143,16 @@ describe("MainContent multi-track layout", () => {
 
     const [{timelineWidth, rowWidthPx}] = trackLaneMock.mock.calls.slice(-1)[0];
 
-    expect(timelineWidth).toBeCloseTo(7080, 0); // 708px available width * (600s / 60s)
-    expect(rowWidthPx).toBeCloseTo(7272, 0); // add left offset (180 + 12)
+    const staticWidth =
+      TRACK_CONTROLS_WIDTH + TRACK_CONTROLS_GAP + TRACK_ROW_PADDING * 2;
+    const expectedTimelineWidth = (900 - staticWidth) * (600000 / 60000);
+    expect(timelineWidth).toBeCloseTo(expectedTimelineWidth, 0);
+    expect(rowWidthPx).toBeCloseTo(expectedTimelineWidth + staticWidth, 0);
 
-    const leftOffset = 180 + 12;
+    const leftOffset =
+      TRACK_ROW_PADDING + TRACK_CONTROLS_WIDTH + TRACK_CONTROLS_GAP;
     const pxPerMs = timelineWidth / 600000;
-    const availableWidth = 900 - leftOffset; // scroll area width minus controls
+    const availableWidth = 900 - (leftOffset + TRACK_ROW_PADDING);
     const visibleWindowMs = availableWidth / pxPerMs;
     expect(visibleWindowMs).toBeCloseTo(60000, -1); // viewport shows ~1 minute
   });

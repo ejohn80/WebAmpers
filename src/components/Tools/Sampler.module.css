@@ -1,0 +1,465 @@
+.samplerPanel {
+  position: fixed;
+  z-index: 10000;
+  width: 520px;
+  background: var(--sampler-panel-bg, #1e1d20);
+  border: 2px solid var(--sampler-panel-border, #333239);
+  border-radius: 10px;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(23, 225, 255, 0.1);
+  user-select: none;
+  overflow: hidden;
+}
+
+.samplerPanel.dragging {
+  cursor: grabbing;
+  box-shadow:
+    0 12px 48px rgba(0, 0, 0, 0.6),
+    0 0 0 1px rgba(23, 225, 255, 0.2);
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  background: var(
+    --sampler-header-bg,
+    linear-gradient(180deg, #252428 0%, #1e1d20 100%)
+  );
+  border-bottom: 1px solid var(--sampler-divider, #333239);
+  cursor: grab;
+}
+
+.samplerPanel.dragging .header {
+  cursor: grabbing;
+}
+
+.titleSection {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--sampler-strong, #00e5ff);
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+
+.closeButton {
+  width: 24px;
+  height: 24px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: var(--sampler-muted, #888);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  padding: 0;
+}
+
+.closeButton:hover {
+  /* Using the new danger hover variables */
+  background: var(--sampler-danger-hover-bg, #dd4b4b);
+  color: var(--sampler-danger-hover-text, #fff);
+}
+
+.instrumentSelector {
+  display: flex;
+  gap: 8px;
+  padding: 12px;
+  background: var(--sampler-footer-bg, #1a191c);
+  border-bottom: 1px solid var(--sampler-divider, #333239);
+}
+
+.instrumentButton {
+  flex: 1;
+  padding: 10px 16px;
+  background: var(--sampler-button-select-bg, #2a2a2a);
+  border: 1px solid var(--sampler-select-border, #3a3a3a);
+  border-radius: 6px;
+  color: var(--sampler-muted, #888);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.instrumentButton:hover {
+  border-color: var(--sampler-select-hover, #4a4a4a);
+  color: var(--sampler-text-hover, #aaa);
+}
+
+.instrumentButton.active {
+  background: var(--sampler-reset-bg, #172528);
+  border-color: var(--sampler-strong, #17e1ff);
+  color: var(--sampler-strong, #17e1ff);
+}
+
+.keyboardContainer {
+  padding: 16px 12px;
+  background: var(--sampler-curve-bg, #0f0f0f);
+  cursor: default;
+}
+
+.pianoKeyboard {
+  display: flex;
+  position: relative;
+  height: 140px;
+  background: var(--sampler-select-bg, #1a1a1a);
+  border-radius: 6px;
+  padding: 8px;
+  gap: 2px;
+}
+
+.pianoKey {
+  position: relative;
+  flex: 1;
+  background: var(
+    --sampler-white-key-bg,
+    linear-gradient(180deg, #f5f5f5 0%, #e0e0e0 90%, #ccc 100%)
+  );
+  border: 1px solid var(--sampler-white-key-border, #999);
+  border-radius: 0 0 4px 4px;
+  cursor: pointer;
+  transition: all 0.1s ease;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  padding-bottom: 8px;
+}
+
+.pianoKey:hover {
+  background: var(
+    --sampler-white-key-hover,
+    linear-gradient(180deg, #fff 0%, #f0f0f0 90%, #ddd 100%)
+  );
+}
+
+.pianoKey.active {
+  background: var(
+    --sampler-active-key-bg,
+    linear-gradient(180deg, #17e1ff 0%, #0fb8d4 90%, #0a9ab3 100%)
+  );
+  transform: translateY(2px);
+  box-shadow: 0 2px 8px var(--sampler-active-shadow, rgba(23, 225, 255, 0.4));
+}
+
+.pianoKey.black {
+  position: absolute;
+  width: 28px;
+  height: 85px;
+  background: var(
+    --sampler-black-key-bg,
+    linear-gradient(180deg, #333 0%, #1a1a1a 90%, #000 100%)
+  );
+  border: 1px solid var(--sampler-black-key-border, #000);
+  border-radius: 0 0 3px 3px;
+  z-index: 1;
+  margin-left: -14px;
+}
+
+.pianoKey.black:hover {
+  background: var(
+    --sampler-black-key-hover,
+    linear-gradient(180deg, #444 0%, #2a2a2a 90%, #111 100%)
+  );
+}
+
+.pianoKey.black.active {
+  background: var(
+    --sampler-black-key-active,
+    linear-gradient(180deg, #11a1b7 0%, #0d8a9e 90%, #096b7a 100%)
+  );
+  transform: translateY(2px);
+}
+
+.pianoKey.black .keyLabel {
+  color: var(--sampler-muted-darker, #666);
+}
+
+.pianoKey.black .keyBinding {
+  color: var(--sampler-muted, #888);
+}
+
+.keyLabel {
+  font-size: 10px;
+  color: var(--sampler-muted-darker, #666);
+  font-weight: 500;
+  margin-bottom: 2px;
+}
+
+.keyBinding {
+  font-size: 11px;
+  color: var(--sampler-strong, #17e1ff);
+  font-weight: 600;
+  background: rgba(0, 8, 9, 0.46);
+  padding: 2px 6px;
+  border-radius: 3px;
+  text-transform: uppercase;
+}
+
+.drumPadGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  padding: 8px;
+  background: var(--sampler-select-bg, #1a1a1a);
+  border-radius: 6px;
+}
+
+.drumPad {
+  aspect-ratio: 1;
+  background: var(
+    --sampler-button-bg,
+    linear-gradient(145deg, #2a2a2a 0%, #1e1e1e 100%)
+  );
+  border: 2px solid var(--sampler-select-border, #3a3a3a);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.1s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 70px;
+}
+
+.drumPad:hover {
+  border-color: var(--sampler-select-hover, #4a4a4a);
+  background: var(
+    --sampler-button-bg-hover,
+    linear-gradient(145deg, #333 0%, #252525 100%)
+  );
+}
+
+.drumPad.active {
+  background: var(
+    --sampler-active-bg,
+    linear-gradient(145deg, #17e1ff 0%, #0fb8d4 100%)
+  );
+  border-color: var(--sampler-strong, #17e1ff);
+  transform: scale(0.95);
+  box-shadow: 0 0 20px var(--sampler-active-shadow, rgba(23, 225, 255, 0.4));
+}
+
+.drumPad .padLabel {
+  font-size: 11px;
+  color: var(--sampler-muted, #888);
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.drumPad .keyBinding {
+  font-size: 12px;
+  color: var(--sampler-strong, #17e1ff);
+  font-weight: 600;
+  background: rgba(23, 225, 255, 0.15);
+  padding: 3px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.drumPad.active .padLabel,
+.drumPad.active .keyBinding {
+  /* Using a dark color for text on the bright active button */
+  color: var(--sampler-panel-bg-darker, #1a1a1a);
+}
+
+.recordingControls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px;
+  background: var(--sampler-footer-bg, #1a191c);
+  border-top: 1px solid var(--sampler-divider, #333239);
+}
+
+.recordingStatus {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.recordButton {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 2px solid var(--sampler-select-border, #3a3a3a);
+  background: var(--sampler-button-select-bg, #2a2a2a);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.recordButton:hover {
+  border-color: var(--sampler-danger-strong, #e74c3c);
+  background: var(--sampler-record-hover-bg, #3a2a2a);
+}
+
+.recordButton.recording {
+  border-color: var(--sampler-danger-strong, #e74c3c);
+  background: var(--sampler-danger-strong, #e74c3c);
+  animation: pulse 1s infinite;
+}
+
+.recordButtonInner {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--sampler-record-icon, #e74c3c);
+  transition: all 0.2s ease;
+}
+
+.recordButton.recording .recordButtonInner {
+  width: 14px;
+  height: 14px;
+  border-radius: 2px;
+  background: var(--sampler-record-icon-active, #fff);
+}
+
+.recordingTime {
+  font-family: monospace;
+  font-size: 14px;
+  color: var(--sampler-muted, #888);
+  min-width: 60px;
+}
+
+.recordingTime.active {
+  color: var(--sampler-record-text-active, #e74c3c);
+}
+
+.recordingHint {
+  font-size: 11px;
+  color: var(--sampler-muted-darker, #555);
+}
+
+.saveControls {
+  display: flex;
+  gap: 8px;
+}
+
+.saveButton {
+  padding: 8px 16px;
+  font-size: 12px;
+  background: var(--sampler-save-bg, #172528);
+  color: var(--sampler-save-text, #17e1ff);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-weight: 500;
+}
+
+.saveButton:hover:not(:disabled) {
+  background: var(--sampler-save-hover, #1e3034);
+}
+
+.saveButton:disabled {
+  background: var(--sampler-select-bg, #1a1a1a);
+  color: var(--sampler-select-hover, #4a4a4a);
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.discardButton {
+  padding: 8px 16px;
+  font-size: 12px;
+  background: var(--sampler-discard-bg, #2a2020);
+  color: var(--sampler-discard-text, #e74c3c);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-weight: 500;
+}
+
+.discardButton:hover:not(:disabled) {
+  background: var(--sampler-discard-hover, #3a2525);
+}
+
+.discardButton:disabled {
+  background: var(--sampler-select-bg, #1a1a1a);
+  color: var(--sampler-select-hover, #4a4a4a);
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.volumeSection {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--sampler-footer-bg, #1a191c);
+  border-top: 1px solid var(--sampler-divider, #333239);
+}
+
+.volumeLabel {
+  font-size: 11px;
+  color: var(--sampler-muted-darker, #666);
+  min-width: 50px;
+}
+
+.volumeSlider {
+  flex: 1;
+  height: 4px;
+  background: var(--sampler-select-bg, #2a2a2a);
+  border-radius: 2px;
+  appearance: none;
+  cursor: pointer;
+}
+
+.volumeSlider::-webkit-slider-thumb {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  background: var(--sampler-strong, #17e1ff);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+
+.volumeSlider::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+
+.volumeValue {
+  font-size: 11px;
+  font-family: monospace;
+  color: var(--sampler-muted, #888);
+  min-width: 35px;
+  text-align: right;
+}
+
+.loadingOverlay {
+  position: absolute;
+  inset: 0;
+  background: var(--sampler-loading-overlay-bg, rgba(30, 29, 32, 0.9));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  border-radius: 8px;
+}
+
+.loadingText {
+  color: var(--sampler-strong, #17e1ff);
+  font-size: 13px;
+  animation: loadingPulse 1.5s infinite;
+}

@@ -52,6 +52,19 @@ const loadEffectParametersForSession = (activeSessionId) => {
   return createDefaultEffects();
 };
 
+const getInitialTheme = () => {
+  if (typeof window === "undefined" || !window.localStorage) {
+    return "dark";
+  }
+
+  try {
+    return window.localStorage.getItem("webamp.theme") || "dark";
+  } catch (error) {
+    console.warn("Failed to read theme preference:", error);
+    return "dark";
+  }
+};
+
 const shallowEqualEffects = (a = {}, b = {}) => {
   const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
   for (const key of keys) {
@@ -70,6 +83,9 @@ const AppContextProvider = ({children}) => {
 
   // Active session state with localStorage persistence
   const [activeSession, setActiveSession] = useState(getInitialActiveSession);
+
+  // Theme state
+  const [theme, setTheme] = useState(getInitialTheme);
 
   const lastSessionRef = useRef(activeSession);
 
@@ -807,11 +823,37 @@ const AppContextProvider = ({children}) => {
     }
   }, [activeSession, engineRef]);
 
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("webamp.masterEffects");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        setEffects(mergeWithDefaults(parsed));
+      }
+    } catch (e) {
+      console.warn("Failed to load master effects:", e);
+    }
+  }, []);
+
   // Apply Master Effect Parameter Values to Engine
   useEffect(() => {
     // Apply effect parameter values to the audio engine (only enabled ones)
     applyEffectsToEngine(effects);
   }, [effects, applyEffectsToEngine]);
+
+  // Persist and apply theme
+  useEffect(() => {
+    try {
+      window.localStorage?.setItem("webamp.theme", theme);
+    } catch (e) {
+      console.warn("Failed to store theme preference:", e);
+    }
+
+    if (typeof document !== "undefined") {
+      document.body.classList.remove("theme-dark", "theme-light");
+      document.body.classList.add(`theme-${theme}`);
+    }
+  }, [theme]);
 
   // Engine ref adoption
   useEffect(() => {
@@ -830,6 +872,8 @@ const AppContextProvider = ({children}) => {
       setActiveProject,
       activeSession,
       setActiveSession,
+      theme,
+      setTheme,
 
       // Master Effects
       effects,
@@ -878,6 +922,8 @@ const AppContextProvider = ({children}) => {
       setActiveProject,
       activeSession,
       setActiveSession,
+      theme,
+      setTheme,
       effects,
       setEffects,
       selectedTrackId,

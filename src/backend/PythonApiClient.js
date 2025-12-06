@@ -2,8 +2,18 @@
  * Client for communicating with Python backend API
  */
 class PythonApiClient {
-  constructor(baseUrl = "http://localhost:5000") {
-    this.baseUrl = baseUrl;
+  constructor(baseUrl = null) {
+    // Localhost in development, production URL otherwise
+    if (!baseUrl) {
+      const isDevelopment =
+        window.location.hostname === "localhost" ||
+        window.location.hostname === "127.0.0.1";
+      this.baseUrl = isDevelopment
+        ? "http://localhost:5000/"
+        : "https://webamp-backend-602045977933.us-central1.run.app/";
+    } else {
+      this.baseUrl = baseUrl;
+    }
   }
 
   /**
