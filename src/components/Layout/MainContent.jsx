@@ -252,7 +252,13 @@ function MainContent({
             ? tracks[trackIndex]?.id
             : null;
 
-        onAssetDrop(dropData.assetId, targetTrackId, timelinePositionMs);
+        // Pass the asset name along with the drop data
+        onAssetDrop(
+          dropData.assetId,
+          targetTrackId,
+          timelinePositionMs,
+          dropData.name // Add this to pass the asset name
+        );
       }
     } catch (err) {
       console.error("Error handling drop:", err);

@@ -691,15 +691,19 @@ function AudioPage() {
   };
 
   // Handle dropping an asset from the assets tab to create a new track OR append to existing
+  // In AudioPage.jsx, update the handleAssetDrop function to include name/fileName:
+
   const handleAssetDrop = async (
     assetId,
     targetTrackId = null,
-    timelinePositionMs = 0
+    timelinePositionMs = 0,
+    assetName = null
   ) => {
     try {
       console.log(`Dropping asset ${assetId}`, {
         targetTrackId,
         timelinePositionMs,
+        assetName, // Log it
       });
 
       // Get the asset from the database first
@@ -709,6 +713,9 @@ function AudioPage() {
         alert("Asset not found in database");
         return;
       }
+
+      // Use the name from the parameter if provided, otherwise from the asset
+      const segmentName = assetName || asset.name;
 
       // Check if we have a cached buffer for this asset
       let toneBuffer = assetBufferCache.get(assetId);
@@ -758,10 +765,12 @@ function AudioPage() {
           `Appending segment to track ${targetTrackId} at ${timelinePositionMs}ms`
         );
 
-        // Create new segment
+        // Create new segment WITH name and fileName
         const newSegment = {
           id: segmentId,
           assetId,
+          name: segmentName,
+          fileName: segmentName,
           buffer: toneBuffer,
           offset: 0,
           duration: durationSeconds,
@@ -800,14 +809,16 @@ function AudioPage() {
 
       // Save to database first with current session to get the DB-assigned ID
       const trackData = {
-        name: asset.name,
+        name: segmentName, // Use the segment name for the track too
         color: `hsl(${Math.random() * 360}, 70%, 50%)`,
         assetId: assetId,
-        enabledEffects: {}, // Initialize empty enabledEffects
+        enabledEffects: {},
         segments: [
           {
             id: segmentId,
             assetId,
+            name: segmentName,
+            fileName: segmentName,
             offset: 0,
             duration: durationSeconds,
             durationMs,
@@ -830,14 +841,16 @@ function AudioPage() {
       // Now create the track for audioManager
       const newTrack = {
         id: dbId,
-        name: asset.name,
+        name: segmentName, // Use the segment name for the track too
         color: trackData.color,
         buffer: toneBuffer,
-        enabledEffects: {}, // Initialize empty enabledEffects
+        enabledEffects: {},
         segments: [
           {
             id: segmentId,
             assetId,
+            name: segmentName,
+            fileName: segmentName,
             buffer: toneBuffer,
             offset: 0,
             duration: durationSeconds,

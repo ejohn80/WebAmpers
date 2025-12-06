@@ -21,9 +21,7 @@ import {
   CopyIcon,
   PasteIcon,
   DeleteIcon,
-  SoundQualityIcon,
   ThemesIcon,
-  ColorAccessibilityIcon,
   GuestIcon,
 } from "./Svgs";
 

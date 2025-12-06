@@ -94,7 +94,7 @@
   font-size: 13px;
   width: 150px;
   font-size: 11px;
-  color: rgb(209, 209, 209);
+  color: var(--songname-color, rgb(209, 209, 209));
 }
 
 /* Show text cursor on hover for editable text */

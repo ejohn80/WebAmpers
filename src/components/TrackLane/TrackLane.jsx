@@ -492,7 +492,12 @@ const TrackLane = memo(function TrackLane({
 
     console.log(`Asset dropped on track ${track.id} at ${startMs}ms`);
 
-    onAssetDrop(assetData.assetId, track.id, Math.max(0, startMs));
+    onAssetDrop(
+      assetData.assetId,
+      track.id,
+      Math.max(0, startMs),
+      assetData.name
+    );
     clearDropPreview();
   };
 
@@ -626,7 +631,6 @@ const TrackLane = memo(function TrackLane({
             </div>
           </div>
         </div>
-
         <div className="tracklane-main" style={tracklaneMainStyle}>
           <div
             className={`tracklane-timeline ${dropPreview ? "tracklane-timeline--drop" : ""}`}
@@ -636,6 +640,18 @@ const TrackLane = memo(function TrackLane({
             onDragOver={handleTimelineDragOver}
             onDrop={handleTimelineDrop}
           >
+            {/* Track name overlay - positioned at top left */}
+            {showTitle && (
+              <div className="tracklane-title-overlay">
+                <div className="tracklane-title">
+                  {track.name ?? "Untitled Track"}
+                </div>
+                <div className="tracklane-track-number">
+                  Track {trackIndex + 1} of {totalTracks}
+                </div>
+              </div>
+            )}
+
             {segments.length === 0 && (
               <div className="tracklane-empty">
                 No segments — import audio or drag assets here to add segments.
@@ -700,6 +716,75 @@ const TrackLane = memo(function TrackLane({
               />
             ))}
           </div>
+        </div>
+        <div
+          className={`tracklane-timeline ${dropPreview ? "tracklane-timeline--drop" : ""}`}
+          style={tracklaneTimelineStyle}
+          onDragEnter={handleTimelineDragEnter}
+          onDragLeave={handleTimelineDragLeave}
+          onDragOver={handleTimelineDragOver}
+          onDrop={handleTimelineDrop}
+        >
+          {segments.length === 0 && (
+            <div className="tracklane-empty">
+              No segments — import audio or drag assets here to add segments.
+            </div>
+          )}
+
+          {dropPreview && (
+            <div
+              className={`tracklane-drop-preview ${dropPreview.isLoadingDuration ? "loading" : ""}`}
+              style={(() => {
+                const startPx = pxPerMs
+                  ? Math.round(dropPreview.startOnTimelineMs * pxPerMs)
+                  : totalLengthMs > 0
+                    ? `${(dropPreview.startOnTimelineMs / totalLengthMs) * 100}%`
+                    : 0;
+                const widthPx =
+                  pxPerMs && dropPreview.durationMs
+                    ? Math.max(4, Math.round(dropPreview.durationMs * pxPerMs))
+                    : totalLengthMs > 0 && dropPreview.durationMs
+                      ? `${(dropPreview.durationMs / totalLengthMs) * 100}%`
+                      : 80;
+
+                if (
+                  typeof startPx === "number" &&
+                  typeof widthPx === "number"
+                ) {
+                  return {left: `${startPx}px`, width: `${widthPx}px`};
+                }
+
+                return {
+                  left: typeof startPx === "string" ? startPx : "0%",
+                  width: typeof widthPx === "string" ? widthPx : "10%",
+                };
+              })()}
+            >
+              <div className="drop-preview-label">
+                {dropPreview.assetName || "New segment"}
+              </div>
+              <div className="drop-preview-duration">
+                {dropPreview.isLoadingDuration
+                  ? "Loading…"
+                  : formatDurationLabel(dropPreview.durationMs)}
+              </div>
+            </div>
+          )}
+
+          {segments.map((seg, index) => (
+            <SegmentBlock
+              key={seg.id || seg.fileUrl || `segment-${index}`}
+              segment={seg}
+              trackColor={track?.color}
+              pxPerMs={pxPerMs}
+              totalLengthMs={totalLengthMs}
+              onSegmentMove={handleSegmentMove}
+              segmentIndex={index}
+              isSelected={selectedSegmentIndex === index}
+              onSelect={handleSegmentSelect}
+              onSegmentContextMenu={handleSegmentContextMenu}
+            />
+          ))}
         </div>
       </div>
       {contextMenuPortal}

@@ -34,6 +34,8 @@ const SegmentBlock = ({
   const audioBuffer = segment.buffer ?? segment.fileBuffer ?? null;
   const startOnTimelineMs = Math.max(0, segment.startOnTimelineMs || 0);
   const durationMs = Math.max(0, segment.durationMs || 0);
+  const segmentName =
+    segment.name || segment.fileName || `Segment ${segmentIndex + 1}`;
 
   const startDragSession = () => {
     if (dragPlayheadMsRef.current !== null) return;
@@ -70,9 +72,6 @@ const SegmentBlock = ({
       `[SegmentBlock] Finalizing drag, saved playhead was ${savedMs}ms`
     );
 
-    // Don't call requestSeek here - the handleSegmentMove will restore the playhead
-    // after the engine reload completes. Just unlock and end the scrub session.
-
     progressStore.setScrubLocked(false);
     progressStore.endScrub();
     dragPlayheadMsRef.current = null;
@@ -85,7 +84,6 @@ const SegmentBlock = ({
     document.removeEventListener("mouseup", handleMouseUp);
 
     if (dragPlayheadMsRef.current === null) {
-      // Click without dragging; no position change or scrub session
       setIsDragging(false);
       setDragOffset(0);
       return;
@@ -96,7 +94,6 @@ const SegmentBlock = ({
     const deltaMs = currentPxPerMs > 0 ? deltaX / currentPxPerMs : 0;
     const newPositionMs = Math.max(0, originalPosition.current + deltaMs);
 
-    // Snap to 10ms grid for finer control
     const snapMs = 10;
     const snappedPositionMs = Math.round(newPositionMs / snapMs) * snapMs;
 
@@ -123,6 +120,15 @@ const SegmentBlock = ({
     }
   };
 
+  // Format duration for display
+  const formatDuration = (ms) => {
+    if (!ms) return "0:00";
+    const totalSeconds = Math.max(0, Math.round(ms / 1000));
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = (totalSeconds % 60).toString().padStart(2, "0");
+    return `${minutes}:${seconds}`;
+  };
+
   // Calculate position style
   let positionStyle;
   if (pxPerMs) {
@@ -145,14 +151,11 @@ const SegmentBlock = ({
   }
 
   const handleMouseDown = (e) => {
-    // Only handle left mouse button
     if (e.button !== 0) return;
 
-    // Prevent default to avoid text selection
     e.preventDefault();
     e.stopPropagation();
 
-    // Select this segment
     if (onSelect) {
       onSelect(segmentIndex);
     }
@@ -161,12 +164,10 @@ const SegmentBlock = ({
     originalPosition.current = startOnTimelineMs;
     dragPlayheadMsRef.current = null;
 
-    // Add global listeners
     document.addEventListener("mousemove", handleMouseMove);
     document.addEventListener("mouseup", handleMouseUp);
   };
 
-  // Cleanup listeners on unmount
   useEffect(() => {
     return () => {
       document.removeEventListener("mousemove", handleMouseMove);
@@ -199,6 +200,12 @@ const SegmentBlock = ({
       }
     >
       <div className="tracklane-segment">
+        {/* Segment name overlay */}
+        <div className="segment-name-overlay">
+          <div className="segment-name">{segmentName}</div>
+          <div className="segment-duration">{formatDuration(durationMs)}</div>
+        </div>
+
         <div className="segment-waveform">
           {audioBuffer ? (
             <Waveform
