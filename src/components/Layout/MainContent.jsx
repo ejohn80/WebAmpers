@@ -398,10 +398,11 @@ function MainContent({
     }
   };
 
-  // Handle Ctrl + Click + Drag to create a cut range on the selected segment
+  // Handle Ctrl/Cmd + Click + Drag to create a cut range on the selected segment
   const handleTracksMouseDown = (e) => {
-    // Only Ctrl + left button
-    if (!(e.ctrlKey && e.button === 0)) return;
+    const modifierPressed = e.ctrlKey || e.metaKey;
+    // Only modifier + left button
+    if (!(modifierPressed && e.button === 0)) return;
 
     // Eat this event so TrackLane's drag handler never sees it
     e.preventDefault();
@@ -438,6 +439,18 @@ function MainContent({
     const track = tracks[trackIndex];
     if (!track || !Array.isArray(track.segments) || track.segments.length === 0)
       return;
+
+    // Prefer measuring the waveform area (timeline) instead of the full track wrapper
+    let highlightTopPx = trackTopPx;
+    let highlightHeightPx = trackHeightPx;
+    const timelineEl = wrappers[trackIndex].querySelector(
+      ".tracklane-timeline"
+    );
+    if (timelineEl) {
+      const timelineRect = timelineEl.getBoundingClientRect();
+      highlightTopPx = timelineRect.top - containerRect.top;
+      highlightHeightPx = timelineRect.height;
+    }
 
     // Time where mouse went down
     const rawStartMs = msFromClientX(e.clientX);
@@ -491,8 +504,8 @@ function MainContent({
       startMs,
       endMs: startMs,
       isDragging: true,
-      topPx: trackTopPx,
-      heightPx: trackHeightPx,
+      topPx: highlightTopPx,
+      heightPx: highlightHeightPx,
     });
 
     const handleMove = (moveEvt) => {
