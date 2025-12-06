@@ -64,8 +64,12 @@ class ClipboardManager {
         mute: track.mute,
         solo: track.solo,
         effects: track.effects ? JSON.parse(JSON.stringify(track.effects)) : {},
-        activeEffectsList: track.activeEffectsList ? [...track.activeEffectsList] : [],
-        enabledEffects: track.enabledEffects ? JSON.parse(JSON.stringify(track.enabledEffects)) : {},
+        activeEffectsList: track.activeEffectsList
+          ? [...track.activeEffectsList]
+          : [],
+        enabledEffects: track.enabledEffects
+          ? JSON.parse(JSON.stringify(track.enabledEffects))
+          : {},
         segments: track.segments?.map((seg) => ({
           id: seg.id,
           assetId: seg.assetId,

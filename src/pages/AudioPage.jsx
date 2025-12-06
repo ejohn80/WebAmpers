@@ -1411,256 +1411,258 @@ function AudioPage() {
 
   // Paste track from clipboard
   const handlePasteTrack = async () => {
-  const clipboardData = clipboardManager.getClipboard();
+    const clipboardData = clipboardManager.getClipboard();
 
-  if (!clipboardData) {
-    console.warn("No track in clipboard to paste");
-    return;
-  }
-
-  const {trackData} = clipboardData;
-
-  console.log("Clipboard data:", clipboardData);
-  console.log("Track data assetId:", trackData.assetId);
-
-  if (!trackData.assetId) {
-    console.error("Cannot paste track without assetId");
-    console.error("Full track data:", trackData);
-    alert("Cannot paste track: missing assetId");
-    return;
-  }
-
-  if (!activeSession) {
-    console.error("No active session for paste");
-    alert("Please create or select a session first");
-    return;
-  }
-
-  try {
-    // Helper function to get buffer for a specific asset
-    const getBufferForAsset = async (assetId) => {
-      // Check cache first
-      let buffer = assetBufferCache.get(assetId);
-      if (buffer) {
-        return buffer;
-      }
-
-      // Load from database
-      const asset = await dbManager.getAsset(assetId);
-      if (!asset) {
-        console.error(`Asset ${assetId} not found`);
-        return null;
-      }
-
-      const {buffer: serializedBuffer} = asset;
-      if (!serializedBuffer || !serializedBuffer.channels) {
-        console.error(`Asset ${assetId} has no valid buffer data`);
-        return null;
-      }
-
-      const audioBuffer = deserializeAudioBuffer(serializedBuffer);
-      const toneBuffer = new Tone.ToneAudioBuffer(audioBuffer);
-      assetBufferCache.set(assetId, toneBuffer);
-      return toneBuffer;
-    };
-
-    // Get the primary asset buffer
-    const primaryBuffer = await getBufferForAsset(trackData.assetId);
-    if (!primaryBuffer) {
-      alert("Cannot paste track: primary asset not found");
+    if (!clipboardData) {
+      console.warn("No track in clipboard to paste");
       return;
     }
 
-    const audioBuffer = primaryBuffer.get();
-    const fullDurationMs = audioBuffer.duration * 1000;
+    const {trackData} = clipboardData;
 
-    const clipboardSegments = Array.isArray(trackData.segments)
-      ? trackData.segments
-      : [];
+    console.log("Clipboard data:", clipboardData);
+    console.log("Track data assetId:", trackData.assetId);
 
-    // Prefer explicit region (single cut)
-    const hasTopLevelRegion =
-      typeof trackData.clipStartInFileMs === "number" &&
-      typeof trackData.clipDurationMs === "number" &&
-      trackData.clipDurationMs > 0;
+    if (!trackData.assetId) {
+      console.error("Cannot paste track without assetId");
+      console.error("Full track data:", trackData);
+      alert("Cannot paste track: missing assetId");
+      return;
+    }
 
-    const baseSegments = (() => {
-      if (hasTopLevelRegion) {
-        return [
-          {
-            id:
-              clipboardSegments[0]?.id ??
-              `seg_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-            startOnTimelineMs: 0,
-            startInFileMs: Math.max(0, trackData.clipStartInFileMs),
-            durationMs: Math.max(
-              1,
-              Math.min(trackData.clipDurationMs, fullDurationMs)
-            ),
-            assetId: trackData.assetId, // Single segment from primary asset
-          },
-        ];
-      }
+    if (!activeSession) {
+      console.error("No active session for paste");
+      alert("Please create or select a session first");
+      return;
+    }
 
-      if (clipboardSegments.length > 0) {
-        // CRITICAL: Preserve each segment's assetId
-        return clipboardSegments.map((seg) => ({
-          ...seg,
-          assetId: seg.assetId || trackData.assetId, // Use segment's assetId or fallback to track's
-        }));
-      }
+    try {
+      // Helper function to get buffer for a specific asset
+      const getBufferForAsset = async (assetId) => {
+        // Check cache first
+        let buffer = assetBufferCache.get(assetId);
+        if (buffer) {
+          return buffer;
+        }
 
-      // Fallback: full asset as one segment
-      return [
-        {
-          id: `seg_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-          startOnTimelineMs: 0,
-          startInFileMs: 0,
-          durationMs: Math.round(fullDurationMs),
-          assetId: trackData.assetId,
-        },
-      ];
-    })();
-
-    const normalizedSegments = baseSegments.map((seg, idx) => {
-      const startOnTimelineMs = Math.max(
-        0,
-        Math.round(seg.startOnTimelineMs ?? 0)
-      );
-      const startInFileMs = Math.max(
-        0,
-        Math.round(
-          typeof seg.startInFileMs === "number"
-            ? seg.startInFileMs
-            : seg.offset
-              ? seg.offset * 1000
-              : 0
-        )
-      );
-      const durationMs = Math.max(
-        1,
-        Math.round(
-          typeof seg.durationMs === "number"
-            ? seg.durationMs
-            : typeof seg.duration === "number"
-              ? seg.duration * 1000
-              : fullDurationMs
-        )
-      );
-
-      return {
-        id:
-          seg.id ??
-          `seg_${Date.now()}_${idx}_${Math.random()
-            .toString(36)
-            .slice(2, 6)}`,
-        startOnTimelineMs,
-        startOnTimeline: startOnTimelineMs / 1000,
-        startInFileMs,
-        offset: startInFileMs / 1000,
-        durationMs,
-        duration: durationMs / 1000,
-        assetId: seg.assetId || trackData.assetId, // CRITICAL: Preserve assetId
-      };
-    });
-
-    // Generate a unique copy name
-    const copyName = generateCopyName(trackData.name);
-
-    // Create new track data for DB
-    const newTrackData = {
-      name: copyName,
-      color: trackData.color || `hsl(${Math.random() * 360}, 70%, 50%)`,
-      assetId: trackData.assetId,
-      volume: trackData.volume ?? 0,
-      pan: trackData.pan ?? 0,
-      mute: trackData.mute ?? false,
-      solo: trackData.solo ?? false,
-      // CRITICAL: Use the clipboard snapshot, not current track state
-      effects: trackData.effects || {},
-      activeEffectsList: trackData.activeEffectsList || [],
-      enabledEffects: trackData.enabledEffects || {},
-      segments: normalizedSegments.map((seg) => ({
-        id: seg.id,
-        offset: seg.offset,
-        duration: seg.duration,
-        durationMs: seg.durationMs,
-        startOnTimelineMs: seg.startOnTimelineMs,
-        startInFileMs: seg.startInFileMs,
-        assetId: seg.assetId, // CRITICAL: Each segment keeps its own assetId
-      })),
-    };
-
-    // Save to database
-    const dbId = await dbManager.addTrack(newTrackData, activeSession);
-    console.log("Pasted track saved to DB with ID:", dbId, {
-      effects: newTrackData.effects,
-      activeEffectsList: newTrackData.activeEffectsList,
-      enabledEffects: newTrackData.enabledEffects,
-    });
-
-    // Build the track object for audioManager
-    // CRITICAL: Load the correct buffer for each segment
-    const segmentsWithBuffers = await Promise.all(
-      normalizedSegments.map(async (seg) => {
-        const segmentBuffer = await getBufferForAsset(seg.assetId);
-        if (!segmentBuffer) {
-          console.warn(`Failed to load buffer for segment ${seg.id} with assetId ${seg.assetId}`);
+        // Load from database
+        const asset = await dbManager.getAsset(assetId);
+        if (!asset) {
+          console.error(`Asset ${assetId} not found`);
           return null;
         }
+
+        const {buffer: serializedBuffer} = asset;
+        if (!serializedBuffer || !serializedBuffer.channels) {
+          console.error(`Asset ${assetId} has no valid buffer data`);
+          return null;
+        }
+
+        const audioBuffer = deserializeAudioBuffer(serializedBuffer);
+        const toneBuffer = new Tone.ToneAudioBuffer(audioBuffer);
+        assetBufferCache.set(assetId, toneBuffer);
+        return toneBuffer;
+      };
+
+      // Get the primary asset buffer
+      const primaryBuffer = await getBufferForAsset(trackData.assetId);
+      if (!primaryBuffer) {
+        alert("Cannot paste track: primary asset not found");
+        return;
+      }
+
+      const audioBuffer = primaryBuffer.get();
+      const fullDurationMs = audioBuffer.duration * 1000;
+
+      const clipboardSegments = Array.isArray(trackData.segments)
+        ? trackData.segments
+        : [];
+
+      // Prefer explicit region (single cut)
+      const hasTopLevelRegion =
+        typeof trackData.clipStartInFileMs === "number" &&
+        typeof trackData.clipDurationMs === "number" &&
+        trackData.clipDurationMs > 0;
+
+      const baseSegments = (() => {
+        if (hasTopLevelRegion) {
+          return [
+            {
+              id:
+                clipboardSegments[0]?.id ??
+                `seg_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+              startOnTimelineMs: 0,
+              startInFileMs: Math.max(0, trackData.clipStartInFileMs),
+              durationMs: Math.max(
+                1,
+                Math.min(trackData.clipDurationMs, fullDurationMs)
+              ),
+              assetId: trackData.assetId, // Single segment from primary asset
+            },
+          ];
+        }
+
+        if (clipboardSegments.length > 0) {
+          // CRITICAL: Preserve each segment's assetId
+          return clipboardSegments.map((seg) => ({
+            ...seg,
+            assetId: seg.assetId || trackData.assetId, // Use segment's assetId or fallback to track's
+          }));
+        }
+
+        // Fallback: full asset as one segment
+        return [
+          {
+            id: `seg_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+            startOnTimelineMs: 0,
+            startInFileMs: 0,
+            durationMs: Math.round(fullDurationMs),
+            assetId: trackData.assetId,
+          },
+        ];
+      })();
+
+      const normalizedSegments = baseSegments.map((seg, idx) => {
+        const startOnTimelineMs = Math.max(
+          0,
+          Math.round(seg.startOnTimelineMs ?? 0)
+        );
+        const startInFileMs = Math.max(
+          0,
+          Math.round(
+            typeof seg.startInFileMs === "number"
+              ? seg.startInFileMs
+              : seg.offset
+                ? seg.offset * 1000
+                : 0
+          )
+        );
+        const durationMs = Math.max(
+          1,
+          Math.round(
+            typeof seg.durationMs === "number"
+              ? seg.durationMs
+              : typeof seg.duration === "number"
+                ? seg.duration * 1000
+                : fullDurationMs
+          )
+        );
+
         return {
-          ...seg,
-          buffer: segmentBuffer, // Each segment gets its own buffer
+          id:
+            seg.id ??
+            `seg_${Date.now()}_${idx}_${Math.random()
+              .toString(36)
+              .slice(2, 6)}`,
+          startOnTimelineMs,
+          startOnTimeline: startOnTimelineMs / 1000,
+          startInFileMs,
+          offset: startInFileMs / 1000,
+          durationMs,
+          duration: durationMs / 1000,
+          assetId: seg.assetId || trackData.assetId, // CRITICAL: Preserve assetId
         };
-      })
-    );
+      });
 
-    // Filter out any segments that failed to load
-    const validSegments = segmentsWithBuffers.filter(Boolean);
+      // Generate a unique copy name
+      const copyName = generateCopyName(trackData.name);
 
-    if (validSegments.length === 0) {
-      alert("Failed to paste track: could not load segment buffers");
-      return;
+      // Create new track data for DB
+      const newTrackData = {
+        name: copyName,
+        color: trackData.color || `hsl(${Math.random() * 360}, 70%, 50%)`,
+        assetId: trackData.assetId,
+        volume: trackData.volume ?? 0,
+        pan: trackData.pan ?? 0,
+        mute: trackData.mute ?? false,
+        solo: trackData.solo ?? false,
+        // CRITICAL: Use the clipboard snapshot, not current track state
+        effects: trackData.effects || {},
+        activeEffectsList: trackData.activeEffectsList || [],
+        enabledEffects: trackData.enabledEffects || {},
+        segments: normalizedSegments.map((seg) => ({
+          id: seg.id,
+          offset: seg.offset,
+          duration: seg.duration,
+          durationMs: seg.durationMs,
+          startOnTimelineMs: seg.startOnTimelineMs,
+          startInFileMs: seg.startInFileMs,
+          assetId: seg.assetId, // CRITICAL: Each segment keeps its own assetId
+        })),
+      };
+
+      // Save to database
+      const dbId = await dbManager.addTrack(newTrackData, activeSession);
+      console.log("Pasted track saved to DB with ID:", dbId, {
+        effects: newTrackData.effects,
+        activeEffectsList: newTrackData.activeEffectsList,
+        enabledEffects: newTrackData.enabledEffects,
+      });
+
+      // Build the track object for audioManager
+      // CRITICAL: Load the correct buffer for each segment
+      const segmentsWithBuffers = await Promise.all(
+        normalizedSegments.map(async (seg) => {
+          const segmentBuffer = await getBufferForAsset(seg.assetId);
+          if (!segmentBuffer) {
+            console.warn(
+              `Failed to load buffer for segment ${seg.id} with assetId ${seg.assetId}`
+            );
+            return null;
+          }
+          return {
+            ...seg,
+            buffer: segmentBuffer, // Each segment gets its own buffer
+          };
+        })
+      );
+
+      // Filter out any segments that failed to load
+      const validSegments = segmentsWithBuffers.filter(Boolean);
+
+      if (validSegments.length === 0) {
+        alert("Failed to paste track: could not load segment buffers");
+        return;
+      }
+
+      const pastedTrack = {
+        id: dbId,
+        name: copyName,
+        color: newTrackData.color,
+        buffer: primaryBuffer, // Track-level buffer for compatibility
+        assetId: trackData.assetId,
+        volume: newTrackData.volume,
+        pan: newTrackData.pan,
+        mute: newTrackData.mute,
+        solo: newTrackData.solo,
+        // CRITICAL: Use clipboard snapshot for effects state
+        effects: newTrackData.effects,
+        activeEffectsList: newTrackData.activeEffectsList,
+        enabledEffects: newTrackData.enabledEffects,
+        segments: validSegments, // Each segment has the correct buffer
+      };
+
+      // Add to audioManager
+      audioManager.addTrackFromBuffer(pastedTrack);
+
+      // Update React state
+      setTracks([...audioManager.tracks]);
+
+      // Reload engine
+      const newVersion = buildVersionFromTracks(audioManager.tracks);
+      if (newVersion && engineRef.current) {
+        await engineRef.current.load(newVersion);
+        console.log("Engine reloaded after paste");
+      }
+
+      console.log(
+        `Track pasted: ${copyName} with ${validSegments.length} segment(s)`
+      );
+    } catch (error) {
+      console.error("Error while pasting track:", error);
+      alert("Failed to paste track. See console for details.");
     }
-
-    const pastedTrack = {
-      id: dbId,
-      name: copyName,
-      color: newTrackData.color,
-      buffer: primaryBuffer, // Track-level buffer for compatibility
-      assetId: trackData.assetId,
-      volume: newTrackData.volume,
-      pan: newTrackData.pan,
-      mute: newTrackData.mute,
-      solo: newTrackData.solo,
-      // CRITICAL: Use clipboard snapshot for effects state
-      effects: newTrackData.effects,
-      activeEffectsList: newTrackData.activeEffectsList,
-      enabledEffects: newTrackData.enabledEffects,
-      segments: validSegments, // Each segment has the correct buffer
-    };
-
-    // Add to audioManager
-    audioManager.addTrackFromBuffer(pastedTrack);
-
-    // Update React state
-    setTracks([...audioManager.tracks]);
-
-    // Reload engine
-    const newVersion = buildVersionFromTracks(audioManager.tracks);
-    if (newVersion && engineRef.current) {
-      await engineRef.current.load(newVersion);
-      console.log("Engine reloaded after paste");
-    }
-
-    console.log(
-      `Track pasted: ${copyName} with ${validSegments.length} segment(s)`
-    );
-  } catch (error) {
-    console.error("Error while pasting track:", error);
-    alert("Failed to paste track. See console for details.");
-  }
-};
+  };
 
   // Handle asset deletion - clear from buffer cache and clipboard
   const handleAssetDelete = (assetId) => {
