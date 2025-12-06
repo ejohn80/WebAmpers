@@ -109,82 +109,118 @@ class DBManager {
   }
 
   serializeSegmentForStorage(segment, defaultAssetId = null) {
-  if (!segment) return null;
+    if (!segment) return null;
 
-  // CRITICAL FIX: Always prioritize the segment's own assetId
-  // Do NOT use defaultAssetId if segment.assetId exists
-  const segAssetId = segment.assetId ?? segment.asset?.id ?? null;
-  
-  console.log(`[DBManager] Serializing segment ${segment.id}:`, {
-    segmentAssetId: segment.assetId,
-    resolvedAssetId: segAssetId,
-    defaultAssetId: defaultAssetId,
-    willUseDefault: !segAssetId
-  });
+    // CRITICAL FIX: Always prioritize the segment's own assetId
+    // Do NOT use defaultAssetId if segment.assetId exists
+    const segAssetId = segment.assetId ?? segment.asset?.id ?? null;
 
-  const serialized = {
-    id: segment.id,
-    assetId: segAssetId || defaultAssetId,  // Only use default if segment has no assetId
-    offset:
-      typeof segment.offset === "number"
-        ? segment.offset
-        : typeof segment.startInFileMs === "number"
-          ? segment.startInFileMs / 1000
-          : undefined,
-    duration:
-      typeof segment.duration === "number"
-        ? segment.duration
-        : typeof segment.durationMs === "number"
-          ? segment.durationMs / 1000
-          : undefined,
-    durationMs: segment.durationMs,
-    startOnTimelineMs: segment.startOnTimelineMs,
-    startInFileMs: segment.startInFileMs,
-  };
+    console.log(`[DBManager] Serializing segment ${segment.id}:`, {
+      segmentAssetId: segment.assetId,
+      resolvedAssetId: segAssetId,
+      defaultAssetId: defaultAssetId,
+      willUseDefault: !segAssetId,
+    });
 
-  if (!serialized.id) {
-    serialized.id = `seg_${Date.now()}_${Math.random()
-      .toString(36)
-      .slice(2, 7)}`;
-  }
+    const serialized = {
+      id: segment.id,
+      assetId: segAssetId || defaultAssetId, // Only use default if segment has no assetId
+      offset:
+        typeof segment.offset === "number"
+          ? segment.offset
+          : typeof segment.startInFileMs === "number"
+            ? segment.startInFileMs / 1000
+            : undefined,
+      duration:
+        typeof segment.duration === "number"
+          ? segment.duration
+          : typeof segment.durationMs === "number"
+            ? segment.durationMs / 1000
+            : undefined,
+      durationMs: segment.durationMs,
+      startOnTimelineMs: segment.startOnTimelineMs,
+      startInFileMs: segment.startInFileMs,
+    };
 
-  // Only store buffer if no assetId at all
-  if (!serialized.assetId) {
-    const bufferCandidate =
-      segment.buffer || segment.bufferData || segment.audioBuffer;
-    const nativeBuffer = this.extractBufferCandidate(bufferCandidate);
-    const buffer = this.serializeBufferForStorage(nativeBuffer);
-    if (buffer) {
-      serialized.buffer = buffer;
-      console.warn(`[DBManager] Segment ${segment.id} has no assetId, storing buffer inline`);
+    if (!serialized.id) {
+      serialized.id = `seg_${Date.now()}_${Math.random()
+        .toString(36)
+        .slice(2, 7)}`;
     }
-  } else {
-    console.log(`[DBManager] Segment ${segment.id} has assetId ${serialized.assetId}, not storing buffer`);
+
+    // Only store buffer if no assetId at all
+    if (!serialized.assetId) {
+      const bufferCandidate =
+        segment.buffer || segment.bufferData || segment.audioBuffer;
+      const nativeBuffer = this.extractBufferCandidate(bufferCandidate);
+      const buffer = this.serializeBufferForStorage(nativeBuffer);
+      if (buffer) {
+        serialized.buffer = buffer;
+        console.warn(
+          `[DBManager] Segment ${segment.id} has no assetId, storing buffer inline`
+        );
+      }
+    } else {
+      console.log(
+        `[DBManager] Segment ${segment.id} has assetId ${serialized.assetId}, not storing buffer`
+      );
+    }
+
+    return serialized;
   }
 
-  return serialized;
-}
+  serializeSegmentForStorage(segment, defaultAssetId = null) {
+    if (!segment) return null;
 
-serializeSegmentsForStorage(segments = [], defaultAssetId = null) {
-  console.log(`[DBManager] Serializing ${segments.length} segments with default assetId: ${defaultAssetId}`);
-  
-  return segments
-    .map((segment, index) => {
-      const serialized = this.serializeSegmentForStorage(segment, defaultAssetId);
-      
-      if (serialized) {
-        console.log(`[DBManager] Segment ${index} serialized:`, {
-          id: serialized.id,
-          assetId: serialized.assetId,
-          startOnTimelineMs: serialized.startOnTimelineMs,
-          durationMs: serialized.durationMs
-        });
+    const segAssetId = segment.assetId ?? segment.asset?.id ?? null;
+
+    const serialized = {
+      id: segment.id,
+      assetId: segAssetId || defaultAssetId,
+      offset:
+        typeof segment.offset === "number"
+          ? segment.offset
+          : typeof segment.startInFileMs === "number"
+            ? segment.startInFileMs / 1000
+            : undefined,
+      duration:
+        typeof segment.duration === "number"
+          ? segment.duration
+          : typeof segment.durationMs === "number"
+            ? segment.durationMs / 1000
+            : undefined,
+      durationMs: segment.durationMs,
+      startOnTimelineMs: segment.startOnTimelineMs,
+      startInFileMs: segment.startInFileMs,
+    };
+
+    if (!serialized.id) {
+      serialized.id = `seg_${Date.now()}_${Math.random()
+        .toString(36)
+        .slice(2, 7)}`;
+    }
+
+    // Only store buffer if no assetId at all
+    if (!serialized.assetId) {
+      const bufferCandidate =
+        segment.buffer || segment.bufferData || segment.audioBuffer;
+      const nativeBuffer = this.extractBufferCandidate(bufferCandidate);
+      const buffer = this.serializeBufferForStorage(nativeBuffer);
+      if (buffer) {
+        serialized.buffer = buffer;
       }
-      
-      return serialized;
-    })
-    .filter(Boolean);
-}
+    }
+
+    return serialized;
+  }
+
+  serializeSegmentsForStorage(segments = [], defaultAssetId = null) {
+    return segments
+      .map((segment) =>
+        this.serializeSegmentForStorage(segment, defaultAssetId)
+      )
+      .filter(Boolean);
+  }
 
   async openDB() {
     if (this.db) {
@@ -535,7 +571,7 @@ serializeSegmentsForStorage(segments = [], defaultAssetId = null) {
       sessionId: track.sessionId ?? track._sessionId,
       assetId: track.assetId ?? track._assetId,
       effects: track.effects || {},
-      enabledEffects: track.enabledEffects || {}, // ADD THIS LINE
+      enabledEffects: track.enabledEffects || {},
       activeEffectsList: track.activeEffectsList || [],
     };
 
@@ -718,8 +754,6 @@ serializeSegmentsForStorage(segments = [], defaultAssetId = null) {
     const sessions = await this.getAllSessions();
     return sessions.some((s) => s.name.trim() === name.trim());
   }
-
-  // ============= ASSET MANAGEMENT =============
 
   /**
    * Add an asset (imported audio file) to the database

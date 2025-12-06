@@ -90,117 +90,134 @@ class AudioManager {
 
     // Build segments
     let builtSegments = [];
-if (Array.isArray(audioData.segments) && audioData.segments.length > 0) {
-  // Rehydrate each segment from stored data
-  for (const s of audioData.segments) {
-    // CRITICAL FIX: Use the segment's own buffer first, not the track's buffer
-    let segToneBuf = s.buffer || toneBuffer;
-    
-    console.log(`[AudioManager] Processing segment ${s.id}:`, {
-      hasOwnBuffer: !!s.buffer,
-      ownBufferDuration: s.buffer ? (s.buffer.duration || s.buffer.get?.()?.duration) : null,
-      willUseTrackBuffer: !s.buffer,
-      assetId: s.assetId
-    });
-    
-    // Try to reconstruct buffer from serialized data if present
-    // (This is only needed for segments with inline buffers, not asset references)
-    if (!segToneBuf) {
-      try {
-        const b = s?.buffer;
-        if (
-          b &&
-          b.channels &&
-          b.sampleRate &&
-          b.length &&
-          b.numberOfChannels
-        ) {
-          const native = Tone.context.createBuffer(
-            b.numberOfChannels,
-            b.length,
-            b.sampleRate
-          );
-          for (let i = 0; i < b.numberOfChannels; i++) {
-            native.copyToChannel(b.channels[i], i);
+    if (Array.isArray(audioData.segments) && audioData.segments.length > 0) {
+      // Rehydrate each segment from stored data
+      for (const s of audioData.segments) {
+        // CRITICAL FIX: Use the segment's own buffer first, not the track's buffer
+        let segToneBuf = s.buffer || toneBuffer;
+
+        console.log(`[AudioManager] Processing segment ${s.id}:`, {
+          hasOwnBuffer: !!s.buffer,
+          ownBufferDuration: s.buffer
+            ? s.buffer.duration || s.buffer.get?.()?.duration
+            : null,
+          willUseTrackBuffer: !s.buffer,
+          assetId: s.assetId,
+        });
+
+        // Try to reconstruct buffer from serialized data if present
+        // (This is only needed for segments with inline buffers, not asset references)
+        if (!segToneBuf) {
+          try {
+            const b = s?.buffer;
+            if (
+              b &&
+              b.channels &&
+              b.sampleRate &&
+              b.length &&
+              b.numberOfChannels
+            ) {
+              const native = Tone.context.createBuffer(
+                b.numberOfChannels,
+                b.length,
+                b.sampleRate
+              );
+              for (let i = 0; i < b.numberOfChannels; i++) {
+                native.copyToChannel(b.channels[i], i);
+              }
+              segToneBuf = new Tone.ToneAudioBuffer(native);
+              console.log(
+                `[AudioManager] Reconstructed buffer from serialized data for segment ${s.id}`
+              );
+            }
+          } catch (err) {
+            console.warn(
+              `[AudioManager] Failed to reconstruct buffer for segment ${s.id}, using track buffer:`,
+              err
+            );
+            // fallback to main toneBuffer
+            segToneBuf = toneBuffer;
           }
-          segToneBuf = new Tone.ToneAudioBuffer(native);
-          console.log(`[AudioManager] Reconstructed buffer from serialized data for segment ${s.id}`);
         }
-      } catch (err) {
-        console.warn(`[AudioManager] Failed to reconstruct buffer for segment ${s.id}, using track buffer:`, err);
-        // fallback to main toneBuffer
-        segToneBuf = toneBuffer;
+
+        const offsetSec =
+          typeof s.offset === "number"
+            ? s.offset
+            : typeof s.startInFileMs === "number"
+              ? s.startInFileMs / 1000
+              : 0;
+        const durationSec =
+          typeof s.duration === "number"
+            ? s.duration
+            : typeof s.durationMs === "number"
+              ? s.durationMs / 1000
+              : undefined;
+
+        try {
+          const seg = new AudioSegment({
+            buffer: segToneBuf,
+            offset: offsetSec,
+            duration: durationSec,
+          });
+
+          // Preserve metadata used by UI/engine
+          if (typeof s.durationMs === "number") seg.durationMs = s.durationMs;
+          if (typeof s.startOnTimelineMs === "number")
+            seg.startOnTimelineMs = s.startOnTimelineMs;
+          if (typeof s.startInFileMs === "number")
+            seg.startInFileMs = s.startInFileMs;
+          if (s.id) seg.id = s.id;
+
+          // CRITICAL: Preserve assetId from the segment data
+          const segmentAssetId = s.assetId ?? audioData.assetId ?? null;
+          seg.assetId = segmentAssetId;
+
+          console.log(`[AudioManager] Built segment ${seg.id}:`, {
+            assetId: seg.assetId,
+            bufferDuration: segToneBuf
+              ? segToneBuf.duration || segToneBuf.get?.()?.duration
+              : null,
+            offset: offsetSec,
+            duration: durationSec,
+          });
+
+          builtSegments.push(seg);
+        } catch (e) {
+          console.warn(
+            "[AudioManager] Failed to rebuild segment, skipping:",
+            e
+          );
+        }
       }
-    }
 
-    const offsetSec =
-      typeof s.offset === "number"
-        ? s.offset
-        : typeof s.startInFileMs === "number"
-          ? s.startInFileMs / 1000
-          : 0;
-    const durationSec =
-      typeof s.duration === "number"
-        ? s.duration
-        : typeof s.durationMs === "number"
-          ? s.durationMs / 1000
-          : undefined;
+      // Verify all segments have assetIds
+      console.log(
+        `[AudioManager] Built ${builtSegments.length} segments for track ${audioData.id || "NEW"}:`
+      );
+      builtSegments.forEach((seg, idx) => {
+        console.log(
+          `  Segment ${idx}: id=${seg.id}, assetId=${seg.assetId}, bufferDuration=${seg.buffer ? seg.buffer.duration || seg.buffer.get?.()?.duration : null}`
+        );
+      });
+    } else {
+      // Single segment built from the provided buffer
+      const segment = new AudioSegment({
+        buffer: toneBuffer,
+        offset: 0,
+        duration: toneBuffer.duration,
+      });
+      const durationMs = Math.round(toneBuffer.duration * 1000);
+      segment.durationMs = durationMs;
+      segment.startOnTimelineMs = 0;
+      segment.startInFileMs = 0;
+      segment.assetId = audioData.assetId ?? null;
 
-    try {
-      const seg = new AudioSegment({
-        buffer: segToneBuf,
-        offset: offsetSec,
-        duration: durationSec,
-      });
-      
-      // Preserve metadata used by UI/engine
-      if (typeof s.durationMs === "number") seg.durationMs = s.durationMs;
-      if (typeof s.startOnTimelineMs === "number")
-        seg.startOnTimelineMs = s.startOnTimelineMs;
-      if (typeof s.startInFileMs === "number")
-        seg.startInFileMs = s.startInFileMs;
-      if (s.id) seg.id = s.id;
-      
-      // CRITICAL: Preserve assetId from the segment data
-      const segmentAssetId = s.assetId ?? audioData.assetId ?? null;
-      seg.assetId = segmentAssetId;
-      
-      console.log(`[AudioManager] Built segment ${seg.id}:`, {
-        assetId: seg.assetId,
-        bufferDuration: segToneBuf ? (segToneBuf.duration || segToneBuf.get?.()?.duration) : null,
-        offset: offsetSec,
-        duration: durationSec
-      });
-      
-      builtSegments.push(seg);
-    } catch (e) {
-      console.warn("[AudioManager] Failed to rebuild segment, skipping:", e);
+      console.log(
+        `[AudioManager] Created single segment with assetId ${segment.assetId}`
+      );
+
+      builtSegments = [segment];
     }
-  }
-  
-  // Verify all segments have assetIds
-  console.log(`[AudioManager] Built ${builtSegments.length} segments for track ${audioData.id || 'NEW'}:`);
-  builtSegments.forEach((seg, idx) => {
-    console.log(`  Segment ${idx}: id=${seg.id}, assetId=${seg.assetId}, bufferDuration=${seg.buffer ? (seg.buffer.duration || seg.buffer.get?.()?.duration) : null}`);
-  });
-  
-} else {
-  // Single segment built from the provided buffer
-  const segment = new AudioSegment({
-    buffer: toneBuffer,
-    offset: 0,
-    duration: toneBuffer.duration,
-  });
-  const durationMs = Math.round(toneBuffer.duration * 1000);
-  segment.durationMs = durationMs;
-  segment.startOnTimelineMs = 0;
-  segment.startInFileMs = 0;
-  segment.assetId = audioData.assetId ?? null;
-  
-  console.log(`[AudioManager] Created single segment with assetId ${segment.assetId}`);
-  
-  builtSegments = [segment];
-}
 
     const trackEffects = audioData.effects || createDefaultEffects();
     const trackActiveEffectsList = audioData.activeEffectsList || [];
