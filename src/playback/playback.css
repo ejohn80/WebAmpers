@@ -39,27 +39,57 @@
 
 .transport-button svg {
   display: block;
+  color: var(--transport-btn-icon, #e5e5e5);
 }
 
 .transport-button {
-  background: transparent;
-  border: none;
+  background: var(--transport-btn-bg, #343338);
+  border: 1px solid var(--transport-btn-bg, #343338);
   padding: 0;
   margin: 0;
   cursor: pointer;
-  transition: all 0.3s ease; /* Changed to all for comprehensive transitions */
+  transition: all 0.25s ease;
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
   z-index: 1;
-  width: 30px; /* Fixed width to prevent size changes */
-  height: 30px; /* Fixed height to prevent size changes */
+  width: 28px; /* Slightly smaller */
+  height: 28px; /* Slightly smaller */
+  border-radius: 999px;
+  box-shadow: var(--transport-shadow, 0 4px 10px rgba(0, 0, 0, 0.25));
+  color: var(--transport-btn-icon, #e5e5e5);
 }
 
 .transport-button:hover {
-  opacity: 0.8;
-  transform: scale(1.05); /* Subtle hover effect */
+  background: var(--transport-btn-hover, #3f3f46);
+  transform: scale(1.05);
+}
+
+.transport-button:active {
+  background: var(--transport-btn-active, #d6d6d6);
+  color: var(--transport-btn-icon, #1f1f2a);
+}
+
+.transport-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+.transport-button svg path,
+.transport-button svg polyline,
+.transport-button svg line,
+.transport-button svg rect,
+.transport-button svg circle {
+  stroke: currentColor !important;
+}
+
+.transport-button svg path[fill]:not([fill="none"]),
+.transport-button svg rect[fill]:not([fill="none"]),
+.transport-button svg circle[fill]:not([fill="none"]) {
+  fill: currentColor !important;
 }
 
 /* Play/Pause button specific transitions */
@@ -122,11 +152,11 @@
 
 .time-display {
   font-size: 12px;
-  opacity: 0.85;
+  opacity: 0.95;
   min-width: 80px;
   text-align: center;
   font-family: monospace;
-  color: #e5e5e5;
+  color: var(--transport-time-color, #e5e5e5);
   /* border: 2px solid magenta; */
 }
 

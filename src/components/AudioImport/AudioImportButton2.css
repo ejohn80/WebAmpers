@@ -1,8 +1,8 @@
 .import-button {
-  background-color: #3a3a3c;
+  background-color: var(--import-btn-bg, #efefef);
   margin-top: 20px;
-  color: #ffffff;
-  border: none;
+  color: var(--import-btn-color, #333);
+  border: 1px solid var(--import-btn-border, #333239);
   padding: 8px 16px;
   border-radius: 6px;
   font-size: 14px;
@@ -18,6 +18,6 @@
 }
 
 .import-button:hover {
-  background-color: #4a4a4c;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  background-color: var(--import-btn-hover-bg, #17e1ff);
+  box-shadow: var(--import-btn-shadow, 0 2px 8px rgba(0, 0, 0, 0.3));
 }
