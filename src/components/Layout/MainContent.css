@@ -53,7 +53,7 @@
   top: 0;
   bottom: 0;
   width: 2px;
-  background: red;
+  background: var(--timeline-playhead-color, #f44336);
   pointer-events: none;
   z-index: 21;
   will-change: transform;
