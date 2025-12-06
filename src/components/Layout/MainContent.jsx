@@ -443,7 +443,9 @@ function MainContent({
     // Prefer measuring the waveform area (timeline) instead of the full track wrapper
     let highlightTopPx = trackTopPx;
     let highlightHeightPx = trackHeightPx;
-    const timelineEl = wrappers[trackIndex].querySelector(".tracklane-timeline");
+    const timelineEl = wrappers[trackIndex].querySelector(
+      ".tracklane-timeline"
+    );
     if (timelineEl) {
       const timelineRect = timelineEl.getBoundingClientRect();
       highlightTopPx = timelineRect.top - containerRect.top;
