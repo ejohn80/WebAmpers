@@ -629,9 +629,12 @@ const AppContextProvider = ({children}) => {
 
   // Only run this block once per actual session change
   if (lastSessionRef.current !== activeSession) {
+    const previousSession = lastSessionRef.current;
     lastSessionRef.current = activeSession;
 
-    // Remove automatic track selection
+    console.log(`[AppContext] Session changed: ${previousSession} → ${activeSession}`);
+
+    // Remove automatic track selection when switching sessions
     setSelectedTrackId(null);
     setSelectedTrackEffects(null);
     setSelectedTrackActiveEffects([]);
@@ -686,8 +689,68 @@ const AppContextProvider = ({children}) => {
           );
         }
       }
+
+      // CRITICAL FIX: Re-apply all track effects after session switch
+      // This ensures effects are applied to the audio engine when returning to a session
+      console.log(`[AppContext] Re-applying track effects for session ${activeSession}`);
+      
+      // Wait a bit for AudioPage to finish loading tracks
+      setTimeout(() => {
+        try {
+          // Get all current tracks
+          const currentTracks = audioManager.tracks || [];
+          
+          console.log(`[AppContext] Found ${currentTracks.length} tracks to restore effects for`);
+          
+          currentTracks.forEach((track) => {
+            if (!track?.id || !engineRef.current) return;
+            
+            const trackEnabled = track.enabledEffects || {};
+            const trackEffects = track.effects || {};
+            
+            // Check if track has any non-default effects
+            const hasEffects = Object.keys(trackEffects).some(
+              key => {
+                const value = trackEffects[key];
+                return value !== undefined && 
+                       value !== 0 && 
+                       value !== 100 &&
+                       key !== 'volume'; // volume 100 is default
+              }
+            );
+            
+            if (!hasEffects && Object.keys(trackEnabled).length === 0) {
+              return; // Skip if no effects to apply
+            }
+            
+            console.log(`[AppContext] Re-applying effects for track ${track.id}:`, {
+              effects: trackEffects,
+              enabled: trackEnabled
+            });
+            
+            // Apply track effects
+            if (engineRef.current.setTrackEffects) {
+              try {
+                engineRef.current.setTrackEffects(
+                  track.id,
+                  trackEffects,
+                  trackEnabled,
+                  true // silent mode
+                );
+              } catch (e) {
+                console.error(`[AppContext] Failed to apply effects for track ${track.id}:`, e);
+              }
+            }
+          });
+          
+          console.log('[AppContext] Track effects re-application complete');
+        } catch (e) {
+          console.error('[AppContext] Failed to re-apply track effects:', e);
+        }
+      }, 100); // Small delay to ensure AudioPage has finished loading
     }
-    console.log(`[Session ${activeSession}] Session loaded, track effects will be applied by AudioPage`);
+    
+    console.log(`[Session ${activeSession}] Session loaded`);
   }
 }, [activeSession, engineRef]);
 

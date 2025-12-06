@@ -456,6 +456,13 @@ function AudioPage() {
       `[AudioPage] Found ${savedTracks.length} tracks for session ${activeSession}`
     );
 
+    // Sort tracks by their ID to maintain consistent order
+    savedTracks.sort((a, b) => {
+      const idA = typeof a.id === 'number' ? a.id : parseInt(a.id) || 0;
+      const idB = typeof b.id === 'number' ? b.id : parseInt(b.id) || 0;
+      return idA - idB;
+    });
+
     // Clear current tracks
     audioManager.clearAllTracks();
 
@@ -594,7 +601,7 @@ function AudioPage() {
   }
 };
 
-  loadSessionTracks();
+loadSessionTracks();
 }, [activeSession]);
 
   const toggleSidebar = () => {
