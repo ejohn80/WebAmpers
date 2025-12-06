@@ -42,6 +42,7 @@ const TrackLane = memo(function TrackLane({
   onSegmentSelected = () => {},
   onClearSegmentSelection = () => {},
   onSegmentDelete = () => {},
+  onTimelineScrubStart = null,
 }) {
   if (!track) return null;
 
@@ -241,13 +242,37 @@ const TrackLane = memo(function TrackLane({
       ? {minWidth: `${rowWidthPx}px`, width: `${rowWidthPx}px`}
       : undefined;
 
-  const handleTrackClick = (e) => {
-    e.stopPropagation();
+  const selectTrackOnly = useCallback(() => {
     if (typeof onClearSegmentSelection === "function") {
       onClearSegmentSelection();
     }
     setSelectedSegmentIndex(null);
     onSelect(track.id);
+  }, [onClearSegmentSelection, onSelect, track.id]);
+
+  const handleTrackClick = (e) => {
+    e.stopPropagation();
+    selectTrackOnly();
+  };
+
+  const handleTimelineMouseDown = (event) => {
+    if (typeof onTimelineScrubStart !== "function") return;
+    if (event.button !== 0) return;
+    if (event.target.closest(".tracklane-segment-positioned")) return;
+    event.preventDefault();
+    event.stopPropagation();
+    selectTrackOnly();
+    onTimelineScrubStart(event.clientX, "mouse");
+  };
+
+  const handleTimelineTouchStart = (event) => {
+    if (typeof onTimelineScrubStart !== "function") return;
+    if (!event.touches || event.touches.length === 0) return;
+    if (event.target.closest(".tracklane-segment-positioned")) return;
+    event.preventDefault();
+    event.stopPropagation();
+    selectTrackOnly();
+    onTimelineScrubStart(event.touches[0].clientX, "touch");
   };
 
   const selectionStyle = isSelected
@@ -635,6 +660,8 @@ const TrackLane = memo(function TrackLane({
             onDragLeave={handleTimelineDragLeave}
             onDragOver={handleTimelineDragOver}
             onDrop={handleTimelineDrop}
+            onMouseDown={handleTimelineMouseDown}
+            onTouchStart={handleTimelineTouchStart}
           >
             {segments.length === 0 && (
               <div className="tracklane-empty">

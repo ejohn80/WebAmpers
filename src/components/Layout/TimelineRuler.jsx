@@ -9,6 +9,7 @@ export default function TimelineRuler({
   totalLengthMs = 0,
   timelineWidth = 0,
   timelineLeftOffsetPx = 0,
+  onScrubStart = null,
 }) {
   const playheadMarkerRef = useRef(null);
   const {
@@ -142,8 +143,29 @@ export default function TimelineRuler({
     width: `${Math.max(0, Math.round(timelineWidth))}px`,
   };
 
+  const startScrubFromMouse = (event) => {
+    if (typeof onScrubStart !== "function") return;
+    if (event.button !== undefined && event.button !== 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    onScrubStart(event.clientX, "mouse");
+  };
+
+  const startScrubFromTouch = (event) => {
+    if (typeof onScrubStart !== "function") return;
+    if (!event.touches || event.touches.length === 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    onScrubStart(event.touches[0].clientX, "touch");
+  };
+
   return (
-    <div className="timeline-ruler-bar" style={rulerStyle}>
+    <div
+      className="timeline-ruler-bar"
+      style={rulerStyle}
+      onMouseDown={startScrubFromMouse}
+      onTouchStart={startScrubFromTouch}
+    >
       {preHighlightWidthPx > 0 && (
         <div
           className="timeline-pre-highlight"

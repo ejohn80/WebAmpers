@@ -81,7 +81,7 @@
   background: var(--timeline-ruler-bg);
   border-bottom: 1px solid var(--timeline-ruler-border);
   box-shadow: var(--timeline-ruler-shadow);
-  pointer-events: none;
+  pointer-events: auto;
   z-index: 11;
   margin-bottom: 12px;
   overflow: visible;
