@@ -8,6 +8,7 @@ import AudioExportButton from "../AudioExport/AudioExportButton";
 import AudioImportButton from "../AudioImport/AudioImportButton";
 import Equalizer from "../Tools/Equalizer";
 import Sampler from "../Tools/Sampler";
+import SaveLoadModal from "../../CloudSaving/SaveLoadModal";
 
 import "./Header.css";
 import {
@@ -42,6 +43,7 @@ function DropdownPortal({
   selectedTrackId,
   hasClipboard,
   onSamplerRecording,
+  onSessionLoad,
 }) {
   const navigate = useNavigate();
   const {userData, closeEffectsMenu} = useContext(AppContext); // closes effects menu
@@ -52,6 +54,8 @@ function DropdownPortal({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isEQOpen, setIsEQOpen] = useState(false);
   const [isSamplerOpen, setIsSamplerOpen] = useState(false);
+  const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
+  const [isLoadModalOpen, setIsLoadModalOpen] = useState(false);
 
   // Tooltip state
   const [tooltip, setTooltip] = useState({show: false, text: "", x: 0, y: 0});
@@ -319,15 +323,29 @@ function DropdownPortal({
           </span>
         </a>
 
-        {/* DISABLED - Save */}
         <a
           href="#"
-          className="dropdown-item-disabled"
+          className={!userData ? "dropdown-item-disabled" : ""}
           onClick={(e) => {
             e.preventDefault();
+            if (!userData) return;
+            setIsSaveModalOpen(true);
+            setActiveDropdown(null);
           }}
         >
           <span>Save</span>
+        </a>
+        <a
+          href="#"
+          className={!userData ? "dropdown-item-disabled" : ""}
+          onClick={(e) => {
+            e.preventDefault();
+            if (!userData) return;
+            setIsLoadModalOpen(true);
+            setActiveDropdown(null);
+          }}
+        >
+          <span>Load</span>
         </a>
 
         {/* ENABLED - Import Audio */}
@@ -810,6 +828,26 @@ function DropdownPortal({
             top: "100px",
             left: "100px",
             zIndex: 999999,
+          }}
+        />
+      )}
+      {isSaveModalOpen && (
+        <SaveLoadModal
+          mode="save"
+          isOpen={isSaveModalOpen}
+          onClose={() => setIsSaveModalOpen(false)}
+        />
+      )}
+      {isLoadModalOpen && (
+        <SaveLoadModal
+          mode="load"
+          isOpen={isLoadModalOpen}
+          onClose={() => setIsLoadModalOpen(false)}
+          onLoadComplete={(stats) => {
+            console.log("Session loaded:", stats);
+            
+            // This callback needs to actually reload the page or update state
+            window.location.reload();
           }}
         />
       )}

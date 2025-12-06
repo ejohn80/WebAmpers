@@ -6,6 +6,7 @@ import {AppContext} from "../../../context/AppContext";
 import {createDefaultEffects} from "../../../context/effectsStorage";
 import {dbManager} from "../../../managers/DBManager";
 import styles from "../Layout.module.css";
+import { audioManager } from "../../../managers/AudioManager";
 
 function SessionsTab() {
   const {activeSession, setActiveSession, effects, setEffects} =
@@ -18,6 +19,102 @@ function SessionsTab() {
   const [renamingSessionId, setRenamingSessionId] = useState(null);
   const [renameValue, setRenameValue] = useState("");
   const initializingRef = useRef(false);
+
+  useEffect(() => {
+    if (!activeSession || !hasInitialized) return;
+  
+    const loadSessionTracks = async () => {
+      try {
+        const dbTracks = await dbManager.getAllTracks(activeSession);
+        console.log(`Loading ${dbTracks.length} tracks for session ${activeSession}`);
+  
+        // Clear and reload tracks in AudioManager
+        audioManager.clearAllTracks();
+  
+        // FIX: Import Tone.js to reconstruct buffers
+        const Tone = await import("tone");
+  
+        for (const trackData of dbTracks) {
+          let reconstructedBuffer = null;
+  
+          // Load asset if track references one
+          if (trackData.assetId) {
+            const asset = await dbManager.getAsset(trackData.assetId);
+            if (asset && asset.buffer && asset.buffer.channels) {
+              // Reconstruct Tone.ToneAudioBuffer from serialized buffer
+              const { numberOfChannels, length, sampleRate, channels } = asset.buffer;
+              
+              // Create native AudioBuffer
+              const nativeBuffer = Tone.context.createBuffer(
+                numberOfChannels,
+                length,
+                sampleRate
+              );
+              
+              // Copy channel data
+              for (let i = 0; i < numberOfChannels; i++) {
+                if (channels && channels[i]) {
+                  const channelData = new Float32Array(channels[i]);
+                  nativeBuffer.copyToChannel(channelData, i);
+                }
+              }
+              
+              // Create Tone.ToneAudioBuffer from native buffer
+              reconstructedBuffer = new Tone.ToneAudioBuffer(nativeBuffer);
+              console.log(`Reconstructed buffer for asset ${trackData.assetId}:`, reconstructedBuffer);
+            }
+          }
+  
+          // If we have a reconstructed buffer, set it on the track and ALL segments
+          if (reconstructedBuffer) {
+            trackData.buffer = reconstructedBuffer;
+            
+            // CRITICAL: Update ALL segments to use the reconstructed buffer
+            if (trackData.segments && Array.isArray(trackData.segments)) {
+              trackData.segments = trackData.segments.map(seg => {
+                // Keep all segment metadata but replace the buffer
+                return {
+                  ...seg,
+                  buffer: reconstructedBuffer  // Use the reconstructed Tone buffer
+                };
+              });
+            }
+          } else if (trackData.segments && Array.isArray(trackData.segments)) {
+            // Fallback: try to reconstruct from segment buffers (for old data without assetId)
+            for (let i = 0; i < trackData.segments.length; i++) {
+              const segment = trackData.segments[i];
+              if (segment.buffer && segment.buffer.channels) {
+                const { numberOfChannels, length, sampleRate, channels } = segment.buffer;
+                
+                const nativeBuffer = Tone.context.createBuffer(
+                  numberOfChannels,
+                  length,
+                  sampleRate
+                );
+                
+                for (let ch = 0; ch < numberOfChannels; ch++) {
+                  if (channels && channels[ch]) {
+                    const channelData = new Float32Array(channels[ch]);
+                    nativeBuffer.copyToChannel(channelData, ch);
+                  }
+                }
+                
+                trackData.segments[i].buffer = new Tone.ToneAudioBuffer(nativeBuffer);
+              }
+            }
+          }
+          
+          console.log(`Track ${trackData.id} prepared with ${trackData.segments?.length || 0} segments`);
+          audioManager.addTrackFromBuffer(trackData);
+        }
+  
+      } catch (e) {
+        console.error("Failed to load session tracks:", e);
+      }
+    };
+  
+    loadSessionTracks();
+  }, [activeSession, hasInitialized]);
 
   // Load sessions from IndexedDB
   const loadSessions = useCallback(async () => {
