@@ -623,7 +623,10 @@ function MainContent({
       ? createPortal(
           <div
             className="tracklane-context-menu"
-            style={{top: `${backgroundMenu.y}px`, left: `${backgroundMenu.x}px`}}
+            style={{
+              top: `${backgroundMenu.y}px`,
+              left: `${backgroundMenu.x}px`,
+            }}
             role="menu"
           >
             <button
