@@ -34,6 +34,20 @@ const SegmentBlock = ({
   const audioBuffer = segment.buffer ?? segment.fileBuffer ?? null;
   const startOnTimelineMs = Math.max(0, segment.startOnTimelineMs || 0);
   const durationMs = Math.max(0, segment.durationMs || 0);
+
+  // Debug log to see what properties the segment has
+  useEffect(() => {
+    console.log(`[SegmentBlock ${segmentIndex}] Segment data:`, {
+      id: segment.id,
+      name: segment.name,
+      fileName: segment.fileName,
+      assetId: segment.assetId,
+      hasName: !!segment.name,
+      hasFileName: !!segment.fileName,
+      allKeys: Object.keys(segment),
+    });
+  }, [segment, segmentIndex]);
+
   const segmentName =
     segment.name || segment.fileName || `Segment ${segmentIndex + 1}`;
 

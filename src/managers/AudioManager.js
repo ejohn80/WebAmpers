@@ -135,6 +135,8 @@ class AudioManager {
             buffer: segToneBuf,
             offset: offsetSec,
             duration: durationSec,
+            name: s.name || s.fileName || null,
+            fileName: s.fileName || s.name || null,
           });
           // Preserve metadata used by UI/engine
           if (typeof s.durationMs === "number") seg.durationMs = s.durationMs;
@@ -155,6 +157,8 @@ class AudioManager {
         buffer: toneBuffer,
         offset: 0,
         duration: toneBuffer.duration,
+        name: audioData.name || null,
+        fileName: audioData.name || null,
       });
       const durationMs = Math.round(toneBuffer.duration * 1000);
       segment.durationMs = durationMs;

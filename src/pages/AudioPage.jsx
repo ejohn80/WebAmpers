@@ -693,6 +693,7 @@ function AudioPage() {
   // Handle dropping an asset from the assets tab to create a new track OR append to existing
   // In AudioPage.jsx, update the handleAssetDrop function to include name/fileName:
 
+  // In AudioPage.jsx, update the handleAssetDrop function to include name/fileName:
   const handleAssetDrop = async (
     assetId,
     targetTrackId = null,
@@ -715,7 +716,11 @@ function AudioPage() {
       }
 
       // Use the name from the parameter if provided, otherwise from the asset
+      // This ensures we always have a name even if the parameter wasn't passed
       const segmentName = assetName || asset.name;
+      console.log(
+        `[handleAssetDrop] Using segment name: "${segmentName}" (from ${assetName ? "parameter" : "database"})`
+      );
 
       // Check if we have a cached buffer for this asset
       let toneBuffer = assetBufferCache.get(assetId);
