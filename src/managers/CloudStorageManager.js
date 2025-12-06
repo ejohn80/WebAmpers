@@ -240,7 +240,7 @@ class CloudStorageManager {
       try {
         const metaRef = ref(storage, `${folder.fullPath}/metadata.json`);
         const meta = await getMetadata(metaRef);
-        const url = await getDownloadURL(metaRef);
+        // const url = await getDownloadURL(metaRef);
   
         // Extract project name from folder name (remove timestamp)
         const folderName = folder.name;
@@ -251,7 +251,7 @@ class CloudStorageManager {
           projectName: projectName,
           savedAt: meta.timeCreated,
           size: meta.size,
-          url
+          // url
         });
       } catch (_) {}
     }
@@ -263,11 +263,26 @@ class CloudStorageManager {
   // DELETE SAVE
   // -----------------------------------------------
   async deleteSave(userId, folderName) {
-    const folder = ref(storage, `${this.STORAGE_PATH}/${userId}/saves/${folderName}`);
-    const res = await listAll(folder);
-
-    await Promise.all(res.items.map(i => deleteObject(i)));
-    return true;
+    const folderRef = ref(storage, `${this.STORAGE_PATH}/${userId}/saves/${folderName}`);
+    
+    try {
+      const res = await listAll(folderRef);
+  
+      // Delete all files in the main folder
+      await Promise.all(res.items.map(item => deleteObject(item)));
+      
+      // Delete all files in subfolders (like assets/)
+      for (const subFolder of res.prefixes) {
+        const subRes = await listAll(subFolder);
+        await Promise.all(subRes.items.map(item => deleteObject(item)));
+      }
+  
+      console.log(`Deleted all files in ${folderName}`);
+      return true;
+    } catch (e) {
+      console.error(`Failed to delete save ${folderName}:`, e);
+      throw e;
+    }
   }
 }
 

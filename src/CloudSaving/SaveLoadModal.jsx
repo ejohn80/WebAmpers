@@ -34,7 +34,7 @@ function SaveLoadModal({ isOpen, onClose, onLoadComplete, mode = "save" }) {
     if (isOpen && mode === "load" && isAuthenticated) {
       listSaves();
     }
-  }, [isOpen, mode, isAuthenticated, listSaves]);
+  }, [isOpen, mode, isAuthenticated]);
 
   // Clear errors when closing
   useEffect(() => {
