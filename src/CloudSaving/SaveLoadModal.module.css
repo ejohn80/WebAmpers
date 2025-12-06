@@ -230,12 +230,13 @@
 }
 
 .saveName {
+  text-align: left;
+  margin-left: 2px;
   color: #fff;
   font-size: 14px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  justify-content: start;
 }
 
 .saveMeta {

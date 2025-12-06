@@ -14,8 +14,6 @@ import "./Header.css";
 import {
   ExportIcon,
   ImportIcon,
-  NewIcon,
-  PreviousVersionsIcon,
   UndoIcon,
   RedoIcon,
   CutIcon,
@@ -46,7 +44,7 @@ function DropdownPortal({
   onSessionLoad,
 }) {
   const navigate = useNavigate();
-  const {userData, closeEffectsMenu} = useContext(AppContext); // closes effects menu
+  const {userData, closeEffectsMenu, setActiveSession} = useContext(AppContext); // closes effects menu
 
   const [activeDropdown, setActiveDropdown] = useState(null);
   const [position, setPosition] = useState({top: 0, left: 0});
@@ -281,26 +279,6 @@ function DropdownPortal({
         }}
         onMouseLeave={handleDropdownMouseLeave}
       >
-        {/* DISABLED - New */}
-        <a
-          href="#"
-          className="dropdown-item-disabled"
-          onClick={(e) => {
-            e.preventDefault();
-          }}
-        >
-          <span
-            style={{
-              display: "flex",
-              alignItems: "center",
-              width: "100%",
-              gap: "8px",
-            }}
-          >
-            <NewIcon />
-            <span>New...</span>
-          </span>
-        </a>
         <a
           href="#"
           className={!userData ? "dropdown-item-disabled" : ""}
@@ -824,8 +802,8 @@ function DropdownPortal({
           onLoadComplete={(stats) => {
             console.log("Session loaded:", stats);
             
-            // This callback needs to actually reload the page or update state
-            window.location.reload();
+            // Switch to the newly created session
+            setActiveSession(stats.sessionId);
           }}
         />
       )}

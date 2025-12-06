@@ -9,6 +9,7 @@ import {
 import { storage } from "../firebase/firebase";
 import { dbManager } from "./DBManager";
 import ExportManager from "../components/AudioExport/ExportManager";
+import * as Tone from "tone";
 
 class CloudStorageManager {
   constructor() {
@@ -139,10 +140,6 @@ class CloudStorageManager {
 
     console.log(`Loading: ${tracks.length} tracks, ${assets.length} assets`);
 
-    if (clearExisting) {
-      await this._clearDB();
-    }
-
     // Download and decode MP3 assets
     const assetIdMap = new Map();
     for (const assetMeta of assets) {
@@ -189,15 +186,15 @@ class CloudStorageManager {
       }
     }
 
-    // Recreate session
+    // Create a new session with the loaded session name
     const newSessionId = await dbManager.createSession(session.name, {
       effects: session.effects || {pitch: 0, volume: 100, reverb: 0}
     });
 
-    // Recreate tracks with updated asset IDs
+    // Recreate tracks with the new session ID and updated asset IDs
     for (const track of tracks) {
       const clean = { ...track };
-      delete clean.id;
+      delete clean.id; // Let DB assign new ID
       clean.sessionId = newSessionId;
       
       if (clean.assetId && assetIdMap.has(clean.assetId)) {
@@ -216,6 +213,7 @@ class CloudStorageManager {
       await dbManager.addTrack(clean, newSessionId);
     }
 
+    // Set the newly created session as active
     localStorage.setItem("webamp.activeSession", String(newSessionId));
 
     return {
@@ -270,23 +268,6 @@ class CloudStorageManager {
 
     await Promise.all(res.items.map(i => deleteObject(i)));
     return true;
-  }
-
-  // -----------------------------------------------
-  // DB CLEAR (sessions + tracks only)
-  // -----------------------------------------------
-  async _clearDB() {
-    const db = await dbManager.openDB();
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction(["sessions", "tracks", "assets"], "readwrite");
-
-      tx.objectStore("sessions").clear();
-      tx.objectStore("tracks").clear();
-      tx.objectStore("assets").clear();
-
-      tx.oncomplete = () => resolve();
-      tx.onerror = e => reject(e);
-    });
   }
 }
 

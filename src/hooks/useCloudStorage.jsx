@@ -125,6 +125,7 @@ export function useCloudStorage() {
       return [];
     }
 
+    setIsLoading(true);
     setError(null);
 
     try {
@@ -134,6 +135,8 @@ export function useCloudStorage() {
     } catch (err) {
       setError(err.message);
       return [];
+    } finally {
+      setIsLoading(false);
     }
   }, [userData]);
 

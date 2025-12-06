@@ -63,24 +63,15 @@ function SaveLoadModal({ isOpen, onClose, onLoadComplete, mode = "save" }) {
   };
 
   const handleLoad = async (fileName) => {
-    if (!window.confirm("Loading will replace your current session. Continue?")) {
-      return;
-    }
-  
     const stats = await loadSession(fileName);
     if (stats) {
       console.log("Session loaded successfully:", stats);
       
-      // Call the callback if provided
+      // Notify parent with the new session ID
       onLoadComplete?.(stats);
       
-      // Close modal
+      // Close modal - parent will handle switching to the new session
       onClose();
-      
-      // Reload page to refresh all components
-      setTimeout(() => {
-        window.location.reload();
-      }, 100);
     }
   };
 
