@@ -22,6 +22,7 @@
   overflow: auto;
   padding-bottom: 32px;
   scrollbar-gutter: stable both-edges;
+  position: relative;
 }
 
 .timeline-scroll-content {
@@ -54,7 +55,7 @@
   width: 2px;
   background: red;
   pointer-events: none;
-  z-index: 10;
+  z-index: 21;
   will-change: transform;
   transform: translate3d(0, 0, 0);
 }
@@ -67,7 +68,7 @@
   left: var(--timeline-left-offset);
   width: var(--timeline-content-width, 100%);
   pointer-events: none;
-  z-index: 10;
+  z-index: 20;
 }
 
 /* Timeline ruler overlay */

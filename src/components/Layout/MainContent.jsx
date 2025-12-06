@@ -284,6 +284,20 @@ function MainContent({
         onDrop={handleDrop}
         onDragOver={handleDragOver}
       >
+        {hasTracks && (
+          <div
+            className="global-playhead-rail"
+            style={{
+              left: `${timelineMetrics.leftOffsetPx}px`,
+              width: `${timelineMetrics.widthPx}px`,
+            }}
+          >
+            <GlobalPlayhead
+              totalLengthMs={totalLengthMs}
+              timelineWidth={timelineMetrics.widthPx}
+            />
+          </div>
+        )}
         {hasTracks ? (
           <>
             <TimelineRuler
@@ -298,18 +312,6 @@ function MainContent({
                 width: `${timelineMetrics.rowWidthPx}px`,
               }}
             >
-              <div
-                className="global-playhead-rail"
-                style={{
-                  left: `${timelineMetrics.leftOffsetPx}px`,
-                  width: `${timelineMetrics.widthPx}px`,
-                }}
-              >
-                <GlobalPlayhead
-                  totalLengthMs={totalLengthMs}
-                  timelineWidth={timelineMetrics.widthPx}
-                />
-              </div>
               <div
                 className="tracks-relative"
                 style={{width: `${timelineMetrics.rowWidthPx}px`}}
