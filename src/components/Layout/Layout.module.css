@@ -116,6 +116,7 @@
   font-size: 12px;
   color: var(--sidebar-panel-muted, #aaa);
   text-align: right;
+  justify-self: end;
 }
 
 .importButtonWrapper {

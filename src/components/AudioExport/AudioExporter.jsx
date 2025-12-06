@@ -1,6 +1,7 @@
 import React, {useState, useMemo, useContext} from "react";
 import ExportManager from "./ExportManager.js";
 import {AppContext} from "../../context/AppContext";
+import {BeatLoader} from "react-spinners";
 
 const AudioExporter = ({
   tracks,
@@ -207,6 +208,13 @@ const AudioExporter = ({
           />
         </div>
 
+        {format === "ogg" && (
+          <div>
+            OGG files require backend encoding during export and may take extra
+            time.
+          </div>
+        )}
+
         {error && (
           <p className="text-sm font-medium text-red-600 p-2 border border-red-200 bg-red-50 rounded-md">
             Error: {error}
@@ -223,7 +231,7 @@ const AudioExporter = ({
           }`}
           aria-label="Export Audio"
         >
-          {isLoading ? "Processing..." : "Export Audio"}
+          {isLoading ? <BeatLoader color="white" size={10} /> : "Export Audio"}
         </button>
       </form>
     </div>
