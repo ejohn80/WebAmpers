@@ -52,7 +52,7 @@
   position: absolute;
   top: 0;
   bottom: 0;
-  width: 2px;
+  width: 1px;
   background: var(--timeline-playhead-color, #f44336);
   pointer-events: none;
   z-index: 21;

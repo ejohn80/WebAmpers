@@ -19,8 +19,9 @@ export default function GlobalPlayhead({totalLengthMs = 0, timelineWidth = 0}) {
 
       // Calculate position
       const p = denom > 0 ? Math.max(0, Math.min(1, ms / denom)) : 0;
-      const leftPx = p * timelineWidth;
-      playheadRef.current.style.transform = `translate3d(${leftPx}px, 0, 0)`;
+  const leftPx = p * timelineWidth;
+  const centeringOffsetPx = -0.5; // keep 1px line centered beneath the triangle marker
+  playheadRef.current.style.transform = `translate3d(${leftPx + centeringOffsetPx}px, 0, 0)`;
     });
 
     return unsubscribe;
