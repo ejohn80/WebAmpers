@@ -451,126 +451,215 @@ function AudioPage() {
     lastSessionRef.current = activeSession;
 
     const loadSessionTracks = async () => {
+  try {
+    // First, let's see ALL tracks in the database
+    const allTracksInDB = await dbManager.getAllTracks(null); // null = get all tracks
+    console.log(`[AudioPage] TOTAL tracks in database: ${allTracksInDB.length}`);
+    allTracksInDB.forEach((track, idx) => {
+      console.log(`  Track ${idx}: id=${track.id}, name="${track.name}", sessionId=${track.sessionId}, segments=${track.segments?.length || 0}`);
+      if (track.segments) {
+        track.segments.forEach((seg, segIdx) => {
+          console.log(`    Segment ${segIdx}: id=${seg.id}, assetId=${seg.assetId}`);
+        });
+      }
+    });
+
+    // Now get tracks for THIS session
+    const savedTracks = await dbManager.getAllTracks(activeSession);
+    console.log(
+      `[AudioPage] Found ${savedTracks.length} tracks for session ${activeSession}`
+    );
+    
+    savedTracks.forEach((track, idx) => {
+      console.log(`  Session Track ${idx}: id=${track.id}, name="${track.name}", sessionId=${track.sessionId}`);
+      if (track.segments) {
+        track.segments.forEach((seg, segIdx) => {
+          console.log(`    Segment ${segIdx}: id=${seg.id}, assetId=${seg.assetId}`);
+        });
+      }
+    });
+
+    // Clear current tracks
+    audioManager.clearAllTracks();
+
+    const localAssetBufferCache = new Map();
+    const getToneBufferForAsset = async (assetId) => {
+      console.log(`[getToneBufferForAsset] Attempting to load asset ${assetId}`);
+      
+      if (!assetId) {
+        console.warn(`[getToneBufferForAsset] No assetId provided`);
+        return null;
+      }
+
+      if (assetBufferCache.has(assetId)) {
+        console.log(`[getToneBufferForAsset] Found asset ${assetId} in global cache`);
+        return assetBufferCache.get(assetId);
+      }
+
+      if (localAssetBufferCache.has(assetId)) {
+        console.log(`[getToneBufferForAsset] Found asset ${assetId} in local cache`);
+        return localAssetBufferCache.get(assetId);
+      }
+
       try {
-        const savedTracks = await dbManager.getAllTracks(activeSession);
-        console.log(
-          `[AudioPage] Found ${savedTracks.length} tracks for session ${activeSession}`
-        );
-
-        // Clear current tracks
-        audioManager.clearAllTracks();
-
-        const localAssetBufferCache = new Map();
-        const getToneBufferForAsset = async (assetId) => {
-          if (!assetId) return null;
-
-          if (assetBufferCache.has(assetId)) {
-            return assetBufferCache.get(assetId);
-          }
-
-          if (localAssetBufferCache.has(assetId)) {
-            return localAssetBufferCache.get(assetId);
-          }
-
-          try {
-            const asset = await dbManager.getAsset(assetId);
-            const toneBuffer = await buildToneBufferFromAssetRecord(asset);
-            if (toneBuffer) {
-              assetBufferCache.set(assetId, toneBuffer);
-              localAssetBufferCache.set(assetId, toneBuffer);
-              return toneBuffer;
-            }
-          } catch (e) {
-            console.warn(`Failed to load asset ${assetId} for hydration`, e);
-          }
-
+        console.log(`[getToneBufferForAsset] Fetching asset ${assetId} from database`);
+        const asset = await dbManager.getAsset(assetId);
+        
+        if (!asset) {
+          console.error(`[getToneBufferForAsset] Asset ${assetId} NOT FOUND in database!`);
           localAssetBufferCache.set(assetId, null);
           return null;
-        };
+        }
+        
+        console.log(`[getToneBufferForAsset] Asset ${assetId} found:`, {
+          name: asset.name,
+          hasBuffer: !!asset.buffer,
+          hasFileBlob: !!asset.fileBlob
+        });
+        
+        const toneBuffer = await buildToneBufferFromAssetRecord(asset);
+        
+        if (toneBuffer) {
+          console.log(`[getToneBufferForAsset] Successfully created buffer for asset ${assetId}`);
+          assetBufferCache.set(assetId, toneBuffer);
+          localAssetBufferCache.set(assetId, toneBuffer);
+          return toneBuffer;
+        } else {
+          console.error(`[getToneBufferForAsset] Failed to create buffer for asset ${assetId}`);
+        }
+      } catch (e) {
+        console.error(`[getToneBufferForAsset] Exception loading asset ${assetId}:`, e);
+      }
 
-        // Reconstruct tracks from DB
-        for (const savedTrack of savedTracks) {
-          const hydratedSegments = [];
-          if (Array.isArray(savedTrack.segments)) {
-            for (const segment of savedTrack.segments) {
-              const segAssetId = segment.assetId ?? savedTrack.assetId ?? null;
+      localAssetBufferCache.set(assetId, null);
+      return null;
+    };
 
-              let segmentToneBuffer = await getToneBufferForAsset(segAssetId);
-              if (!segmentToneBuffer && segment?.buffer?.channels) {
-                const audioBuffer = deserializeAudioBuffer(segment.buffer);
-                segmentToneBuffer = new Tone.ToneAudioBuffer(audioBuffer);
-              }
+    // Reconstruct tracks from DB
+    for (const savedTrack of savedTracks) {
+      console.log(`[AudioPage] Processing track ${savedTrack.id} from DB:`, {
+        name: savedTrack.name,
+        sessionId: savedTrack.sessionId,
+        assetId: savedTrack.assetId,
+        segmentCount: savedTrack.segments?.length || 0
+      });
 
-              if (!segmentToneBuffer) {
-                console.warn(
-                  `Skipping segment ${segment.id} on track ${savedTrack.id} - missing buffer`
-                );
-                continue;
-              }
+      const hydratedSegments = [];
+      if (Array.isArray(savedTrack.segments)) {
+        for (const segment of savedTrack.segments) {
+          const segAssetId = segment.assetId ?? savedTrack.assetId ?? null;
 
-              hydratedSegments.push({
-                ...segment,
-                assetId: segAssetId,
-                buffer: segmentToneBuffer,
-              });
-            }
+          console.log(`[AudioPage] Hydrating segment ${segment.id}:`, {
+            segmentAssetId: segment.assetId,
+            trackAssetId: savedTrack.assetId,
+            resolvedAssetId: segAssetId
+          });
+
+          let segmentToneBuffer = await getToneBufferForAsset(segAssetId);
+          
+          console.log(`[AudioPage] Buffer result for segment ${segment.id}:`, {
+            assetId: segAssetId,
+            gotBuffer: !!segmentToneBuffer,
+            bufferDuration: segmentToneBuffer ? (segmentToneBuffer.duration || segmentToneBuffer.get?.()?.duration) : null
+          });
+          
+          if (!segmentToneBuffer && segment?.buffer?.channels) {
+            console.log(`[AudioPage] Fallback: Using inline buffer for segment ${segment.id}`);
+            const audioBuffer = deserializeAudioBuffer(segment.buffer);
+            segmentToneBuffer = new Tone.ToneAudioBuffer(audioBuffer);
           }
 
-          let primaryBuffer = hydratedSegments[0]?.buffer ?? null;
-          if (!primaryBuffer && savedTrack.assetId) {
-            primaryBuffer = await getToneBufferForAsset(savedTrack.assetId);
-          }
-          if (!primaryBuffer && savedTrack.segments?.length) {
-            const fallbackSerialized = savedTrack.segments.find(
-              (seg) => seg?.buffer?.channels
-            );
-            if (fallbackSerialized?.buffer) {
-              const audioBuffer = deserializeAudioBuffer(
-                fallbackSerialized.buffer
-              );
-              primaryBuffer = new Tone.ToneAudioBuffer(audioBuffer);
-            }
-          }
-
-          if (!primaryBuffer) {
-            console.warn(
-              `[AudioPage] Skipping track ${savedTrack.id} - could not resolve buffer`
+          if (!segmentToneBuffer) {
+            console.error(
+              `[AudioPage] CRITICAL: Skipping segment ${segment.id} on track ${savedTrack.id} - missing buffer!`
             );
             continue;
           }
 
-          const trackData = {
-            ...savedTrack,
-            buffer: primaryBuffer,
-            segments:
-              hydratedSegments.length > 0 ? hydratedSegments : undefined,
-            effects: savedTrack.effects,
-            enabledEffects: savedTrack.enabledEffects || {},
+          const hydratedSegment = {
+            ...segment,
+            assetId: segAssetId,
+            buffer: segmentToneBuffer,
           };
+          
+          console.log(`[AudioPage] Hydrated segment ${segment.id}:`, {
+            assetId: hydratedSegment.assetId,
+            hasBuffer: !!hydratedSegment.buffer,
+            bufferDuration: hydratedSegment.buffer ? (hydratedSegment.buffer.duration || hydratedSegment.buffer.get?.()?.duration) : null
+          });
 
-          audioManager.addTrackFromBuffer(trackData);
+          hydratedSegments.push(hydratedSegment);
         }
-
-        setTracks([...audioManager.tracks]);
-
-        // Reload engine
-        const newVersion = buildVersionFromTracks(audioManager.tracks);
-        if (engineRef.current) {
-          try {
-            if (newVersion) {
-              await engineRef.current.load(newVersion);
-            } else {
-              await engineRef.current.load(EMPTY_VERSION);
-            }
-            console.log("[AudioPage] Engine reloaded");
-          } catch (e) {
-            console.error("Failed to reload engine:", e);
-          }
-        }
-      } catch (error) {
-        console.error("Failed to load session tracks:", error);
       }
-    };
+
+      let primaryBuffer = hydratedSegments[0]?.buffer ?? null;
+      if (!primaryBuffer && savedTrack.assetId) {
+        primaryBuffer = await getToneBufferForAsset(savedTrack.assetId);
+      }
+      if (!primaryBuffer && savedTrack.segments?.length) {
+        const fallbackSerialized = savedTrack.segments.find(
+          (seg) => seg?.buffer?.channels
+        );
+        if (fallbackSerialized?.buffer) {
+          const audioBuffer = deserializeAudioBuffer(
+            fallbackSerialized.buffer
+          );
+          primaryBuffer = new Tone.ToneAudioBuffer(audioBuffer);
+        }
+      }
+
+      if (!primaryBuffer) {
+        console.warn(
+          `[AudioPage] Skipping track ${savedTrack.id} - could not resolve buffer`
+        );
+        continue;
+      }
+
+      const trackData = {
+        ...savedTrack,
+        buffer: primaryBuffer,
+        segments:
+          hydratedSegments.length > 0 ? hydratedSegments : undefined,
+        effects: savedTrack.effects,
+        enabledEffects: savedTrack.enabledEffects || {},
+      };
+
+      console.log(`[AudioPage] Creating track from hydrated data:`, {
+        id: savedTrack.id,
+        name: savedTrack.name,
+        segmentCount: trackData.segments?.length || 0,
+        segments: trackData.segments?.map(s => ({id: s.id, assetId: s.assetId}))
+      });
+
+      audioManager.addTrackFromBuffer(trackData);
+    }
+
+    setTracks([...audioManager.tracks]);
+
+    console.log(`[AudioPage] Final audioManager.tracks:`, audioManager.tracks.map(t => ({
+      id: t.id,
+      name: t.name,
+      segmentCount: t.segments?.length || 0
+    })));
+
+    // Reload engine
+    const newVersion = buildVersionFromTracks(audioManager.tracks);
+    if (engineRef.current) {
+      try {
+        if (newVersion) {
+          await engineRef.current.load(newVersion);
+        } else {
+          await engineRef.current.load(EMPTY_VERSION);
+        }
+        console.log("[AudioPage] Engine reloaded");
+      } catch (e) {
+        console.error("Failed to reload engine:", e);
+      }
+    }
+  } catch (error) {
+    console.error("Failed to load session tracks:", error);
+  }
+};
 
     loadSessionTracks();
   }, [activeSession]);
@@ -691,171 +780,135 @@ function AudioPage() {
 
   // Handle dropping an asset from the assets tab to create a new track OR append to existing
   const handleAssetDrop = async (
-    assetId,
-    targetTrackId = null,
-    timelinePositionMs = 0
-  ) => {
-    try {
-      console.log(`Dropping asset ${assetId}`, {
-        targetTrackId,
-        timelinePositionMs,
+  assetId,
+  targetTrackId = null,
+  timelinePositionMs = 0
+) => {
+  try {
+    console.log(`Dropping asset ${assetId}`, {
+      targetTrackId,
+      timelinePositionMs,
+    });
+
+    // Get the asset from the database first
+    const asset = await dbManager.getAsset(assetId);
+    if (!asset) {
+      console.error("Asset not found:", assetId);
+      alert("Asset not found in database");
+      return;
+    }
+
+    // Check if we have a cached buffer for this asset
+    let toneBuffer = assetBufferCache.get(assetId);
+
+    if (toneBuffer) {
+      console.log(`Using cached buffer for asset ${assetId}`);
+    } else {
+      console.log(`Decoding buffer for asset ${assetId}`);
+      toneBuffer = await buildToneBufferFromAssetRecord(asset);
+
+      if (!toneBuffer) {
+        console.error("Asset has no valid buffer data");
+        alert("Asset has no valid audio buffer data");
+        return;
+      }
+
+      assetBufferCache.set(assetId, toneBuffer);
+      console.log(
+        `Cached buffer for asset ${assetId}, cache size: ${assetBufferCache.size}`
+      );
+    }
+
+    // Get the native AudioBuffer from toneBuffer for metadata
+    const audioBuffer =
+      typeof toneBuffer.get === "function" ? toneBuffer.get() : null;
+
+    if (!audioBuffer) {
+      console.error("Tone buffer did not provide an AudioBuffer");
+      alert("Asset could not be decoded for playback");
+      return;
+    }
+
+    const segmentId = `seg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const durationSeconds = audioBuffer.duration;
+    const durationMs = Math.round(durationSeconds * 1000);
+
+    // If targetTrackId is provided, append to existing track
+    if (targetTrackId) {
+      const track = audioManager.getTrack(targetTrackId);
+      if (!track) {
+        console.error("Target track not found:", targetTrackId);
+        alert("Target track not found");
+        return;
+      }
+
+      console.log(
+        `Appending segment to track ${targetTrackId} at ${timelinePositionMs}ms`
+      );
+
+      // Create new segment with explicit assetId
+      const newSegment = {
+        id: segmentId,
+        assetId: assetId,  // CRITICAL: Set assetId explicitly
+        buffer: toneBuffer,
+        offset: 0,
+        duration: durationSeconds,
+        durationMs,
+        startOnTimelineMs: Math.round(timelinePositionMs),
+        startInFileMs: 0,
+      };
+
+      console.log(`Created new segment with assetId ${assetId}:`, {
+        segmentId,
+        assetId: newSegment.assetId,
+        startOnTimelineMs: newSegment.startOnTimelineMs,
       });
 
-      // Get the asset from the database first
-      const asset = await dbManager.getAsset(assetId);
-      if (!asset) {
-        console.error("Asset not found:", assetId);
-        alert("Asset not found in database");
-        return;
+      // Add segment to track with automatic spacing
+      const positionedSegments = insertSegmentWithSpacing(
+        track.segments,
+        newSegment
+      );
+      
+      // Verify assetId was preserved after spacing
+      const insertedSegment = positionedSegments.find(seg => seg.id === segmentId);
+      if (insertedSegment && !insertedSegment.assetId) {
+        console.error("CRITICAL: assetId lost during insertSegmentWithSpacing!");
+        insertedSegment.assetId = assetId;
       }
+      
+      console.log(`After spacing, segment ${segmentId} has assetId:`, insertedSegment?.assetId);
+      
+      track.segments = positionedSegments;
 
-      // Check if we have a cached buffer for this asset
-      let toneBuffer = assetBufferCache.get(assetId);
-
-      if (toneBuffer) {
-        console.log(`Using cached buffer for asset ${assetId}`);
-      } else {
-        console.log(`Decoding buffer for asset ${assetId}`);
-        toneBuffer = await buildToneBufferFromAssetRecord(asset);
-
-        if (!toneBuffer) {
-          console.error("Asset has no valid buffer data");
-          alert("Asset has no valid audio buffer data");
-          return;
+      // Double-check all segments have proper assetIds before saving
+      console.log(`[handleAssetDrop] About to save track ${targetTrackId} with ${track.segments.length} segments:`);
+      track.segments.forEach((seg, idx) => {
+        console.log(`  Segment ${idx}: id=${seg.id}, assetId=${seg.assetId}, startMs=${seg.startOnTimelineMs}`);
+        if (!seg.assetId) {
+          console.error(`CRITICAL: Segment ${idx} (${seg.id}) missing assetId before DB save!`);
+          // Emergency fix: if this is the new segment, use the assetId we just added
+          if (seg.id === segmentId) {
+            console.log(`  Emergency fix: Setting assetId to ${assetId}`);
+            seg.assetId = assetId;
+          }
         }
+      });
 
-        assetBufferCache.set(assetId, toneBuffer);
-        console.log(
-          `Cached buffer for asset ${assetId}, cache size: ${assetBufferCache.size}`
-        );
+      // Update in database
+      console.log(`[handleAssetDrop] Calling dbManager.updateTrack for track ${targetTrackId}`);
+      await dbManager.updateTrack(track);
+      console.log("Track updated with new segment");
+
+      // Verify what was saved to the database
+      const savedTrack = await dbManager.getAllTracks(activeSession).then(tracks => 
+        tracks.find(t => t.id === targetTrackId)
+      );
+      
+      if (savedTrack) {
+        const savedSegment = savedTrack.segments?.find(s => s.id === segmentId);
+        console.log(`Verified in DB - segment ${segmentId} has assetId:`, savedSegment?.assetId);
       }
-
-      // Get the native AudioBuffer from toneBuffer for metadata
-      const audioBuffer =
-        typeof toneBuffer.get === "function" ? toneBuffer.get() : null;
-
-      if (!audioBuffer) {
-        console.error("Tone buffer did not provide an AudioBuffer");
-        alert("Asset could not be decoded for playback");
-        return;
-      }
-
-      const segmentId = `seg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      const durationSeconds = audioBuffer.duration;
-      const durationMs = Math.round(durationSeconds * 1000);
-
-      // If targetTrackId is provided, append to existing track
-      if (targetTrackId) {
-        const track = audioManager.getTrack(targetTrackId);
-        if (!track) {
-          console.error("Target track not found:", targetTrackId);
-          alert("Target track not found");
-          return;
-        }
-
-        console.log(
-          `Appending segment to track ${targetTrackId} at ${timelinePositionMs}ms`
-        );
-
-        // Create new segment
-        const newSegment = {
-          id: segmentId,
-          assetId,
-          buffer: toneBuffer,
-          offset: 0,
-          duration: durationSeconds,
-          durationMs,
-          startOnTimelineMs: Math.round(timelinePositionMs),
-          startInFileMs: 0,
-        };
-
-        // Add segment to track with automatic spacing
-        const positionedSegments = insertSegmentWithSpacing(
-          track.segments,
-          newSegment
-        );
-        track.segments = positionedSegments;
-
-        // Update in database
-        await dbManager.updateTrack(track);
-        console.log("Track updated with new segment");
-
-        // Update React state
-        setTracks([...audioManager.tracks]);
-
-        // Rebuild and reload engine
-        const newVersion = buildVersionFromTracks(audioManager.tracks);
-        if (newVersion && engineRef.current) {
-          await engineRef.current.load(newVersion);
-          console.log("Engine reloaded after segment append");
-        }
-
-        console.log("Segment appended to track successfully");
-        return;
-      }
-
-      // Otherwise, create a new track
-      console.log(`Creating new track from asset ${assetId}`);
-
-      // Save to database first with current session to get the DB-assigned ID
-      const trackData = {
-        name: asset.name,
-        color: `hsl(${Math.random() * 360}, 70%, 50%)`,
-        assetId: assetId,
-        enabledEffects: {}, // Initialize empty enabledEffects
-        segments: [
-          {
-            id: segmentId,
-            assetId,
-            offset: 0,
-            duration: durationSeconds,
-            durationMs,
-            startOnTimelineMs: 0,
-            startInFileMs: 0,
-          },
-        ],
-        volume: 0,
-        pan: 0,
-        mute: false,
-        solo: false,
-      };
-
-      console.log("Track data for DB:", trackData);
-
-      // Save to database with current session
-      const dbId = await dbManager.addTrack(trackData, activeSession);
-      console.log("Track saved to DB with ID:", dbId);
-
-      // Now create the track for audioManager
-      const newTrack = {
-        id: dbId,
-        name: asset.name,
-        color: trackData.color,
-        buffer: toneBuffer,
-        enabledEffects: {}, // Initialize empty enabledEffects
-        segments: [
-          {
-            id: segmentId,
-            assetId,
-            buffer: toneBuffer,
-            offset: 0,
-            duration: durationSeconds,
-            durationMs,
-            startOnTimelineMs: 0,
-            startInFileMs: 0,
-          },
-        ],
-        volume: 0,
-        pan: 0,
-        mute: false,
-        solo: false,
-      };
-
-      console.log("Track object for audioManager:", newTrack);
-
-      // Add to audioManager
-      const createdTrack = audioManager.addTrackFromBuffer(newTrack);
-      console.log("Track added to audioManager:", createdTrack);
 
       // Update React state
       setTracks([...audioManager.tracks]);
@@ -864,16 +917,94 @@ function AudioPage() {
       const newVersion = buildVersionFromTracks(audioManager.tracks);
       if (newVersion && engineRef.current) {
         await engineRef.current.load(newVersion);
-        console.log("Engine reloaded after asset drop");
+        console.log("Engine reloaded after segment append");
       }
 
-      console.log("Track created from asset successfully");
-    } catch (error) {
-      console.error("Failed to create track from asset:", error);
-      console.error("Error stack:", error.stack);
-      alert(`Failed to create track from asset: ${error.message}`);
+      console.log("Segment appended to track successfully");
+      return;
     }
-  };
+
+    // Otherwise, create a new track
+    console.log(`Creating new track from asset ${assetId}`);
+
+    // Save to database first with current session to get the DB-assigned ID
+    const trackData = {
+      name: asset.name,
+      color: `hsl(${Math.random() * 360}, 70%, 50%)`,
+      assetId: assetId,
+      enabledEffects: {},
+      segments: [
+        {
+          id: segmentId,
+          assetId: assetId,  // CRITICAL: Set assetId explicitly
+          offset: 0,
+          duration: durationSeconds,
+          durationMs,
+          startOnTimelineMs: 0,
+          startInFileMs: 0,
+        },
+      ],
+      volume: 0,
+      pan: 0,
+      mute: false,
+      solo: false,
+    };
+
+    console.log("Track data for DB:", trackData);
+
+    // Save to database with current session
+    const dbId = await dbManager.addTrack(trackData, activeSession);
+    console.log("Track saved to DB with ID:", dbId);
+
+    // Now create the track for audioManager
+    const newTrack = {
+      id: dbId,
+      name: asset.name,
+      color: trackData.color,
+      buffer: toneBuffer,
+      assetId: assetId,  // Track-level assetId
+      enabledEffects: {},
+      segments: [
+        {
+          id: segmentId,
+          assetId: assetId,  // CRITICAL: Segment-level assetId
+          buffer: toneBuffer,
+          offset: 0,
+          duration: durationSeconds,
+          durationMs,
+          startOnTimelineMs: 0,
+          startInFileMs: 0,
+        },
+      ],
+      volume: 0,
+      pan: 0,
+      mute: false,
+      solo: false,
+    };
+
+    console.log("Track object for audioManager:", newTrack);
+
+    // Add to audioManager
+    const createdTrack = audioManager.addTrackFromBuffer(newTrack);
+    console.log("Track added to audioManager:", createdTrack);
+
+    // Update React state
+    setTracks([...audioManager.tracks]);
+
+    // Rebuild and reload engine
+    const newVersion = buildVersionFromTracks(audioManager.tracks);
+    if (newVersion && engineRef.current) {
+      await engineRef.current.load(newVersion);
+      console.log("Engine reloaded after asset drop");
+    }
+
+    console.log("Track created from asset successfully");
+  } catch (error) {
+    console.error("Failed to create track from asset:", error);
+    console.error("Error stack:", error.stack);
+    alert(`Failed to create track from asset: ${error.message}`);
+  }
+};
 
   function cutSegmentByRange(segment, cutStartMs, cutEndMs) {
     if (!segment)

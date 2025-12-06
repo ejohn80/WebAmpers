@@ -6,9 +6,26 @@ const clampMs = (value) => {
   return Math.max(0, Math.round(value));
 };
 
-const cloneSegment = (segment) => ({
-  ...segment,
-});
+// FIXED: Ensure ALL properties are preserved when cloning
+const cloneSegment = (segment) => {
+  if (!segment) return null;
+  
+  // Create a deep copy that preserves all properties including assetId
+  return {
+    ...segment,
+    // Explicitly preserve critical properties that must not be lost
+    id: segment.id,
+    assetId: segment.assetId,
+    buffer: segment.buffer,
+    offset: segment.offset,
+    duration: segment.duration,
+    durationMs: segment.durationMs,
+    startOnTimelineMs: segment.startOnTimelineMs,
+    startInFileMs: segment.startInFileMs,
+    startOnTimeline: segment.startOnTimeline,
+    // Preserve any other properties via spread
+  };
+};
 
 const getStartMs = (segment) => {
   if (!segment) return 0;
@@ -183,6 +200,8 @@ export const resolveSegmentStart = (
  * Insert a segment into the provided list while ensuring there are no overlaps.
  * Subsequent segments are shifted to the right if necessary to make room.
  * Returns a new array without mutating the original segment list.
+ * 
+ * CRITICAL: All segment properties (especially assetId) are preserved through cloning
  */
 export const insertSegmentWithSpacing = (segments = [], candidateSegment) => {
   if (!candidateSegment) {
@@ -194,6 +213,12 @@ export const insertSegmentWithSpacing = (segments = [], candidateSegment) => {
     : [];
 
   const newSegment = cloneSegment(candidateSegment);
+  
+  // Preserve assetId explicitly
+  if (candidateSegment.assetId && !newSegment.assetId) {
+    newSegment.assetId = candidateSegment.assetId;
+  }
+  
   const segmentDuration = getDurationMs(newSegment);
   if (!Number.isFinite(newSegment.durationMs) && segmentDuration > 0) {
     newSegment.durationMs = segmentDuration;
@@ -222,7 +247,10 @@ export const insertSegmentWithSpacing = (segments = [], candidateSegment) => {
     const prevEnd = prevStart + clampMs(prev.durationMs);
 
     if (clampMs(curr.startOnTimelineMs) < prevEnd) {
-      working[i] = applyStartTime(cloneSegment(curr), prevEnd);
+      // Clone and apply new start time while preserving all properties
+      const shifted = cloneSegment(curr);
+      applyStartTime(shifted, prevEnd);
+      working[i] = shifted;
     }
   }
 
