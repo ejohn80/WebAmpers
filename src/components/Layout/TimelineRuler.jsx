@@ -1,4 +1,5 @@
-import React, {useMemo} from "react";
+import React, {useEffect, useMemo, useRef} from "react";
+import {progressStore} from "../../playback/progressStore";
 
 /**
  * TimelineRuler
@@ -8,7 +9,9 @@ export default function TimelineRuler({
   totalLengthMs = 0,
   timelineWidth = 0,
   timelineLeftOffsetPx = 0,
+  onScrubStart = null,
 }) {
+  const playheadMarkerRef = useRef(null);
   const {
     majorTicks,
     minorTicks,
@@ -106,6 +109,26 @@ export default function TimelineRuler({
     };
   }, [totalLengthMs, timelineWidth]);
 
+  useEffect(() => {
+    const node = playheadMarkerRef.current;
+    if (!node || timelineWidth <= 0) return undefined;
+
+    const updatePosition = ({ms, lengthMs}) => {
+      const denom = totalLengthMs > 0 ? totalLengthMs : lengthMs || 0;
+      const p = denom > 0 ? Math.max(0, Math.min(1, ms / denom)) : 0;
+      const leftPx = p * timelineWidth;
+      node.style.transform = `translateX(${leftPx}px) translateX(-50%)`;
+    };
+
+    const initialState =
+      typeof progressStore.getState === "function"
+        ? progressStore.getState()
+        : {ms: 0, lengthMs: totalLengthMs};
+    updatePosition(initialState);
+    const unsubscribe = progressStore.subscribe(updatePosition);
+    return unsubscribe;
+  }, [timelineWidth, totalLengthMs]);
+
   const fmt = (ms) => {
     const s = Math.floor(ms / 1000);
     const m = Math.floor(s / 60);
@@ -120,8 +143,29 @@ export default function TimelineRuler({
     width: `${Math.max(0, Math.round(timelineWidth))}px`,
   };
 
+  const startScrubFromMouse = (event) => {
+    if (typeof onScrubStart !== "function") return;
+    if (event.button !== undefined && event.button !== 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    onScrubStart(event.clientX, "mouse");
+  };
+
+  const startScrubFromTouch = (event) => {
+    if (typeof onScrubStart !== "function") return;
+    if (!event.touches || event.touches.length === 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    onScrubStart(event.touches[0].clientX, "touch");
+  };
+
   return (
-    <div className="timeline-ruler-bar" style={rulerStyle}>
+    <div
+      className="timeline-ruler-bar"
+      style={rulerStyle}
+      onMouseDown={startScrubFromMouse}
+      onTouchStart={startScrubFromTouch}
+    >
       {preHighlightWidthPx > 0 && (
         <div
           className="timeline-pre-highlight"
@@ -168,6 +212,11 @@ export default function TimelineRuler({
           <div className="timeline-tick-label">{fmt(t)}</div>
         </div>
       ))}
+      <div
+        ref={playheadMarkerRef}
+        className="timeline-playhead-marker"
+        aria-hidden="true"
+      />
     </div>
   );
 }

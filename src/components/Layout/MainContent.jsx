@@ -20,6 +20,20 @@ const TRACK_CONTROLS_WIDTH = 180;
 const TRACK_CONTROLS_GAP = 12;
 const TRACK_ROW_PADDING = 8; // Keep in sync with --track-row-padding in CSS
 
+const extractClientX = (event) => {
+  if (!event) return null;
+  if (event.touches && event.touches.length > 0) {
+    return event.touches[0].clientX;
+  }
+  if (event.changedTouches && event.changedTouches.length > 0) {
+    return event.changedTouches[0].clientX;
+  }
+  if (typeof event.clientX === "number") {
+    return event.clientX;
+  }
+  return null;
+};
+
 function MainContent({
   tracks = [],
   onMute,
@@ -51,6 +65,9 @@ function MainContent({
   const [timelineContentWidth, setTimelineContentWidth] = useState(0);
   const [scrollAreaWidth, setScrollAreaWidth] = useState(0);
   const scrollAreaRef = useRef(null);
+  const scrubSessionRef = useRef({active: false, source: null, lastMs: null});
+  const scrubSeekRafRef = useRef(null);
+  const pendingScrubSeekRef = useRef(null);
   const [selectedSegment, setSelectedSegment] = useState(null);
 
   const clearSegmentSelection = useCallback(() => {
@@ -264,6 +281,196 @@ function MainContent({
     e.dataTransfer.dropEffect = "copy";
   };
 
+  const getTimelineMsFromClientX = useCallback(
+    (clientX) => {
+      if (!Number.isFinite(clientX)) return null;
+      if (!scrollAreaRef.current) return null;
+      if (totalLengthMs <= 0 || timelineMetrics.widthPx <= 0) return null;
+
+      const rect = scrollAreaRef.current.getBoundingClientRect();
+      const scrollLeft = scrollAreaRef.current.scrollLeft || 0;
+      const relativeX =
+        clientX - rect.left + scrollLeft - timelineMetrics.leftOffsetPx;
+      const clampedPx = Math.max(
+        0,
+        Math.min(timelineMetrics.widthPx, relativeX)
+      );
+      const pxPerMs = timelineMetrics.widthPx / totalLengthMs;
+      if (!Number.isFinite(pxPerMs) || pxPerMs <= 0) return null;
+      const ms = clampedPx / pxPerMs;
+      return Math.max(0, Math.min(totalLengthMs, ms));
+    },
+    [
+      totalLengthMs,
+      timelineMetrics.leftOffsetPx,
+      timelineMetrics.widthPx,
+    ]
+  );
+
+  const moveScrubToClientX = useCallback(
+    (clientX) => {
+      const target = getTimelineMsFromClientX(clientX);
+      if (typeof target !== "number") return null;
+      progressStore.setMs(target);
+      return target;
+    },
+    [getTimelineMsFromClientX]
+  );
+
+  const flushScheduledScrubSeek = useCallback(() => {
+    if (scrubSeekRafRef.current !== null && typeof window !== "undefined") {
+      window.cancelAnimationFrame(scrubSeekRafRef.current);
+      scrubSeekRafRef.current = null;
+    }
+    const pending = pendingScrubSeekRef.current;
+    pendingScrubSeekRef.current = null;
+    if (typeof pending === "number") {
+      try {
+        progressStore.requestSeek(pending);
+      } catch (err) {
+        console.warn("MainContent scrub seek error:", err);
+      }
+    }
+  }, []);
+
+  const scheduleScrubSeek = useCallback((ms) => {
+    if (typeof ms !== "number") return;
+    pendingScrubSeekRef.current = ms;
+
+    if (typeof window === "undefined") {
+      flushScheduledScrubSeek();
+      return;
+    }
+
+    if (scrubSeekRafRef.current !== null) return;
+    scrubSeekRafRef.current = window.requestAnimationFrame(() => {
+      scrubSeekRafRef.current = null;
+      const pending = pendingScrubSeekRef.current;
+      pendingScrubSeekRef.current = null;
+      if (typeof pending === "number") {
+        try {
+          progressStore.requestSeek(pending);
+        } catch (err) {
+          console.warn("MainContent scrub seek error:", err);
+        }
+      }
+    });
+  }, [flushScheduledScrubSeek]);
+
+  const handleScrubPointerMove = useCallback(
+    (event) => {
+      if (!scrubSessionRef.current.active) return;
+      const clientX = extractClientX(event);
+      if (!Number.isFinite(clientX)) return;
+      if (typeof event.preventDefault === "function") {
+        event.preventDefault();
+      }
+      const target = moveScrubToClientX(clientX);
+      if (typeof target === "number") {
+        scrubSessionRef.current.lastMs = target;
+        scheduleScrubSeek(target);
+      }
+    },
+    [moveScrubToClientX, scheduleScrubSeek]
+  );
+
+  const handleScrubPointerUp = useCallback(
+    (event) => {
+      if (!scrubSessionRef.current.active) return;
+      const clientX = extractClientX(event);
+      let finalMs = scrubSessionRef.current.lastMs;
+      if (Number.isFinite(clientX)) {
+        const target = moveScrubToClientX(clientX);
+        if (typeof target === "number") {
+          finalMs = target;
+        }
+      }
+      flushScheduledScrubSeek();
+      if (typeof finalMs === "number") {
+        progressStore.requestSeek(finalMs);
+      }
+      progressStore.endScrub();
+      scrubSessionRef.current = {active: false, source: null, lastMs: null};
+      if (typeof window !== "undefined") {
+        window.removeEventListener("mousemove", handleScrubPointerMove);
+        window.removeEventListener("mouseup", handleScrubPointerUp);
+        window.removeEventListener("touchmove", handleScrubPointerMove);
+        window.removeEventListener("touchend", handleScrubPointerUp);
+        window.removeEventListener("touchcancel", handleScrubPointerUp);
+      }
+    },
+    [moveScrubToClientX, handleScrubPointerMove, flushScheduledScrubSeek]
+  );
+
+  const startScrubSession = useCallback(
+    (clientX, source = "mouse") => {
+      if (scrubSessionRef.current.active) return;
+      if (!Number.isFinite(clientX)) return;
+      if (timelineMetrics.widthPx <= 0 || totalLengthMs <= 0) return;
+
+      try {
+        progressStore.beginScrub({
+          pauseTransport: true,
+          silenceDuringScrub: true,
+        });
+      } catch (err) {
+        console.warn("MainContent scrub begin error:", err);
+        return;
+      }
+
+      const target = moveScrubToClientX(clientX);
+      if (typeof target !== "number") {
+        progressStore.endScrub();
+        return;
+      }
+
+      scrubSessionRef.current = {active: true, source, lastMs: target};
+      scheduleScrubSeek(target);
+
+      if (typeof window !== "undefined") {
+        if (source === "touch") {
+          window.addEventListener("touchmove", handleScrubPointerMove, {
+            passive: false,
+          });
+          window.addEventListener("touchend", handleScrubPointerUp);
+          window.addEventListener("touchcancel", handleScrubPointerUp);
+        } else {
+          window.addEventListener("mousemove", handleScrubPointerMove);
+          window.addEventListener("mouseup", handleScrubPointerUp);
+        }
+      }
+    },
+    [
+      timelineMetrics.widthPx,
+      totalLengthMs,
+      moveScrubToClientX,
+      handleScrubPointerMove,
+      handleScrubPointerUp,
+      scheduleScrubSeek,
+    ]
+  );
+
+  useEffect(() => {
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("mousemove", handleScrubPointerMove);
+        window.removeEventListener("mouseup", handleScrubPointerUp);
+        window.removeEventListener("touchmove", handleScrubPointerMove);
+        window.removeEventListener("touchend", handleScrubPointerUp);
+        window.removeEventListener("touchcancel", handleScrubPointerUp);
+      }
+      if (scrubSessionRef.current.active) {
+        progressStore.endScrub();
+        scrubSessionRef.current = {active: false, source: null, lastMs: null};
+      }
+      flushScheduledScrubSeek();
+    };
+  }, [
+    handleScrubPointerMove,
+    handleScrubPointerUp,
+    flushScheduledScrubSeek,
+  ]);
+
   return (
     <DraggableDiv
       className={`maincontent ${isEffectsMenuOpen ? styles.blurred : ""}`}
@@ -284,12 +491,27 @@ function MainContent({
         onDrop={handleDrop}
         onDragOver={handleDragOver}
       >
+        {hasTracks && (
+          <div
+            className="global-playhead-rail"
+            style={{
+              left: `${timelineMetrics.leftOffsetPx}px`,
+              width: `${timelineMetrics.widthPx}px`,
+            }}
+          >
+            <GlobalPlayhead
+              totalLengthMs={totalLengthMs}
+              timelineWidth={timelineMetrics.widthPx}
+            />
+          </div>
+        )}
         {hasTracks ? (
           <>
             <TimelineRuler
               totalLengthMs={totalLengthMs}
               timelineWidth={timelineMetrics.widthPx}
               timelineLeftOffsetPx={timelineMetrics.leftOffsetPx}
+              onScrubStart={startScrubSession}
             />
             <div
               className="timeline-scroll-content"
@@ -298,18 +520,6 @@ function MainContent({
                 width: `${timelineMetrics.rowWidthPx}px`,
               }}
             >
-              <div
-                className="global-playhead-rail"
-                style={{
-                  left: `${timelineMetrics.leftOffsetPx}px`,
-                  width: `${timelineMetrics.widthPx}px`,
-                }}
-              >
-                <GlobalPlayhead
-                  totalLengthMs={totalLengthMs}
-                  timelineWidth={timelineMetrics.widthPx}
-                />
-              </div>
               <div
                 className="tracks-relative"
                 style={{width: `${timelineMetrics.rowWidthPx}px`}}
@@ -344,6 +554,7 @@ function MainContent({
                         onSegmentSelected={handleSegmentSelected}
                         onClearSegmentSelection={clearSegmentSelection}
                         onSegmentDelete={onSegmentDelete}
+                        onTimelineScrubStart={startScrubSession}
                       />
                     </div>
                   ))}

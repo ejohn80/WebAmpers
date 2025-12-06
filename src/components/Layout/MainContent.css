@@ -22,6 +22,7 @@
   overflow: auto;
   padding-bottom: 32px;
   scrollbar-gutter: stable both-edges;
+  position: relative;
 }
 
 .timeline-scroll-content {
@@ -51,10 +52,10 @@
   position: absolute;
   top: 0;
   bottom: 0;
-  width: 2px;
-  background: red;
+  width: 1px;
+  background: var(--timeline-playhead-color, #f44336);
   pointer-events: none;
-  z-index: 10;
+  z-index: 21;
   will-change: transform;
   transform: translate3d(0, 0, 0);
 }
@@ -67,7 +68,7 @@
   left: var(--timeline-left-offset);
   width: var(--timeline-content-width, 100%);
   pointer-events: none;
-  z-index: 10;
+  z-index: 20;
 }
 
 /* Timeline ruler overlay */
@@ -80,10 +81,24 @@
   background: var(--timeline-ruler-bg);
   border-bottom: 1px solid var(--timeline-ruler-border);
   box-shadow: var(--timeline-ruler-shadow);
-  pointer-events: none;
+  pointer-events: auto;
   z-index: 11;
   margin-bottom: 12px;
   overflow: visible;
+}
+
+.timeline-playhead-marker {
+  position: absolute;
+  top: 0;
+  width: 0;
+  height: 0;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-top: 12px solid var(--timeline-playhead-color, #f44336);
+  transform: translate(-50%, -14px);
+  pointer-events: none;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.35));
+  z-index: 50;
 }
 
 .timeline-pre-highlight {
