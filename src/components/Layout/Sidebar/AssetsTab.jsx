@@ -22,7 +22,7 @@ const AssetsTab = ({
   const [editingAssetId, setEditingAssetId] = useState(null);
   const [editingName, setEditingName] = useState("");
 
-  const { dbRefreshTrigger } = useContext(AppContext);
+  const {dbRefreshTrigger} = useContext(AppContext);
 
   // Load assets from IndexedDB
   const loadAssets = async () => {

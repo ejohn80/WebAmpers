@@ -8,8 +8,13 @@ import {dbManager} from "../../../managers/DBManager";
 import styles from "../Layout.module.css";
 
 function SessionsTab() {
-  const {activeSession, setActiveSession, effects, setEffects, dbRefreshTrigger} =
-    useContext(AppContext);
+  const {
+    activeSession,
+    setActiveSession,
+    effects,
+    setEffects,
+    dbRefreshTrigger,
+  } = useContext(AppContext);
 
   const [isLoading, setIsLoading] = useState(true);
   const [sessions, setSessions] = useState([]);

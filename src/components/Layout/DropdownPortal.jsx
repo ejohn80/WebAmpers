@@ -800,7 +800,7 @@ function DropdownPortal({
           onClose={() => setIsLoadModalOpen(false)}
           onLoadComplete={(stats) => {
             console.log("Session loaded:", stats);
-            
+
             // Switch to the newly created session
             setActiveSession(stats.sessionId);
           }}

@@ -1,16 +1,16 @@
-import React, { useState, useEffect, useContext } from "react";
-import { MoonLoader } from "react-spinners";
-import { FaTrash, FaDownload, FaSave } from "react-icons/fa";
-import { RxCross2 } from "react-icons/rx";
-import { useCloudStorage } from "../hooks/useCloudStorage";
+import React, {useState, useEffect, useContext} from "react";
+import {MoonLoader} from "react-spinners";
+import {FaTrash, FaDownload, FaSave} from "react-icons/fa";
+import {RxCross2} from "react-icons/rx";
+import {useCloudStorage} from "../hooks/useCloudStorage";
 import styles from "./SaveLoadModal.module.css";
-import { AppContext } from "../context/AppContext";
-import { formatDate, formatSize } from "../utils/formatUtils";
+import {AppContext} from "../context/AppContext";
+import {formatDate, formatSize} from "../utils/formatUtils";
 
 /**
  * Modal component for saving and loading sessions from Firebase
  */
-function SaveLoadModal({ isOpen, onClose, onLoadComplete, mode = "save" }) {
+function SaveLoadModal({isOpen, onClose, onLoadComplete, mode = "save"}) {
   const {
     isSaving,
     isLoading,
@@ -27,7 +27,7 @@ function SaveLoadModal({ isOpen, onClose, onLoadComplete, mode = "save" }) {
   const [projectName, setProjectName] = useState("");
   const [localError, setLocalError] = useState(null);
 
-  const { refreshDB } = useContext(AppContext);
+  const {refreshDB} = useContext(AppContext);
 
   useEffect(() => {
     if (isOpen && mode === "load" && isAuthenticated) {
@@ -62,12 +62,12 @@ function SaveLoadModal({ isOpen, onClose, onLoadComplete, mode = "save" }) {
     const stats = await loadSession(fileName);
     if (stats) {
       console.log("Session loaded successfully:", stats);
-      
+
       // Notify parent with the new session ID
       onLoadComplete?.(stats);
-      
+
       // Trigger DB (for assets and sessions to update)
-      refreshDB()
+      refreshDB();
 
       onClose();
     }
@@ -159,7 +159,9 @@ function SaveLoadModal({ isOpen, onClose, onLoadComplete, mode = "save" }) {
                       onClick={() => handleLoad(save.name)}
                     >
                       <div className={styles.saveInfo}>
-                        <span className={styles.saveName}>{save.projectName}</span>
+                        <span className={styles.saveName}>
+                          {save.projectName}
+                        </span>
                         <span className={styles.saveMeta}>
                           {formatDate(save.savedAt)} - {formatSize(save.size)}
                         </span>
@@ -190,9 +192,7 @@ function SaveLoadModal({ isOpen, onClose, onLoadComplete, mode = "save" }) {
 
           {/* Errors */}
           {(error || localError) && (
-            <div className={styles.error}>
-              {error || localError}
-            </div>
+            <div className={styles.error}>{error || localError}</div>
           )}
         </div>
       </div>
