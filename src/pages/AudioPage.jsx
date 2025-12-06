@@ -846,7 +846,7 @@ function AudioPage() {
         segments: [
           {
             id: segmentId,
-            assetId: assetId, // CRITICAL: Segment-level assetId
+            assetId: assetId,
             buffer: toneBuffer,
             offset: 0,
             duration: durationSeconds,

@@ -111,7 +111,6 @@ class DBManager {
   serializeSegmentForStorage(segment, defaultAssetId = null) {
     if (!segment) return null;
 
-    // CRITICAL FIX: Always prioritize the segment's own assetId
     // Do NOT use defaultAssetId if segment.assetId exists
     const segAssetId = segment.assetId ?? segment.asset?.id ?? null;
 
@@ -388,7 +387,6 @@ class DBManager {
         );
       }
 
-      // FIX: Always let IndexedDB assign the ID for new tracks
       // Remove any client-generated string ID so IndexedDB assigns a numeric one
       const hasId =
         typeof storableTrack.id !== "undefined" && storableTrack.id !== null;

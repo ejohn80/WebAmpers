@@ -93,7 +93,6 @@ class AudioManager {
     if (Array.isArray(audioData.segments) && audioData.segments.length > 0) {
       // Rehydrate each segment from stored data
       for (const s of audioData.segments) {
-        // CRITICAL FIX: Use the segment's own buffer first, not the track's buffer
         let segToneBuf = s.buffer || toneBuffer;
 
         console.log(`[AudioManager] Processing segment ${s.id}:`, {
