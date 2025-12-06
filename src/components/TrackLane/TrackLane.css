@@ -6,18 +6,18 @@
   flex-direction: column;
   gap: 6px;
   align-self: stretch;
-  padding-right: 6px;
-  background: var(--surface-strong);
+  background: var(--tracklane-button-box);
   position: sticky;
   left: 0;
   z-index: 5;
+  border-radius: 6px;
 }
 
 .tracklane-root {
   display: flex;
   gap: var(--track-controls-gap);
   align-items: stretch;
-  background: var(--surface-strong);
+  background: var(--waveform-background);
   color: var(--app-text);
   padding: var(--track-row-padding, 8px);
   border-radius: 6px;
@@ -35,14 +35,8 @@
   flex: 1 1 auto;
   display: flex;
   flex-direction: column;
+  background: var(--tracklane-button-box);
 }
-
-/* .tracklane-header {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  margin-bottom: 4px;
-} */
 
 .tracklane-title {
   font-weight: 600;
@@ -51,14 +45,13 @@
 }
 
 .tracklane-track-number {
-  font-size: 10px;
-  color: var(--muted-text);
-  font-weight: 400;
+  font-size: 12px;
+  color: var(--track-text);
+  font-weight: 600;
 }
 
 .tracklane-controls-box {
-  background: var(--surface-subtle);
-  border: 1px solid var(--surface-border);
+  background: var(--tracklane-button-box);
   padding: 8px;
   border-radius: 6px;
   display: flex;
@@ -83,20 +76,32 @@
 }
 
 .tl-btn {
-  background: var(--button-bg, var(--surface-subtle));
+  background: var(--mute-btn-bg, var(--surface-subtle));
   color: var(--app-text);
-  border: 1px solid var(--button-border);
   padding: 6px 8px;
-  border-radius: 4px;
-  font-size: 11px;
+  border-radius: 3px;
+  font-size: 13px;
   cursor: pointer;
   transition: all 0.15s ease;
-  white-space: nowrap;
+  letter-spacing: -0.55px;
+  font-weight: bold;
+  border: none;
 }
 
-.tl-btn:hover:not(:disabled) {
-  background: var(--surface-hover);
-  border-color: var(--surface-active);
+.tl-btn-audio {
+  background: var(--mute-btn-bg, var(--surface-subtle));
+  color: var(--mute-btn-color, var(--app-text));
+}
+
+.tl-btn:hover {
+  background: var(--mute-btn-hover, var(--surface-subtle));
+  color: var(--mute-btn-color, var(--app-text));
+}
+
+.tl-btn-audio.tl-btn--active {
+  background: var(--mute-btn-active-bg);
+  color: var(--mute-btn-active-color);
+  border-color: var(--mute-btn-active-bg);
 }
 
 .tl-btn:disabled {
@@ -111,20 +116,14 @@
 }
 
 .tl-btn-delete {
-  background: var(--danger-bg);
-  color: var(--danger-strong);
-  border-color: var(--danger-border);
+  background: var(--mute-btn-bg, var(--surface-subtle));
+  color: var(--mute-btn-color, var(--app-text));
+  border: none;
 }
 
 .tl-btn-delete:hover {
   background: var(--danger-hover);
   border-color: var(--danger-border-strong);
-}
-
-.tracklane-divider {
-  height: 1px;
-  background: var(--divider);
-  margin: 4px 0;
 }
 
 /* Timeline container for positioned segments */
@@ -283,8 +282,6 @@
   margin: 6px 0;
   background: var(--context-divider);
 }
-
-/* Add this to your TrackLane.css */
 
 .tracklane-title-overlay {
   position: absolute;

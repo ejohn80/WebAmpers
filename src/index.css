@@ -10,10 +10,12 @@
   --app-text: #e5e5e5;
   --menu-text: #e5e5e5;
   --menu-muted: #b7b7b7;
-  --panel-bg: #262529;
+  --panel-bg: #1e1d20;
   --panel-border: #333239;
   --panel-hover: #333239;
-  --surface-strong: #2f2f2f;
+  --surface-strong: #1a1a1a;
+  --tracklane-button-box: #1b1b1b;
+  --waveform-background: #111111;
   --surface-subtle: rgba(255, 255, 255, 0.02);
   --surface-border: rgba(255, 255, 255, 0.03);
   --surface-hover: rgba(255, 255, 255, 0.08);
@@ -23,15 +25,16 @@
   --footer-bg: #242424;
   --footer-border: #333239;
   --section-text: #e5e5e5;
-  --maincontent-bg: #1f1f1f;
+  --maincontent-bg: #1e1d20;
   --divider-strong: rgba(255, 255, 255, 0.06);
   --timeline-bg: rgba(0, 0, 0, 0.2);
   --divider: rgba(255, 255, 255, 0.05);
   --muted-text: #999;
+  --track-text: #c0bfbf;
   --button-border: rgba(255, 255, 255, 0.06);
   --danger-bg: rgba(220, 53, 69, 0.15);
   --danger-border: rgba(220, 53, 69, 0.3);
-  --danger-hover: rgba(220, 53, 69, 0.25);
+  --danger-hover: rgba(220, 53, 69, 0.5);
   --danger-border-strong: rgba(220, 53, 69, 0.5);
   --danger-strong: #ff6b6b;
   --danger-strong-hover: rgba(220, 53, 69, 0.2);
@@ -73,7 +76,7 @@
   --scrollbar-thumb-hover: rgba(255, 255, 255, 0.3);
   --sidebar-panel-bg: #0f0f0f;
   --sidebar-panel-surface: #2a2a2a;
-  --sidebar-panel-border: #333;
+  --sidebar-panel-border: #343239;
   --sidebar-panel-hover: #333;
   --sidebar-panel-text: #ffffff;
   --sidebar-panel-muted: #888;
@@ -235,7 +238,17 @@
     #096b7a 100%
   );
   --sampler-loading-overlay-bg: rgba(30, 29, 32, 0.9);
+  --mute-btn-bg: #272727;
+  --mute-btn-hover: #303030;
+  --mute-btn-active-bg: #17e1ff;
+  --mute-btn-color: #a0a09f;
+  --mute-btn-active-color: #000;
+  --main-content-background: #1e1d20;
 }
+
+/* ======================================================================
+   Light mode themes
+   ====================================================================== */
 
 .theme-light {
   --app-bg: #f4f6fb;
@@ -478,6 +491,9 @@
   );
   --sampler-loading-overlay-bg: rgba(255, 255, 255, 0.9);
   --sampler-button-select-bg: var(--eq-select-bg);
+  --mute-btn-bg: rgba(0, 0, 0, 0.05);
+  --mute-btn-active-bg: #d45252; /* Darker red for light theme */
+  --mute-btn-active-color: #ffffff;
 }
 
 html,

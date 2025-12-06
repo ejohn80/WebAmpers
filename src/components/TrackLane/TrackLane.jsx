@@ -588,45 +588,35 @@ const TrackLane = memo(function TrackLane({
         onContextMenu={handleContextMenu}
       >
         <div className="tracklane-side">
-          {showTitle && (
-            <div className="tracklane-header">
-              <div className="tracklane-title">
-                {track.name ?? "Untitled Track"}
-              </div>
+          <div className="tracklane-controls-box">
+            <div className="tracklane-controls">
               <div className="tracklane-track-number">
                 Track {trackIndex + 1} of {totalTracks}
               </div>
-            </div>
-          )}
-
-          <div className="tracklane-controls-box">
-            <div className="tracklane-controls">
               <button
-                className={`tl-btn tl-btn-mute ${muted ? "tl-btn--active" : ""}`}
+                className={`tl-btn tl-btn-audio ${muted ? "tl-btn--active" : ""}`}
                 onClick={toggleMute}
                 aria-pressed={muted}
                 title={muted ? "Unmute track" : "Mute track"}
               >
-                {muted ? "Muted" : "Mute"}
+                {"MUTE"}
               </button>
 
               <button
-                className={`tl-btn tl-btn-solo ${soloed ? "tl-btn--active" : ""}`}
+                className={`tl-btn tl-btn-audio ${soloed ? "tl-btn--active" : ""}`}
                 onClick={toggleSolo}
                 aria-pressed={soloed}
                 title={soloed ? "Unsolo track" : "Solo track"}
               >
-                {soloed ? "Soloed" : "Solo"}
+                {"SOLO"}
               </button>
-
-              <div className="tracklane-divider" />
 
               <button
                 className="tl-btn tl-btn-delete"
                 onClick={handleDelete}
                 title="Delete track"
               >
-                Delete
+                DELETE
               </button>
             </div>
           </div>
@@ -645,9 +635,6 @@ const TrackLane = memo(function TrackLane({
               <div className="tracklane-title-overlay">
                 <div className="tracklane-title">
                   {track.name ?? "Untitled Track"}
-                </div>
-                <div className="tracklane-track-number">
-                  Track {trackIndex + 1} of {totalTracks}
                 </div>
               </div>
             )}

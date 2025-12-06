@@ -11,12 +11,10 @@ html,
 
 /* Header specific styling */
 .header {
-  background-color: var(--header-bg);
   position: relative;
   z-index: 9999;
   overflow: visible;
   border-bottom: 2px solid var(--header-border);
-  /* border-top: 1px solid black; */
 }
 
 /* Main application container, uses CSS Grid for overall layout */
@@ -47,11 +45,6 @@ html,
   padding: 0 10px; /* reduce vertical padding so controls sit centered */
   height: 100%;
   box-sizing: border-box;
-}
-
-/* Main content (center area) override — use a dark grey so TrackLane can be lighter */
-.maincontent {
-  background-color: var(--maincontent-bg) !important;
 }
 
 /* --- Main Content Area Styling (The Core Grid) --- */
