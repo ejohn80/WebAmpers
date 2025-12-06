@@ -38,6 +38,7 @@ function MainContent({
 }) {
   const {selectedTrackId, setSelectedTrackId, isEffectsMenuOpen} =
     useContext(AppContext);
+  const initialProgress = useMemo(() => progressStore.getState(), []);
 
   // Default visible window length (in ms) before horizontal scrolling is needed
   // Timeline scale is driven by pixels-per-second instead of a fixed window length
@@ -53,6 +54,19 @@ function MainContent({
   const [scrollAreaWidth, setScrollAreaWidth] = useState(0);
   const scrollAreaRef = useRef(null);
   const [selectedSegment, setSelectedSegment] = useState(null);
+  const [playheadMs, setPlayheadMs] = useState(() => initialProgress?.ms || 0);
+  const playheadMsRef = useRef(playheadMs);
+
+  useEffect(() => {
+    playheadMsRef.current = playheadMs;
+  }, [playheadMs]);
+
+  useEffect(() => {
+    const unsubscribe = progressStore.subscribe(({ms}) => {
+      setPlayheadMs(ms || 0);
+    });
+    return unsubscribe;
+  }, []);
 
   const clearSegmentSelection = useCallback(() => {
     setSelectedSegment(null);
@@ -130,6 +144,48 @@ function MainContent({
     const rowWidthPx = widthPx + leftOffsetPx + TRACK_ROW_PADDING;
     return {widthPx, leftOffsetPx, rowWidthPx};
   }, [timelineContentWidth, scrollAreaWidth]);
+
+  const clampZoom = useCallback((value) => {
+    const sanitized = Number.isFinite(value) ? value : 1;
+    return Number(
+      Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, sanitized)).toFixed(2)
+    );
+  }, []);
+
+  const adjustScrollForZoom = useCallback(
+    (prevZoom, nextZoom) => {
+      const node = scrollAreaRef.current;
+      const lengthMs = Math.max(0, totalLengthMs || 0);
+      if (!node || !lengthMs) return;
+
+      const currentWidth = timelineMetrics.widthPx;
+      if (!currentWidth || prevZoom === 0) return;
+
+      const ratio = nextZoom / prevZoom;
+      if (!Number.isFinite(ratio) || ratio === 1) return;
+
+      const newWidth = currentWidth * ratio;
+      const anchorRatio = Math.max(
+        0,
+        Math.min(1, playheadMsRef.current / lengthMs)
+      );
+      const deltaPx = anchorRatio * (newWidth - currentWidth);
+
+      const newRowWidth =
+        newWidth + timelineMetrics.leftOffsetPx + TRACK_ROW_PADDING;
+      const viewportWidth = node.clientWidth || 0;
+      const maxScroll = Math.max(0, newRowWidth - viewportWidth);
+      const desiredScroll = Math.min(
+        Math.max(0, node.scrollLeft + deltaPx),
+        maxScroll
+      );
+
+      if (Number.isFinite(desiredScroll)) {
+        node.scrollLeft = desiredScroll;
+      }
+    },
+    [timelineMetrics.leftOffsetPx, timelineMetrics.widthPx, totalLengthMs]
+  );
 
   // === OPTIMIZED SCROLLING LOGIC ===
   // This replaces the old state-based scrolling.
@@ -212,11 +268,24 @@ function MainContent({
 
   const hasTracks = Array.isArray(tracks) && tracks.length > 0;
 
-  const zoomIn = () =>
-    setZoom((z) => Math.min(MAX_ZOOM, Number((z + 0.25).toFixed(2))));
-  const zoomOut = () =>
-    setZoom((z) => Math.max(MIN_ZOOM, Number((z - 0.25).toFixed(2))));
-  const resetZoom = () => setZoom(1);
+  const setZoomWithCompensation = useCallback(
+    (computeNext) => {
+      setZoom((prevZoom) => {
+        const desired = computeNext(prevZoom);
+        const nextZoom = clampZoom(desired);
+        if (nextZoom === prevZoom) {
+          return prevZoom;
+        }
+        adjustScrollForZoom(prevZoom, nextZoom);
+        return nextZoom;
+      });
+    },
+    [adjustScrollForZoom, clampZoom]
+  );
+
+  const zoomIn = () => setZoomWithCompensation((z) => z + 0.25);
+  const zoomOut = () => setZoomWithCompensation((z) => z - 0.25);
+  const resetZoom = () => setZoomWithCompensation(() => 1);
   const toggleFollow = () => setFollowPlayhead((v) => !v);
 
   // Handle asset drop - can target empty space OR an existing track

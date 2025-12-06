@@ -10,17 +10,22 @@ export default function GlobalPlayhead({totalLengthMs = 0, timelineWidth = 0}) {
   const playheadRef = useRef(null);
 
   useEffect(() => {
-    // Subscribe to the store without triggering React state updates
-    const unsubscribe = progressStore.subscribe(({ms, lengthMs}) => {
+    const updatePosition = (ms, lengthMs) => {
       if (!playheadRef.current) return;
       if (timelineWidth <= 0) return;
 
       const denom = totalLengthMs > 0 ? totalLengthMs : lengthMs || 0;
-
-      // Calculate position
-      const p = denom > 0 ? Math.max(0, Math.min(1, ms / denom)) : 0;
-      const leftPx = p * timelineWidth;
+      const cappedRatio = denom > 0 ? Math.max(0, Math.min(1, ms / denom)) : 0;
+      const leftPx = cappedRatio * timelineWidth;
       playheadRef.current.style.transform = `translate3d(${leftPx}px, 0, 0)`;
+    };
+
+    const currentState = progressStore.getState();
+    updatePosition(currentState.ms || 0, currentState.lengthMs || 0);
+
+    // Subscribe to the store without triggering React state updates
+    const unsubscribe = progressStore.subscribe(({ms, lengthMs}) => {
+      updatePosition(ms, lengthMs);
     });
 
     return unsubscribe;
