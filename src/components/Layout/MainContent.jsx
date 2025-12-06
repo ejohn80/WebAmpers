@@ -440,6 +440,16 @@ function MainContent({
     if (!track || !Array.isArray(track.segments) || track.segments.length === 0)
       return;
 
+    // Prefer measuring the waveform area (timeline) instead of the full track wrapper
+    let highlightTopPx = trackTopPx;
+    let highlightHeightPx = trackHeightPx;
+    const timelineEl = wrappers[trackIndex].querySelector(".tracklane-timeline");
+    if (timelineEl) {
+      const timelineRect = timelineEl.getBoundingClientRect();
+      highlightTopPx = timelineRect.top - containerRect.top;
+      highlightHeightPx = timelineRect.height;
+    }
+
     // Time where mouse went down
     const rawStartMs = msFromClientX(e.clientX);
 
@@ -492,8 +502,8 @@ function MainContent({
       startMs,
       endMs: startMs,
       isDragging: true,
-      topPx: trackTopPx,
-      heightPx: trackHeightPx,
+      topPx: highlightTopPx,
+      heightPx: highlightHeightPx,
     });
 
     const handleMove = (moveEvt) => {
