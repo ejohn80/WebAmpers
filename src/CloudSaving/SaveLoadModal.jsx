@@ -24,7 +24,6 @@ function SaveLoadModal({ isOpen, onClose, onLoadComplete, mode = "save" }) {
   } = useCloudStorage();
 
   const [projectName, setProjectName] = useState("");
-  const [activeTab, setActiveTab] = useState(mode); // "save" or "load"
   const [localError, setLocalError] = useState(null);
 
   // Load saves list when modal opens in load mode

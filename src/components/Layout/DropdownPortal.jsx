@@ -301,28 +301,6 @@ function DropdownPortal({
             <span>New...</span>
           </span>
         </a>
-
-        {/* DISABLED - Previous Versions */}
-        <a
-          href="#"
-          className="dropdown-item-disabled"
-          onClick={(e) => {
-            e.preventDefault();
-          }}
-        >
-          <span
-            style={{
-              display: "flex",
-              alignItems: "center",
-              width: "100%",
-              gap: "8px",
-            }}
-          >
-            <PreviousVersionsIcon />
-            <span>Previous Versions</span>
-          </span>
-        </a>
-
         <a
           href="#"
           className={!userData ? "dropdown-item-disabled" : ""}

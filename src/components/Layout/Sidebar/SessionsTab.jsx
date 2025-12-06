@@ -8,6 +8,8 @@ import {dbManager} from "../../../managers/DBManager";
 import styles from "../Layout.module.css";
 import { audioManager } from "../../../managers/AudioManager";
 
+import * as Tone from "tone";
+
 function SessionsTab() {
   const {activeSession, setActiveSession, effects, setEffects} =
     useContext(AppContext);
@@ -30,9 +32,6 @@ function SessionsTab() {
   
         // Clear and reload tracks in AudioManager
         audioManager.clearAllTracks();
-  
-        // FIX: Import Tone.js to reconstruct buffers
-        const Tone = await import("tone");
   
         for (const trackData of dbTracks) {
           let reconstructedBuffer = null;
@@ -69,7 +68,7 @@ function SessionsTab() {
           if (reconstructedBuffer) {
             trackData.buffer = reconstructedBuffer;
             
-            // CRITICAL: Update ALL segments to use the reconstructed buffer
+            // Update ALL segments to use the reconstructed buffer
             if (trackData.segments && Array.isArray(trackData.segments)) {
               trackData.segments = trackData.segments.map(seg => {
                 // Keep all segment metadata but replace the buffer
