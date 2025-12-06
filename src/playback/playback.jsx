@@ -76,6 +76,8 @@ class PlaybackEngine {
     this.preloaded = new Set(); // store URLs already preloaded
     this.rafId = null; // requestAnimationFrame ID for updating progress
     this.ended = false; // whether we've reached the end of the timeline
+    this._lastEffectState = new Map();
+    this._rebuildInProgress = new Set();
 
     // playback timing parameters
     this.renderAheadSec = 0.2; // small pre-buffer before playback starts
@@ -90,7 +92,14 @@ class PlaybackEngine {
     }
   }
 
-  /** Load a new project ("version") into the playback engine */
+  async _stabilizeAudioGraph() {
+  // Wait for audio graph to stabilize
+  return new Promise(resolve => {
+    const stabilizationTime = 20; // ms
+    setTimeout(resolve, stabilizationTime);
+  });
+}
+
   /** Load a new project ("version") into the playback engine */
   async load(version) {
     await this.ensureAudioUnlocked();
@@ -118,22 +127,40 @@ class PlaybackEngine {
 
     // Create all track buses and connect them to master
     (version.tracks || []).forEach((t) => {
-      const bus = this._makeTrackBus(t);
-      this.trackBuses.set(t.id, bus);
-      (bus.fxOut ?? bus.pan).connect(this.master.fxIn);
-    });
+    const bus = this._makeTrackBus(t);
+    this.trackBuses.set(t.id, bus);
+    (bus.fxOut ?? bus.pan).connect(this.master.fxIn);
+  });
 
+  // WAIT for audio graph to stabilize
+  await this._stabilizeAudioGraph();
+
+    const effectsToApply = [];
     (version.tracks || []).forEach((t) => {
-      // Apply pan if it exists in effects
-      if (t.effects && t.effects.pan !== undefined && t.effects.pan !== 0) {
-        this.setTrackPan(t.id, t.effects.pan);
-      }
-
-      // Apply other effects - FIXED: Pass empty enabled map and silent flag
-      if (t.effects) {
-        this.setTrackEffects(t.id, t.effects, t.enabledEffects || {}, true);
+      if (t.effects || (t.effects && t.effects.pan !== undefined)) {
+        effectsToApply.push({
+          trackId: t.id,
+          effects: t.effects,
+          enabledEffects: t.enabledEffects || {}
+        });
       }
     });
+
+    // Apply all effects in one batch with a small delay for audio graph stabilization
+    if (effectsToApply.length > 0) {
+      // Use setTimeout to ensure audio graph is fully connected
+      await new Promise(resolve => setTimeout(resolve, 10));
+      
+      effectsToApply.forEach(({trackId, effects, enabledEffects}) => {
+        // Apply pan separately
+        if (effects.pan !== undefined && effects.pan !== 0) {
+          this.setTrackPan(trackId, effects.pan);
+        }
+        
+        // Apply effects (silent mode to reduce log spam)
+        this.setTrackEffects(trackId, effects, enabledEffects, true);
+      });
+    }
 
     // Prepare all audio segments (Tone.Player instances)
     await this._prepareSegments(version);
@@ -238,49 +265,48 @@ class PlaybackEngine {
    * @param {boolean} [silent=false] - If true, suppresses console logging
    */
   setTrackEffects(
-    trackId,
-    effectsMap,
-    enabledEffectsMapOrSilent = {},
-    silent = false
-  ) {
-    // Handle backward compatibility
-    let enabledEffectsMap = enabledEffectsMapOrSilent;
-    if (typeof enabledEffectsMapOrSilent === "boolean") {
-      silent = enabledEffectsMapOrSilent;
-      enabledEffectsMap = {};
+  trackId,
+  effectsMap,
+  enabledEffectsMapOrSilent = {},
+  silent = false
+) {
+  // Handle backward compatibility
+  let enabledEffectsMap = enabledEffectsMapOrSilent;
+  if (typeof enabledEffectsMapOrSilent === "boolean") {
+    silent = enabledEffectsMapOrSilent;
+    enabledEffectsMap = {};
+  }
+
+  if (!this.version) return;
+  const bus = this.trackBuses.get(trackId);
+  if (!bus) return;
+
+  // CRITICAL GUARD: Skip if already rebuilding this track
+  if (this._rebuildInProgress.has(trackId)) {
+    if (!silent) console.log(`[setTrackEffects] Rebuild already in progress for track ${trackId}, skipping`);
+    return;
+  }
+
+  // CRITICAL GUARD: Skip if effects haven't actually changed
+  const lastState = this._lastEffectState.get(trackId);
+  if (lastState) {
+    const effectsUnchanged = this._deepEqual(lastState.effects, effectsMap);
+    const enabledUnchanged = this._deepEqual(lastState.enabledEffects, enabledEffectsMap);
+    
+    if (effectsUnchanged && enabledUnchanged) {
+      if (!silent) console.log(`[setTrackEffects] Effects unchanged for track ${trackId}, skipping`);
+      return;
     }
+  }
 
-    if (!this.version) return;
+  // Mark rebuild as in progress
+  this._rebuildInProgress.add(trackId);
 
-    const bus = this.trackBuses.get(trackId);
-    if (!bus) return;
+  if (!silent) {
+    console.log(`[setTrackEffects] Track ${trackId}`, effectsMap, enabledEffectsMap);
+  }
 
-    // CRITICAL: Lock master gain IMMEDIATELY to prevent audio leakage
-    let masterGainValue = null;
-    let masterGainLocked = false;
-
-    try {
-      if (this.master?.gain?.gain) {
-        masterGainValue = this.master.gain.gain.value;
-
-        // If master is muted (gain near 0), lock it at 0 immediately
-        if (masterGainValue < 0.001) {
-          this.master.gain.gain.value = 0;
-          masterGainLocked = true;
-        }
-      }
-    } catch (e) {
-      console.warn("[setTrackEffects] Could not lock master gain");
-    }
-
-    if (!silent)
-      console.log(
-        `[setTrackEffects] Track ${trackId}`,
-        effectsMap,
-        enabledEffectsMap,
-        `Master gain: ${masterGainValue}, locked: ${masterGainLocked}`
-      );
-
+  try {
     // Store the effects map
     const track = this.version.tracks.find((x) => x.id === trackId);
     if (track) {
@@ -288,19 +314,8 @@ class PlaybackEngine {
       track.enabledEffects = enabledEffectsMap;
     }
 
-    const canUpdateExisting = bus.fxNodes && bus.fxNodes.length > 0;
-
-    if (canUpdateExisting) {
-      this._updateExistingEffectNodes(
-        bus.fxNodes,
-        effectsMap,
-        enabledEffectsMap
-      );
-    }
-
     // 1. SAFELY DISCONNECT
     const nextNode = this.master?.fxIn || this.master?.gain;
-
     if (bus.fxOut) {
       try {
         if (nextNode) bus.fxOut.disconnect(nextNode);
@@ -341,7 +356,7 @@ class PlaybackEngine {
       bus.fxOut = bus.pan;
     }
 
-    // Connect Pan to Master - but master gain is still locked at 0 if it was muted
+    // Connect Pan to Master
     const masterDest = this.master?.fxIn || this.master?.gain;
     if (masterDest) {
       try {
@@ -356,20 +371,42 @@ class PlaybackEngine {
       : 0;
     bus.pan.pan.value = panValue;
 
-    // Use synchronous value setting to prevent any audio leak
-    if (masterGainValue !== null) {
-      try {
-        if (this.master?.gain?.gain) {
-          // Cancel any scheduled changes first
-          this.master.gain.gain.cancelScheduledValues(0);
-          // Set value immediately (no ramping)
-          this.master.gain.gain.setValueAtTime(masterGainValue, 0);
-        }
-      } catch (e) {
-        console.warn("[setTrackEffects] Could not restore master gain", e);
-      }
+    // Update last state
+    this._lastEffectState.set(trackId, {
+      effects: JSON.parse(JSON.stringify(effectsMap)),
+      enabledEffects: JSON.parse(JSON.stringify(enabledEffectsMap)),
+      timestamp: performance.now()
+    });
+
+  } finally {
+    // Always remove from in-progress set
+    this._rebuildInProgress.delete(trackId);
+  }
+}
+
+// Add helper for deep comparison
+_deepEqual(obj1, obj2) {
+  if (obj1 === obj2) return true;
+  if (!obj1 || !obj2) return obj1 === obj2;
+  
+  const keys1 = Object.keys(obj1);
+  const keys2 = Object.keys(obj2);
+  
+  if (keys1.length !== keys2.length) return false;
+  
+  for (const key of keys1) {
+    const val1 = obj1[key];
+    const val2 = obj2[key];
+    
+    if (typeof val1 === 'number' && typeof val2 === 'number') {
+      if (Math.abs(val1 - val2) > 0.001) return false;
+    } else if (val1 !== val2) {
+      return false;
     }
   }
+  
+  return true;
+}
 
   /**
    * Update parameters of existing effect nodes without rebuilding the entire chain.
@@ -1730,79 +1767,82 @@ class PlaybackEngine {
    * @param {Object} effects - The effects configuration object
    */
   applyEffects(effects) {
-    let masterGainValue = null;
-    let masterGainLocked = false;
+  let masterGainValue = null;
+  let masterGainLocked = false;
 
+  try {
+    if (this.master?.gain?.gain) {
+      masterGainValue = this.master.gain.gain.value;
+
+      // If master is muted (gain near 0), lock it at 0 immediately
+      if (masterGainValue < 0.001) {
+        const now = Tone.now();
+        this.master.gain.gain.cancelScheduledValues(now);
+        this.master.gain.gain.setValueAtTime(0, now);
+        masterGainLocked = true;
+      }
+    }
+  } catch (e) {
+    console.warn("[applyEffects] Could not lock master gain");
+  }
+
+  console.log(
+    `[applyEffects] Master gain: ${masterGainValue}, locked: ${masterGainLocked}`
+  );
+
+  // 1. Create the new master chain
+  const newMaster = this._createMasterChain(effects);
+
+  // 2. Set the gain on the NEW master BEFORE reconnecting anything
+  if (masterGainValue !== null) {
     try {
-      if (this.master?.gain?.gain) {
-        masterGainValue = this.master.gain.gain.value;
-
-        // If master is muted (gain near 0), lock it at 0 immediately
-        if (masterGainValue < 0.001) {
-          this.master.gain.gain.cancelScheduledValues(0);
-          this.master.gain.gain.setValueAtTime(0, 0);
-          masterGainLocked = true;
-        }
+      if (newMaster?.gain?.gain) {
+        const now = Tone.now();
+        newMaster.gain.gain.cancelScheduledValues(now);
+        newMaster.gain.gain.setValueAtTime(masterGainValue, now);
       }
     } catch (e) {
-      console.warn("[applyEffects] Could not lock master gain");
+      console.warn("[applyEffects] Could not set gain on new master");
     }
-
-    console.log(
-      `[applyEffects] Master gain: ${masterGainValue}, locked: ${masterGainLocked}`
-    );
-
-    // 1. Create the new master chain
-    const newMaster = this._createMasterChain(effects);
-
-    // 2. Set the gain on the NEW master BEFORE reconnecting anything
-    if (masterGainValue !== null) {
-      try {
-        if (newMaster?.gain?.gain) {
-          newMaster.gain.gain.cancelScheduledValues(0);
-          newMaster.gain.gain.setValueAtTime(masterGainValue, 0);
-        }
-      } catch (e) {
-        console.warn("[applyEffects] Could not set gain on new master");
-      }
-    }
-
-    // 3. Reconnect all track buses to the new master
-    this.trackBuses.forEach((bus) => {
-      const oldMasterIn = this.master?.fxIn ?? this.master?.gain;
-      if (oldMasterIn) {
-        try {
-          (bus.fxOut ?? bus.pan).disconnect(oldMasterIn);
-        } catch (e) {}
-      }
-
-      try {
-        (bus.fxOut ?? bus.pan).connect(newMaster.fxIn);
-      } catch (e) {
-        console.warn("[applyEffects] Failed to reconnect track bus:", e);
-      }
-    });
-
-    // 4. Dispose of old master
-    this._disposeMaster();
-
-    // 5. Update reference
-    this.master = newMaster;
-
-    // 6. Final verification that gain is correct
-    if (masterGainValue !== null) {
-      try {
-        if (this.master?.gain?.gain) {
-          this.master.gain.gain.cancelScheduledValues(0);
-          this.master.gain.gain.setValueAtTime(masterGainValue, 0);
-        }
-      } catch (e) {
-        console.warn("[applyEffects] Final gain restore failed");
-      }
-    }
-
-    console.log("Master effects applied with gain:", masterGainValue);
   }
+
+  // 3. Reconnect all track buses to the new master
+  this.trackBuses.forEach((bus) => {
+    const oldMasterIn = this.master?.fxIn ?? this.master?.gain;
+    if (oldMasterIn) {
+      try {
+        (bus.fxOut ?? bus.pan).disconnect(oldMasterIn);
+      } catch (e) {}
+    }
+
+    try {
+      (bus.fxOut ?? bus.pan).connect(newMaster.fxIn);
+    } catch (e) {
+      console.warn("[applyEffects] Failed to reconnect track bus:", e);
+    }
+  });
+
+  // 4. Dispose of old master
+  this._disposeMaster();
+
+  // 5. Update reference
+  this.master = newMaster;
+
+  // 6. Final verification that gain is correct
+  if (masterGainValue !== null) {
+    try {
+      if (this.master?.gain?.gain) {
+        const now = Tone.now();
+        this.master.gain.gain.cancelScheduledValues(now);
+        this.master.gain.gain.setValueAtTime(masterGainValue, now);
+      }
+    } catch (e) {
+      console.warn("[applyEffects] Final gain restore failed");
+    }
+  }
+
+  console.log("Master effects applied with gain:", masterGainValue);
+}
 }
 
 // Export the engine class so other modules (hooks/UI) can instantiate it

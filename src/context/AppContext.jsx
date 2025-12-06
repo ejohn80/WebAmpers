@@ -143,60 +143,6 @@ const AppContextProvider = ({children}) => {
     setSelectedTrackEffects({...track.effects});
     setSelectedTrackActiveEffects([...track.activeEffectsList]);
     setSelectedTrackEnabledEffects({...track.enabledEffects});
-
-    const trackEnabled = track.enabledEffects || {};
-
-    if (engineRef?.current?.setTrackEffects) {
-      // Pre-emptively lock master gain if muted
-      let masterGainBefore = null;
-      let wasMuted = false;
-
-      try {
-        if (engineRef.current.master?.gain?.gain) {
-          masterGainBefore = engineRef.current.master.gain.gain.value;
-
-          // If effectively muted (gain < 0.001), lock it NOW
-          if (masterGainBefore < 0.001) {
-            wasMuted = true;
-            engineRef.current.master.gain.gain.cancelScheduledValues(0);
-            engineRef.current.master.gain.gain.setValueAtTime(0, 0);
-          }
-        }
-      } catch (e) {
-        console.warn(
-          "Could not lock master gain before track effect application"
-        );
-      }
-
-      // Apply track effects
-      engineRef.current.setTrackEffects(
-        selectedTrackId,
-        track.effects,
-        trackEnabled
-      );
-
-      // Verify and restore master gain
-      if (masterGainBefore !== null) {
-        try {
-          if (engineRef.current.master?.gain?.gain) {
-            engineRef.current.master.gain.gain.cancelScheduledValues(0);
-            engineRef.current.master.gain.gain.setValueAtTime(
-              masterGainBefore,
-              0
-            );
-
-            // Double-check if it was muted
-            if (wasMuted) {
-              engineRef.current.master.gain.gain.setValueAtTime(0, 0);
-            }
-          }
-        } catch (e) {
-          console.warn(
-            "Could not verify master gain after track effect application"
-          );
-        }
-      }
-    }
   }, [selectedTrackId, engineRef]);
 
   // Update effect when selection changes
@@ -668,160 +614,82 @@ const AppContextProvider = ({children}) => {
   }, [selectedTrackId, engineRef]);
 
   useEffect(() => {
-    if (activeSession === undefined) return;
+  if (activeSession === undefined) return;
 
+  try {
+    if (activeSession === null) {
+      window.localStorage.removeItem("webamp.activeSession");
+    } else {
+      window.localStorage.setItem(
+        "webamp.activeSession",
+        String(activeSession)
+      );
+    }
+  } catch {}
+
+  // Only run this block once per actual session change
+  if (lastSessionRef.current !== activeSession) {
+    lastSessionRef.current = activeSession;
+
+    // Remove automatic track selection
+    setSelectedTrackId(null);
+    setSelectedTrackEffects(null);
+    setSelectedTrackActiveEffects([]);
+    setSelectedTrackEnabledEffects({});
+  }
+
+  // --- session-level loading (master effects) ---
+  if (typeof activeSession === "number") {
+    const loadedEffectsParams =
+      loadEffectParametersForSession(activeSession) || createDefaultEffects();
+    setEffects(loadedEffectsParams);
+
+    // Preserve master volume when changing sessions
+    let masterGainBefore = null;
+    let wasMuted = false;
     try {
-      if (activeSession === null) {
-        window.localStorage.removeItem("webamp.activeSession");
-      } else {
-        window.localStorage.setItem(
-          "webamp.activeSession",
-          String(activeSession)
-        );
+      const savedVol = window.localStorage.getItem("webamp.masterVol");
+      const savedMuted = window.localStorage.getItem("webamp.muted");
+      if (savedVol !== null) {
+        masterGainBefore = Math.max(0, Math.min(1, Number(savedVol) / 100));
       }
-    } catch {}
+      if (savedMuted !== null) {
+        wasMuted = savedMuted === "1";
+      }
+      if (wasMuted) {
+        masterGainBefore = 0;
+      }
+    } catch (e) {}
 
-    // Only run this block once per actual session change
-    if (lastSessionRef.current !== activeSession) {
-      lastSessionRef.current = activeSession;
-
-      // Remove automatic track selection
-      setSelectedTrackId(null);
-      setSelectedTrackEffects(null);
-      setSelectedTrackActiveEffects([]);
-      setSelectedTrackEnabledEffects({});
-    }
-
-    // --- session-level loading (master effects) ---
-    if (typeof activeSession === "number") {
-      const loadedEffectsParams =
-        loadEffectParametersForSession(activeSession) || createDefaultEffects();
-      setEffects(loadedEffectsParams);
-
-      // Preserve master volume when changing sessions
-      let masterGainBefore = null;
-      let wasMuted = false;
+    // Apply master-level session effects
+    if (engineRef?.current) {
       try {
-        const savedVol = window.localStorage.getItem("webamp.masterVol");
-        const savedMuted = window.localStorage.getItem("webamp.muted");
-        if (savedVol !== null) {
-          masterGainBefore = Math.max(0, Math.min(1, Number(savedVol) / 100));
-        }
-        if (savedMuted !== null) {
-          wasMuted = savedMuted === "1";
-        }
-        if (wasMuted) {
-          masterGainBefore = 0;
-        }
-      } catch (e) {}
-
-      // Apply master-level session effects
-      if (engineRef?.current) {
-        try {
-          // Clear master-level effects
-          engineRef.current.applyEffects?.({});
-          // Apply master session effects
-          engineRef.current.applyEffects?.(loadedEffectsParams);
-        } catch (e) {
-          console.error("[Session Change] Failed to apply master effects:", e);
-        }
-
-        // Restore master volume after applying effects
-        if (masterGainBefore !== null) {
-          try {
-            if (engineRef.current.master?.gain?.gain) {
-              engineRef.current.master.gain.gain.value = masterGainBefore;
-            }
-          } catch (e) {
-            console.warn(
-              "Could not restore master volume after session change"
-            );
-          }
-        }
+        // Clear master-level effects
+        engineRef.current.applyEffects?.({});
+        // Apply master session effects
+        engineRef.current.applyEffects?.(loadedEffectsParams);
+      } catch (e) {
+        console.error("[Session Change] Failed to apply master effects:", e);
       }
 
-      // We need to wait for tracks to be loaded by AudioPage, then apply per-track effects
-      // Use an interval to check when tracks are available
-      const checkAndApplyTrackEffects = () => {
-        if (engineRef?.current && audioManager.tracks?.length > 0) {
-          // Store master volume before applying track effects
-          let masterGainBeforeTrackEffects = null;
-          try {
-            if (engineRef.current.master?.gain?.gain) {
-              masterGainBeforeTrackEffects =
-                engineRef.current.master.gain.gain.value;
-            }
-          } catch (e) {}
-
-          try {
-            // Reapply effects for all tracks currently present
-            audioManager.tracks?.forEach((track) => {
-              if (!track?.id) return;
-
-              // Get enabledEffects from the track (loaded from IndexedDB)
-              const trackEnabled = track.enabledEffects || {};
-              console.log(
-                `[Session ${activeSession}] Applying effects for track ${track.id} with enabled map:`,
-                trackEnabled
-              );
-
-              if (engineRef.current.setTrackEffects) {
-                engineRef.current.setTrackEffects(
-                  track.id,
-                  track.effects || loadedEffectsParams,
-                  trackEnabled
-                );
-              }
-            });
-
-            // Restore master volume after all track effects
-            if (masterGainBeforeTrackEffects !== null) {
-              try {
-                if (engineRef.current.master?.gain?.gain) {
-                  engineRef.current.master.gain.gain.value =
-                    masterGainBeforeTrackEffects;
-                }
-              } catch (e) {}
-            }
-
-            return true; // Successfully applied
-          } catch (e) {
-            console.error("[Session Change] Failed to apply track effects:", e);
-            return false;
+      // Restore master volume after applying effects
+      if (masterGainBefore !== null) {
+        try {
+          if (engineRef.current.master?.gain?.gain) {
+            const now = Tone.now();
+            engineRef.current.master.gain.gain.cancelScheduledValues(now);
+            engineRef.current.master.gain.gain.setValueAtTime(masterGainBefore, now);
           }
+        } catch (e) {
+          console.warn(
+            "Could not restore master volume after session change"
+          );
         }
-        return false; // Tracks not ready yet
-      };
-
-      // Try immediately
-      let applied = checkAndApplyTrackEffects();
-
-      // If not applied, set up interval to retry
-      let retryCount = 0;
-      const maxRetries = 10; // Try for up to 2 seconds (200ms * 10)
-      const retryInterval = 200; // ms
-
-      const retryId = setInterval(() => {
-        if (applied || retryCount >= maxRetries) {
-          clearInterval(retryId);
-          if (!applied && retryCount >= maxRetries) {
-            console.warn(
-              `[Session ${activeSession}] Failed to apply track effects after ${maxRetries} retries`
-            );
-          }
-          return;
-        }
-
-        retryCount++;
-        applied = checkAndApplyTrackEffects();
-      }, retryInterval);
-
-      // Cleanup on unmount or session change
-      return () => {
-        clearInterval(retryId);
-      };
+      }
     }
-  }, [activeSession, engineRef]);
+    console.log(`[Session ${activeSession}] Session loaded, track effects will be applied by AudioPage`);
+  }
+}, [activeSession, engineRef]);
 
   useEffect(() => {
     try {
