@@ -172,6 +172,69 @@
   --eq-reset-hover: #1e3034;
   --eq-reset-text: #17e1ff;
   --eq-footer-bg: #1a191c;
+  --sampler-panel-bg: var(--eq-panel-bg);
+  --sampler-panel-border: var(--eq-panel-border);
+  --sampler-header-bg: var(--eq-header-bg);
+  --sampler-divider: var(--eq-divider);
+  --sampler-footer-bg: var(--eq-footer-bg);
+  --sampler-strong: var(--eq-strong);
+  --sampler-muted: var(--eq-muted);
+  --sampler-muted-darker: #666;
+  --sampler-text-hover: #aaa;
+  --sampler-curve-bg: #0f0f0f;
+  --sampler-select-bg: #1a1a1a;
+  --sampler-button-select-bg: var(--eq-select-bg);
+  --sampler-select-border: #3a3a3a;
+  --sampler-select-hover: #4a4a4a;
+  --sampler-reset-bg: #172528;
+  --sampler-reset-hover: #1e3034;
+  --sampler-reset-text: #17e1ff;
+  --sampler-discard-bg: #2a2020;
+  --sampler-discard-text: #e74c3c;
+  --sampler-discard-hover: #3a2525;
+  --sampler-save-bg: var(--sampler-reset-bg);
+  --sampler-save-hover: var(--sampler-reset-hover);
+  --sampler-save-text: var(--sampler-reset-text);
+  --sampler-button-bg: linear-gradient(145deg, #2a2a2a 0%, #1e1e1e 100%);
+  --sampler-button-bg-hover: linear-gradient(145deg, #333 0%, #252525 100%);
+  --sampler-active-bg: linear-gradient(145deg, #17e1ff 0%, #0fb8d4 100%);
+  --sampler-active-shadow: rgba(23, 225, 255, 0.4);
+  --sampler-danger-strong: #e74c3c;
+  --sampler-record-hover-bg: #3a2a2a;
+  --sampler-record-icon: #e74c3c;
+  --sampler-record-text-active: #e74c3c;
+  --sampler-record-icon-active: #fff;
+  --sampler-white-key-bg: linear-gradient(
+    180deg,
+    #f5f5f5 0%,
+    #e0e0e0 90%,
+    #ccc 100%
+  );
+  --sampler-white-key-hover: linear-gradient(
+    180deg,
+    #fff 0%,
+    #f0f0f0 90%,
+    #ddd 100%
+  );
+  --sampler-black-key-bg: linear-gradient(
+    180deg,
+    #333 0%,
+    #1a1a1a 90%,
+    #000 100%
+  );
+  --sampler-black-key-hover: linear-gradient(
+    180deg,
+    #444 0%,
+    #2a2a2a 90%,
+    #111 100%
+  );
+  --sampler-black-key-active: linear-gradient(
+    180deg,
+    #11a1b7 0%,
+    #0d8a9e 90%,
+    #096b7a 100%
+  );
+  --sampler-loading-overlay-bg: rgba(30, 29, 32, 0.9);
 }
 
 .theme-light {
@@ -352,6 +415,69 @@
   --eq-reset-hover: #e2e9f5;
   --eq-reset-text: #00e5ff;
   --eq-footer-bg: #f1f4f9;
+  --sampler-panel-bg: #ffffff;
+  --sampler-panel-border: #dcdcdc;
+  --sampler-header-bg: linear-gradient(180deg, #f5f5f5 0%, #ffffff 100%);
+  --sampler-divider: #dcdcdc;
+  --sampler-footer-bg: #f4f4f4;
+  --sampler-strong: #00e5ff;
+  --sampler-muted: #555;
+  --sampler-muted-darker: #96a0b1;
+  --sampler-text-hover: #1f1f2a;
+  --sampler-curve-bg: #f4f6fb;
+  --sampler-select-bg: #eef2f8;
+  --sampler-select-border: #d0d0d0;
+  --sampler-select-hover: #c0c0c0;
+  --sampler-reset-bg: #f5f5f5;
+  --sampler-reset-hover: #e0e0e0;
+  --sampler-reset-text: #2979ff;
+  --sampler-discard-bg: #f5f5f5;
+  --sampler-discard-text: #c0392b;
+  --sampler-discard-hover: #e0e0e0;
+  --sampler-save-bg: #f5f5f5;
+  --sampler-save-hover: #e0e0e0;
+  --sampler-save-text: #2979ff;
+  --sampler-button-bg: #f5f5f5;
+  --sampler-button-bg-hover: #e0e0e0;
+  --sampler-active-bg: #00b9d4;
+  --sampler-active-shadow: rgba(0, 0, 0, 0.2);
+  --sampler-danger-strong: #d45252;
+  --sampler-record-hover-bg: #e2e9f5;
+  --sampler-record-icon: #d45252;
+  --sampler-record-text-active: #d45252;
+  --sampler-record-icon-active: #fff;
+  --sampler-white-key-bg: linear-gradient(
+    180deg,
+    #f5f5f5 0%,
+    #e0e0e0 90%,
+    #ccc 100%
+  );
+  --sampler-white-key-hover: linear-gradient(
+    180deg,
+    #fff 0%,
+    #f0f0f0 90%,
+    #ddd 100%
+  );
+  --sampler-black-key-bg: linear-gradient(
+    180deg,
+    #333 0%,
+    #1a1a1a 90%,
+    #000 100%
+  );
+  --sampler-black-key-hover: linear-gradient(
+    180deg,
+    #444 0%,
+    #2a2a2a 90%,
+    #111 100%
+  );
+  --sampler-black-key-active: linear-gradient(
+    180deg,
+    #11a1b7 0%,
+    #0d8a9e 90%,
+    #096b7a 100%
+  );
+  --sampler-loading-overlay-bg: rgba(255, 255, 255, 0.9);
+  --sampler-button-select-bg: var(--eq-select-bg);
 }
 
 html,
@@ -401,6 +527,7 @@ body {
   animation: recordOuter 1.3s ease-in-out infinite;
   pointer-events: none;
 }
+
 @keyframes recordInner {
   0% {
     transform: scale(0.96);
