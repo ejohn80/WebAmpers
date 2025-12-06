@@ -19,6 +19,7 @@ import "./MainContent.css";
 const TRACK_CONTROLS_WIDTH = 180;
 const TRACK_CONTROLS_GAP = 12;
 const TRACK_ROW_PADDING = 8; // Keep in sync with --track-row-padding in CSS
+const TRACK_HEIGHT_PX = 96; // Keep in sync with --track-height default in CSS
 
 function MainContent({
   tracks = [],
@@ -106,17 +107,12 @@ function MainContent({
     }
   }, [tracks, selectedSegment, clearSegmentSelection]);
 
-  const verticalScale = useMemo(
-    () => Math.min(2.25, Math.max(0.6, Math.pow(Math.max(zoom, 0.01), 0.5))),
-    [zoom]
-  );
-
   const timelineStyle = useMemo(
     () => ({
       "--timeline-content-width": `${Math.max(1, timelineContentWidth)}px`,
-      "--track-height": `${Math.round(96 * verticalScale)}px`,
+      "--track-height": `${TRACK_HEIGHT_PX}px`,
     }),
-    [timelineContentWidth, verticalScale]
+    [timelineContentWidth]
   );
 
   const timelineMetrics = useMemo(() => {
@@ -244,7 +240,7 @@ function MainContent({
 
         // Determine which track (if any) was targeted
         const dropY = e.clientY - rect.top;
-        const trackHeight = 96 * verticalScale;
+  const trackHeight = TRACK_HEIGHT_PX;
         const rulerHeight = 40; // Approximate ruler height
         const trackIndex = Math.floor((dropY - rulerHeight) / trackHeight);
         const targetTrackId =
