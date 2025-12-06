@@ -168,9 +168,7 @@ function MainContent({
       xOnTimeline = Math.max(0, Math.min(timelineMetrics.widthPx, xOnTimeline));
 
       const ratio =
-        timelineMetrics.widthPx > 0
-          ? xOnTimeline / timelineMetrics.widthPx
-          : 0;
+        timelineMetrics.widthPx > 0 ? xOnTimeline / timelineMetrics.widthPx : 0;
 
       const ms = ratio * totalLengthMs;
       return Math.round(Math.max(0, Math.min(totalLengthMs, ms)));
@@ -374,11 +372,8 @@ function MainContent({
       const s = track.segments[i];
       if (!s) continue;
       const segStartMs =
-        s.startOnTimelineMs ??
-        Math.round((s.startOnTimeline ?? 0) * 1000);
-      const segDurMs =
-        s.durationMs ??
-        Math.round((s.duration ?? 0) * 1000);
+        s.startOnTimelineMs ?? Math.round((s.startOnTimeline ?? 0) * 1000);
+      const segDurMs = s.durationMs ?? Math.round((s.duration ?? 0) * 1000);
       const segEndMs = segStartMs + Math.max(0, segDurMs);
       if (rawStartMs >= segStartMs && rawStartMs <= segEndMs) {
         segmentIndex = i;
@@ -396,11 +391,8 @@ function MainContent({
     suppressBackgroundClickRef.current = true;
 
     const segStartMs =
-      seg.startOnTimelineMs ??
-      Math.round((seg.startOnTimeline ?? 0) * 1000);
-    const segDurMs =
-      seg.durationMs ??
-      Math.round((seg.duration ?? 0) * 1000);
+      seg.startOnTimelineMs ?? Math.round((seg.startOnTimeline ?? 0) * 1000);
+    const segDurMs = seg.durationMs ?? Math.round((seg.duration ?? 0) * 1000);
     const segEndMs = segStartMs + Math.max(0, segDurMs);
 
     const startMs = Math.max(segStartMs, Math.min(segEndMs, rawStartMs));
@@ -556,48 +548,50 @@ function MainContent({
                 </div>
 
                 {/* CUT BOX OVERLAY */}
-                {cutBox && (() => {
-                  const startX = msToTimelineX(cutBox.startMs);
-                  const endX = msToTimelineX(cutBox.endMs);
-                  const left = Math.min(startX, endX);
-                  const width = Math.max(2, Math.abs(endX - startX));
-                  const top = cutBox.topPx ?? 0;
-                  const height = cutBox.heightPx ?? Math.round(96 * verticalScale);
+                {cutBox &&
+                  (() => {
+                    const startX = msToTimelineX(cutBox.startMs);
+                    const endX = msToTimelineX(cutBox.endMs);
+                    const left = Math.min(startX, endX);
+                    const width = Math.max(2, Math.abs(endX - startX));
+                    const top = cutBox.topPx ?? 0;
+                    const height =
+                      cutBox.heightPx ?? Math.round(96 * verticalScale);
 
-                  return (
-                    <div
-                      className="cut-selection-overlay"
-                      style={{
-                        position: "absolute",
-                        zIndex: 20,
-                        pointerEvents: "auto",
-                        left: `${left}px`,
-                        top: `${top}px`,
-                        width: `${width}px`,
-                        height: `${height}px`,
-                        border: "1px solid #e6c200",
-                        backgroundColor: "rgba(255, 255, 153, 0.6)", // light yellow
-                        boxSizing: "border-box",
-                      }}
-                    >
-                      {!cutBox.isDragging && (
-                        <button
-                          type="button"
-                          className="cut-selection-button"
-                          style={{
-                            position: "absolute",
-                            right: 4,
-                            top: 4,
-                            pointerEvents: "auto",
-                          }}
-                          onClick={handleCutBoxApply}
-                        >
-                          Cut
-                        </button>
-                      )}
-                    </div>
-                  );
-                })()}
+                    return (
+                      <div
+                        className="cut-selection-overlay"
+                        style={{
+                          position: "absolute",
+                          zIndex: 20,
+                          pointerEvents: "auto",
+                          left: `${left}px`,
+                          top: `${top}px`,
+                          width: `${width}px`,
+                          height: `${height}px`,
+                          border: "1px solid #e6c200",
+                          backgroundColor: "rgba(255, 255, 153, 0.6)", // light yellow
+                          boxSizing: "border-box",
+                        }}
+                      >
+                        {!cutBox.isDragging && (
+                          <button
+                            type="button"
+                            className="cut-selection-button"
+                            style={{
+                              position: "absolute",
+                              right: 4,
+                              top: 4,
+                              pointerEvents: "auto",
+                            }}
+                            onClick={handleCutBoxApply}
+                          >
+                            Cut
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })()}
 
                 <div
                   className="tracks-container"
