@@ -66,6 +66,8 @@ function MainContent({
   const [scrollAreaWidth, setScrollAreaWidth] = useState(0);
   const scrollAreaRef = useRef(null);
   const scrubSessionRef = useRef({active: false, source: null, lastMs: null});
+  const scrubSeekRafRef = useRef(null);
+  const pendingScrubSeekRef = useRef(null);
   const [selectedSegment, setSelectedSegment] = useState(null);
 
   const clearSegmentSelection = useCallback(() => {
@@ -315,6 +317,46 @@ function MainContent({
     [getTimelineMsFromClientX]
   );
 
+  const flushScheduledScrubSeek = useCallback(() => {
+    if (scrubSeekRafRef.current !== null && typeof window !== "undefined") {
+      window.cancelAnimationFrame(scrubSeekRafRef.current);
+      scrubSeekRafRef.current = null;
+    }
+    const pending = pendingScrubSeekRef.current;
+    pendingScrubSeekRef.current = null;
+    if (typeof pending === "number") {
+      try {
+        progressStore.requestSeek(pending);
+      } catch (err) {
+        console.warn("MainContent scrub seek error:", err);
+      }
+    }
+  }, []);
+
+  const scheduleScrubSeek = useCallback((ms) => {
+    if (typeof ms !== "number") return;
+    pendingScrubSeekRef.current = ms;
+
+    if (typeof window === "undefined") {
+      flushScheduledScrubSeek();
+      return;
+    }
+
+    if (scrubSeekRafRef.current !== null) return;
+    scrubSeekRafRef.current = window.requestAnimationFrame(() => {
+      scrubSeekRafRef.current = null;
+      const pending = pendingScrubSeekRef.current;
+      pendingScrubSeekRef.current = null;
+      if (typeof pending === "number") {
+        try {
+          progressStore.requestSeek(pending);
+        } catch (err) {
+          console.warn("MainContent scrub seek error:", err);
+        }
+      }
+    });
+  }, [flushScheduledScrubSeek]);
+
   const handleScrubPointerMove = useCallback(
     (event) => {
       if (!scrubSessionRef.current.active) return;
@@ -326,9 +368,10 @@ function MainContent({
       const target = moveScrubToClientX(clientX);
       if (typeof target === "number") {
         scrubSessionRef.current.lastMs = target;
+        scheduleScrubSeek(target);
       }
     },
-    [moveScrubToClientX]
+    [moveScrubToClientX, scheduleScrubSeek]
   );
 
   const handleScrubPointerUp = useCallback(
@@ -342,6 +385,7 @@ function MainContent({
           finalMs = target;
         }
       }
+      flushScheduledScrubSeek();
       if (typeof finalMs === "number") {
         progressStore.requestSeek(finalMs);
       }
@@ -355,7 +399,7 @@ function MainContent({
         window.removeEventListener("touchcancel", handleScrubPointerUp);
       }
     },
-    [moveScrubToClientX, handleScrubPointerMove]
+    [moveScrubToClientX, handleScrubPointerMove, flushScheduledScrubSeek]
   );
 
   const startScrubSession = useCallback(
@@ -365,7 +409,10 @@ function MainContent({
       if (timelineMetrics.widthPx <= 0 || totalLengthMs <= 0) return;
 
       try {
-        progressStore.beginScrub({pauseTransport: false});
+        progressStore.beginScrub({
+          pauseTransport: true,
+          silenceDuringScrub: true,
+        });
       } catch (err) {
         console.warn("MainContent scrub begin error:", err);
         return;
@@ -378,6 +425,7 @@ function MainContent({
       }
 
       scrubSessionRef.current = {active: true, source, lastMs: target};
+      scheduleScrubSeek(target);
 
       if (typeof window !== "undefined") {
         if (source === "touch") {
@@ -398,6 +446,7 @@ function MainContent({
       moveScrubToClientX,
       handleScrubPointerMove,
       handleScrubPointerUp,
+      scheduleScrubSeek,
     ]
   );
 
@@ -414,8 +463,13 @@ function MainContent({
         progressStore.endScrub();
         scrubSessionRef.current = {active: false, source: null, lastMs: null};
       }
+      flushScheduledScrubSeek();
     };
-  }, [handleScrubPointerMove, handleScrubPointerUp]);
+  }, [
+    handleScrubPointerMove,
+    handleScrubPointerUp,
+    flushScheduledScrubSeek,
+  ]);
 
   return (
     <DraggableDiv
