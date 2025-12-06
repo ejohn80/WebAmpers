@@ -9,16 +9,18 @@ import React, {
 import * as Tone from "tone";
 import {progressStore} from "./progressStore";
 import {
-  RewindIcon,
-  ForwardIcon,
-  GoToStartIcon,
   SoundOffIcon,
   VolumeKnob,
-  GoToEndIcon,
   SoundOnLowIcon,
   SoundOnMediumIcon,
   SoundOnHighIcon,
 } from "../components/Layout/Svgs.jsx";
+import {
+  FaStepBackward,
+  FaBackward,
+  FaForward,
+  FaStepForward,
+} from "react-icons/fa";
 
 import "./playback.css";
 import {AppContext} from "../context/AppContext";
@@ -2429,7 +2431,7 @@ export default function WebAmpPlayback({version, onEngineReady}) {
             disabled={hasNoTracks}
             title={hasNoTracks ? "No tracks loaded" : "Go to start"}
           >
-            <GoToStartIcon />
+            <FaStepBackward />
           </button>
 
           <button
@@ -2438,7 +2440,7 @@ export default function WebAmpPlayback({version, onEngineReady}) {
             disabled={hasNoTracks}
             title={hasNoTracks ? "No tracks loaded" : "Skip backward 10s"}
           >
-            <RewindIcon />
+            <FaBackward />
           </button>
 
           <PlayPauseButton
@@ -2453,7 +2455,7 @@ export default function WebAmpPlayback({version, onEngineReady}) {
             disabled={hasNoTracks}
             title={hasNoTracks ? "No tracks loaded" : "Skip forward 10s"}
           >
-            <ForwardIcon />
+            <FaForward />
           </button>
 
           <button
@@ -2462,7 +2464,7 @@ export default function WebAmpPlayback({version, onEngineReady}) {
             disabled={hasNoTracks}
             title={hasNoTracks ? "No tracks loaded" : "Go to end"}
           >
-            <GoToEndIcon />
+            <FaStepForward />
           </button>
         </div>
       </div>

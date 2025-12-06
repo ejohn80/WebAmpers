@@ -4,7 +4,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: transparent;
+  background: var(--effects-overlay-bg, transparent);
   display: flex;
   align-items: left;
   justify-content: left;
@@ -13,8 +13,8 @@
 }
 
 .effectsMenu {
-  background: rgba(29, 29, 30, 0.95);
-  border: 2px solid #0fb1c9;
+  background: var(--effects-menu-bg, rgba(29, 29, 30, 0.95));
+  border: 2px solid var(--effects-menu-border, #0fb1c9);
   border-radius: 10px;
   width: 100%;
   max-width: 250px;
@@ -25,20 +25,20 @@
 
 .header {
   padding: 10px 24px 1px;
-  border-bottom: 1px solid #333239;
+  border-bottom: 1px solid var(--effects-menu-header-border, #333239);
   position: relative;
 }
 
 .header h2 {
   margin: 0;
-  color: #e5e5e5;
+  color: var(--effects-menu-text, #e5e5e5);
   font-size: 16px;
   font-weight: 600;
 }
 
 .subtitle {
   margin: 4px 0 10px;
-  color: #9c9c9c;
+  color: var(--effects-menu-subtext, #9c9c9c);
   font-size: 14px;
 }
 
@@ -55,8 +55,8 @@
 }
 
 .effectCard {
-  background: #1e1d20;
-  border: 1px solid #333239;
+  background: var(--effects-card-bg, #1e1d20);
+  border: 1px solid var(--effects-card-border, #333239);
   border-radius: 8px;
   padding: 5px 10px 8px;
   text-align: left;
@@ -114,7 +114,7 @@
 }
 
 .effectName {
-  color: #e5e5e5;
+  color: var(--effects-card-name, #e5e5e5);
   font-weight: 600;
   font-size: 14px;
   transition: all 0.3s ease;
@@ -123,7 +123,7 @@
 }
 
 .effectDescription {
-  color: #888;
+  color: var(--effects-card-desc, #888);
   font-size: 12px;
   line-height: 1.3;
   transition: all 0.3s ease;
@@ -132,15 +132,15 @@
 
 .footer {
   padding: 10px 24px;
-  border-top: 1px solid #333239;
+  border-top: 1px solid var(--effects-menu-header-border, #333239);
   display: flex;
   justify-content: flex-end;
 }
 
 .cancelButton {
-  background: #2a2a2a;
-  color: #888;
-  border: 1px solid #333239;
+  background: var(--effects-cancel-bg, #2a2a2a);
+  color: var(--effects-cancel-text, #888);
+  border: 1px solid var(--effects-cancel-border, #333239);
   border-radius: 6px;
   padding: 8px 16px;
   cursor: pointer;
@@ -153,8 +153,8 @@
 }
 
 .cancelButton:hover {
-  background: #333239;
-  color: #e5e5e5;
+  background: var(--effects-cancel-hover-bg, #333239);
+  color: var(--effects-cancel-hover-text, #e5e5e5);
 }
 
 /* Scrollbar styling */
@@ -163,16 +163,16 @@
 }
 
 .effectsContent::-webkit-scrollbar-track {
-  background: #1e1d20;
+  background: var(--effects-scroll-track, #1e1d20);
 }
 
 .effectsContent::-webkit-scrollbar-thumb {
-  background: #333239;
+  background: var(--effects-scroll-thumb, #333239);
   border-radius: 3px;
 }
 
 .effectsContent::-webkit-scrollbar-thumb:hover {
-  background: #5c5b62;
+  background: var(--effects-scroll-thumb-hover, #5c5b62);
 }
 
 /* Styling for a disabled (already active) effect card */

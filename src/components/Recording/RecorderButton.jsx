@@ -1,7 +1,5 @@
 import React, {useEffect, useRef, useState} from "react";
 import * as Tone from "tone";
-import RecordIcon from "../../assets/footer/RecordButton.svg";
-import StopRecordIcon from "../../assets/footer/StopRecordButton.svg";
 
 /**
  * Simple recorder using MediaRecorder. Produces an AudioBuffer + blob URL.
@@ -120,12 +118,9 @@ export default function RecorderButton({onComplete, onStart, onStop}) {
 
   if (!support) {
     return (
-      <button title="Recording not supported" disabled style={{opacity: 0.6}}>
-        <img
-          src={RecordIcon}
-          alt="Record"
-          style={{height: 26, display: "block"}}
-        />
+      <button title="Recording not supported" disabled className="rec-button">
+        <span className="rec-indicator" />
+        <span>Rec</span>
       </button>
     );
   }
@@ -135,32 +130,10 @@ export default function RecorderButton({onComplete, onStart, onStop}) {
       type="button"
       onClick={recording ? stop : start}
       title={recording ? "Stop Recording" : "Start Recording"}
-      style={{
-        background: "transparent",
-        border: "none",
-        padding: 0,
-        margin: 0,
-        cursor: "pointer",
-      }}
+      className={`rec-button${recording ? " recording" : ""}`}
     >
-      {recording ? (
-        <span
-          className="record-pulse"
-          aria-label={`Stop Recording ${fmt(elapsedMs)}`}
-        >
-          <img
-            src={StopRecordIcon}
-            alt="Stop Recording"
-            style={{height: 26, display: "block"}}
-          />
-        </span>
-      ) : (
-        <img
-          src={RecordIcon}
-          alt="Record"
-          style={{height: 26, display: "block"}}
-        />
-      )}
+      <span className="rec-indicator" />
+      <span>{recording ? `Stop (${fmt(elapsedMs)})` : "Rec"}</span>
     </button>
   );
 }
