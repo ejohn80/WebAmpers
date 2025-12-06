@@ -288,10 +288,8 @@
 }
 
 .track-wrapper {
-  position: relative; /* so the highlight can fill this row */
-  display: flex;
-  flex-direction: column;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  /* Add a subtle separator between tracks */
+  border-bottom: 1px solid var(--track-separator);
   padding-bottom: 16px;
 }
 

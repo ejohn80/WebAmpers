@@ -25,7 +25,12 @@ const unwrapAudioBuffer = (candidate) => {
   return null;
 };
 
-const computePeaks = (audioBuffer, targetPoints, startSample = 0, endSample = null) => {
+const computePeaks = (
+  audioBuffer,
+  targetPoints,
+  startSample = 0,
+  endSample = null
+) => {
   if (!audioBuffer) return [];
   const totalLength = audioBuffer.length ?? 0;
   if (!totalLength || !audioBuffer.numberOfChannels) return [];
@@ -245,10 +250,7 @@ const Waveform = ({
         0,
         Math.min(Math.floor(startSec * sampleRate), native.length ?? 0)
       );
-      const regionLenSamples = Math.max(
-        1,
-        Math.floor(durSec * sampleRate)
-      );
+      const regionLenSamples = Math.max(1, Math.floor(durSec * sampleRate));
       regionEndSample = Math.max(
         regionStartSample + 1,
         Math.min(regionStartSample + regionLenSamples, native.length ?? 0)

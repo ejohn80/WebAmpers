@@ -876,7 +876,8 @@ function AudioPage() {
   };
 
   function cutSegmentByRange(segment, cutStartMs, cutEndMs) {
-    if (!segment) return { leftSegment: null, cutSegment: null, rightSegment: null };
+    if (!segment)
+      return {leftSegment: null, cutSegment: null, rightSegment: null};
 
     // Normalize order just in case
     const startMs = Math.min(cutStartMs, cutEndMs);
@@ -885,7 +886,9 @@ function AudioPage() {
     const segStartTimelineMs = segment.startOnTimelineMs || 0;
     const segDurationMs =
       segment.durationMs ??
-      (typeof segment.duration === "number" ? Math.round(segment.duration * 1000) : 0);
+      (typeof segment.duration === "number"
+        ? Math.round(segment.duration * 1000)
+        : 0);
     const segEndTimelineMs = segStartTimelineMs + segDurationMs;
 
     // Clamp the cut range to the segment
@@ -894,7 +897,7 @@ function AudioPage() {
 
     if (clampedEnd <= clampedStart) {
       // no overlap, nothing to cut
-      return { leftSegment: null, cutSegment: null, rightSegment: null };
+      return {leftSegment: null, cutSegment: null, rightSegment: null};
     }
 
     const totalDurMs = segDurationMs;
@@ -957,7 +960,7 @@ function AudioPage() {
           }
         : null;
 
-    return { leftSegment, cutSegment, rightSegment };
+    return {leftSegment, cutSegment, rightSegment};
   }
 
   const handleCutSegmentRange = async (
@@ -966,7 +969,7 @@ function AudioPage() {
     cutStartMs,
     cutEndMs
   ) => {
-    const { ms: preservedMs } = progressStore.getState();
+    const {ms: preservedMs} = progressStore.getState();
 
     try {
       const track = audioManager.getTrack(trackId);
@@ -977,7 +980,7 @@ function AudioPage() {
 
       const originalSegment = track.segments[segmentIndex];
 
-      const { leftSegment, cutSegment, rightSegment } = cutSegmentByRange(
+      const {leftSegment, cutSegment, rightSegment} = cutSegmentByRange(
         originalSegment,
         cutStartMs,
         cutEndMs
@@ -1495,15 +1498,15 @@ function AudioPage() {
             typeof primarySeg.startInFileMs === "number"
               ? primarySeg.startInFileMs
               : primarySeg.offset
-              ? Math.round(primarySeg.offset * 1000)
-              : 0;
+                ? Math.round(primarySeg.offset * 1000)
+                : 0;
 
           const segDurationMs =
             typeof primarySeg.durationMs === "number"
               ? primarySeg.durationMs
               : primarySeg.duration
-              ? Math.round(primarySeg.duration * 1000)
-              : fullDurationMs;
+                ? Math.round(primarySeg.duration * 1000)
+                : fullDurationMs;
 
           clipStartMs = Math.max(0, Math.min(segStartInFileMs, fullDurationMs));
           clipDurationMs = Math.max(
