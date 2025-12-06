@@ -63,11 +63,92 @@
 .global-playhead-rail {
   position: absolute;
   top: 0;
-  bottom: 0;
+  height: 32px;
   left: var(--timeline-left-offset);
   width: var(--timeline-content-width, 100%);
-  pointer-events: none;
+  pointer-events: auto;
   z-index: 10;
+}
+
+/* Full-height rail behind all tracks, only for drawing the red playhead */
+.global-playhead-rail-full {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  pointer-events: none; /* don't block clicking on tracks */
+  z-index: 9; /* under handles & timeline header, above track bg */
+}
+
+/* Trim selection side handles */
+.trim-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 24px;
+  background: rgba(255, 215, 0, 0.95);
+  border-radius: 3px;
+  cursor: ew-resize;
+  z-index: 15;
+}
+
+/* Center each handle on its percentage position */
+.trim-handle-left,
+.trim-handle-right {
+  transform: translateX(-50%);
+}
+
+/* Trim controls (✓ / ✕) */
+.trim-controls {
+  position: absolute;
+  top: 4px; /* tweak if you want it higher/lower */
+  transform: translateX(-66px); /* small offset to the right of the handle */
+  display: flex;
+  gap: 4px;
+  z-index: 40;
+}
+
+.trim-btn {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: none;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+.trim-confirm {
+  background: #26a269; /* green */
+  color: #fff;
+}
+
+.trim-cancel {
+  background: #c01c28; /* red */
+  color: #fff;
+}
+
+/* When trim mode is active, all tracks get a subtle highlight + pointer cursor */
+.track-wrapper-trim-hover {
+  cursor: pointer;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.28) inset;
+  transition:
+    box-shadow 0.12s ease-out,
+    background-color 0.12s ease-out;
+}
+
+/* Slightly stronger highlight on hover */
+.track-wrapper-trim-hover:hover {
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.45) inset;
+}
+
+/* Selected track during trim (this already existed, but we’ll now use it) */
+.track-wrapper-trim-selected {
+  outline: 2px solid #ffcc33;
+  outline-offset: -2px;
+  background-color: rgba(255, 204, 51, 0.06);
 }
 
 /* Timeline ruler overlay */
@@ -77,9 +158,9 @@
   margin-left: var(--timeline-left-offset);
   width: var(--timeline-content-width, 100%);
   height: 32px;
-  background: #2c2c2f;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  background: var(--timeline-ruler-bg);
+  border-bottom: 1px solid var(--timeline-ruler-border);
+  box-shadow: var(--timeline-ruler-shadow);
   pointer-events: none;
   z-index: 11;
   margin-bottom: 12px;
@@ -90,12 +171,8 @@
   position: absolute;
   top: 0;
   bottom: 0;
-  background: linear-gradient(
-    90deg,
-    rgba(234, 41, 41, 0.18),
-    rgba(234, 41, 41, 0)
-  );
-  border-right: 1px solid rgba(234, 41, 41, 0.35);
+  background: var(--timeline-pre-fill);
+  border-right: 1px solid var(--timeline-pre-line);
   pointer-events: none;
 }
 
@@ -110,13 +187,13 @@
 .timeline-tick-line {
   width: 2px;
   height: 18px;
-  background: rgba(234, 41, 41, 0.35);
+  background: var(--timeline-pre-line);
 }
 
 .timeline-tick-label {
   margin-top: 2px;
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.75);
+  color: var(--timeline-tick-color);
   white-space: nowrap;
 }
 
@@ -148,16 +225,16 @@
   display: inline-flex;
   gap: 6px;
   align-items: center;
-  background: rgba(0, 0, 0, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: var(--zoom-bg);
+  border: 1px solid var(--zoom-border);
   border-radius: 6px;
   padding: 4px 6px;
 }
 
 .zoom-btn {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  color: #eee;
+  background: var(--zoom-btn-bg);
+  border: 1px solid var(--zoom-btn-border);
+  color: var(--zoom-text);
   font-size: 12px;
   padding: 2px 6px;
   border-radius: 4px;
@@ -165,14 +242,14 @@
 }
 
 .zoom-btn:hover {
-  background: rgba(255, 255, 255, 0.15);
+  background: var(--zoom-btn-hover);
 }
 .zoom-btn.reset {
   opacity: 0.85;
 }
 .zoom-label {
   font-size: 12px;
-  color: #ddd;
+  color: var(--zoom-label);
   min-width: 40px;
   text-align: center;
 }
@@ -182,11 +259,11 @@
   align-items: center;
   gap: 6px;
   padding: 2px 6px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: var(--follow-bg);
+  border: 1px solid var(--follow-border);
   border-radius: 4px;
   font-size: 12px;
-  color: #e6e6e6;
+  color: var(--follow-text);
   cursor: pointer;
   user-select: none;
 }
@@ -199,7 +276,7 @@
 /* Shorter in-between (minor) ticks */
 .timeline-tick.minor .timeline-tick-line {
   height: 10px;
-  background: rgba(234, 41, 41, 0.25);
+  background: var(--timeline-pre-line);
 }
 
 .timeline-tick.minor .timeline-tick-label {
@@ -208,13 +285,25 @@
 
 .track-wrapper {
   /* Add a subtle separator between tracks */
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid var(--track-separator);
   padding-bottom: 16px;
 }
 
 .track-wrapper:last-child {
   border-bottom: none;
   padding-bottom: 0;
+}
+
+/* Yellow overlay covering the entire selected track (single-track trim) */
+.track-trim-highlight {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgba(255, 215, 0, 0.16);
+  border-left: 2px solid rgba(255, 215, 0, 0.9);
+  border-right: 2px solid rgba(255, 215, 0, 0.9);
+  pointer-events: none;
+  z-index: 14;
 }
 
 .empty-state {
@@ -226,7 +315,7 @@
   min-height: 320px;
   text-align: center;
   font-size: 1.5rem;
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--empty-text);
   letter-spacing: 0.02em;
   padding: 32px 16px;
 }
@@ -238,16 +327,16 @@
 }
 
 .timeline-scroll-area::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.1);
+  background: var(--scrollbar-track);
 }
 
 .timeline-scroll-area::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--scrollbar-thumb);
   border-radius: 4px;
 }
 
 .timeline-scroll-area::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.3);
+  background: var(--scrollbar-thumb-hover);
 }
 
 /* Timeline width is driven by global CSS var; can be < or > viewport based on zoom */

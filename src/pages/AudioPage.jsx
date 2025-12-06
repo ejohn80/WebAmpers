@@ -13,7 +13,6 @@ import Sidebar from "../components/Layout/Sidebar";
 import MainContent from "../components/Layout/MainContent";
 import Footer from "../components/Layout/Footer";
 import {audioManager} from "../managers/AudioManager";
-import WebAmpPlayback from "../playback/playback.jsx";
 import {dbManager} from "../managers/DBManager";
 import {AppContext} from "../context/AppContext";
 import {progressStore} from "../playback/progressStore";
@@ -876,6 +875,198 @@ function AudioPage() {
     }
   };
 
+  function cutSegmentByRange(segment, cutStartMs, cutEndMs) {
+    if (!segment)
+      return {leftSegment: null, cutSegment: null, rightSegment: null};
+
+    // Normalize order just in case
+    const startMs = Math.min(cutStartMs, cutEndMs);
+    const endMs = Math.max(cutStartMs, cutEndMs);
+
+    const segStartTimelineMs = segment.startOnTimelineMs || 0;
+    const segDurationMs =
+      segment.durationMs ??
+      (typeof segment.duration === "number"
+        ? Math.round(segment.duration * 1000)
+        : 0);
+    const segEndTimelineMs = segStartTimelineMs + segDurationMs;
+
+    // Clamp the cut range to the segment
+    const clampedStart = Math.max(segStartTimelineMs, Math.min(startMs, endMs));
+    const clampedEnd = Math.min(segEndTimelineMs, Math.max(startMs, endMs));
+
+    if (clampedEnd <= clampedStart) {
+      // no overlap, nothing to cut
+      return {leftSegment: null, cutSegment: null, rightSegment: null};
+    }
+
+    const totalDurMs = segDurationMs;
+    const fileStartMs = segment.startInFileMs ?? 0;
+
+    // Position inside the segment
+    const offsetStartInsideSegMs = clampedStart - segStartTimelineMs;
+    const offsetEndInsideSegMs = clampedEnd - segStartTimelineMs;
+
+    // Corresponding positions in the underlying file
+    const cutStartInFileMs = fileStartMs + offsetStartInsideSegMs;
+    const cutEndInFileMs = fileStartMs + offsetEndInsideSegMs;
+
+    const leftDurMs = offsetStartInsideSegMs;
+    const rightDurMs = totalDurMs - offsetEndInsideSegMs;
+    const cutDurMs = cutEndInFileMs - cutStartInFileMs;
+
+    const base = segment;
+    const makeId = (suffix) => `${segment.id}_${suffix}_${Date.now()}`;
+
+    const leftSegment =
+      leftDurMs > 0
+        ? {
+            ...base,
+            id: makeId("L"),
+            startOnTimelineMs: segStartTimelineMs,
+            startOnTimeline: segStartTimelineMs / 1000,
+            startInFileMs: fileStartMs,
+            offset: fileStartMs / 1000,
+            durationMs: leftDurMs,
+            duration: leftDurMs / 1000,
+          }
+        : null;
+
+    const cutSegment =
+      cutDurMs > 0
+        ? {
+            ...base,
+            id: makeId("CUT"),
+            startOnTimelineMs: clampedStart,
+            startOnTimeline: clampedStart / 1000,
+            startInFileMs: cutStartInFileMs,
+            offset: cutStartInFileMs / 1000,
+            durationMs: cutDurMs,
+            duration: cutDurMs / 1000,
+          }
+        : null;
+
+    const rightSegment =
+      rightDurMs > 0
+        ? {
+            ...base,
+            id: makeId("R"),
+            startOnTimelineMs: clampedEnd,
+            startOnTimeline: clampedEnd / 1000,
+            startInFileMs: cutEndInFileMs,
+            offset: cutEndInFileMs / 1000,
+            durationMs: rightDurMs,
+            duration: rightDurMs / 1000,
+          }
+        : null;
+
+    return {leftSegment, cutSegment, rightSegment};
+  }
+
+  const handleCutSegmentRange = async (
+    trackId,
+    segmentIndex,
+    cutStartMs,
+    cutEndMs
+  ) => {
+    const {ms: preservedMs} = progressStore.getState();
+
+    try {
+      const track = audioManager.getTrack(trackId);
+      if (!track || !track.segments || !track.segments[segmentIndex]) {
+        console.warn("[cut] Track or segment not found");
+        return;
+      }
+
+      const originalSegment = track.segments[segmentIndex];
+
+      const {leftSegment, cutSegment, rightSegment} = cutSegmentByRange(
+        originalSegment,
+        cutStartMs,
+        cutEndMs
+      );
+
+      if (!cutSegment) {
+        console.warn("[cut] No overlapping region to cut");
+        return;
+      }
+
+      // Build new segments list: left + right, drop the middle
+      const newSegments = [
+        ...track.segments.slice(0, segmentIndex),
+        ...(leftSegment ? [leftSegment] : []),
+        ...(rightSegment ? [rightSegment] : []),
+        ...track.segments.slice(segmentIndex + 1),
+      ];
+
+      track.segments = newSegments;
+
+      // Make sure track has assetId (similar pattern to your copy/cut)
+      try {
+        const allTracks = await dbManager.getAllTracks(activeSession);
+        const dbTrack = allTracks.find((t) => t.id === trackId);
+        if (dbTrack && dbTrack.assetId) {
+          track.assetId = dbTrack.assetId;
+          cutSegment.assetId = cutSegment.assetId ?? dbTrack.assetId;
+        }
+      } catch (e) {
+        console.warn("[cut] Failed to enrich track with assetId", e);
+      }
+
+      // Put the CUT piece into clipboard as a tiny "track-like" object
+      const clipTrack = {
+        id: `clip_${track.id}_${Date.now()}`,
+        name: `${track.name} (cut)`,
+        color: track.color,
+        assetId: cutSegment.assetId ?? track.assetId,
+        volume: track.volume ?? 0,
+        pan: track.pan ?? 0,
+        mute: false,
+        solo: false,
+        effects: track.effects || {},
+        activeEffectsList: track.activeEffectsList || [],
+        // important: only this one segment, starting at 0 on timeline
+        segments: [
+          {
+            ...cutSegment,
+            startOnTimelineMs: 0,
+            startOnTimeline: 0,
+          },
+        ],
+        // extra metadata so paste can know file region
+        clipStartInFileMs: cutSegment.startInFileMs ?? 0,
+        clipDurationMs: cutSegment.durationMs ?? 0,
+      };
+
+      clipboardManager.setClipboard(clipTrack, "cut");
+
+      // Persist to DB
+      await dbManager.updateTrack(track);
+
+      // Update React state
+      setTracks([...audioManager.tracks]);
+
+      // Rebuild & reload engine (and restore playhead)
+      const newVersion = buildVersionFromTracks(audioManager.tracks);
+      if (newVersion && engineRef.current) {
+        await engineRef.current.load(newVersion);
+        try {
+          engineRef.current.setPositionMs(preservedMs);
+        } catch (e) {
+          console.warn("[cut] Failed to restore playhead after cut", e);
+        }
+      }
+
+      console.log(
+        `[cut] Segment ${segmentIndex} of track ${trackId} cut into left/right, ` +
+          `clipboard now has middle region`
+      );
+    } catch (error) {
+      console.error("Failed to cut segment:", error);
+      alert(`Failed to cut segment: ${error.message}`);
+    }
+  };
+
   // Handle segment movement within a track
   const handleSegmentMove = async (trackId, segmentIndex, newPositionMs) => {
     const {ms: preservedMs} = progressStore.getState();
@@ -1235,9 +1426,13 @@ function AudioPage() {
     if (!trackData.assetId) {
       console.error("Cannot paste track without assetId");
       console.error("Full track data:", trackData);
-      alert(
-        "Cannot paste track: missing asset reference. This may happen if the track was created before the clipboard system was implemented."
-      );
+      alert("Cannot paste track: missing assetId");
+      return;
+    }
+
+    if (!activeSession) {
+      console.error("No active session for paste");
+      alert("Please create or select a session first");
       return;
     }
 
@@ -1250,9 +1445,8 @@ function AudioPage() {
         return;
       }
 
-      // Get or create cached buffer
+      // Get or create cached Tone buffer
       let toneBuffer = assetBufferCache.get(trackData.assetId);
-
       if (!toneBuffer) {
         console.log(
           `Creating buffer for pasted track from asset ${trackData.assetId}`
@@ -1270,14 +1464,98 @@ function AudioPage() {
         assetBufferCache.set(trackData.assetId, toneBuffer);
       }
 
-      // Get serialized buffer for DB
       const {buffer: serializedBuffer} = asset;
       const audioBuffer = toneBuffer.get();
+      const fullDurationMs = audioBuffer.duration * 1000;
+
+      const clipboardSegments = Array.isArray(trackData.segments)
+        ? trackData.segments
+        : [];
+
+      // Prefer explicit region (single cut)
+      const hasTopLevelRegion =
+        typeof trackData.clipStartInFileMs === "number" &&
+        typeof trackData.clipDurationMs === "number" &&
+        trackData.clipDurationMs > 0;
+
+      const baseSegments = (() => {
+        if (hasTopLevelRegion) {
+          return [
+            {
+              id:
+                clipboardSegments[0]?.id ??
+                `seg_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+              startOnTimelineMs: 0,
+              startInFileMs: Math.max(0, trackData.clipStartInFileMs),
+              durationMs: Math.max(
+                1,
+                Math.min(trackData.clipDurationMs, fullDurationMs)
+              ),
+            },
+          ];
+        }
+
+        if (clipboardSegments.length > 0) {
+          return clipboardSegments;
+        }
+
+        // Fallback: full asset as one segment
+        return [
+          {
+            id: `seg_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+            startOnTimelineMs: 0,
+            startInFileMs: 0,
+            durationMs: Math.round(fullDurationMs),
+          },
+        ];
+      })();
+
+      const normalizedSegments = baseSegments.map((seg, idx) => {
+        const startOnTimelineMs = Math.max(
+          0,
+          Math.round(seg.startOnTimelineMs ?? 0)
+        );
+        const startInFileMs = Math.max(
+          0,
+          Math.round(
+            typeof seg.startInFileMs === "number"
+              ? seg.startInFileMs
+              : seg.offset
+                ? seg.offset * 1000
+                : 0
+          )
+        );
+        const durationMs = Math.max(
+          1,
+          Math.round(
+            typeof seg.durationMs === "number"
+              ? seg.durationMs
+              : typeof seg.duration === "number"
+                ? seg.duration * 1000
+                : fullDurationMs
+          )
+        );
+
+        return {
+          id:
+            seg.id ??
+            `seg_${Date.now()}_${idx}_${Math.random()
+              .toString(36)
+              .slice(2, 6)}`,
+          startOnTimelineMs,
+          startOnTimeline: startOnTimelineMs / 1000,
+          startInFileMs,
+          offset: startInFileMs / 1000,
+          durationMs,
+          duration: durationMs / 1000,
+          assetId: trackData.assetId,
+        };
+      });
 
       // Generate a unique copy name
       const copyName = generateCopyName(trackData.name);
 
-      // Create new track with pasted data
+      // Create new track data for DB
       const newTrackData = {
         name: copyName,
         color: trackData.color || `hsl(${Math.random() * 360}, 70%, 50%)`,
@@ -1288,30 +1566,22 @@ function AudioPage() {
         solo: trackData.solo ?? false,
         effects: trackData.effects || {},
         activeEffectsList: trackData.activeEffectsList || [],
-        segments: [
-          {
-            id: `seg_${Date.now()}`,
-            buffer: {
-              numberOfChannels: audioBuffer.numberOfChannels,
-              length: audioBuffer.length,
-              sampleRate: audioBuffer.sampleRate,
-              duration: audioBuffer.duration,
-              channels: serializedBuffer.channels,
-            },
-            offset: 0,
-            duration: audioBuffer.duration,
-            durationMs: Math.round(audioBuffer.duration * 1000),
-            startOnTimelineMs: 0,
-            startInFileMs: 0,
-          },
-        ],
+        segments: normalizedSegments.map((seg) => ({
+          id: seg.id,
+          offset: seg.offset,
+          duration: seg.duration,
+          durationMs: seg.durationMs,
+          startOnTimelineMs: seg.startOnTimelineMs,
+          startInFileMs: seg.startInFileMs,
+          assetId: trackData.assetId,
+        })),
       };
 
       // Save to database
       const dbId = await dbManager.addTrack(newTrackData, activeSession);
       console.log("Pasted track saved to DB with ID:", dbId);
 
-      // Create track for audioManager
+      // Build the track object for audioManager
       const pastedTrack = {
         id: dbId,
         name: copyName,
@@ -1324,17 +1594,10 @@ function AudioPage() {
         solo: newTrackData.solo,
         effects: newTrackData.effects,
         activeEffectsList: newTrackData.activeEffectsList,
-        segments: [
-          {
-            id: `seg_${Date.now()}`,
-            buffer: toneBuffer,
-            offset: 0,
-            duration: audioBuffer.duration,
-            durationMs: Math.round(audioBuffer.duration * 1000),
-            startOnTimelineMs: 0,
-            startInFileMs: 0,
-          },
-        ],
+        segments: normalizedSegments.map((seg) => ({
+          ...seg,
+          buffer: toneBuffer,
+        })),
       };
 
       // Add to audioManager
@@ -1350,10 +1613,28 @@ function AudioPage() {
         console.log("Engine reloaded after paste");
       }
 
-      console.log("Track pasted successfully");
+      const summaryStart =
+        normalizedSegments.length === 1
+          ? normalizedSegments[0].startInFileMs
+          : null;
+      const summaryEnd =
+        normalizedSegments.length === 1
+          ? normalizedSegments[0].startInFileMs +
+            (normalizedSegments[0].durationMs ?? 0)
+          : null;
+
+      if (summaryStart !== null && summaryEnd !== null) {
+        console.log(
+          `Track pasted: ${copyName}, region ${summaryStart}ms → ${summaryEnd}ms`
+        );
+      } else {
+        console.log(
+          `Track pasted: ${copyName} with ${normalizedSegments.length} segment(s)`
+        );
+      }
     } catch (error) {
-      console.error("Failed to paste track:", error);
-      alert(`Failed to paste track: ${error.message}`);
+      console.error("Error while pasting track:", error);
+      alert("Failed to paste track. See console for details.");
     }
   };
 
@@ -1478,6 +1759,7 @@ function AudioPage() {
             handleTrackPropertyUpdate(trackId, "solo", soloed, "setTrackSolo")
           }
           onDelete={handleDeleteTrack}
+          onCutSegmentRange={handleCutSegmentRange}
         />
       </div>
 

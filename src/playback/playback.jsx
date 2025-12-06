@@ -9,16 +9,18 @@ import React, {
 import * as Tone from "tone";
 import {progressStore} from "./progressStore";
 import {
-  RewindIcon,
-  ForwardIcon,
-  GoToStartIcon,
   SoundOffIcon,
   VolumeKnob,
-  GoToEndIcon,
   SoundOnLowIcon,
   SoundOnMediumIcon,
   SoundOnHighIcon,
 } from "../components/Layout/Svgs.jsx";
+import {
+  FaStepBackward,
+  FaBackward,
+  FaForward,
+  FaStepForward,
+} from "react-icons/fa";
 
 import "./playback.css";
 import {AppContext} from "../context/AppContext";
@@ -98,6 +100,7 @@ class PlaybackEngine {
     Tone.Transport.cancel(0);
     this._cancelRaf();
     this._disposeAll();
+    Tone.Transport.cancel(0);
     this._disposeMaster();
     this._emitTransport(false);
 
@@ -1342,6 +1345,9 @@ class PlaybackEngine {
       const offsetSec = (seg.startInFileMs || 0) / 1000;
       const durSec = (seg.durationMs || 0) / 1000;
 
+      // If the segment has zero duration, skip entirely (prevents Tone.js from playing unintended audio)
+      if (durSec <= 0) continue;
+
       // Sync player to Transport so pause/stop works correctly
       player.sync();
 
@@ -1625,11 +1631,14 @@ class PlaybackEngine {
   _disposeAll() {
     this.playersBySegment.forEach((h) => {
       try {
-        h.player.unsync?.();
+        h.player.stop();
+      } catch {}
+      try {
+        h.player.unsync();
+      } catch {}
+      try {
         h.disposers.forEach((d) => d());
-      } catch {
-        /* To suppress linter warning */
-      }
+      } catch {}
     });
     this.playersBySegment.clear();
 
@@ -2429,7 +2438,7 @@ export default function WebAmpPlayback({version, onEngineReady}) {
             disabled={hasNoTracks}
             title={hasNoTracks ? "No tracks loaded" : "Go to start"}
           >
-            <GoToStartIcon />
+            <FaStepBackward />
           </button>
 
           <button
@@ -2438,7 +2447,7 @@ export default function WebAmpPlayback({version, onEngineReady}) {
             disabled={hasNoTracks}
             title={hasNoTracks ? "No tracks loaded" : "Skip backward 10s"}
           >
-            <RewindIcon />
+            <FaBackward />
           </button>
 
           <PlayPauseButton
@@ -2453,7 +2462,7 @@ export default function WebAmpPlayback({version, onEngineReady}) {
             disabled={hasNoTracks}
             title={hasNoTracks ? "No tracks loaded" : "Skip forward 10s"}
           >
-            <ForwardIcon />
+            <FaForward />
           </button>
 
           <button
@@ -2462,7 +2471,7 @@ export default function WebAmpPlayback({version, onEngineReady}) {
             disabled={hasNoTracks}
             title={hasNoTracks ? "No tracks loaded" : "Go to end"}
           >
-            <GoToEndIcon />
+            <FaStepForward />
           </button>
         </div>
       </div>
