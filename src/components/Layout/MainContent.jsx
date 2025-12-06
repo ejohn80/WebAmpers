@@ -398,10 +398,11 @@ function MainContent({
     }
   };
 
-  // Handle Ctrl + Click + Drag to create a cut range on the selected segment
+  // Handle Ctrl/Cmd + Click + Drag to create a cut range on the selected segment
   const handleTracksMouseDown = (e) => {
-    // Only Ctrl + left button
-    if (!(e.ctrlKey && e.button === 0)) return;
+    const modifierPressed = e.ctrlKey || e.metaKey;
+    // Only modifier + left button
+    if (!(modifierPressed && e.button === 0)) return;
 
     // Eat this event so TrackLane's drag handler never sees it
     e.preventDefault();
