@@ -864,9 +864,9 @@ const AppContextProvider = ({children}) => {
       }
     } catch {}
   }, [engineRef]);
-  
+
   const refreshDB = useCallback(() => {
-    setDbRefreshTrigger(prev => prev + 1);
+    setDbRefreshTrigger((prev) => prev + 1);
   }, []);
 
   const contextValue = useMemo(
