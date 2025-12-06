@@ -11,11 +11,11 @@ html,
 
 /* Header specific styling */
 .header {
-  background-color: #242424;
+  background-color: var(--header-bg);
   position: relative;
   z-index: 9999;
   overflow: visible;
-  border-bottom: 2px solid #343239;
+  border-bottom: 2px solid var(--header-border);
   /* border-top: 1px solid black; */
 }
 
@@ -29,7 +29,7 @@ html,
 /* Ensure other sections have lower z-index */
 
 .footer {
-  background-color: #242424;
+  background-color: var(--footer-bg);
   z-index: 1; /* Lower than header */
 }
 
@@ -37,7 +37,7 @@ html,
 .section {
   padding: 10px;
   box-sizing: border-box;
-  color: #e5e5e5; /* match header text color */
+  color: var(--section-text); /* match header text color */
 }
 
 /* Footer-specific overrides to vertically center content inside the small footer row */
@@ -51,7 +51,7 @@ html,
 
 /* Main content (center area) override — use a dark grey so TrackLane can be lighter */
 .maincontent {
-  background-color: #1f1f1f !important;
+  background-color: var(--maincontent-bg) !important;
 }
 
 /* --- Main Content Area Styling (The Core Grid) --- */
@@ -67,7 +67,7 @@ html,
 .divider {
   cursor: ew-resize;
   width: 5px;
-  background-color: black;
+  background-color: var(--divider-vertical);
   height: 100%;
 }
 

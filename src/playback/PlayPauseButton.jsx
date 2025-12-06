@@ -1,4 +1,4 @@
-import {PlayIcon, PauseIcon} from "../components/Layout/Svgs.jsx";
+import {FaPlay, FaPause} from "react-icons/fa";
 
 const PlayPauseButton = ({
   isPlaying,
@@ -17,12 +17,12 @@ const PlayPauseButton = ({
       <div className="play-pause-container">
         {/* Play Icon */}
         <div className={`play-icon ${isPlaying ? "hidden" : "visible"}`}>
-          <PlayIcon />
+          <FaPlay />
         </div>
 
         {/* Pause Icon */}
         <div className={`pause-icon ${isPlaying ? "visible" : "hidden"}`}>
-          <PauseIcon />
+          <FaPause />
         </div>
       </div>
     </button>
