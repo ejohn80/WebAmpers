@@ -393,43 +393,6 @@ function DropdownPortal({
         }}
         onMouseLeave={handleDropdownMouseLeave}
       >
-        {/* DISABLED - Undo */}
-        <a
-          href="#"
-          className="dropdown-item-disabled"
-          onClick={(e) => e.preventDefault()}
-        >
-          <span
-            style={{
-              display: "flex",
-              alignItems: "center",
-              width: "100%",
-              gap: "8px",
-            }}
-          >
-            <UndoIcon />
-            <span>Undo</span>
-          </span>
-        </a>
-
-        {/* DISABLED - Redo */}
-        <a
-          href="#"
-          className="dropdown-item-disabled"
-          onClick={(e) => e.preventDefault()}
-        >
-          <span
-            style={{
-              display: "flex",
-              alignItems: "center",
-              width: "100%",
-              gap: "8px",
-            }}
-          >
-            <RedoIcon />
-            <span>Redo</span>
-          </span>
-        </a>
 
         {/* ENABLED/DISABLED - Cut (depends on track selection) */}
         <a
