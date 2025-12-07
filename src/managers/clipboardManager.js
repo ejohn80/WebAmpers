@@ -81,7 +81,6 @@ class ClipboardManager {
           // Include name, fileName, AND assetId properties
           name: seg.name,
           fileName: seg.fileName,
-          assetId: seg.assetId, // Each segment needs its own assetId
         })),
         // For single-segment cuts, preserve the region info
         clipStartInFileMs: track.clipStartInFileMs,
