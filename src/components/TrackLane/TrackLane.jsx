@@ -1,4 +1,11 @@
-import React, {useState, useEffect, memo, useCallback, useRef} from "react";
+import React, {
+  useState,
+  useEffect,
+  memo,
+  useCallback,
+  useRef,
+  useMemo,
+} from "react";
 import {createPortal} from "react-dom";
 import SegmentBlock from "./SegmentBlock";
 import "./TrackLane.css";
@@ -45,7 +52,9 @@ const TrackLane = memo(function TrackLane({
 }) {
   //if (!track) return null;
 
-  const segments = Array.isArray(track.segments) ? track.segments : [];
+  const segments = useMemo(() => {
+    return Array.isArray(track.segments) ? track.segments : [];
+  }, [track.segments]);
 
   const getInitialState = () => {
     try {
@@ -354,15 +363,18 @@ const TrackLane = memo(function TrackLane({
     setDropPreview(null);
   }, []);
 
-  const getTimelinePositionFromEvent = (event) => {
-    const timelineElement = event.currentTarget;
-    if (!timelineElement) return 0;
+  const getTimelinePositionFromEvent = useCallback(
+    (event) => {
+      const timelineElement = event.currentTarget;
+      if (!timelineElement) return 0;
 
-    const rect = timelineElement.getBoundingClientRect();
-    const dropX = event.clientX - rect.left;
-    const pxPerMsValue = pxPerMs && Number.isFinite(pxPerMs) ? pxPerMs : 0;
-    return pxPerMsValue > 0 ? Math.max(0, dropX / pxPerMsValue) : 0;
-  };
+      const rect = timelineElement.getBoundingClientRect();
+      const dropX = event.clientX - rect.left;
+      const pxPerMsValue = pxPerMs && Number.isFinite(pxPerMs) ? pxPerMs : 0;
+      return pxPerMsValue > 0 ? Math.max(0, dropX / pxPerMsValue) : 0;
+    },
+    [pxPerMs]
+  );
 
   const updateDropPreview = useCallback(
     (event, assetData) => {
@@ -391,10 +403,9 @@ const TrackLane = memo(function TrackLane({
           isLoadingDuration: durationMs === 0,
         };
       });
-
       ensurePreviewDuration(assetData.assetId);
     },
-    [segments, pxPerMs, ensurePreviewDuration]
+    [segments, getTimelinePositionFromEvent, ensurePreviewDuration]
   );
 
   useEffect(() => {

@@ -1,4 +1,4 @@
-import React, {useRef, useEffect, useState} from "react";
+import React, {useRef, useEffect, useState, useCallback} from "react";
 import "./Waveform.css";
 import {progressStore} from "../../playback/progressStore";
 
@@ -146,24 +146,25 @@ const Waveform = ({
   const [wavePath, setWavePath] = useState({d: "", width: 0});
   const [{ms, lengthMs}, setProgress] = useState(progressStore.getState());
 
-  const isScrubLocked = () =>
-    typeof progressStore.isScrubLocked === "function"
+  const isScrubLocked = useCallback(() => {
+    return typeof progressStore.isScrubLocked === "function"
       ? progressStore.isScrubLocked()
       : false;
+  }, []);
 
   useEffect(() => {
     return progressStore.subscribe(setProgress);
   }, []);
 
-  const cancelLiveSeek = () => {
+  const cancelLiveSeek = useCallback(() => {
     if (typeof window !== "undefined" && liveSeekFrameRef.current !== null) {
       window.cancelAnimationFrame(liveSeekFrameRef.current);
     }
     liveSeekFrameRef.current = null;
     liveSeekValueRef.current = null;
-  };
+  }, []);
 
-  const flushLiveSeek = () => {
+  const flushLiveSeek = useCallback(() => {
     if (typeof window !== "undefined" && liveSeekFrameRef.current !== null) {
       window.cancelAnimationFrame(liveSeekFrameRef.current);
     }
@@ -173,9 +174,10 @@ const Waveform = ({
     if (typeof pending === "number") {
       progressStore.requestSeek(pending);
     }
-  };
+  }, []);
 
-  const scheduleLiveSeek = (target) => {
+  const scheduleLiveSeek = useCallback(
+    (target) => {
     if (typeof target !== "number") return;
     liveSeekValueRef.current = target;
     if (
@@ -194,7 +196,9 @@ const Waveform = ({
         progressStore.requestSeek(pending);
       }
     });
-  };
+    },
+    [flushLiveSeek]
+  );
 
   useEffect(() => {
     const container = containerRef.current;
@@ -297,74 +301,84 @@ const Waveform = ({
   }
 
   // Scrub helpers
-  const msAtClientX = (clientX) => {
-    const el = containerRef.current;
-    if (!el) return;
-    const rect = el.getBoundingClientRect();
-    const visibleWidth = rect?.width ?? 0;
-    if (!visibleWidth) return;
+  const msAtClientX = useCallback(
+    (clientX) => {
+      const el = containerRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      const visibleWidth = rect?.width ?? 0;
+      if (!visibleWidth) return;
 
-    const rel = clamp(clientX - rect.left, 0, visibleWidth);
-    const scrollLeft = el.scrollLeft ?? 0;
-    const scrollWidth = el.scrollWidth ?? visibleWidth;
-    const totalWidth = Math.max(scrollWidth, 1);
-    const absolute = Math.max(0, Math.min(totalWidth, scrollLeft + rel));
-    const p = absolute / totalWidth;
-    // If segment timing provided, map within this segment; else map across global length
-    if (durationMs && durationMs > 0) {
-      return (startOnTimelineMs || 0) + p * durationMs;
-    }
-    if (!lengthMs) return;
-    return p * lengthMs;
-  };
+      const rel = clamp(clientX - rect.left, 0, visibleWidth);
+      const scrollLeft = el.scrollLeft ?? 0;
+      const scrollWidth = el.scrollWidth ?? visibleWidth;
+      const totalWidth = Math.max(scrollWidth, 1);
+      const absolute = Math.max(0, Math.min(totalWidth, scrollLeft + rel));
+      const p = absolute / totalWidth;
+      if (durationMs && durationMs > 0) {
+        return (startOnTimelineMs || 0) + p * durationMs;
+      }
+      if (!lengthMs) return;
+      return p * lengthMs;
+    },
+    [durationMs, startOnTimelineMs, lengthMs]
+  );
 
   // Scrubbing handlers
-  const onMouseDown = (e) => {
-    if (e.button !== 0) return; // left button only
-    if (!interactive || isScrubLocked()) return;
-    draggingRef.current = true;
-    progressStore.beginScrub({
-      pauseTransport: true,
-      silenceDuringScrub: false,
-    });
-    const target = msAtClientX(e.clientX);
-    if (typeof target === "number") {
-      // preview only: move the playhead visually without seeking audio
-      progressStore.setMs(target); // visual move
-      scheduleLiveSeek(target);
-    }
-    if (typeof window !== "undefined") {
-      window.addEventListener("mousemove", onMouseMove);
-      window.addEventListener("mouseup", onMouseUp);
-    }
-  };
-
-  const onMouseMove = (e) => {
-    if (!draggingRef.current) return;
-    if (isScrubLocked()) return;
-    const target = msAtClientX(e.clientX);
-    if (typeof target === "number") {
-      progressStore.setMs(target);
-      scheduleLiveSeek(target);
-    }
-  };
-
-  const onMouseUp = (e) => {
-    if (!draggingRef.current) return;
-    draggingRef.current = false;
-    cancelLiveSeek();
-    const target = msAtClientX(e.clientX);
-    if (!isScrubLocked()) {
+  const onMouseMove = useCallback(
+    (e) => {
+      if (!draggingRef.current) return;
+      if (isScrubLocked()) return;
+      const target = msAtClientX(e.clientX);
       if (typeof target === "number") {
-        progressStore.requestSeek(target); // commit seek to engine
+        progressStore.setMs(target);
+        scheduleLiveSeek(target);
       }
-      progressStore.endScrub();
-    }
-    if (typeof window !== "undefined") {
-      window.removeEventListener("mousemove", onMouseMove);
-      window.removeEventListener("mouseup", onMouseUp);
-    }
-  };
+    },
+    [isScrubLocked, msAtClientX, scheduleLiveSeek]
+  );
+
+  const onMouseUp = useCallback(
+    (e) => {
+      if (!draggingRef.current) return;
+      draggingRef.current = false;
+      cancelLiveSeek();
+      const target = msAtClientX(e.clientX);
+      if (!isScrubLocked()) {
+        if (typeof target === "number") {
+          progressStore.requestSeek(target);
+        }
+        progressStore.endScrub();
+      }
+      if (typeof window !== "undefined") {
+        window.removeEventListener("mousemove", onMouseMove);
+        window.removeEventListener("mouseup", onMouseUp);
+      }
+    },
+    [cancelLiveSeek, isScrubLocked, msAtClientX, onMouseMove]
+  );
+
+  const onMouseDown = useCallback(
+    (e) => {
+      if (e.button !== 0) return; // left button only
+      if (!interactive || isScrubLocked()) return;
+      draggingRef.current = true;
+      progressStore.beginScrub({
+        pauseTransport: true,
+        silenceDuringScrub: false,
+      });
+      const target = msAtClientX(e.clientX);
+      if (typeof target === "number") {
+        progressStore.setMs(target);
+        scheduleLiveSeek(target);
+      }
+      if (typeof window !== "undefined") {
+        window.addEventListener("mousemove", onMouseMove);
+        window.addEventListener("mouseup", onMouseUp);
+      }
+    },
+    [interactive, isScrubLocked, msAtClientX, scheduleLiveSeek, onMouseMove, onMouseUp]
+  );
 
   const onWheel = (e) => {
     const el = containerRef.current;
@@ -386,7 +400,7 @@ const Waveform = ({
       }
       cancelLiveSeek();
     },
-    []
+    [onMouseMove, onMouseUp, cancelLiveSeek]
   );
 
   // Touch support
