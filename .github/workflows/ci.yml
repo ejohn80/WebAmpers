@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [tests]
+    branches: [guides-ci-updates]
   pull_request:
     branches: [main]
   workflow_dispatch:
