@@ -1,4 +1,5 @@
-import React, {useMemo} from "react";
+import React, {useEffect, useMemo, useRef} from "react";
+import {progressStore} from "../../playback/progressStore";
 
 /**
  * TimelineRuler
@@ -9,6 +10,8 @@ export default function TimelineRuler({
   timelineWidth = 0,
   timelineLeftOffsetPx = 0,
 }) {
+  const indicatorRef = useRef(null);
+
   const {
     majorTicks,
     minorTicks,
@@ -113,6 +116,43 @@ export default function TimelineRuler({
     return `${m}:${ss}`;
   };
 
+  useEffect(() => {
+    if (!timelineWidth) return undefined;
+
+    const node = indicatorRef.current;
+    if (!node) return undefined;
+
+    let playheadWidthPx = 1;
+    let indicatorOffsetPx = 0;
+    if (typeof window !== "undefined" && document?.documentElement) {
+      const rootStyles = getComputedStyle(document.documentElement);
+      const raw = rootStyles.getPropertyValue("--playhead-line-width");
+      const parsed = parseFloat(raw);
+      if (!Number.isNaN(parsed)) {
+        playheadWidthPx = parsed;
+      }
+
+      const offsetRaw = rootStyles.getPropertyValue("--playhead-indicator-offset");
+      const offsetParsed = parseFloat(offsetRaw);
+      if (!Number.isNaN(offsetParsed)) {
+        indicatorOffsetPx = offsetParsed;
+      }
+    }
+
+    const updatePosition = ({ms = 0, lengthMs = 0}) => {
+      const denom = totalLengthMs > 0 ? totalLengthMs : lengthMs;
+      const ratio = denom > 0 ? Math.max(0, Math.min(1, ms / denom)) : 0;
+      const leftPx =
+        ratio * timelineWidth + playheadWidthPx / 2 + indicatorOffsetPx;
+      node.style.left = `${leftPx}px`;
+    };
+
+    updatePosition(progressStore.getState() || {});
+
+    const unsubscribe = progressStore.subscribe(updatePosition);
+    return unsubscribe;
+  }, [timelineWidth, totalLengthMs]);
+
   if (!totalLengthMs || timelineWidth <= 0) return null;
 
   const rulerStyle = {
@@ -122,6 +162,11 @@ export default function TimelineRuler({
 
   return (
     <div className="timeline-ruler-bar" style={rulerStyle}>
+      <div
+        ref={indicatorRef}
+        className="timeline-scrub-indicator"
+        aria-hidden
+      />
       {preHighlightWidthPx > 0 && (
         <div
           className="timeline-pre-highlight"
