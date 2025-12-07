@@ -77,7 +77,7 @@ const makeImport = (name, seed = 1) => {
     sampleRate: 44100,
     numberOfChannels: 1,
     length: 44100,
-    getChannelData: (i) => new Float32Array([seed, seed + 0.1, seed + 0.2]),
+    getChannelData: () => new Float32Array([seed, seed + 0.1, seed + 0.2]),
   };
 
   const toneBuf = new Tone.ToneAudioBuffer(mockNative);

@@ -1,3 +1,6 @@
+/* global global */
+// ^ Ignores for Vitest globals. ESlint sees these as undefined otherwise.
+
 import {describe, it, expect, vi, beforeEach, afterEach} from "vitest";
 import {render, screen, fireEvent, waitFor} from "@testing-library/react";
 import AudioExporter from "../components/AudioExport/AudioExporter";
@@ -292,16 +295,16 @@ vi.mock("../components/AudioExport/ExportManager", () => {
         return mockBuffer;
       }
 
-      createWavBlob(audioBuffer) {
+      createWavBlob(_audioBuffer) {
         return new Blob(["mock-wav"], {type: "audio/wav"});
       }
 
       async exportAudio(tracks, totalLengthMs, effects = {}, options = {}) {
         // Simulate the full export flow
-        let mixedBuffer = await this.mixTracks(tracks, totalLengthMs);
+        let MIXED_BUFFER = await this.mixTracks(tracks, totalLengthMs);
 
         if (effects && Object.keys(effects).length > 0) {
-          mixedBuffer = await this.applyMasterEffects(mixedBuffer, effects);
+          MIXED_BUFFER = await this.applyMasterEffects(MIXED_BUFFER, effects);
         }
 
         const format = options.format || "mp3";

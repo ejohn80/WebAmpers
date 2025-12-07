@@ -102,12 +102,12 @@ const mockDbManager = {
   createSession: vi.fn(() => Promise.resolve(MOCK_SESSION_ID)),
   addAsset: vi.fn(() => Promise.resolve(Math.random().toString())),
   // Mock addTrack to simulate it successfully adding the track to the audioManager state
-  addTrack: vi.fn((trackData, sessionId) => {
+  addTrack: vi.fn((trackData, _sessionId) => {
     const newTrack = {...trackData, id: `track_${Date.now()}`};
     mockTracks.push(newTrack);
     return Promise.resolve(newTrack.id);
   }),
-  deleteTrack: vi.fn((trackId, sessionId) => {
+  deleteTrack: vi.fn((trackId, _sessionId) => {
     mockAudioManager.deleteTrack(trackId);
     return Promise.resolve();
   }),
@@ -282,7 +282,7 @@ const AudioPage = ({children}) => {
 // 3. Test Utility Functions
 // -------------------------------------------------------------------------
 
-const createMockAudioBuffer = (name = "test.wav") => {
+const createMockAudioBuffer = (_name = "test.wav") => {
   const sampleRate = 44100;
   const length = 44100; // 1 second
   const channels = 2;
@@ -292,7 +292,7 @@ const createMockAudioBuffer = (name = "test.wav") => {
     length,
     sampleRate,
     duration: length / sampleRate,
-    getChannelData: vi.fn((channel) => new Float32Array(length)),
+    getChannelData: vi.fn((_channel) => new Float32Array(length)),
   };
 };
 
@@ -387,7 +387,7 @@ describe("Clipboard and Delete Hotkeys Integration", () => {
 
   describe("Ctrl+C (Copy) Hotkey", () => {
     it("copies selected track when Ctrl+C is pressed", async () => {
-      const {trackId, trackData} = await createAndAddTrack("test-track.wav");
+      const {trackId, _trackData} = await createAndAddTrack("test-track.wav");
       const {container} = setup();
 
       await waitFor(() => expect(mockAudioManager.tracks.length).toBe(1));
@@ -502,7 +502,7 @@ describe("Clipboard and Delete Hotkeys Integration", () => {
     });
 
     it("pastes track when Ctrl+V is pressed after a cut and clears clipboard", async () => {
-      const {trackId} = await createAndAddTrack("cut-me.wav");
+      const {_trackId} = await createAndAddTrack("cut-me.wav");
       const {container} = setup();
 
       await waitFor(() => expect(mockAudioManager.tracks.length).toBe(1));

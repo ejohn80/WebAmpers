@@ -1,3 +1,6 @@
+/* global global */
+// ^ Ignores for Vitest globals. ESlint sees these as undefined otherwise.
+
 import React from "react";
 import {
   render,
@@ -111,12 +114,12 @@ describe("AudioExporter", () => {
       numberOfChannels: 2,
       sampleRate: 44100,
       length: 100,
-      getChannelData: vi.fn((channel) => new Float32Array(100).fill(0.5)),
+      getChannelData: vi.fn((_channel) => new Float32Array(100).fill(0.5)),
       get: vi.fn().mockReturnValue({
         numberOfChannels: 2,
         sampleRate: 44100,
         length: 100,
-        getChannelData: vi.fn((channel) => new Float32Array(100).fill(0.5)),
+        getChannelData: vi.fn((_channel) => new Float32Array(100).fill(0.5)),
       }),
     };
 
