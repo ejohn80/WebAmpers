@@ -8,6 +8,7 @@
   width: 100%;
   padding: 0;
   position: relative;
+  min-height: 0;
   --track-controls-width: 180px;
   --track-controls-gap: 12px;
   --track-row-padding: 8px;
@@ -22,6 +23,7 @@
   overflow: auto;
   padding-bottom: 32px;
   scrollbar-gutter: stable both-edges;
+  min-height: 0;
 }
 
 .timeline-scroll-content {
