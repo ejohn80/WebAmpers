@@ -1,3 +1,7 @@
+/* global vi, beforeEach, test, expect, describe, global */
+/* eslint-disable no-import-assign */
+// ^ Ignores for Vitest globals. ESlint sees these as undefined otherwise.
+
 import AudioImporter from "../components/AudioImport/AudioImporter";
 import * as Tone from "tone";
 

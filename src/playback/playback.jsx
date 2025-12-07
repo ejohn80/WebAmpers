@@ -285,7 +285,7 @@ class PlaybackEngine {
           masterGainLocked = true;
         }
       }
-    } catch (e) {
+    } catch {
       console.warn("[setTrackEffects] Could not lock master gain");
     }
 
@@ -320,11 +320,15 @@ class PlaybackEngine {
     if (bus.fxOut) {
       try {
         if (nextNode) bus.fxOut.disconnect(nextNode);
-      } catch (e) {}
+      } catch {
+        // Intentionally empty
+      }
     } else {
       try {
         if (nextNode) bus.pan.disconnect(nextNode);
-      } catch (e) {}
+      } catch {
+        // Intentionally empty
+      }
     }
 
     // 2. DISPOSE OLD NODES
@@ -332,7 +336,9 @@ class PlaybackEngine {
       bus.fxNodes.forEach((node) => {
         try {
           node.dispose();
-        } catch (e) {}
+        } catch {
+          // Intentionally empty
+        }
       });
     }
 
@@ -343,7 +349,9 @@ class PlaybackEngine {
     // 4. RECONNECT
     try {
       bus.gain.disconnect();
-    } catch (e) {}
+    } catch {
+      // Intentionally empty
+    }
 
     if (fxNodes.length > 0) {
       bus.gain.connect(fxNodes[0]);
@@ -362,7 +370,9 @@ class PlaybackEngine {
     if (masterDest) {
       try {
         bus.pan.disconnect();
-      } catch (e) {}
+      } catch {
+        // Intentionally empty
+      }
       bus.pan.connect(masterDest);
     }
 
@@ -1147,13 +1157,17 @@ class PlaybackEngine {
     // preserve master output level (UI volume)
     try {
       newMaster.gain.gain.value = prevLevel;
-    } catch {}
+    } catch {
+      // Intentionally empty
+    }
 
     // Reconnect buses to the new master head
     this.trackBuses.forEach((bus) => {
       try {
         (bus.fxOut ?? bus.pan).disconnect();
-      } catch {}
+      } catch {
+        // Intentionally empty
+      }
       (bus.fxOut ?? bus.pan).connect(newMaster.fxIn ?? newMaster.gain);
     });
 
@@ -1162,13 +1176,19 @@ class PlaybackEngine {
     if (old) {
       try {
         (old.fxOut ?? old.gain).disconnect();
-      } catch {}
+      } catch {
+        // Intentionally empty
+      }
       try {
         (old.chain || []).forEach((n) => n.dispose?.());
-      } catch {}
+      } catch {
+        // Intentionally empty
+      }
       try {
         old.gain.dispose?.();
-      } catch {}
+      } catch {
+        // Intentionally empty
+      }
     }
   }
 
@@ -1322,7 +1342,9 @@ class PlaybackEngine {
           // Some Tone versions expose native buffer under _buffer
           src = src._buffer;
         }
-      } catch {}
+      } catch {
+        // Ignore errors, use original src
+      }
 
       // Create a Tone.Player for each segment
       const player = new Tone.Player({
@@ -1506,7 +1528,9 @@ class PlaybackEngine {
             default:
               break;
           }
-        } catch {}
+        } catch {
+          console.warn("Failed to create master effect node for config:", cfg);
+        }
       });
     }
 
@@ -1520,11 +1544,15 @@ class PlaybackEngine {
       for (let i = 0; i < nodes.length - 1; i++) {
         try {
           nodes[i].connect(nodes[i + 1]);
-        } catch {}
+        } catch {
+          // Intentionally empty
+        }
       }
       try {
         fxOut.connect(outGain);
-      } catch {}
+      } catch {
+        // Intentionally empty
+      }
     }
 
     outGain.connect(Tone.Destination);
@@ -1598,7 +1626,9 @@ class PlaybackEngine {
         if (!this.ended) {
           try {
             Tone.Transport.pause();
-          } catch {}
+          } catch {
+            // Intentionally empty
+          }
           this.seekMs(len);
           this._emitTransport(false);
           this.ended = true;
@@ -1648,13 +1678,19 @@ class PlaybackEngine {
     this.playersBySegment.forEach((h) => {
       try {
         h.player.stop();
-      } catch {}
+      } catch {
+        // Intentionally empty
+      }
       try {
         h.player.unsync();
-      } catch {}
+      } catch {
+        // Intentionally empty
+      }
       try {
         h.disposers.forEach((d) => d());
-      } catch {}
+      } catch {
+        // Intentionally empty
+      }
     });
     this.playersBySegment.clear();
 
@@ -1760,7 +1796,7 @@ class PlaybackEngine {
           masterGainLocked = true;
         }
       }
-    } catch (e) {
+    } catch {
       console.warn("[applyEffects] Could not lock master gain");
     }
 
@@ -1778,7 +1814,7 @@ class PlaybackEngine {
           newMaster.gain.gain.cancelScheduledValues(0);
           newMaster.gain.gain.setValueAtTime(masterGainValue, 0);
         }
-      } catch (e) {
+      } catch {
         console.warn("[applyEffects] Could not set gain on new master");
       }
     }
@@ -1789,7 +1825,9 @@ class PlaybackEngine {
       if (oldMasterIn) {
         try {
           (bus.fxOut ?? bus.pan).disconnect(oldMasterIn);
-        } catch (e) {}
+        } catch {
+          console.warn("[applyEffects] Failed to disconnect track bus");
+        }
       }
 
       try {
@@ -1812,7 +1850,7 @@ class PlaybackEngine {
           this.master.gain.gain.cancelScheduledValues(0);
           this.master.gain.gain.setValueAtTime(masterGainValue, 0);
         }
-      } catch (e) {
+      } catch {
         console.warn("[applyEffects] Final gain restore failed");
       }
     }
@@ -1839,7 +1877,7 @@ export default function WebAmpPlayback({version, onEngineReady}) {
     try {
       const v = localStorage.getItem("webamp.masterVol");
       return v !== null ? Number(v) : 50;
-    } catch (e) {
+    } catch {
       return 50;
     }
   });
@@ -1847,7 +1885,7 @@ export default function WebAmpPlayback({version, onEngineReady}) {
     try {
       const m = localStorage.getItem("webamp.muted");
       return m !== null ? m === "1" : false;
-    } catch (e) {
+    } catch {
       return false;
     }
   });
@@ -1890,12 +1928,14 @@ export default function WebAmpPlayback({version, onEngineReady}) {
     // expose engine to global app context so EffectsTab can control FX
     try {
       setEngineRef && setEngineRef(engineRef);
-    } catch {}
+    } catch {
+      // Intentionally empty
+    }
     // Inform parent that the engine instance is available so it can call
     // control methods (setTrackMute, setTrackSolo, etc.).
     try {
       onEngineReady && onEngineReady(engine);
-    } catch (e) {
+    } catch {
       // swallow
     }
     return () => engine.dispose();
@@ -1996,11 +2036,15 @@ export default function WebAmpPlayback({version, onEngineReady}) {
                 const v = localStorage.getItem("webamp.masterVol");
                 if (v !== null)
                   initVol = Math.max(0, Math.min(1, Number(v) / 100));
-              } catch (e) {}
+              } catch {
+                // Intentionally empty
+              }
               try {
                 const m = localStorage.getItem("webamp.muted");
                 if (m !== null) initMuted = m === "1";
-              } catch (e) {}
+              } catch {
+                // Intentionally empty
+              }
 
               // Store the actual desired volume
               savedVolumeRef.current = initVol;
@@ -2020,7 +2064,9 @@ export default function WebAmpPlayback({version, onEngineReady}) {
               }
             }
             restorePlayheadAfterLoad();
-          } catch {}
+          } catch {
+            // Intentionally empty
+          }
         })
         .catch((e) => console.error("[UI] engine.load() failed:", e));
       prevLoadSigRef.current = sig;
@@ -2168,39 +2214,49 @@ export default function WebAmpPlayback({version, onEngineReady}) {
   }, [muted, engine]);
 
   // Control handlers for play, pause, stop
-  const onPlay = async () => {
+  const onPlay = useCallback(async () => {
     try {
       syncTransportToProgressStore();
       await engine.play();
     } catch (e) {
       console.error("[UI] engine.play() failed:", e);
     }
-  };
-  const onPause = () => engine.pause();
+  }, [engine, syncTransportToProgressStore]);
+
+  const onPause = useCallback(() => {
+    try {
+      engine.pause();
+    } catch (e) {
+      console.error("[UI] engine.pause() failed:", e);
+    }
+  }, [engine]);
 
   // Combined play/pause toggle
-  const onTogglePlay = async () => {
+  const onTogglePlay = useCallback(async () => {
     if (playing) {
       onPause();
     } else {
       await onPlay();
     }
-  };
+  }, [playing, onPause, onPlay]);
 
   // Skip helpers (±10s)
-  const skipMs = (delta) => {
-    const len = version?.lengthMs ?? Number.POSITIVE_INFINITY;
-    const next = Math.max(0, Math.min((ms || 0) + delta, len));
-    try {
-      engine.seekMs(next);
-    } catch (err) {
-      console.warn("skip failed:", err);
-    }
-    setMs(next);
-  };
+  const skipMs = useCallback(
+    (delta) => {
+      const len = version?.lengthMs ?? Number.POSITIVE_INFINITY;
+      const next = Math.max(0, Math.min((ms || 0) + delta, len));
+      try {
+        engine.seekMs(next);
+      } catch (err) {
+        console.warn("skip failed:", err);
+      }
+      setMs(next);
+    },
+    [engine, ms, version?.lengthMs]
+  );
 
-  const skipBack10 = () => skipMs(-10000);
-  const skipFwd10 = () => skipMs(10000);
+  const skipBack10 = useCallback(() => skipMs(-10000), [skipMs]);
+  const skipFwd10 = useCallback(() => skipMs(10000), [skipMs]);
 
   // Jump to start (0:00)
   const goToStart = () => {
@@ -2212,7 +2268,9 @@ export default function WebAmpPlayback({version, onEngineReady}) {
     setMs(0);
     try {
       progressStore.setMs(0);
-    } catch {}
+    } catch {
+      // Intentionally empty
+    }
   };
 
   // Jump to end of timeline
@@ -2230,7 +2288,9 @@ export default function WebAmpPlayback({version, onEngineReady}) {
     setMs(endMs);
     try {
       progressStore.setMs(endMs);
-    } catch {}
+    } catch {
+      // Intentionally empty
+    }
   };
 
   // Publish progress to store whenever local ms updates
@@ -2328,7 +2388,9 @@ export default function WebAmpPlayback({version, onEngineReady}) {
             }
             try {
               localStorage.setItem("webamp.muted", "0");
-            } catch (e) {}
+            } catch {
+              // Intentionally empty
+            }
           }
           // Mute if reducing to 0
           else if (newVolume === 0 && !muted) {
@@ -2339,7 +2401,9 @@ export default function WebAmpPlayback({version, onEngineReady}) {
             }
             try {
               localStorage.setItem("webamp.muted", "1");
-            } catch (e) {}
+            } catch {
+              // Intentionally empty
+            }
           }
           // Normal volume adjustment (not muted)
           else if (!muted) {
@@ -2351,7 +2415,9 @@ export default function WebAmpPlayback({version, onEngineReady}) {
 
           try {
             localStorage.setItem("webamp.masterVol", String(newVolume));
-          } catch (e) {}
+          } catch {
+            // Intentionally empty
+          }
         } catch (err) {
           console.warn("master volume set failed:", err);
         }
@@ -2389,7 +2455,9 @@ export default function WebAmpPlayback({version, onEngineReady}) {
         try {
           localStorage.setItem("webamp.muted", "0");
           localStorage.setItem("webamp.masterVol", String(restorePercent));
-        } catch (e) {}
+        } catch {
+          // Intentionally empty
+        }
       } else {
         // MUTE: save current volume and set gain to 0
         const currentPercent = masterVol;
@@ -2405,7 +2473,9 @@ export default function WebAmpPlayback({version, onEngineReady}) {
         try {
           localStorage.setItem("webamp.muted", "1");
           // Don't change masterVol in storage - keep the user's volume preference
-        } catch (e) {}
+        } catch {
+          // Intentionally empty
+        }
       }
     } catch (err) {
       console.warn("toggle mute failed:", err);
@@ -2537,7 +2607,9 @@ export default function WebAmpPlayback({version, onEngineReady}) {
                   }
                   try {
                     localStorage.setItem("webamp.muted", "0");
-                  } catch (e) {}
+                  } catch {
+                    // Intentionally empty
+                  }
                 }
                 // Auto-mute when dragging to 0
                 else if (v === 0 && !muted) {
@@ -2549,7 +2621,9 @@ export default function WebAmpPlayback({version, onEngineReady}) {
                   }
                   try {
                     localStorage.setItem("webamp.muted", "1");
-                  } catch (e) {}
+                  } catch {
+                    // Intentionally empty
+                  }
                 }
                 // Normal volume change when not muted
                 else if (!muted) {
@@ -2569,7 +2643,9 @@ export default function WebAmpPlayback({version, onEngineReady}) {
               try {
                 localStorage.setItem("webamp.masterVol", String(masterVol));
                 localStorage.setItem("webamp.muted", muted ? "1" : "0");
-              } catch (e) {}
+              } catch {
+                // Intentionally empty
+              }
             }}
             onMouseLeave={() => setDraggingVol(false)}
             onTouchStart={() => setDraggingVol(true)}
@@ -2578,7 +2654,9 @@ export default function WebAmpPlayback({version, onEngineReady}) {
               try {
                 localStorage.setItem("webamp.masterVol", String(masterVol));
                 localStorage.setItem("webamp.muted", muted ? "1" : "0");
-              } catch (e) {}
+              } catch {
+                // Intentionally empty
+              }
             }}
             className="volume-input"
           />

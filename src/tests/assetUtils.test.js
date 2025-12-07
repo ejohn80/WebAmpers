@@ -1,3 +1,6 @@
+/* global vi, it, describe, expect */
+// ^ Ignores for Vitest globals. ESlint sees these as undefined otherwise.
+
 import {saveAsset} from "../utils/assetUtils";
 
 const createMockAudioBuffer = () => {

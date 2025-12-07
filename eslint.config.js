@@ -8,9 +8,12 @@ import {defineConfig, globalIgnores} from "eslint/config";
 export default defineConfig([
   // Ignore these paths/patterns entirely
   globalIgnores([
-    "src/playback/**",
-    "src/components/Waveform/**",
-    "src/components/TrackLane/**",
+    "**/.venv/**",
+    //"src/components/Waveform/**",
+    //"src/components/TrackLane/**",
+    "src/context/AppContext.jsx",
+    "src/components/Layout/Header.jsx",
+    "src/components/Layout/Sidebar.jsx",
     "src/components/Recording/RecorderButton.jsx",
     "src/managers/DBManager.js",
     "src/models/AudioTrack.js",
@@ -18,9 +21,6 @@ export default defineConfig([
     "dist/**",
     "coverage/**",
     "node_modules/**",
-    "src/tests/**",
-    "**/*.test.{js,jsx,ts,tsx}",
-    "**/*.spec.{js,jsx,ts,tsx}",
   ]),
 
   {
