@@ -17,7 +17,7 @@ import {dbManager} from "../managers/DBManager";
 import {AppContext} from "../context/AppContext";
 import {progressStore} from "../playback/progressStore";
 import {saveAsset} from "../utils/assetUtils";
-import {clipboardManager} from "../managers/clipboardManager";
+import {clipboardManager} from "../managers/ClipboardManager";
 import {insertSegmentWithSpacing} from "../utils/segmentPlacement";
 
 const MIN_WIDTH = 0;
@@ -1447,22 +1447,7 @@ function AudioPage() {
     }
 
     try {
-      // Helper function to get buffer for a specific asset
-      const getBufferForAsset = async (assetId) => {
-        // Check cache first
-        let buffer = assetBufferCache.get(assetId);
-        if (buffer) {
-          return buffer;
-        }
-
-        // Load from database
-        const asset = await dbManager.getAsset(assetId);
-        if (!asset) {
-          console.error(`Asset ${assetId} not found`);
-          return null;
-        }
-
-      // Helper function to get buffer for a specific asset
+      // Helper function to get buffer for a specific asset (The consolidated, correct version)
       const getBufferForAsset = async (assetId) => {
         // Check cache first
         let buffer = assetBufferCache.get(assetId);
@@ -1481,24 +1466,9 @@ function AudioPage() {
         if (!serializedBuffer || !serializedBuffer.channels) {
           console.error(`Asset ${assetId} has no valid buffer data`);
           return null;
-          console.error(`Asset ${assetId} has no valid buffer data`);
-          return null;
         }
 
         const audioBuffer = deserializeAudioBuffer(serializedBuffer);
-        const toneBuffer = new Tone.ToneAudioBuffer(audioBuffer);
-        assetBufferCache.set(assetId, toneBuffer);
-        return toneBuffer;
-      };
-
-      // Get the primary asset buffer
-      const primaryBuffer = await getBufferForAsset(trackData.assetId);
-      if (!primaryBuffer) {
-        alert("Cannot paste track: primary asset not found");
-        return;
-      }
-
-      const audioBuffer = primaryBuffer.get();
         const toneBuffer = new Tone.ToneAudioBuffer(audioBuffer);
         assetBufferCache.set(assetId, toneBuffer);
         return toneBuffer;
@@ -1537,16 +1507,15 @@ function AudioPage() {
                 1,
                 Math.min(trackData.clipDurationMs, fullDurationMs)
               ),
-              assetId: trackData.assetId, // Single segment from primary asset
+              assetId: trackData.assetId,
             },
           ];
         }
 
         if (clipboardSegments.length > 0) {
-          // CRITICAL: Preserve each segment's assetId
           return clipboardSegments.map((seg) => ({
             ...seg,
-            assetId: seg.assetId || trackData.assetId, // Use segment's assetId or fallback to track's
+            assetId: seg.assetId || trackData.assetId,
           }));
         }
 
@@ -1557,7 +1526,6 @@ function AudioPage() {
             startOnTimelineMs: 0,
             startInFileMs: 0,
             durationMs: Math.round(fullDurationMs),
-            assetId: trackData.assetId,
             assetId: trackData.assetId,
           },
         ];
@@ -1601,7 +1569,7 @@ function AudioPage() {
           offset: startInFileMs / 1000,
           durationMs,
           duration: durationMs / 1000,
-          assetId: seg.assetId || trackData.assetId, // CRITICAL: Preserve assetId
+          assetId: seg.assetId || trackData.assetId,
         };
       });
 
@@ -1617,7 +1585,6 @@ function AudioPage() {
         pan: trackData.pan ?? 0,
         mute: trackData.mute ?? false,
         solo: trackData.solo ?? false,
-        // CRITICAL: Use the clipboard snapshot, not current track state
         effects: trackData.effects || {},
         activeEffectsList: trackData.activeEffectsList || [],
         enabledEffects: trackData.enabledEffects || {},
@@ -1628,7 +1595,7 @@ function AudioPage() {
           durationMs: seg.durationMs,
           startOnTimelineMs: seg.startOnTimelineMs,
           startInFileMs: seg.startInFileMs,
-          assetId: seg.assetId, // CRITICAL: Each segment keeps its own assetId
+          assetId: seg.assetId,
         })),
       };
 
@@ -1641,7 +1608,6 @@ function AudioPage() {
       });
 
       // Build the track object for audioManager
-      // CRITICAL: Load the correct buffer for each segment
       const segmentsWithBuffers = await Promise.all(
         normalizedSegments.map(async (seg) => {
           const segmentBuffer = await getBufferForAsset(seg.assetId);
@@ -1671,13 +1637,11 @@ function AudioPage() {
         name: copyName,
         color: newTrackData.color,
         buffer: primaryBuffer, // Track-level buffer for compatibility
-        buffer: primaryBuffer, // Track-level buffer for compatibility
         assetId: trackData.assetId,
         volume: newTrackData.volume,
         pan: newTrackData.pan,
         mute: newTrackData.mute,
         solo: newTrackData.solo,
-        // CRITICAL: Use clipboard snapshot for effects state
         effects: newTrackData.effects,
         activeEffectsList: newTrackData.activeEffectsList,
         enabledEffects: newTrackData.enabledEffects,
