@@ -11,7 +11,7 @@
   background-color: var(--sidebar-panel-bg, #0f0f0f);
   overflow: hidden;
   padding: 12px;
-  color: var(--sidebar-panel-text, #ffffff);
+  color: var(--sidebar-panel-text);
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -95,7 +95,7 @@
   font-size: 13px;
   width: 150px;
   font-size: 11px;
-  color: var(--songname-color, rgb(209, 209, 209));
+  color: var(--songname-color);
 }
 
 /* Show text cursor on hover for editable text */

@@ -240,6 +240,9 @@
   --mute-btn-color: #a0a09f;
   --mute-btn-active-color: #000;
   --main-content-background: #1e1d20;
+  --songname-color: rgb(209, 209, 209);
+  --segment-overlay: rgba(0, 0, 0, 0.75);
+  --segment-name: #ffffff;
 }
 
 /* ======================================================================
@@ -488,8 +491,14 @@
   --sampler-loading-overlay-bg: rgba(255, 255, 255, 0.9);
   --sampler-button-select-bg: var(--eq-select-bg);
   --mute-btn-bg: rgba(0, 0, 0, 0.05);
-  --mute-btn-active-bg: #d45252; /* Darker red for light theme */
+  --mute-btn-active-bg: #52cbd4;
   --mute-btn-active-color: #ffffff;
+  --songname-color: rgb(0, 0, 0);
+  --tracklane-button-box: #ffffff00;
+  --waveform-background: #c1c1c11d;
+  --segment-overlay: rgba(179, 179, 179, 0.75);
+  --segment-name: black;
+  --mute-btn-hover: #52cbd465;
 }
 
 html,

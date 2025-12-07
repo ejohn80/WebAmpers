@@ -83,7 +83,7 @@
 }
 
 .tl-btn {
-  background: var(--mute-btn-bg, var(--surface-subtle));
+  background: var(--mute-btn-bg);
   color: var(--app-text);
   padding: 6px;
   border-radius: 3px;
@@ -101,7 +101,7 @@
 }
 
 .tl-btn:hover {
-  background: var(--mute-btn-hover, var(--surface-subtle));
+  background: var(--mute-btn-hover);
   color: var(--mute-btn-color, var(--app-text));
 }
 
