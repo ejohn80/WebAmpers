@@ -22,6 +22,7 @@ import {insertSegmentWithSpacing} from "../utils/segmentPlacement";
 
 const MIN_WIDTH = 0;
 const MAX_WIDTH = 300;
+const TRACK_END_PADDING_MS = 2000;
 
 // Buffer cache to share audio buffers across tracks from the same asset
 const assetBufferCache = new Map(); // assetId -> Tone.ToneAudioBuffer
@@ -442,7 +443,8 @@ function AudioPage() {
       });
     });
 
-    vs.lengthMs = maxEndMs || 60000;
+    const paddedLengthMs = maxEndMs > 0 ? maxEndMs + TRACK_END_PADDING_MS : 0;
+    vs.lengthMs = paddedLengthMs || 60000;
     return vs;
   };
 
