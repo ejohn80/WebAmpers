@@ -1556,7 +1556,7 @@ function AudioPage() {
                 trackData.name ||
                 asset.name ||
                 null,
-              assetId: trackData.assetId,  
+              assetId: trackData.assetId,
             },
           ];
         }
