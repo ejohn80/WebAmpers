@@ -50,10 +50,16 @@ function AudioPage() {
   const [audioData, setAudioData] = useState(null);
   const [recording, setRecording] = useState({stream: null, startTs: 0});
   const [assetsRefreshTrigger, setAssetsRefreshTrigger] = useState(0);
+  const [hasClipboardFlag, setHasClipboardFlag] = useState(() =>
+    clipboardManager.hasClipboard()
+  );
 
   const engineRef = React.useRef(null);
   const lastSessionRef = useRef(null);
   const assetPreviewCacheRef = useRef(new Map());
+  const refreshClipboardFlag = useCallback(() => {
+    setHasClipboardFlag(clipboardManager.hasClipboard());
+  }, []);
 
   // Keyboard shortcuts for cut/copy/paste
   useEffect(() => {
@@ -89,6 +95,7 @@ function AudioPage() {
         e.preventDefault();
         if (clipboardManager.hasClipboard()) {
           handlePasteTrack();
+          refreshClipboardFlag();
         }
       }
 
@@ -103,7 +110,7 @@ function AudioPage() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [selectedTrackId]); // Re-bind when selected track changes
+  }, [selectedTrackId, refreshClipboardFlag]);
 
   /**
    * Handle saving a sampler recording as a new track
@@ -1039,6 +1046,7 @@ function AudioPage() {
       };
 
       clipboardManager.setClipboard(clipTrack, "cut");
+      refreshClipboardFlag();
 
       // Persist to DB
       await dbManager.updateTrack(track);
@@ -1368,6 +1376,7 @@ function AudioPage() {
 
     // Copy to clipboard
     clipboardManager.setClipboard(track, "cut");
+    refreshClipboardFlag();
 
     // Delete the track
     await handleDeleteTrack(selectedTrackId);
@@ -1405,6 +1414,7 @@ function AudioPage() {
 
     // Copy to clipboard
     clipboardManager.setClipboard(track, "copy");
+    refreshClipboardFlag();
 
     console.log(`Track copied to clipboard: ${track.name}`);
   };
@@ -1452,13 +1462,43 @@ function AudioPage() {
           return null;
         }
 
+      // Helper function to get buffer for a specific asset
+      const getBufferForAsset = async (assetId) => {
+        // Check cache first
+        let buffer = assetBufferCache.get(assetId);
+        if (buffer) {
+          return buffer;
+        }
+
+        // Load from database
+        const asset = await dbManager.getAsset(assetId);
+        if (!asset) {
+          console.error(`Asset ${assetId} not found`);
+          return null;
+        }
+
         const {buffer: serializedBuffer} = asset;
         if (!serializedBuffer || !serializedBuffer.channels) {
+          console.error(`Asset ${assetId} has no valid buffer data`);
+          return null;
           console.error(`Asset ${assetId} has no valid buffer data`);
           return null;
         }
 
         const audioBuffer = deserializeAudioBuffer(serializedBuffer);
+        const toneBuffer = new Tone.ToneAudioBuffer(audioBuffer);
+        assetBufferCache.set(assetId, toneBuffer);
+        return toneBuffer;
+      };
+
+      // Get the primary asset buffer
+      const primaryBuffer = await getBufferForAsset(trackData.assetId);
+      if (!primaryBuffer) {
+        alert("Cannot paste track: primary asset not found");
+        return;
+      }
+
+      const audioBuffer = primaryBuffer.get();
         const toneBuffer = new Tone.ToneAudioBuffer(audioBuffer);
         assetBufferCache.set(assetId, toneBuffer);
         return toneBuffer;
@@ -1517,6 +1557,7 @@ function AudioPage() {
             startOnTimelineMs: 0,
             startInFileMs: 0,
             durationMs: Math.round(fullDurationMs),
+            assetId: trackData.assetId,
             assetId: trackData.assetId,
           },
         ];
@@ -1630,6 +1671,7 @@ function AudioPage() {
         name: copyName,
         color: newTrackData.color,
         buffer: primaryBuffer, // Track-level buffer for compatibility
+        buffer: primaryBuffer, // Track-level buffer for compatibility
         assetId: trackData.assetId,
         volume: newTrackData.volume,
         pan: newTrackData.pan,
@@ -1675,6 +1717,7 @@ function AudioPage() {
     if (clipboardManager.isAssetInClipboard(assetId)) {
       console.log(`Clearing clipboard - referenced deleted asset ${assetId}`);
       clipboardManager.clearClipboard();
+      refreshClipboardFlag();
     }
   };
 
@@ -1746,7 +1789,7 @@ function AudioPage() {
         onCopyTrack={handleCopyTrack}
         onPasteTrack={handlePasteTrack}
         selectedTrackId={selectedTrackId}
-        hasClipboard={clipboardManager.hasClipboard()}
+        hasClipboard={hasClipboardFlag}
         onSamplerRecording={handleSamplerRecording}
       />
 
@@ -1777,7 +1820,7 @@ function AudioPage() {
           onCutTrack={handleCutTrack}
           onCopyTrack={handleCopyTrack}
           onPasteTrack={handlePasteTrack}
-          hasClipboard={clipboardManager.hasClipboard()}
+          hasClipboard={hasClipboardFlag}
           onMute={(trackId, muted) =>
             handleTrackPropertyUpdate(trackId, "mute", muted, "setTrackMute")
           }
