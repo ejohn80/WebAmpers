@@ -26,6 +26,11 @@ const SegmentBlock = ({
   const segmentRef = useRef(null);
   const pxPerMsRef = useRef(pxPerMs || 0);
   const dragPlayheadMsRef = useRef(null);
+  const onSegmentMoveRef = useRef(onSegmentMove);
+
+  useEffect(() => {
+    onSegmentMoveRef.current = onSegmentMove;
+  }, [onSegmentMove]);
 
   useEffect(() => {
     pxPerMsRef.current = pxPerMs || 0;
@@ -105,9 +110,10 @@ const SegmentBlock = ({
       const snappedPositionMs = Math.round(newPositionMs / snapMs) * snapMs;
 
       let movePromise = null;
-      if (onSegmentMove) {
+      const moveHandler = onSegmentMoveRef.current;
+      if (moveHandler) {
         try {
-          movePromise = onSegmentMove(segmentIndex, snappedPositionMs);
+          movePromise = moveHandler(segmentIndex, snappedPositionMs);
         } catch (err) {
           console.error("Segment move failed:", err);
         }
@@ -126,7 +132,7 @@ const SegmentBlock = ({
         finish();
       }
     },
-    [handleMouseMove, onSegmentMove, segmentIndex, finalizeDragPlaybackState]
+    [handleMouseMove, segmentIndex, finalizeDragPlaybackState]
   );
 
   // Calculate position style
