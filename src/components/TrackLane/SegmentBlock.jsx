@@ -134,15 +134,6 @@ const SegmentBlock = ({
     }
   };
 
-  // Format duration for display
-  const formatDuration = (ms) => {
-    if (!ms) return "0:00";
-    const totalSeconds = Math.max(0, Math.round(ms / 1000));
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = (totalSeconds % 60).toString().padStart(2, "0");
-    return `${minutes}:${seconds}`;
-  };
-
   // Calculate position style
   let positionStyle;
   let segmentWidthPx = 0;

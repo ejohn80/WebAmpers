@@ -20,7 +20,6 @@ const createContextMenuState = (overrides = {}) => ({
  */
 const TrackLane = memo(function TrackLane({
   track,
-  showTitle = true,
   onMute,
   onSolo,
   onDelete,
