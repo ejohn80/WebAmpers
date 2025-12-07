@@ -178,24 +178,24 @@ const Waveform = ({
 
   const scheduleLiveSeek = useCallback(
     (target) => {
-    if (typeof target !== "number") return;
-    liveSeekValueRef.current = target;
-    if (
-      typeof window === "undefined" ||
-      typeof window.requestAnimationFrame !== "function"
-    ) {
-      flushLiveSeek();
-      return;
-    }
-    if (liveSeekFrameRef.current !== null) return;
-    liveSeekFrameRef.current = window.requestAnimationFrame(() => {
-      liveSeekFrameRef.current = null;
-      const pending = liveSeekValueRef.current;
-      liveSeekValueRef.current = null;
-      if (typeof pending === "number") {
-        progressStore.requestSeek(pending);
+      if (typeof target !== "number") return;
+      liveSeekValueRef.current = target;
+      if (
+        typeof window === "undefined" ||
+        typeof window.requestAnimationFrame !== "function"
+      ) {
+        flushLiveSeek();
+        return;
       }
-    });
+      if (liveSeekFrameRef.current !== null) return;
+      liveSeekFrameRef.current = window.requestAnimationFrame(() => {
+        liveSeekFrameRef.current = null;
+        const pending = liveSeekValueRef.current;
+        liveSeekValueRef.current = null;
+        if (typeof pending === "number") {
+          progressStore.requestSeek(pending);
+        }
+      });
     },
     [flushLiveSeek]
   );
@@ -377,7 +377,14 @@ const Waveform = ({
         window.addEventListener("mouseup", onMouseUp);
       }
     },
-    [interactive, isScrubLocked, msAtClientX, scheduleLiveSeek, onMouseMove, onMouseUp]
+    [
+      interactive,
+      isScrubLocked,
+      msAtClientX,
+      scheduleLiveSeek,
+      onMouseMove,
+      onMouseUp,
+    ]
   );
 
   const onWheel = (e) => {
