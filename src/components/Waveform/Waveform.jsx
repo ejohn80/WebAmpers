@@ -323,7 +323,10 @@ const Waveform = ({
     if (e.button !== 0) return; // left button only
     if (!interactive || isScrubLocked()) return;
     draggingRef.current = true;
-    progressStore.beginScrub({pauseTransport: false});
+    progressStore.beginScrub({
+      pauseTransport: true,
+      silenceDuringScrub: false,
+    });
     const target = msAtClientX(e.clientX);
     if (typeof target === "number") {
       // preview only: move the playhead visually without seeking audio
@@ -391,7 +394,10 @@ const Waveform = ({
     if (!e.touches || e.touches.length === 0) return;
     if (!interactive || isScrubLocked()) return;
     draggingRef.current = true;
-    progressStore.beginScrub({pauseTransport: false});
+    progressStore.beginScrub({
+      pauseTransport: true,
+      silenceDuringScrub: false,
+    });
     const target = msAtClientX(e.touches[0].clientX);
     if (typeof target === "number") {
       progressStore.setMs(target);
