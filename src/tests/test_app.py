@@ -5,13 +5,10 @@ import os
 import io
 import sys
 from unittest.mock import patch, MagicMock
-
 import pytest
-
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from backend.app import app, allowed_file
-# FIX: Import AudioProcessingError so it can be used for the mock side_effect
-from backend.audio_processor import AudioProcessingError 
+from backend.audio_processor import AudioProcessingError
 
 
 @pytest.fixture(name='test_client')
@@ -98,7 +95,7 @@ def test_convert_audio_success(mock_remove, test_client,
     assert mock_remove.call_count == 2
 
 @patch('backend.app.os.remove')
-def test_convert_audio_missing_input(mock_remove, test_client, processor_mock):
+def test_convert_audio_missing_input(_mock_remove, test_client, processor_mock):
     """Tests /convert when the required 'file' or 'target_format' is missing."""
     # Case 1: Missing file
     response_no_file = test_client.post('/convert',
@@ -117,7 +114,7 @@ def test_convert_audio_missing_input(mock_remove, test_client, processor_mock):
     processor_mock.convert_format.assert_not_called()
 
 @patch('backend.app.os.remove')
-def test_convert_audio_invalid_file_type(mock_remove, test_client, processor_mock):
+def test_convert_audio_invalid_file_type(_mock_remove, test_client, processor_mock):
     """Tests /convert with an invalid input file type (e.g., PDF)."""
     data = {
         'file': create_mock_file('doc.pdf', 'application/pdf'),
@@ -130,9 +127,8 @@ def test_convert_audio_invalid_file_type(mock_remove, test_client, processor_moc
     processor_mock.convert_format.assert_not_called()
 
 @patch('backend.app.os.remove')
-def test_convert_audio_processor_failure(mock_remove, test_client, processor_mock):
+def test_convert_audio_processor_failure(_mock_remove, test_client, processor_mock):
     """Tests /convert when the AudioProcessor raises an exception."""
-    # FIX: Raise AudioProcessingError, which the app route explicitly catches.
     processor_mock.convert_format.side_effect = AudioProcessingError("Format validation failed")
 
     data = {
@@ -150,7 +146,7 @@ def test_convert_audio_processor_failure(mock_remove, test_client, processor_moc
 @patch('backend.app.os.remove')
 @patch('backend.app.uuid.uuid4',
        side_effect=[MagicMock(hex='f1_id'), MagicMock(hex='f2_id')])
-def test_merge_audio_success(mock_uuid, mock_remove, test_client,
+def test_merge_audio_success(_mock_uuid, mock_remove, test_client,
                               processor_mock, send_file_mock):
     """Tests successful audio merging via the /merge route."""
     processor_mock.merge_files.return_value = '/tmp/merged.ogg'
@@ -177,7 +173,7 @@ def test_merge_audio_success(mock_uuid, mock_remove, test_client,
 @patch('backend.app.os.remove')
 @patch('backend.app.uuid.uuid4',
        side_effect=[MagicMock(hex='f1_id'), MagicMock(hex='f2_id')])
-def test_merge_audio_one_invalid_file(mock_uuid, mock_remove, test_client,
+def test_merge_audio_one_invalid_file(_mock_uuid, _mock_remove, test_client,
                                        processor_mock):
     """Tests merge failure when one of the uploaded files is an invalid type."""
     data = {
@@ -216,7 +212,7 @@ def test_merge_audio_error_too_few_files(test_client, processor_mock):
 # --- /export tests ---
 
 @patch('backend.app.os.remove')
-def test_export_audio_success(mock_remove, test_client,
+def test_export_audio_success(_mock_remove, test_client,
                                processor_mock, send_file_mock):
     """Tests successful audio export with specific settings via /export route."""
     processor_mock.export_with_settings.return_value = '/tmp/exported.flac'
@@ -234,7 +230,7 @@ def test_export_audio_success(mock_remove, test_client,
         'bitrate': '1411k',
         'sample_rate': 96000
     }
-    # Check for correct arguments passed to export_with_settings (already fixed in prior iteration)
+    # Check for correct arguments passed to export_with_settings
     processor_mock.export_with_settings.assert_called_once_with(
         processor_mock.export_with_settings.call_args[0][0],
         'flac',
@@ -248,7 +244,7 @@ def test_export_audio_success(mock_remove, test_client,
     )
 
 @patch('backend.app.os.remove')
-def test_export_audio_missing_required_params(mock_remove, test_client,
+def test_export_audio_missing_required_params(_mock_remove, test_client,
                                                 processor_mock):
     """Tests /export when mandatory parameters are missing."""
     data = {
@@ -266,7 +262,7 @@ def test_export_audio_missing_required_params(mock_remove, test_client,
     processor_mock.export_with_settings.assert_not_called()
 
 @patch('backend.app.os.remove')
-def test_export_audio_invalid_sample_rate(mock_remove, test_client, processor_mock):
+def test_export_audio_invalid_sample_rate(_mock_remove, test_client, processor_mock):
     """Tests /export when sample_rate is not a valid integer."""
     data = {
         'file': create_mock_file('source.wav', 'audio/wav'),
@@ -286,7 +282,7 @@ def test_export_audio_invalid_sample_rate(mock_remove, test_client, processor_mo
 
 @patch('backend.app.os.remove')
 @patch('backend.app.uuid.uuid4', return_value=MagicMock(hex='meta_id'))
-def test_get_metadata_success(mock_uuid, mock_remove, test_client, processor_mock):
+def test_get_metadata_success(_mock_uuid, mock_remove, test_client, processor_mock):
     """Tests successful metadata retrieval via /metadata route."""
     expected_metadata = {
         'duration_seconds': 5.0,
@@ -307,7 +303,7 @@ def test_get_metadata_success(mock_uuid, mock_remove, test_client, processor_moc
     assert 'meta_id_info.mp3' in mock_remove.call_args[0][0]
 
 @patch('backend.app.os.remove')
-def test_get_metadata_invalid_file_type(mock_remove, test_client, processor_mock):
+def test_get_metadata_invalid_file_type(_mock_remove, test_client, processor_mock):
     """Tests /metadata with an invalid input file type (e.g., PDF)."""
     data = {
         'file': create_mock_file('doc.pdf', 'application/pdf')
@@ -321,7 +317,7 @@ def test_get_metadata_invalid_file_type(mock_remove, test_client, processor_mock
     processor_mock.get_audio_info.assert_not_called()
 
 @patch('backend.app.os.remove')
-def test_get_metadata_no_file(mock_remove, test_client, processor_mock):
+def test_get_metadata_no_file(_mock_remove, test_client, processor_mock):
     """Tests metadata endpoint with no file provided."""
     response = test_client.post('/metadata', data={},
                                 content_type='multipart/form-data')
