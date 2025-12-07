@@ -31,28 +31,13 @@ export default function GlobalPlayhead({totalLengthMs = 0, timelineWidth = 0}) {
         const screenX = rulerRect.left + leftPx;
         playheadRef.current.style.left = `${screenX}px`;
         
-        // Calculate vertical position and height
-        // Triangle should be at the top of the ruler
+        // Position at top of ruler
         const topY = rulerRect.top;
         playheadRef.current.style.top = `${topY}px`;
         
-        // Line should extend from bottom of triangle to bottom of tracks
-        const triangleHeight = 10;
-        const lineTop = triangleHeight;
-        const lineHeight = Math.max(0, tracksRect.bottom - rulerRect.top - triangleHeight);
-        
-        // Update triangle and line positions
-        const triangle = playheadRef.current.querySelector('.playhead-triangle');
-        const line = playheadRef.current.querySelector('.playhead-line');
-        
-        if (triangle) {
-          triangle.style.top = '0px';
-        }
-        
-        if (line) {
-          line.style.top = `${lineTop}px`;
-          line.style.height = `${lineHeight}px`;
-        }
+        // Height extends to bottom of tracks
+        const height = Math.max(0, tracksRect.bottom - rulerRect.top);
+        playheadRef.current.style.height = `${height}px`;
       }
     };
 
@@ -94,15 +79,11 @@ export default function GlobalPlayhead({totalLengthMs = 0, timelineWidth = 0}) {
 
   if (!timelineWidth) return null;
 
-  // Render at root level with fixed positioning
   return (
     <div
       ref={playheadRef}
       className="global-playhead"
       style={{willChange: "transform"}}
-    >
-      <div className="playhead-triangle" />
-      <div className="playhead-line" />
-    </div>
+    />
   );
 }
