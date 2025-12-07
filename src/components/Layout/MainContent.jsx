@@ -675,7 +675,7 @@ function MainContent({
         onDragOver={handleDragOver}
       >
         {hasTracks ? (
-          <>
+          <div className="timeline-stack">
             <TimelineRuler
               totalLengthMs={totalLengthMs}
               timelineWidth={timelineMetrics.widthPx}
@@ -689,37 +689,12 @@ function MainContent({
               }}
             >
               <div
-                className="global-playhead-rail"
-                style={{
-                  left: `${timelineMetrics.leftOffsetPx}px`,
-                  width: `${timelineMetrics.widthPx}px`,
-                }}
-              >
-                <GlobalPlayhead
-                  totalLengthMs={totalLengthMs}
-                  timelineWidth={timelineMetrics.widthPx}
-                />
-              </div>
-              <div
                 className="tracks-relative"
                 style={{
                   width: `${timelineMetrics.rowWidthPx}px`,
                   position: "relative",
                 }}
               >
-                {/* Full-height red playhead that runs through all tracks */}
-                <div
-                  className="global-playhead-rail-full"
-                  style={{
-                    left: `${timelineMetrics.leftOffsetPx}px`,
-                    width: `${timelineMetrics.widthPx}px`,
-                  }}
-                >
-                  <GlobalPlayhead
-                    totalLengthMs={totalLengthMs}
-                    timelineWidth={timelineMetrics.widthPx}
-                  />
-                </div>
 
                 {/* CUT BOX OVERLAY */}
                 {cutBox &&
@@ -808,7 +783,19 @@ function MainContent({
                 </div>
               </div>
             </div>
-          </>
+            <div
+              className="global-playhead-overlay"
+              style={{
+                left: `${timelineMetrics.leftOffsetPx}px`,
+                width: `${timelineMetrics.widthPx}px`,
+              }}
+            >
+              <GlobalPlayhead
+                totalLengthMs={totalLengthMs}
+                timelineWidth={timelineMetrics.widthPx}
+              />
+            </div>
+          </div>
         ) : (
           <div className="empty-state" role="status" aria-live="polite">
             Import an audio file
