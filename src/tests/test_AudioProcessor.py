@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from pydub import AudioSegment
 
-from backend.AudioProcessor import AudioProcessor
+from backend.audio_processor import AudioProcessor
 
 
 @pytest.fixture(name='norm_mock')

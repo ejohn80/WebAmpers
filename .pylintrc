@@ -4,25 +4,6 @@ ignore=node_modules,venv,.venv,build,dist,.git
 
 [MESSAGES CONTROL]
 # Disable specific warnings that are unavoidable or less critical
-disable=
-    # Import errors when running pylint without proper PYTHONPATH
-    import-error,
-    # Wrong import position (after sys.path.insert in tests)
-    wrong-import-position,
-    # Too many arguments/locals/return statements (sometimes necessary for complex logic)
-    too-many-arguments,
-    too-many-positional-arguments,
-    too-many-locals,
-    too-many-return-statements,
-    # Broad exception catching (necessary for robustness in production code)
-    broad-exception-caught,
-    broad-exception-raised,
-    # Unused arguments in test fixtures are expected
-    unused-argument,
-    # Protected member access in tests is acceptable
-    protected-access,
-    # Module naming (AudioProcessor is standard in the codebase)
-    invalid-name
 
 [FORMAT]
 # Maximum line length

@@ -11,8 +11,11 @@ from typing import List, Dict, Any, Optional
 try:
     from pydub import AudioSegment
     from pydub.effects import normalize
+    PYDUB_AVAILABLE = True
 except ImportError:
-    class AudioSegment:
+    PYDUB_AVAILABLE = False
+
+    class AudioSegment:  # type: ignore
         """Fallback AudioSegment when pydub is not available"""
         @staticmethod
         def from_file(file_path):
@@ -31,11 +34,11 @@ except ImportError:
         def __radd__(self, other):
             return self
 
-        def append(self, seg, crossfade_duration):
+        def append(self, seg, crossfade_duration):  # pylint: disable=unused-argument
             """Mock append method"""
             return self
 
-        def set_frame_rate(self, sample_rate):
+        def set_frame_rate(self, sample_rate):  # pylint: disable=unused-argument
             """Mock set_frame_rate method"""
             return self
 
@@ -62,13 +65,17 @@ except ImportError:
             return 0
 
         @property
-        def dBFS(self):
+        def dBFS(self):  # pylint: disable=invalid-name
             """Mock dBFS property"""
             return -20.0
 
     def normalize(audio):
         """Mock normalize function"""
         return audio
+
+
+class AudioProcessingError(Exception):
+    """Custom exception for audio processing errors"""
 
 
 class AudioProcessor:
@@ -145,10 +152,10 @@ class AudioProcessor:
 
         Raises:
             ValueError: If format is unsupported
-            Exception: If conversion fails
+            AudioProcessingError: If conversion fails
         """
+        self._validate_format(target_format)
         try:
-            self._validate_format(target_format)
             audio = AudioSegment.from_file(input_path)
             output_path = self._generate_output_path('converted', target_format)
 
@@ -162,10 +169,8 @@ class AudioProcessor:
 
             return output_path
 
-        except ValueError as exc:
-            raise exc
-        except Exception as exc:
-            raise Exception(f"Conversion failed: {str(exc)}") from exc
+        except (IOError, OSError) as exc:
+            raise AudioProcessingError(f"Conversion failed: {str(exc)}") from exc
 
     def merge_files(
         self,
@@ -186,13 +191,14 @@ class AudioProcessor:
 
         Raises:
             ValueError: If fewer than 2 files provided or format is unsupported
-            Exception: If merge fails
+            AudioProcessingError: If merge fails
         """
-        try:
-            if len(file_paths) < 2:
-                raise ValueError("Need at least 2 files to merge")
+        if len(file_paths) < 2:
+            raise ValueError("Need at least 2 files to merge")
 
-            self._validate_format(output_format)
+        self._validate_format(output_format)
+
+        try:
             merged = AudioSegment.from_file(file_paths[0])
 
             for path in file_paths[1:]:
@@ -215,18 +221,14 @@ class AudioProcessor:
 
             return output_path
 
-        except ValueError as exc:
-            raise exc
-        except Exception as exc:
-            raise Exception(f"Merge failed: {str(exc)}") from exc
+        except (IOError, OSError) as exc:
+            raise AudioProcessingError(f"Merge failed: {str(exc)}") from exc
 
     def export_with_settings(
         self,
         input_path: str,
         target_format: str,
-        bitrate: Optional[str] = None,
-        sample_rate: Optional[int] = None,
-        normalize_audio: bool = False
+        settings: Dict[str, Any]
     ) -> str:
         """
         Apply settings (bitrate, sample rate, normalization) and export.
@@ -234,20 +236,24 @@ class AudioProcessor:
         Args:
             input_path: Path to input audio file
             target_format: Output format
-            bitrate: Custom bitrate string (e.g., '64k', '192k')
-            sample_rate: Custom sample rate (e.g., 44100, 22050)
-            normalize_audio: Whether to apply peak normalization
+            settings: Dictionary containing optional settings:
+                      'bitrate' (str), 'sample_rate' (int), 'normalize_audio' (bool)
 
         Returns:
             Path to exported file
 
         Raises:
             ValueError: If format is unsupported
-            Exception: If export fails
+            AudioProcessingError: If export fails
         """
+        self._validate_format(target_format)
+
         try:
-            self._validate_format(target_format)
             audio = AudioSegment.from_file(input_path)
+
+            normalize_audio = settings.get('normalize_audio', False)
+            sample_rate = settings.get('sample_rate')
+            bitrate = settings.get('bitrate')
 
             if normalize_audio:
                 audio = normalize(audio)
@@ -270,10 +276,10 @@ class AudioProcessor:
 
             return output_path
 
-        except ValueError as exc:
-            raise exc
-        except Exception as exc:
-            raise Exception(f"Export with settings failed: {str(exc)}") from exc
+        except (IOError, OSError) as exc:
+            raise AudioProcessingError(
+                f"Export with settings failed: {str(exc)}"
+            ) from exc
 
     def trim_audio(
         self,
@@ -296,10 +302,11 @@ class AudioProcessor:
 
         Raises:
             ValueError: If time range is invalid or format is unsupported
-            Exception: If trim fails
+            AudioProcessingError: If trim fails
         """
+        self._validate_format(output_format)
+
         try:
-            self._validate_format(output_format)
             audio = AudioSegment.from_file(input_path)
             duration_ms = len(audio)
 
@@ -315,10 +322,8 @@ class AudioProcessor:
 
             return output_path
 
-        except ValueError as exc:
-            raise exc
-        except Exception as exc:
-            raise Exception(f"Trim failed: {str(exc)}") from exc
+        except (IOError, OSError) as exc:
+            raise AudioProcessingError(f"Trim failed: {str(exc)}") from exc
 
     def adjust_volume(
         self,
@@ -340,10 +345,11 @@ class AudioProcessor:
 
         Raises:
             ValueError: If format is unsupported
-            Exception: If adjustment fails
+            AudioProcessingError: If adjustment fails
         """
+        self._validate_format(output_format)
+
         try:
-            self._validate_format(output_format)
             audio = AudioSegment.from_file(input_path)
             adjusted_audio = audio + volume_change_db
 
@@ -352,10 +358,10 @@ class AudioProcessor:
 
             return output_path
 
-        except ValueError as exc:
-            raise exc
-        except Exception as exc:
-            raise Exception(f"Volume adjustment failed: {str(exc)}") from exc
+        except (IOError, OSError) as exc:
+            raise AudioProcessingError(
+                f"Volume adjustment failed: {str(exc)}"
+            ) from exc
 
     def get_audio_info(self, input_path: str) -> Dict[str, Any]:
         """
@@ -368,7 +374,7 @@ class AudioProcessor:
             Dictionary containing audio metadata
 
         Raises:
-            Exception: If metadata extraction fails
+            AudioProcessingError: If metadata extraction fails
         """
         try:
             audio = AudioSegment.from_file(input_path)
@@ -380,8 +386,10 @@ class AudioProcessor:
                 'frame_count': audio.frame_count(),
                 'dBFS': audio.dBFS
             }
-        except Exception as exc:
-            raise Exception(f"Failed to get audio info: {str(exc)}") from exc
+        except (IOError, OSError, AttributeError) as exc:
+            raise AudioProcessingError(
+                f"Failed to get audio info: {str(exc)}"
+            ) from exc
 
     def cleanup_old_files(self) -> int:
         """
@@ -407,7 +415,7 @@ class AudioProcessor:
 
             return cleaned_count
 
-        except Exception as exc:
+        except (IOError, OSError) as exc:
             print(f"Error during cleanup: {exc}")
             return cleaned_count
 
@@ -418,6 +426,6 @@ class AudioProcessor:
         try:
             if os.path.exists(self.upload_folder):
                 shutil.rmtree(self.upload_folder)
-        except Exception as exc:
+        except (IOError, OSError) as exc:
             print(f"Warning: Could not remove temporary directory "
                   f"{self.upload_folder}: {exc}")

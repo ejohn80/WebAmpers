@@ -9,7 +9,7 @@ from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
 
-from backend.AudioProcessor import AudioProcessor
+from backend.audio_processor import AudioProcessor, AudioProcessingError
 
 app = Flask(__name__)
 CORS(app)
@@ -41,10 +41,8 @@ def _cleanup_paths(paths):
         if path:
             try:
                 os.remove(path)
-            except OSError:
-                logging.warning("Failed to remove file during cleanup: %s", path)
-            except Exception:
-                pass
+            except (OSError, IOError) as exc:
+                logging.warning("Failed to remove file during cleanup: %s - %s", path, exc)
 
 @app.route('/health', methods=['GET'])
 def health_check():
@@ -52,7 +50,7 @@ def health_check():
     return jsonify({'status': 'healthy', 'message': 'Backend is running'}), 200
 
 @app.route('/convert', methods=['POST'])
-def convert_audio():
+def convert_audio():  # pylint: disable=too-many-return-statements
     """
     Convert audio file from one format to another
     Expects: file (audio file), target_format (wav, mp3, ogg)
@@ -100,7 +98,7 @@ def convert_audio():
 
         return response
 
-    except Exception as exc:
+    except (ValueError, AudioProcessingError, IOError, OSError) as exc:
         _cleanup_paths([input_path, output_path])
         return jsonify({'error': str(exc)}), 500
 
@@ -151,7 +149,7 @@ def merge_audio():
 
         return response
 
-    except Exception as exc:
+    except (ValueError, AudioProcessingError, IOError, OSError) as exc:
         paths_to_clean = file_paths + ([output_path] if output_path else [])
         _cleanup_paths(paths_to_clean)
 
@@ -202,11 +200,15 @@ def export_audio():
             # Reraise as a string error that will be caught by outer handler
             raise ValueError("Sample rate must be an integer") from exc
 
+        export_settings = {
+            'bitrate': bitrate,
+            'sample_rate': sample_rate
+        }
+
         output_path = processor.export_with_settings(
             input_path,
             output_format,
-            bitrate,
-            sample_rate
+            export_settings
         )
 
         response = send_file(
@@ -221,7 +223,7 @@ def export_audio():
 
         return response
 
-    except Exception as exc:
+    except (ValueError, AudioProcessingError, IOError, OSError) as exc:
         _cleanup_paths([input_path, output_path])
 
         error_keywords = ['Sample rate must be', 'Missing required']
@@ -253,7 +255,7 @@ def get_metadata():
         metadata = processor.get_audio_info(filepath)
         return jsonify(metadata), 200
 
-    except Exception as exc:
+    except (ValueError, AudioProcessingError, IOError, OSError) as exc:
         return jsonify({'error': str(exc)}), 500
 
     finally:
