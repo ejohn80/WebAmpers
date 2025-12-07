@@ -93,11 +93,19 @@ class PythonApiClient {
       formData.append("file", file);
       formData.append("format", settings.format || "mp3");
 
-      if (settings.bitrate) {
+      if (settings.bitrate !== undefined && settings.bitrate !== null) {
         formData.append("bitrate", settings.bitrate);
+      } else {
+        // Send an empty string or a default if the backend expects a value
+        // Based on app.py, the backend expects *something* for these keys.
+        // It's safer to ensure they are present.
+        formData.append("bitrate", "");
       }
-      if (settings.sampleRate) {
+      
+      if (settings.sampleRate !== undefined && settings.sampleRate !== null) {
         formData.append("sample_rate", settings.sampleRate.toString());
+      } else {
+        formData.append("sample_rate", "");
       }
 
       const response = await fetch(`${this.baseUrl}/export`, {

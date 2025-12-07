@@ -64,8 +64,7 @@ const AudioExporter = ({
     e.preventDefault();
     setError(null);
     const exportBitrate =
-      format === "mp3" || format === "ogg" ? qualitySetting : undefined;
-
+      format === "mp3" || format === "ogg" ? qualitySetting : null;
     // Compatibility: support legacy prop `audioBuffer` used in tests
     if (typeof audioBuffer !== "undefined") {
       if (!audioBuffer) {
