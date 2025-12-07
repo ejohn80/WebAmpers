@@ -63,8 +63,13 @@ class ClipboardManager {
         pan: track.pan,
         mute: track.mute,
         solo: track.solo,
-        effects: track.effects || {},
-        activeEffectsList: track.activeEffectsList || [],
+        effects: track.effects ? JSON.parse(JSON.stringify(track.effects)) : {},
+        activeEffectsList: track.activeEffectsList
+          ? [...track.activeEffectsList]
+          : [],
+        enabledEffects: track.enabledEffects
+          ? JSON.parse(JSON.stringify(track.enabledEffects))
+          : {},
         segments: track.segments?.map((seg) => ({
           id: seg.id,
           assetId: seg.assetId,
@@ -74,6 +79,9 @@ class ClipboardManager {
           startOnTimelineMs: seg.startOnTimelineMs,
           startInFileMs: seg.startInFileMs,
         })),
+        // For single-segment cuts, preserve the region info
+        clipStartInFileMs: track.clipStartInFileMs,
+        clipDurationMs: track.clipDurationMs,
       },
     };
 
