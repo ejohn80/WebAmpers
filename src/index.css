@@ -49,16 +49,12 @@
   --context-hover: rgba(255, 255, 255, 0.08);
   --context-divider: rgba(255, 255, 255, 0.06);
   --divider-vertical: #000;
-  --timeline-ruler-bg: #2c2c2f;
+  --timeline-ruler-bg: #141414;
   --timeline-ruler-border: rgba(255, 255, 255, 0.12);
   --timeline-ruler-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
-  --timeline-tick-color: rgba(255, 255, 255, 0.75);
-  --timeline-pre-line: rgba(234, 41, 41, 0.35);
-  --timeline-pre-fill: linear-gradient(
-    90deg,
-    rgba(234, 41, 41, 0.18),
-    rgba(234, 41, 41, 0)
-  );
+  --timeline-tick-color: rgba(211, 25, 25, 0.7);
+  --timeline-pre-line: rgba(211, 25, 25, 0.7);
+  --timeline-pre-fill: rgba(25, 25, 25, 0.35);
   --zoom-bg: rgba(0, 0, 0, 0.7);
   --zoom-border: rgba(255, 255, 255, 0.12);
   --zoom-btn-bg: rgba(255, 255, 255, 0.08);

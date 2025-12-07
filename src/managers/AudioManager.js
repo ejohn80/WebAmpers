@@ -77,14 +77,15 @@ class AudioManager {
 
     // Generate a unique color for this track
     const colors = [
-      "#FF6B6B",
-      "#4ECDC4",
-      "#45B7D1",
-      "#FFA07A",
-      "#98D8C8",
-      "#F7DC6F",
-      "#BB8FCE",
-      "#85C1E2",
+      "#00e5ff",
+      "#1aff00",
+      "#f8dc6f",
+      "#ff6eff",
+      "#b32595",
+      "#ff89b5",
+      "#7a1cee",
+      "#fe4467",
+      "#eb7813",
     ];
     const color = colors[this.tracks.length % colors.length];
 

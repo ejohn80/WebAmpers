@@ -38,6 +38,7 @@
   display: flex;
   flex-direction: column;
   background: var(--tracklane-button-box);
+  padding: 8px 0px;
   /* border: 1px solid red; */
 }
 
@@ -301,7 +302,7 @@
   .tracklane-title-overlay
   .tracklane-title {
   font-size: 11px;
-}  
+}
 
 .context-menu-section-title {
   font-size: 11px;
