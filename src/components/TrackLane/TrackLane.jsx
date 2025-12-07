@@ -43,7 +43,7 @@ const TrackLane = memo(function TrackLane({
   onClearSegmentSelection = () => {},
   onSegmentDelete = () => {},
 }) {
-  if (!track) return null;
+  //if (!track) return null;
 
   const segments = Array.isArray(track.segments) ? track.segments : [];
 
@@ -53,7 +53,7 @@ const TrackLane = memo(function TrackLane({
       return saved
         ? JSON.parse(saved)
         : {muted: !!track.mute, soloed: !!track.solo};
-    } catch (e) {
+    } catch {
       return {muted: !!track.mute, soloed: !!track.solo};
     }
   };
@@ -268,7 +268,7 @@ const TrackLane = memo(function TrackLane({
             return parsed;
           }
         }
-      } catch (err) {
+      } catch {
         // Ignore malformed payloads
       }
     }

@@ -17,7 +17,7 @@ vi.mock("../components/TrackLane/TrackLane", () => ({
 
 vi.mock("../components/Generic/DraggableDiv", () => ({
   __esModule: true,
-  default: ({children, disableSectionPadding, ...rest}) => (
+  default: ({children, ...rest}) => (
     <div data-testid="mock-draggable" {...rest}>
       {children}
     </div>
