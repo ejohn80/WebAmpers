@@ -6,19 +6,18 @@
   flex-direction: column;
   gap: 6px;
   align-self: stretch;
-  padding-right: 6px;
-  background: var(--surface-strong);
-  box-shadow: 6px 0 12px rgba(0, 0, 0, 0.45);
-  position: sticky;
+  background: var(--tracklane-button-box);
   left: 0;
   z-index: 5;
+  border-radius: 6px;
+  /* border: 0.1px solid lime; */
 }
 
 .tracklane-root {
   display: flex;
   gap: var(--track-controls-gap);
   align-items: stretch;
-  background: var(--surface-strong);
+  background: var(--waveform-background);
   color: var(--app-text);
   padding: var(--track-row-padding, 8px);
   border-radius: 6px;
@@ -26,8 +25,8 @@
     var(--timeline-left-offset) + var(--timeline-content-width, 100%)
   );
   position: relative;
-  contain: layout style;
   box-sizing: border-box;
+  /* border: 0.1px solid lime; */
 }
 
 .tracklane-main {
@@ -36,13 +35,9 @@
   flex: 1 1 auto;
   display: flex;
   flex-direction: column;
-}
-
-.tracklane-header {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  margin-bottom: 4px;
+  background: var(--tracklane-button-box);
+  padding: 8px 0px;
+  /* border: 1px solid red; */
 }
 
 .tracklane-title {
@@ -53,13 +48,12 @@
 
 .tracklane-track-number {
   font-size: 10px;
-  color: var(--muted-text);
-  font-weight: 400;
+  color: var(--track-text);
+  font-weight: 600;
 }
 
 .tracklane-controls-box {
-  background: var(--surface-subtle);
-  border: 1px solid var(--surface-border);
+  background: var(--tracklane-button-box);
   padding: 8px;
   border-radius: 6px;
   display: flex;
@@ -74,30 +68,45 @@
   flex-direction: column;
   align-items: stretch;
   justify-content: center;
-  gap: 6px;
+  gap: 7px;
+  /* border: 0.5px solid pink; */
 }
 
 .tracklane-controls {
   display: flex;
   gap: 8px;
+  padding: 2px 6px;
   align-items: center;
+  /* border: 0.1px solid yellow; */
 }
 
 .tl-btn {
-  background: var(--button-bg, var(--surface-subtle));
+  background: var(--mute-btn-bg);
   color: var(--app-text);
-  border: 1px solid var(--button-border);
-  padding: 6px 8px;
-  border-radius: 4px;
-  font-size: 11px;
+  padding: 6px;
+  border-radius: 3px;
+  font-size: 12px;
   cursor: pointer;
   transition: all 0.15s ease;
-  white-space: nowrap;
+  letter-spacing: -0.55px;
+  font-weight: bold;
+  border: none;
 }
 
-.tl-btn:hover:not(:disabled) {
-  background: var(--surface-hover);
-  border-color: var(--surface-active);
+.tl-btn-audio {
+  background: var(--mute-btn-bg, var(--surface-subtle));
+  color: var(--mute-btn-color, var(--app-text));
+}
+
+.tl-btn:hover {
+  background: var(--mute-btn-hover);
+  color: var(--mute-btn-color, var(--app-text));
+}
+
+.tl-btn-audio.tl-btn--active {
+  background: var(--mute-btn-active-bg);
+  color: var(--mute-btn-active-color);
+  border-color: var(--mute-btn-active-bg);
 }
 
 .tl-btn:disabled {
@@ -112,20 +121,14 @@
 }
 
 .tl-btn-delete {
-  background: var(--danger-bg);
-  color: var(--danger-strong);
-  border-color: var(--danger-border);
+  background: var(--mute-btn-bg, var(--surface-subtle));
+  color: var(--mute-btn-color, var(--app-text));
+  border: none;
 }
 
 .tl-btn-delete:hover {
   background: var(--danger-hover);
   border-color: var(--danger-border-strong);
-}
-
-.tracklane-divider {
-  height: 1px;
-  background: var(--divider);
-  margin: 4px 0;
 }
 
 /* Timeline container for positioned segments */
@@ -195,13 +198,13 @@
 
 .tracklane-segment {
   background: var(--surface-subtle);
-  border: 1px solid var(--surface-border);
-  padding: 8px;
   border-radius: 6px;
+  padding: 1px;
   height: 100%;
   display: flex;
   flex-direction: column;
   flex: 1 1 auto;
+  /* border: 0.1px solid hotpink; */
 }
 
 .segment-waveform {
@@ -283,6 +286,20 @@
   height: 1px;
   margin: 6px 0;
   background: var(--context-divider);
+}
+
+/* Hide track name overlay when timeline is very narrow */
+.tracklane-timeline[data-narrow="true"] .tracklane-title-overlay {
+  display: none;
+}
+*/ .tracklane-timeline[data-medium="true"] .tracklane-title-overlay {
+  padding: 4px 6px;
+}
+
+.tracklane-timeline[data-medium="true"]
+  .tracklane-title-overlay
+  .tracklane-title {
+  font-size: 11px;
 }
 
 .context-menu-section-title {

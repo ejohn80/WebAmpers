@@ -17,7 +17,7 @@ vi.mock("../components/TrackLane/TrackLane", () => ({
 
 vi.mock("../components/Generic/DraggableDiv", () => ({
   __esModule: true,
-  default: ({children, disableSectionPadding, ...rest}) => (
+  default: ({children, ...rest}) => (
     <div data-testid="mock-draggable" {...rest}>
       {children}
     </div>
@@ -69,8 +69,8 @@ const setScrollAreaWidth = (width) => {
   ResizeObserverStub.callback?.();
 };
 
-const TRACK_CONTROLS_WIDTH = 180;
-const TRACK_CONTROLS_GAP = 12;
+const TRACK_CONTROLS_WIDTH = 70;
+const TRACK_CONTROLS_GAP = 37;
 const TRACK_ROW_PADDING = 8; // Keep in sync with MainContent constants
 
 const mockAppContextValue = {

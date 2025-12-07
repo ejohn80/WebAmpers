@@ -253,7 +253,8 @@ describe("PlaybackEngine transport controls", () => {
     const engine = new PlaybackEngine(events);
     await engine.load(makeVersion([{id: "multi"}]));
 
-    Tone.Transport.seconds = engine.version.lengthMs / 1000;
+    Tone.Transport.seconds =
+      engine.version.lengthMs / 1000 + engine.jogLatencySec;
     const seekSpy = vi.spyOn(engine, "seekMs");
 
     await engine.play();

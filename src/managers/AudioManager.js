@@ -77,14 +77,15 @@ class AudioManager {
 
     // Generate a unique color for this track
     const colors = [
-      "#FF6B6B",
-      "#4ECDC4",
-      "#45B7D1",
-      "#FFA07A",
-      "#98D8C8",
-      "#F7DC6F",
-      "#BB8FCE",
-      "#85C1E2",
+      "#00e5ff",
+      "#1aff00",
+      "#f8dc6f",
+      "#ff6eff",
+      "#b32595",
+      "#ff89b5",
+      "#7a1cee",
+      "#fe4467",
+      "#eb7813",
     ];
     const color = colors[this.tracks.length % colors.length];
 
@@ -153,10 +154,20 @@ class AudioManager {
               : undefined;
 
         try {
+          console.log(`[AudioManager] Reconstructing segment:`, {
+            id: s.id,
+            name: s.name,
+            fileName: s.fileName,
+            hasName: !!s.name,
+            hasFileName: !!s.fileName,
+          });
+
           const seg = new AudioSegment({
             buffer: segToneBuf,
             offset: offsetSec,
             duration: durationSec,
+            name: s.name || s.fileName || null,
+            fileName: s.fileName || s.name || null,
           });
 
           // Preserve metadata used by UI/engine
@@ -204,6 +215,8 @@ class AudioManager {
         buffer: toneBuffer,
         offset: 0,
         duration: toneBuffer.duration,
+        name: audioData.name || null,
+        fileName: audioData.name || null,
       });
       const durationMs = Math.round(toneBuffer.duration * 1000);
       segment.durationMs = durationMs;

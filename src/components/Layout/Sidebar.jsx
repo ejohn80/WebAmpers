@@ -4,13 +4,10 @@ import AssetsTab from "./Sidebar/AssetsTab";
 import EffectsTab from "./Sidebar/EffectsTab";
 import SessionsTab from "./Sidebar/SessionsTab";
 import {AppContext} from "../../context/AppContext";
-import React from "react";
 import "./Sidebar.css";
 
 /**
  * Sidebar component for the application layout.
- * @param {object} props - The component props.
- * @param {number} props.width - The current width of the sidebar.
  * @param {function} props.onImportSuccess - Callback for successful audio import.
  * @param {function} props.onImportError - Callback for failed audio import.
  * @param {function} props.onAssetDelete - Callback for asset deletion.
@@ -36,7 +33,6 @@ const getInitialTab = () => {
 };
 
 function Sidebar({
-  width,
   onImportSuccess,
   onImportError,
   onAssetDelete,
@@ -50,26 +46,25 @@ function Sidebar({
     {
       key: "assets",
       label: "Assets",
-      Component: AssetsTab,
-      props: {
-        onImportSuccess,
-        onImportError,
-        onAssetDelete,
-        refreshTrigger: assetsRefreshTrigger,
-        assetBufferCache,
-      },
+      component: (
+        <AssetsTab
+          onImportSuccess={onImportSuccess}
+          onImportError={onImportError}
+          onAssetDelete={onAssetDelete}
+          refreshTrigger={assetsRefreshTrigger}
+          assetBufferCache={assetBufferCache}
+        />
+      ),
     },
     {
       key: "effects",
       label: "Effects",
-      Component: EffectsTab,
-      props: {},
+      component: <EffectsTab />,
     },
     {
       key: "sessions",
       label: "Sessions",
-      Component: SessionsTab,
-      props: {},
+      component: <SessionsTab />,
     },
   ];
 
@@ -121,12 +116,12 @@ function Sidebar({
       </div>
 
       <div>
-        {tabs.map(({key, Component, props}) => (
+        {tabs.map(({key, component}) => (
           <div
             key={key}
             style={{display: currentTab === key ? "block" : "none"}}
           >
-            <Component {...props} />
+            {component}
           </div>
         ))}
       </div>

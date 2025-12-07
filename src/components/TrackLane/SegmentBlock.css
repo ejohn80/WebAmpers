@@ -31,3 +31,42 @@
   height: 100%;
   width: 100%;
 }
+
+/* Segment name overlay */
+.segment-name-overlay {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  z-index: 10;
+  background: var(--segment-overlay);
+  backdrop-filter: blur(6px);
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: calc(100% - 16px); /* prevent overflow */
+}
+
+.segment-name {
+  font-weight: 600;
+  color: var(--segment-name);
+  font-size: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Hide overlay on very small segments to avoid clutter */
+@media (max-width: 768px) {
+  .segment-name-overlay {
+    font-size: 9px;
+    padding: 3px;
+  }
+
+  .segment-name {
+    font-size: 9px;
+  }
+}

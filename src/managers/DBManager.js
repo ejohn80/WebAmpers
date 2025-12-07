@@ -132,6 +132,8 @@ class DBManager {
       durationMs: segment.durationMs,
       startOnTimelineMs: segment.startOnTimelineMs,
       startInFileMs: segment.startInFileMs,
+      name: segment.name || null,
+      fileName: segment.fileName || null,
     };
 
     if (!serialized.id) {

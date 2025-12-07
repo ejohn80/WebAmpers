@@ -1,3 +1,6 @@
+/* global it, beforeEach, describe, afterEach, expect */
+// ^ Ignores for Vitest globals. ESlint sees these as undefined otherwise.
+
 import {dbManager} from "../managers/DBManager";
 
 /**
