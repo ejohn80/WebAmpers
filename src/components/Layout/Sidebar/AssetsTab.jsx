@@ -1,4 +1,4 @@
-import {useState, useEffect} from "react";
+import {useState, useEffect, useContext} from "react";
 import {IoSearch} from "react-icons/io5";
 import {MoonLoader} from "react-spinners";
 import {dbManager} from "../../../managers/DBManager";
@@ -6,6 +6,7 @@ import {saveAsset} from "../../../utils/assetUtils";
 import AudioImportButton from "../../AudioImport/AudioImportButton2";
 import styles from "../Layout.module.css";
 import {TrashCan} from "../Svgs.jsx";
+import {AppContext} from "../../../context/AppContext";
 
 const AssetsTab = ({
   onImportSuccess,
@@ -20,6 +21,8 @@ const AssetsTab = ({
   const [error, setError] = useState(null);
   const [editingAssetId, setEditingAssetId] = useState(null);
   const [editingName, setEditingName] = useState("");
+
+  const {dbRefreshTrigger} = useContext(AppContext);
 
   // Load assets from IndexedDB
   const loadAssets = async () => {
@@ -37,7 +40,7 @@ const AssetsTab = ({
 
   useEffect(() => {
     loadAssets();
-  }, []);
+  }, [dbRefreshTrigger]);
 
   // Reload when refreshTrigger changes (triggered by external imports)
   useEffect(() => {

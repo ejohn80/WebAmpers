@@ -67,6 +67,7 @@ class ClipboardManager {
         activeEffectsList: track.activeEffectsList || [],
         segments: track.segments?.map((seg) => ({
           id: seg.id,
+          assetId: seg.assetId,
           offset: seg.offset,
           duration: seg.duration,
           durationMs: seg.durationMs,

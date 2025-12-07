@@ -301,4 +301,19 @@
   .tracklane-title-overlay
   .tracklane-title {
   font-size: 11px;
+}  
+
+.context-menu-section-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted-text);
+  padding: 4px 10px 6px;
+  font-weight: 600;
+}
+
+.context-menu-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
 }

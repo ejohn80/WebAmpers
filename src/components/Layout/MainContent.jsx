@@ -6,6 +6,7 @@ import React, {
   useContext,
   useCallback,
 } from "react";
+import {createPortal} from "react-dom";
 import DraggableDiv from "../Generic/DraggableDiv";
 import GlobalPlayhead from "../Generic/GlobalPlayhead";
 import TimelineRuler from "./TimelineRuler";
@@ -55,6 +56,11 @@ function MainContent({
   const [scrollAreaWidth, setScrollAreaWidth] = useState(0);
   const scrollAreaRef = useRef(null);
   const [selectedSegment, setSelectedSegment] = useState(null);
+  const [backgroundMenu, setBackgroundMenu] = useState({
+    open: false,
+    x: 0,
+    y: 0,
+  });
   const [playheadMs, setPlayheadMs] = useState(() => initialProgress?.ms || 0);
   const playheadMsRef = useRef(playheadMs);
   const [cutBox, setCutBox] = useState(null);
@@ -571,6 +577,83 @@ function MainContent({
     e.dataTransfer.dropEffect = "copy";
   };
 
+  const closeBackgroundMenu = useCallback(() => {
+    setBackgroundMenu((prev) => (prev.open ? {...prev, open: false} : prev));
+  }, []);
+
+  useEffect(() => {
+    if (!backgroundMenu.open) return undefined;
+
+    const handlePointerDown = (event) => {
+      if (
+        event.target instanceof Node &&
+        event.target.closest(".tracklane-context-menu")
+      ) {
+        return;
+      }
+      closeBackgroundMenu();
+    };
+
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") {
+        closeBackgroundMenu();
+      }
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [backgroundMenu.open, closeBackgroundMenu]);
+
+  const handleBackgroundContextMenu = (e) => {
+    const isOnTrack = e.target?.closest(".tracklane-root");
+    if (isOnTrack) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    const menuWidth = 200;
+    const menuHeight = 120;
+    const x = Math.min(e.clientX, window.innerWidth - menuWidth);
+    const y = Math.min(e.clientY, window.innerHeight - menuHeight);
+
+    setBackgroundMenu({open: true, x, y});
+  };
+
+  const backgroundMenuPortal =
+    backgroundMenu.open && typeof document !== "undefined"
+      ? createPortal(
+          <div
+            className="tracklane-context-menu"
+            style={{
+              top: `${backgroundMenu.y}px`,
+              left: `${backgroundMenu.x}px`,
+            }}
+            role="menu"
+          >
+            <button
+              className={`context-menu-item${
+                hasClipboard ? "" : " context-menu-item--disabled"
+              }`}
+              onClick={() => {
+                if (!hasClipboard || !onPasteTrack) return;
+                onPasteTrack();
+                closeBackgroundMenu();
+              }}
+              disabled={!hasClipboard || !onPasteTrack}
+              role="menuitem"
+            >
+              Paste
+            </button>
+          </div>,
+          document.body
+        )
+      : null;
+
   const handleClearSegmentSelection = useCallback(() => {
     clearSegmentSelection();
     setCutBox(null);
@@ -593,6 +676,7 @@ function MainContent({
         className="timeline-scroll-area"
         ref={scrollAreaRef}
         onClick={handleScrollAreaClick}
+        onContextMenu={handleBackgroundContextMenu}
         onDrop={handleDrop}
         onDragOver={handleDragOver}
       >
@@ -737,6 +821,7 @@ function MainContent({
           </div>
         )}
       </div>
+      {backgroundMenuPortal}
       <div className="zoom-controls-bar">
         <div
           className="zoom-controls"
