@@ -606,198 +606,186 @@ function MainContent({
   }, []);
 
   return (
-    <DraggableDiv
-      className={`maincontent ${isEffectsMenuOpen ? styles.blurred : ""}`}
-      style={timelineStyle}
-      disableSectionPadding
-    >
-      {isEffectsMenuOpen && (
-        <div className={styles.effectsMenuContainer}>
-          <EffectsMenu />
-        </div>
-      )}
+    <>
+      {/* Render playhead at document body level */}
+      {typeof document !== "undefined" &&
+        hasTracks &&
+        createPortal(
+          <GlobalPlayhead
+            totalLengthMs={totalLengthMs}
+            timelineWidth={timelineMetrics.widthPx}
+          />,
+          document.body
+        )}
 
-      <div
-        className="timeline-scroll-area"
-        ref={scrollAreaRef}
-        onClick={handleScrollAreaClick}
-        onContextMenu={handleBackgroundContextMenu}
-        onDrop={handleDrop}
-        onDragOver={handleDragOver}
+      <DraggableDiv
+        className={`maincontent ${isEffectsMenuOpen ? styles.blurred : ""}`}
+        style={timelineStyle}
+        disableSectionPadding
       >
-        {hasTracks ? (
-          <>
-            <TimelineRuler
-              totalLengthMs={totalLengthMs}
-              timelineWidth={timelineMetrics.widthPx}
-              timelineLeftOffsetPx={timelineMetrics.leftOffsetPx}
-              onSeek={handleTimelineSeek}
-            />
-            <div
-              className="timeline-scroll-content"
-              style={{
-                minWidth: `${timelineMetrics.rowWidthPx}px`,
-                width: `${timelineMetrics.rowWidthPx}px`,
-              }}
-            >
-              <div
-                className="global-playhead-rail"
-                style={{
-                  left: `${timelineMetrics.leftOffsetPx}px`,
-                  width: `${timelineMetrics.widthPx}px`,
-                }}
-              >
-                <GlobalPlayhead
-                  totalLengthMs={totalLengthMs}
-                  timelineWidth={timelineMetrics.widthPx}
-                />
-              </div>
-              <div
-                className="tracks-relative"
-                style={{
-                  width: `${timelineMetrics.rowWidthPx}px`,
-                  position: "relative",
-                }}
-              >
-                <div
-                  className="global-playhead-rail-full"
-                  style={{
-                    left: `${timelineMetrics.leftOffsetPx}px`,
-                    width: `${timelineMetrics.widthPx}px`,
-                  }}
-                >
-                  <GlobalPlayhead
-                    totalLengthMs={totalLengthMs}
-                    timelineWidth={timelineMetrics.widthPx}
-                  />
-                </div>
-
-                {cutBox &&
-                  (() => {
-                    const startX = msToTimelineX(cutBox.startMs);
-                    const endX = msToTimelineX(cutBox.endMs);
-                    const left = Math.min(startX, endX);
-                    const width = Math.max(2, Math.abs(endX - startX));
-                    const top = cutBox.topPx ?? 0;
-                    const height = cutBox.heightPx ?? TRACK_HEIGHT_PX;
-
-                    return (
-                      <div
-                        className="cut-selection-overlay"
-                        style={{
-                          position: "absolute",
-                          zIndex: 20,
-                          pointerEvents: "auto",
-                          left: `${left}px`,
-                          top: `${top}px`,
-                          width: `${width}px`,
-                          height: `${height}px`,
-                          border: "1px solid #e6c200",
-                          backgroundColor: "rgba(255, 255, 153, 0.6)",
-                          boxSizing: "border-box",
-                        }}
-                      >
-                        {!cutBox.isDragging && (
-                          <button
-                            type="button"
-                            className="cut-selection-button"
-                            style={{
-                              position: "absolute",
-                              right: 4,
-                              top: 4,
-                              pointerEvents: "auto",
-                              background: "#e6c200",
-                              color: "#000",
-                              border: "none",
-                              padding: "4px 8px",
-                              cursor: "pointer",
-                            }}
-                            onClick={handleCutBoxApply}
-                          >
-                            Cut
-                          </button>
-                        )}
-                      </div>
-                    );
-                  })()}
-
-                <div
-                  className="tracks-container"
-                  style={{width: `${timelineMetrics.rowWidthPx}px`}}
-                  onMouseDownCapture={handleTracksMouseDown}
-                >
-                  {tracks.map((track, index) => (
-                    <div key={track.id} className="track-wrapper">
-                      <TrackLane
-                        track={track}
-                        trackIndex={index}
-                        totalTracks={tracks.length}
-                        isSelected={track.id === selectedTrackId}
-                        onSelect={handleTrackSelected}
-                        showTitle={true}
-                        onMute={onMute}
-                        onSolo={onSolo}
-                        onDelete={onDelete}
-                        onSegmentMove={onSegmentMove}
-                        requestAssetPreview={requestAssetPreview}
-                        onAssetDrop={onAssetDrop}
-                        onCutTrack={onCutTrack}
-                        onCopyTrack={onCopyTrack}
-                        onPasteTrack={onPasteTrack}
-                        hasClipboard={hasClipboard}
-                        totalLengthMs={totalLengthMs}
-                        timelineWidth={timelineMetrics.widthPx}
-                        rowWidthPx={timelineMetrics.rowWidthPx}
-                        selectedSegment={selectedSegment}
-                        onSegmentSelected={handleSegmentSelected}
-                        onClearSegmentSelection={handleClearSegmentSelection}
-                        onSegmentDelete={onSegmentDelete}
-                        onTimelineSeek={handleTimelineSeek}
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </>
-        ) : (
-          <div className="empty-state" role="status" aria-live="polite">
-            Import an audio file
+        {isEffectsMenuOpen && (
+          <div className={styles.effectsMenuContainer}>
+            <EffectsMenu />
           </div>
         )}
-      </div>
-      {backgroundMenuPortal}
-      <div className="zoom-controls-bar">
+
         <div
-          className="zoom-controls"
-          role="toolbar"
-          aria-label="Timeline zoom controls"
+          className="timeline-scroll-area"
+          ref={scrollAreaRef}
+          onClick={handleScrollAreaClick}
+          onContextMenu={handleBackgroundContextMenu}
+          onDrop={handleDrop}
+          onDragOver={handleDragOver}
         >
-          <button className="zoom-btn" onClick={zoomOut} title="Zoom out (-)">
-            -
-          </button>
-          <span className="zoom-label">{Math.round(zoom * 100)}%</span>
-          <button className="zoom-btn" onClick={zoomIn} title="Zoom in (+)">
-            +
-          </button>
-          <button
-            className="zoom-btn reset"
-            onClick={resetZoom}
-            title="Reset zoom"
-          >
-            Reset
-          </button>
-          <label className="follow-toggle" title="Scroll with the playhead">
-            <input
-              type="checkbox"
-              checked={followPlayhead}
-              onChange={toggleFollow}
-            />
-            <span>Follow</span>
-          </label>
+          {hasTracks ? (
+            <>
+              <TimelineRuler
+                totalLengthMs={totalLengthMs}
+                timelineWidth={timelineMetrics.widthPx}
+                timelineLeftOffsetPx={timelineMetrics.leftOffsetPx}
+                onSeek={handleTimelineSeek}
+              />
+              <div
+                className="timeline-scroll-content"
+                style={{
+                  minWidth: `${timelineMetrics.rowWidthPx}px`,
+                  width: `${timelineMetrics.rowWidthPx}px`,
+                }}
+              >
+                <div
+                  className="tracks-relative"
+                  style={{
+                    width: `${timelineMetrics.rowWidthPx}px`,
+                    position: "relative",
+                  }}
+                >
+                  {cutBox &&
+                    (() => {
+                      const startX = msToTimelineX(cutBox.startMs);
+                      const endX = msToTimelineX(cutBox.endMs);
+                      const left = Math.min(startX, endX);
+                      const width = Math.max(2, Math.abs(endX - startX));
+                      const top = cutBox.topPx ?? 0;
+                      const height = cutBox.heightPx ?? TRACK_HEIGHT_PX;
+
+                      return (
+                        <div
+                          className="cut-selection-overlay"
+                          style={{
+                            position: "absolute",
+                            zIndex: 20,
+                            pointerEvents: "auto",
+                            left: `${left}px`,
+                            top: `${top}px`,
+                            width: `${width}px`,
+                            height: `${height}px`,
+                            border: "1px solid #e6c200",
+                            backgroundColor: "rgba(255, 255, 153, 0.6)",
+                            boxSizing: "border-box",
+                          }}
+                        >
+                          {!cutBox.isDragging && (
+                            <button
+                              type="button"
+                              className="cut-selection-button"
+                              style={{
+                                position: "absolute",
+                                right: 4,
+                                top: 4,
+                                pointerEvents: "auto",
+                                background: "#e6c200",
+                                color: "#000",
+                                border: "none",
+                                padding: "4px 8px",
+                                cursor: "pointer",
+                              }}
+                              onClick={handleCutBoxApply}
+                            >
+                              Cut
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })()}
+
+                  <div
+                    className="tracks-container"
+                    style={{width: `${timelineMetrics.rowWidthPx}px`}}
+                    onMouseDownCapture={handleTracksMouseDown}
+                  >
+                    {tracks.map((track, index) => (
+                      <div key={track.id} className="track-wrapper">
+                        <TrackLane
+                          track={track}
+                          trackIndex={index}
+                          totalTracks={tracks.length}
+                          isSelected={track.id === selectedTrackId}
+                          onSelect={handleTrackSelected}
+                          showTitle={true}
+                          onMute={onMute}
+                          onSolo={onSolo}
+                          onDelete={onDelete}
+                          onSegmentMove={onSegmentMove}
+                          requestAssetPreview={requestAssetPreview}
+                          onAssetDrop={onAssetDrop}
+                          onCutTrack={onCutTrack}
+                          onCopyTrack={onCopyTrack}
+                          onPasteTrack={onPasteTrack}
+                          hasClipboard={hasClipboard}
+                          totalLengthMs={totalLengthMs}
+                          timelineWidth={timelineMetrics.widthPx}
+                          rowWidthPx={timelineMetrics.rowWidthPx}
+                          selectedSegment={selectedSegment}
+                          onSegmentSelected={handleSegmentSelected}
+                          onClearSegmentSelection={handleClearSegmentSelection}
+                          onSegmentDelete={onSegmentDelete}
+                          onTimelineSeek={handleTimelineSeek}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="empty-state" role="status" aria-live="polite">
+              Import an audio file
+            </div>
+          )}
         </div>
-      </div>
-    </DraggableDiv>
+        {backgroundMenuPortal}
+        <div className="zoom-controls-bar">
+          <div
+            className="zoom-controls"
+            role="toolbar"
+            aria-label="Timeline zoom controls"
+          >
+            <button className="zoom-btn" onClick={zoomOut} title="Zoom out (-)">
+              -
+            </button>
+            <span className="zoom-label">{Math.round(zoom * 100)}%</span>
+            <button className="zoom-btn" onClick={zoomIn} title="Zoom in (+)">
+              +
+            </button>
+            <button
+              className="zoom-btn reset"
+              onClick={resetZoom}
+              title="Reset zoom"
+            >
+              Reset
+            </button>
+            <label className="follow-toggle" title="Scroll with the playhead">
+              <input
+                type="checkbox"
+                checked={followPlayhead}
+                onChange={toggleFollow}
+              />
+              <span>Follow</span>
+            </label>
+          </div>
+        </div>
+      </DraggableDiv>
+    </>
   );
 }
 
