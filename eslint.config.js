@@ -44,6 +44,7 @@ export default defineConfig([
         "error",
         {varsIgnorePattern: "^[A-Z_]", argsIgnorePattern: "^_"},
       ],
+      "react-refresh/only-export-components": "off",
     },
   },
 ]);
