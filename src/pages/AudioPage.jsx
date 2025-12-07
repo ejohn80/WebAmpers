@@ -62,58 +62,7 @@ function AudioPage() {
     setHasClipboardFlag(clipboardManager.hasClipboard());
   }, []);
 
-  // Keyboard shortcuts for cut/copy/paste
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      const activeElement = document.activeElement;
-      const isTextEntry =
-        activeElement.tagName === "TEXTAREA" ||
-        activeElement.isContentEditable ||
-        (activeElement.tagName === "INPUT" &&
-          !["range", "checkbox", "radio", "button", "submit", "file"].includes(
-            activeElement.type
-          ));
-
-      // Don't trigger shortcuts if typing in a text field
-      if (isTextEntry) return;
-
-      // Check for Ctrl/Cmd + X (Cut)
-      if ((e.ctrlKey || e.metaKey) && e.key === "x") {
-        e.preventDefault();
-        if (selectedTrackId) {
-          handleCutTrack();
-        }
-      }
-
-      // Check for Ctrl/Cmd + C (Copy)
-      if ((e.ctrlKey || e.metaKey) && e.key === "c") {
-        e.preventDefault();
-        if (selectedTrackId) {
-          handleCopyTrack();
-        }
-      }
-
-      // Check for Ctrl/Cmd + V (Paste)
-      if ((e.ctrlKey || e.metaKey) && e.key === "v") {
-        e.preventDefault();
-        if (clipboardManager.hasClipboard()) {
-          handlePasteTrack();
-          refreshClipboardFlag();
-        }
-      }
-
-      // Check for Backspace or Delete (Delete track)
-      if (e.key === "Backspace" || e.key === "Delete") {
-        e.preventDefault();
-        if (selectedTrackId) {
-          handleDeleteTrack(selectedTrackId);
-        }
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [selectedTrackId, refreshClipboardFlag]);
+  // Keyboard shortcuts for cut/copy/paste handled later once handlers are defined
 
   /**
    * Handle saving a sampler recording as a new track
@@ -268,7 +217,7 @@ function AudioPage() {
   };
 
   // Helper function to deserialize audio buffer from DB format
-  const deserializeAudioBuffer = (serializedBuffer) => {
+  const deserializeAudioBuffer = useCallback((serializedBuffer) => {
     const audioBuffer = Tone.context.createBuffer(
       serializedBuffer.numberOfChannels,
       serializedBuffer.length,
@@ -285,14 +234,17 @@ function AudioPage() {
     }
 
     return audioBuffer;
-  };
+  }, []);
 
-  const createToneBufferFromSerialized = (serializedBuffer) => {
-    const audioBuffer = deserializeAudioBuffer(serializedBuffer);
-    return new Tone.ToneAudioBuffer(audioBuffer);
-  };
+  const createToneBufferFromSerialized = useCallback(
+    (serializedBuffer) => {
+      const audioBuffer = deserializeAudioBuffer(serializedBuffer);
+      return new Tone.ToneAudioBuffer(audioBuffer);
+    },
+    [deserializeAudioBuffer]
+  );
 
-  const buildToneBufferFromAssetRecord = async (asset) => {
+  const buildToneBufferFromAssetRecord = useCallback(async (asset) => {
     if (!asset) return null;
 
     if (asset.buffer?.channels?.length) {
@@ -321,7 +273,7 @@ function AudioPage() {
     }
 
     return null;
-  };
+  }, [createToneBufferFromSerialized]);
 
   const getAssetPreviewInfo = useCallback(
     async (assetId) => {
@@ -364,31 +316,31 @@ function AudioPage() {
   );
 
   // Helper function to generate a unique copy name
-  const generateCopyName = (baseName) => {
-    const cleanName = baseName.replace(/\s+Copy(\s+\d+)?$/, "");
+  const generateCopyName = useCallback(
+    (baseName) => {
+      const cleanName = baseName.replace(/\s+Copy(\s+\d+)?$/, "");
 
-    // Get all existing track names
-    const existingNames = new Set(audioManager.tracks.map((t) => t.name));
+      const existingNames = new Set(tracks.map((t) => t.name));
 
-    // Try "BaseName Copy" first
-    const firstCopyName = `${cleanName} Copy`;
-    if (!existingNames.has(firstCopyName)) {
-      return firstCopyName;
-    }
+      const firstCopyName = `${cleanName} Copy`;
+      if (!existingNames.has(firstCopyName)) {
+        return firstCopyName;
+      }
 
-    // Otherwise, find the next available "Copy N" number
-    let counter = 2;
-    let newName;
-    do {
-      newName = `${cleanName} Copy ${counter}`;
-      counter++;
-    } while (existingNames.has(newName));
+      let counter = 2;
+      let newName;
+      do {
+        newName = `${cleanName} Copy ${counter}`;
+        counter++;
+      } while (existingNames.has(newName));
 
-    return newName;
-  };
+      return newName;
+    },
+    [tracks]
+  );
 
   // Helper function to build version from tracks
-  const buildVersionFromTracks = (tracksArray) => {
+  const buildVersionFromTracks = useCallback((tracksArray) => {
     if (!tracksArray || tracksArray.length === 0) return null;
 
     const vs = {
@@ -448,7 +400,7 @@ function AudioPage() {
     const paddedLengthMs = maxEndMs > 0 ? maxEndMs + TRACK_END_PADDING_MS : 0;
     vs.lengthMs = paddedLengthMs || 60000;
     return vs;
-  };
+  }, []);
 
   // Load tracks for active session
   useEffect(() => {
@@ -586,7 +538,12 @@ function AudioPage() {
     };
 
     loadSessionTracks();
-  }, [activeSession]);
+  }, [
+    activeSession,
+    buildToneBufferFromAssetRecord,
+    buildVersionFromTracks,
+    deserializeAudioBuffer,
+  ]);
 
   const toggleSidebar = () => {
     setSidebarWidth((prevWidth) =>
@@ -1262,7 +1219,8 @@ function AudioPage() {
   };
 
   // Handle track deletion with proper cleanup
-  const handleDeleteTrack = async (trackId) => {
+  const handleDeleteTrack = useCallback(
+    async (trackId) => {
     try {
       console.log(`Deleting track ${trackId}...`);
 
@@ -1367,10 +1325,12 @@ function AudioPage() {
     } catch (error) {
       console.error("Failed to delete track:", error);
     }
-  };
+    },
+    [buildVersionFromTracks, engineRef, selectedTrackId, setSelectedTrackId, setTracks]
+  );
 
   // Cut selected track to clipboard
-  const handleCutTrack = async () => {
+  const handleCutTrack = useCallback(async () => {
     if (!selectedTrackId) {
       console.warn("No track selected for cut");
       return;
@@ -1382,13 +1342,11 @@ function AudioPage() {
       return;
     }
 
-    // Get the track from DB to ensure we have the assetId
     try {
       const allTracks = await dbManager.getAllTracks(activeSession);
       const dbTrack = allTracks.find((t) => t.id === selectedTrackId);
 
       if (dbTrack && dbTrack.assetId) {
-        // Merge the assetId into the track object
         track.assetId = dbTrack.assetId;
       }
 
@@ -1397,18 +1355,16 @@ function AudioPage() {
       console.warn("Failed to retrieve assetId from DB:", error);
     }
 
-    // Copy to clipboard
     clipboardManager.setClipboard(track, "cut");
     refreshClipboardFlag();
 
-    // Delete the track
     await handleDeleteTrack(selectedTrackId);
 
     console.log(`Track cut to clipboard: ${track.name}`);
-  };
+  }, [activeSession, handleDeleteTrack, refreshClipboardFlag, selectedTrackId]);
 
   // Copy selected track to clipboard
-  const handleCopyTrack = async () => {
+  const handleCopyTrack = useCallback(async () => {
     if (!selectedTrackId) {
       console.warn("No track selected for copy");
       return;
@@ -1433,13 +1389,11 @@ function AudioPage() {
       }))
     );
 
-    // Get the track from DB to ensure we have the assetId
     try {
       const allTracks = await dbManager.getAllTracks(activeSession);
       const dbTrack = allTracks.find((t) => t.id === selectedTrackId);
 
       if (dbTrack && dbTrack.assetId) {
-        // Merge the assetId into the track object
         track.assetId = dbTrack.assetId;
       }
 
@@ -1448,16 +1402,15 @@ function AudioPage() {
       console.warn("Failed to retrieve assetId from DB:", error);
     }
 
-    // Copy to clipboard
     clipboardManager.setClipboard(track, "copy");
     refreshClipboardFlag();
 
     console.log(`Track copied to clipboard: ${track.name}`);
-  };
+  }, [activeSession, refreshClipboardFlag, selectedTrackId]);
 
   // Paste track from clipboard
   // In AudioPage.jsx, replace the handlePasteTrack function with this fixed version:
-  const handlePasteTrack = async () => {
+  const handlePasteTrack = useCallback(async () => {
     const clipboardData = clipboardManager.getClipboard();
 
     if (!clipboardData) {
@@ -1756,7 +1709,69 @@ function AudioPage() {
       console.error("Error while pasting track:", error);
       alert("Failed to paste track. See console for details.");
     }
-  };
+  }, [
+    activeSession,
+    buildVersionFromTracks,
+    deserializeAudioBuffer,
+    engineRef,
+    generateCopyName,
+    setTracks,
+  ]);
+
+  // Keyboard shortcuts for cut/copy/paste
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      const activeElement = document.activeElement;
+      const isTextEntry =
+        activeElement?.tagName === "TEXTAREA" ||
+        activeElement?.isContentEditable ||
+        (activeElement?.tagName === "INPUT" &&
+          !["range", "checkbox", "radio", "button", "submit", "file"].includes(
+            activeElement.type
+          ));
+
+      if (isTextEntry) return;
+
+      if ((e.ctrlKey || e.metaKey) && e.key === "x") {
+        e.preventDefault();
+        if (selectedTrackId) {
+          handleCutTrack();
+        }
+      }
+
+      if ((e.ctrlKey || e.metaKey) && e.key === "c") {
+        e.preventDefault();
+        if (selectedTrackId) {
+          handleCopyTrack();
+        }
+      }
+
+      if ((e.ctrlKey || e.metaKey) && e.key === "v") {
+        e.preventDefault();
+        if (clipboardManager.hasClipboard()) {
+          handlePasteTrack();
+          refreshClipboardFlag();
+        }
+      }
+
+      if (e.key === "Backspace" || e.key === "Delete") {
+        e.preventDefault();
+        if (selectedTrackId) {
+          handleDeleteTrack(selectedTrackId);
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [
+    handleCopyTrack,
+    handleCutTrack,
+    handleDeleteTrack,
+    handlePasteTrack,
+    refreshClipboardFlag,
+    selectedTrackId,
+  ]);
 
   // Handle asset deletion - clear from buffer cache and clipboard
   const handleAssetDelete = (assetId) => {
