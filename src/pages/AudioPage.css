@@ -11,19 +11,17 @@ html,
 
 /* Header specific styling */
 .header {
-  background-color: var(--header-bg);
   position: relative;
   z-index: 9999;
   overflow: visible;
   border-bottom: 2px solid var(--header-border);
-  /* border-top: 1px solid black; */
 }
 
 /* Main application container, uses CSS Grid for overall layout */
 .app-container {
   height: 100vh;
   display: grid;
-  grid-template-rows: 40px 1fr 40px;
+  grid-template-rows: 40px minmax(0, 1fr) 40px;
 }
 
 /* Ensure other sections have lower z-index */
@@ -49,11 +47,6 @@ html,
   box-sizing: border-box;
 }
 
-/* Main content (center area) override — use a dark grey so TrackLane can be lighter */
-.maincontent {
-  background-color: var(--maincontent-bg) !important;
-}
-
 /* --- Main Content Area Styling (The Core Grid) --- */
 .main-content-area {
   display: grid;
@@ -61,6 +54,8 @@ html,
   height: 100%;
   position: relative;
   z-index: 1; /* Ensure main content is below header */
+  min-height: 0; /* allow internal scroll containers to shrink */
+  overflow: hidden; /* keep footer visible and delegate scroll to children */
 }
 
 /* --- Movable Divider Styling --- */

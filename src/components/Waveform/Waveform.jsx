@@ -391,11 +391,18 @@ const Waveform = ({
     const el = containerRef.current;
     if (!el) return;
 
-    // Use whichever axis has the stronger signal so normal mouse wheels work
-    const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+    const absX = Math.abs(e.deltaX);
+    const absY = Math.abs(e.deltaY);
 
-    if (delta === 0) return;
+    // Let vertical scrolls (without Shift) bubble to parent scroll areas
+    if (absY >= absX && !e.shiftKey) {
+      return;
+    }
 
+    const delta = absX > 0 ? e.deltaX : e.deltaY;
+    if (!delta) return;
+
+    e.preventDefault();
     el.scrollLeft += delta;
   };
 

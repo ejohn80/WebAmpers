@@ -40,6 +40,21 @@ const SegmentBlock = ({
   const startOnTimelineMs = Math.max(0, segment.startOnTimelineMs || 0);
   const durationMs = Math.max(0, segment.durationMs || 0);
 
+  useEffect(() => {
+    console.log(`[SegmentBlock ${segmentIndex}] Segment data:`, {
+      id: segment.id,
+      name: segment.name,
+      fileName: segment.fileName,
+      assetId: segment.assetId,
+      hasName: !!segment.name,
+      hasFileName: !!segment.fileName,
+      allKeys: Object.keys(segment),
+    });
+  }, [segment, segmentIndex]);
+
+  const segmentName =
+    segment.name || segment.fileName || `Segment ${segmentIndex + 1}`;
+
   const startDragSession = useCallback(() => {
     if (dragPlayheadMsRef.current !== null) return;
 
@@ -77,9 +92,6 @@ const SegmentBlock = ({
     console.log(
       `[SegmentBlock] Finalizing drag, saved playhead was ${savedMs}ms`
     );
-
-    // Don't call requestSeek here - the handleSegmentMove will restore the playhead
-    // after the engine reload completes. Just unlock and end the scrub session.
 
     progressStore.setScrubLocked(false);
     progressStore.endScrub();
@@ -137,10 +149,13 @@ const SegmentBlock = ({
 
   // Calculate position style
   let positionStyle;
+  let segmentWidthPx = 0;
+
   if (pxPerMs) {
     const leftPx =
       Math.round(startOnTimelineMs * pxPerMs) + (isDragging ? dragOffset : 0);
     const widthPx = Math.max(2, Math.round(durationMs * pxPerMs));
+    segmentWidthPx = widthPx;
     positionStyle = {
       left: `${leftPx}px`,
       width: `${widthPx}px`,
@@ -156,16 +171,16 @@ const SegmentBlock = ({
     };
   }
 
+  // Determine if overlay should be shown based on width
+  const showOverlay = segmentWidthPx === 0 || segmentWidthPx >= 60;
+
   const handleMouseDown = useCallback(
     (e) => {
-      // Only handle left mouse button
       if (e.button !== 0) return;
 
-      // Prevent default to avoid text selection
       e.preventDefault();
       e.stopPropagation();
 
-      // Select this segment
       if (onSelect) {
         onSelect(segmentIndex);
       }
@@ -174,14 +189,12 @@ const SegmentBlock = ({
       originalPosition.current = startOnTimelineMs;
       dragPlayheadMsRef.current = null;
 
-      // Add global listeners
       document.addEventListener("mousemove", handleMouseMove);
       document.addEventListener("mouseup", handleMouseUp);
     },
     [handleMouseMove, handleMouseUp, onSelect, segmentIndex, startOnTimelineMs]
   );
 
-  // Cleanup listeners on unmount
   useEffect(() => {
     return () => {
       document.removeEventListener("mousemove", handleMouseMove);
@@ -214,6 +227,24 @@ const SegmentBlock = ({
       }
     >
       <div className="tracklane-segment">
+        {/* Segment name overlay - only show if segment is wide enough */}
+        {showOverlay && (
+          <div
+            className="segment-name-overlay"
+            style={{
+              // Shrink overlay content for narrower segments
+              ...(segmentWidthPx > 0 && segmentWidthPx < 100
+                ? {
+                    padding: "3px 6px",
+                    fontSize: "10px",
+                  }
+                : {}),
+            }}
+          >
+            <div className="segment-name">{segmentName}</div>
+          </div>
+        )}
+
         <div className="segment-waveform">
           {audioBuffer ? (
             <Waveform

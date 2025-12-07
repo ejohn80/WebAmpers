@@ -22,6 +22,7 @@ import {insertSegmentWithSpacing} from "../utils/segmentPlacement";
 
 const MIN_WIDTH = 0;
 const MAX_WIDTH = 300;
+const TRACK_END_PADDING_MS = 2000;
 
 // Buffer cache to share audio buffers tracks from the same asset
 const assetBufferCache = new Map(); // assetId -> Tone.ToneAudioBuffer
@@ -47,7 +48,7 @@ function AudioPage() {
   } = useContext(AppContext);
   const [sidebarWidth, setSidebarWidth] = useState(MAX_WIDTH);
   const [tracks, setTracks] = useState(audioManager.tracks);
-  const [audioData, setAudioData] = useState(null);
+  const [_audioData, setAudioData] = useState(null);
   const [recording, setRecording] = useState({stream: null, startTs: 0});
   const [assetsRefreshTrigger, setAssetsRefreshTrigger] = useState(0);
   const [hasClipboardFlag, setHasClipboardFlag] = useState(() =>
@@ -130,7 +131,7 @@ function AudioPage() {
       return;
     }
 
-    const {audioBlob, duration, instrument, name} = recordingData;
+    const {audioBlob, _duration, instrument, name} = recordingData;
 
     if (!audioBlob || audioBlob.size === 0) {
       console.warn("No audio recorded");
@@ -444,7 +445,8 @@ function AudioPage() {
       });
     });
 
-    vs.lengthMs = maxEndMs || 60000;
+    const paddedLengthMs = maxEndMs > 0 ? maxEndMs + TRACK_END_PADDING_MS : 0;
+    vs.lengthMs = paddedLengthMs || 60000;
     return vs;
   };
 
@@ -516,10 +518,13 @@ function AudioPage() {
                 continue;
               }
 
+              // Preserve name and fileName from saved segment
               hydratedSegments.push({
                 ...segment,
                 assetId: segAssetId,
                 buffer: segmentToneBuffer,
+                name: segment.name || segment.fileName || null,
+                fileName: segment.fileName || segment.name || null,
               });
             }
           }
@@ -701,12 +706,14 @@ function AudioPage() {
   const handleAssetDrop = async (
     assetId,
     targetTrackId = null,
-    timelinePositionMs = 0
+    timelinePositionMs = 0,
+    assetName = null
   ) => {
     try {
       console.log(`Dropping asset ${assetId}`, {
         targetTrackId,
         timelinePositionMs,
+        assetName, // Log it
       });
 
       // Get the asset from the database first
@@ -716,6 +723,13 @@ function AudioPage() {
         alert("Asset not found in database");
         return;
       }
+
+      // Use the name from the parameter if provided, otherwise from the asset
+      // This ensures we always have a name even if the parameter wasn't passed
+      const segmentName = assetName || asset.name;
+      console.log(
+        `[handleAssetDrop] Using segment name: "${segmentName}" (from ${assetName ? "parameter" : "database"})`
+      );
 
       // Check if we have a cached buffer for this asset
       let toneBuffer = assetBufferCache.get(assetId);
@@ -765,10 +779,12 @@ function AudioPage() {
           `Appending segment to track ${targetTrackId} at ${timelinePositionMs}ms`
         );
 
-        // Create new segment
+        // Create new segment WITH name and fileName
         const newSegment = {
           id: segmentId,
           assetId,
+          name: segmentName,
+          fileName: segmentName,
           buffer: toneBuffer,
           offset: 0,
           duration: durationSeconds,
@@ -807,14 +823,16 @@ function AudioPage() {
 
       // Save to database first with current session to get the DB-assigned ID
       const trackData = {
-        name: asset.name,
+        name: segmentName, // Use the segment name for the track too
         color: `hsl(${Math.random() * 360}, 70%, 50%)`,
         assetId: assetId,
-        enabledEffects: {}, // Initialize empty enabledEffects
+        enabledEffects: {},
         segments: [
           {
             id: segmentId,
             assetId,
+            name: segmentName,
+            fileName: segmentName,
             offset: 0,
             duration: durationSeconds,
             durationMs,
@@ -830,6 +848,8 @@ function AudioPage() {
 
       console.log("Track data for DB:", trackData);
 
+      console.log("Segment data being saved to DB:", trackData.segments);
+
       // Save to database with current session
       const dbId = await dbManager.addTrack(trackData, activeSession);
       console.log("Track saved to DB with ID:", dbId);
@@ -837,14 +857,16 @@ function AudioPage() {
       // Now create the track for audioManager
       const newTrack = {
         id: dbId,
-        name: asset.name,
+        name: segmentName, // Use the segment name for the track too
         color: trackData.color,
         buffer: toneBuffer,
-        enabledEffects: {}, // Initialize empty enabledEffects
+        enabledEffects: {},
         segments: [
           {
             id: segmentId,
             assetId,
+            name: segmentName,
+            fileName: segmentName,
             buffer: toneBuffer,
             offset: 0,
             duration: durationSeconds,
@@ -1398,6 +1420,19 @@ function AudioPage() {
       return;
     }
 
+    console.log(
+      "Track segments being copied:",
+      track.segments.map((s) => ({
+        id: s.id,
+        name: s.name,
+        fileName: s.fileName,
+        assetId: s.assetId,
+        startInFileMs: s.startInFileMs,
+        durationMs: s.durationMs,
+        startOnTimelineMs: s.startOnTimelineMs,
+      }))
+    );
+
     // Get the track from DB to ensure we have the assetId
     try {
       const allTracks = await dbManager.getAllTracks(activeSession);
@@ -1421,6 +1456,7 @@ function AudioPage() {
   };
 
   // Paste track from clipboard
+  // In AudioPage.jsx, replace the handlePasteTrack function with this fixed version:
   const handlePasteTrack = async () => {
     const clipboardData = clipboardManager.getClipboard();
 
@@ -1489,33 +1525,65 @@ function AudioPage() {
         ? trackData.segments
         : [];
 
-      // Prefer explicit region (single cut)
+      // Prefer explicit region (single cut) - this is ONLY for single-segment cut operations
       const hasTopLevelRegion =
         typeof trackData.clipStartInFileMs === "number" &&
         typeof trackData.clipDurationMs === "number" &&
         trackData.clipDurationMs > 0;
 
       const baseSegments = (() => {
-        if (hasTopLevelRegion) {
+        // Only use top-level region if it's a single-segment cut AND we have exactly 1 segment
+        if (hasTopLevelRegion && clipboardSegments.length <= 1) {
           return [
             {
               id:
                 clipboardSegments[0]?.id ??
                 `seg_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-              startOnTimelineMs: 0,
+              startOnTimelineMs: clipboardSegments[0]?.startOnTimelineMs ?? 0,
               startInFileMs: Math.max(0, trackData.clipStartInFileMs),
               durationMs: Math.max(
                 1,
                 Math.min(trackData.clipDurationMs, fullDurationMs)
               ),
+              // Preserve name and fileName from clipboard
+              name:
+                clipboardSegments[0]?.name ||
+                clipboardSegments[0]?.fileName ||
+                trackData.name ||
+                asset.name || // eslint-disable-line no-undef
+                null,
+              fileName:
+                clipboardSegments[0]?.fileName ||
+                clipboardSegments[0]?.name ||
+                trackData.name ||
+                asset.name || // eslint-disable-line no-undef
+                null,
               assetId: trackData.assetId,
             },
           ];
         }
 
+        // *If we have multiple segments, preserve ALL of them
         if (clipboardSegments.length > 0) {
           return clipboardSegments.map((seg) => ({
             ...seg,
+            // Ensure all properties are preserved
+            id:
+              seg.id ??
+              `seg_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+            startOnTimelineMs:
+              seg.startOnTimelineMs ??
+              (seg.startOnTimeline
+                ? Math.round(seg.startOnTimeline * 1000)
+                : 0),
+            startInFileMs:
+              seg.startInFileMs ??
+              (seg.offset ? Math.round(seg.offset * 1000) : 0),
+            durationMs:
+              seg.durationMs ??
+              (seg.duration ? Math.round(seg.duration * 1000) : 0),
+            name: seg.name || seg.fileName || null,
+            fileName: seg.fileName || seg.name || null,
             assetId: seg.assetId || trackData.assetId,
           }));
         }
@@ -1527,6 +1595,9 @@ function AudioPage() {
             startOnTimelineMs: 0,
             startInFileMs: 0,
             durationMs: Math.round(fullDurationMs),
+            // Use asset name as fallback
+            name: trackData.name || asset.name || null, // eslint-disable-line no-undef
+            fileName: trackData.name || asset.name || null, // eslint-disable-line no-undef
             assetId: trackData.assetId,
           },
         ];
@@ -1558,6 +1629,16 @@ function AudioPage() {
           )
         );
 
+        // Preserve each segment's individual name and add " Copy" to it
+        const originalSegmentName =
+          seg.name || seg.fileName || trackData.name || asset.name || null; // eslint-disable-line no-undef
+        const segmentCopyName = originalSegmentName
+          ? generateCopyName(originalSegmentName)
+          : null;
+
+        // Use the segment's own assetId, not the track's assetId
+        const _segmentAssetId = seg.assetId ?? trackData.assetId;
+
         return {
           id:
             seg.id ??
@@ -1570,7 +1651,10 @@ function AudioPage() {
           offset: startInFileMs / 1000,
           durationMs,
           duration: durationMs / 1000,
-          assetId: seg.assetId || trackData.assetId,
+          assetId: seg.assetId || trackData.assetId, // Use segment's own assetId
+          // Use the individual segment's copy name
+          name: segmentCopyName,
+          fileName: segmentCopyName,
         };
       });
 
@@ -1596,6 +1680,9 @@ function AudioPage() {
           durationMs: seg.durationMs,
           startOnTimelineMs: seg.startOnTimelineMs,
           startInFileMs: seg.startInFileMs,
+          // Include name and fileName in DB save
+          name: seg.name,
+          fileName: seg.fileName,
           assetId: seg.assetId,
         })),
       };
@@ -1728,12 +1815,12 @@ function AudioPage() {
   // Build version object for playback engine
   const version = buildVersionFromTracks(tracks);
 
-  const audioBuffer =
+  const _audioBuffer =
     tracks.length > 0
       ? tracks[0].buffer || tracks[0].segments?.[0]?.buffer
       : null;
 
-  const handleEngineReady = (engine) => {
+  const _handleEngineReady = (engine) => {
     engineRef.current = engine;
     setEngineRef(engineRef);
 
