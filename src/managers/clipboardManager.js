@@ -72,7 +72,14 @@ class ClipboardManager {
           durationMs: seg.durationMs,
           startOnTimelineMs: seg.startOnTimelineMs,
           startInFileMs: seg.startInFileMs,
+          // Include name, fileName, AND assetId properties
+          name: seg.name,
+          fileName: seg.fileName,
+          assetId: seg.assetId, // Each segment needs its own assetId
         })),
+        // Preserve cut region metadata if present (for single-segment cuts)
+        clipStartInFileMs: track.clipStartInFileMs,
+        clipDurationMs: track.clipDurationMs,
       },
     };
 
