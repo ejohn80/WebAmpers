@@ -18,8 +18,8 @@ import "./MainContent.css";
 
 const TRACK_CONTROLS_WIDTH = 180;
 const TRACK_CONTROLS_GAP = 12;
-const TRACK_ROW_PADDING = 8; // Keep in sync with --track-row-padding in CSS
-const TRACK_HEIGHT_PX = 96; // Base track height (fixed for horizontal-only zoom)
+const TRACK_ROW_PADDING = 8;
+const TRACK_HEIGHT_PX = 96;
 
 function MainContent({
   tracks = [],
@@ -41,15 +41,12 @@ function MainContent({
     useContext(AppContext);
   const initialProgress = useMemo(() => progressStore.getState(), []);
 
-  // Default visible window length (in ms) before horizontal scrolling is needed
-  // Timeline scale is driven by pixels-per-second instead of a fixed window length
-  const BASE_PX_PER_SEC = 100; // fallback density: 100px per second when viewport not measured
-  const DEFAULT_VISIBLE_MS = 60000; // 1 minute of timeline should fit in the viewport at 100% zoom
-  const MIN_ZOOM = 0.25; // 25% (zoom out)
-  const MAX_ZOOM = 5; // 500% (zoom in)
+  const BASE_PX_PER_SEC = 100;
+  const DEFAULT_VISIBLE_MS = 60000;
+  const MIN_ZOOM = 0.25;
+  const MAX_ZOOM = 5;
   const [zoom, setZoom] = useState(1);
 
-  // Follow-mode toggle to auto-scroll the timeline during playback
   const [followPlayhead, setFollowPlayhead] = useState(false);
   const [timelineContentWidth, setTimelineContentWidth] = useState(0);
   const [scrollAreaWidth, setScrollAreaWidth] = useState(0);
@@ -60,12 +57,10 @@ function MainContent({
   const [cutBox, setCutBox] = useState(null);
   const suppressBackgroundClickRef = useRef(false);
 
-  // Keep playhead ref in sync with state
   useEffect(() => {
     playheadMsRef.current = playheadMs;
   }, [playheadMs]);
 
-  // Subscribe to progress store for playhead updates
   useEffect(() => {
     const unsubscribe = progressStore.subscribe(({ms}) => {
       setPlayheadMs(ms || 0);
@@ -94,13 +89,11 @@ function MainContent({
             ? segmentIndex
             : null,
       });
-      // selecting a segment should clear any existing cut selection
       setCutBox(null);
     },
     []
   );
 
-  // Deselect when clicking background
   const handleBackgroundClick = () => {
     if (typeof setSelectedTrackId === "function") {
       setSelectedTrackId(null);
@@ -109,7 +102,6 @@ function MainContent({
     setCutBox(null);
   };
 
-  // Segment validation logic
   useEffect(() => {
     if (!selectedSegment) return;
 
@@ -135,7 +127,6 @@ function MainContent({
   const timelineStyle = useMemo(
     () => ({
       "--timeline-content-width": `${Math.max(1, timelineContentWidth)}px`,
-      // Track height is now fixed, adhering to horizontal-only zoom.
       "--track-height": `${TRACK_HEIGHT_PX}px`,
     }),
     [timelineContentWidth]
@@ -162,43 +153,31 @@ function MainContent({
       if (typeof setSelectedTrackId === "function") {
         setSelectedTrackId(trackId);
       }
-      // whenever the user selects any track, clear the yellow box
       setCutBox(null);
     },
     [setSelectedTrackId]
   );
 
-  // Convert a mouse X coordinate → timeline milliseconds.
   const msFromClientX = useCallback(
     (clientX) => {
       const scrollArea = scrollAreaRef.current;
       if (!scrollArea || !totalLengthMs) return 0;
 
       const rect = scrollArea.getBoundingClientRect();
-
-      // Clamp mouse X inside the scroll area
       const clampedX = Math.max(rect.left, Math.min(rect.right, clientX));
       const xInViewport = clampedX - rect.left;
-
       const scrollLeft = scrollArea.scrollLeft || 0;
       const xOnRow = scrollLeft + xInViewport;
-
-      // Move into “timeline only” space (skip track controls)
       let xOnTimeline = xOnRow - timelineMetrics.leftOffsetPx;
-
-      // Clamp to timeline
       xOnTimeline = Math.max(0, Math.min(timelineMetrics.widthPx, xOnTimeline));
-
       const ratio =
         timelineMetrics.widthPx > 0 ? xOnTimeline / timelineMetrics.widthPx : 0;
-
       const ms = ratio * totalLengthMs;
       return Math.round(Math.max(0, Math.min(totalLengthMs, ms)));
     },
     [totalLengthMs, timelineMetrics]
   );
 
-  // Helper: convert ms → x-position in pixels
   const msToTimelineX = useCallback(
     (ms) => {
       if (!totalLengthMs || !timelineMetrics.widthPx) {
@@ -228,32 +207,22 @@ function MainContent({
       const ratio = nextZoom / prevZoom;
       if (!Number.isFinite(ratio) || ratio === 1) return;
 
-      // We calculate the new timeline width without relying on the state update
-      // which hasn't happened yet.
       const newWidth = currentWidth * ratio;
-
-      // Anchor the scroll calculation around the current playhead position
       const anchorRatio = Math.max(
         0,
         Math.min(1, playheadMsRef.current / lengthMs)
       );
-      // Calculate how much the content *before* the playhead has expanded/shrunk
       const deltaPx = anchorRatio * (newWidth - currentWidth);
-
-      // Recalculate full row width to determine max scroll
       const newRowWidth =
         newWidth + timelineMetrics.leftOffsetPx + TRACK_ROW_PADDING;
       const viewportWidth = node.clientWidth || 0;
       const maxScroll = Math.max(0, newRowWidth - viewportWidth);
-
-      // Calculate desired scroll based on previous scroll + delta
       const desiredScroll = Math.min(
         Math.max(0, node.scrollLeft + deltaPx),
         maxScroll
       );
 
       if (Number.isFinite(desiredScroll)) {
-        // Direct DOM update (High Performance)
         node.scrollLeft = desiredScroll;
       }
     },
@@ -268,7 +237,6 @@ function MainContent({
         if (nextZoom === prevZoom) {
           return prevZoom;
         }
-        // This adjusts the scroll *before* React renders the new content width
         adjustScrollForZoom(prevZoom, nextZoom);
         return nextZoom;
       });
@@ -276,10 +244,8 @@ function MainContent({
     [adjustScrollForZoom, clampZoom]
   );
 
-  // === OPTIMIZED SCROLLING LOGIC ===
   useEffect(() => {
     const unsubscribe = progressStore.subscribe(({ms}) => {
-      // If follow mode is off, do nothing
       if (!followPlayhead) return;
 
       const node = scrollAreaRef.current;
@@ -289,8 +255,6 @@ function MainContent({
       if (lengthMs === 0 || timelineMetrics.widthPx === 0) return;
 
       const pxPerMs = timelineMetrics.widthPx / lengthMs;
-
-      // Calculate where the playhead is in pixels
       const playheadX =
         timelineMetrics.leftOffsetPx +
         Math.max(0, Math.min(ms, lengthMs)) * pxPerMs;
@@ -298,13 +262,11 @@ function MainContent({
       const viewportWidth = node.clientWidth || 0;
       if (viewportWidth === 0) return;
 
-      // Center the playhead
       const desiredScroll = playheadX - viewportWidth / 2;
       const maxScroll = Math.max(0, timelineMetrics.rowWidthPx - viewportWidth);
       const nextScroll = Math.min(Math.max(0, desiredScroll), maxScroll);
 
       if (Number.isFinite(nextScroll)) {
-        // Direct DOM update (High Performance)
         node.scrollLeft = nextScroll;
       }
     });
@@ -312,7 +274,6 @@ function MainContent({
     return unsubscribe;
   }, [followPlayhead, totalLengthMs, timelineMetrics]);
 
-  // Timeline width calculation
   useEffect(() => {
     const lengthMs = Math.max(1, totalLengthMs || 0);
     const visibleWindowMs = Math.max(1, Math.min(lengthMs, DEFAULT_VISIBLE_MS));
@@ -330,7 +291,6 @@ function MainContent({
     setTimelineContentWidth(desiredWidth);
   }, [totalLengthMs, zoom, scrollAreaWidth]);
 
-  // Scroll Area Width Observer
   useEffect(() => {
     const node = scrollAreaRef.current;
     if (!node) return;
@@ -362,7 +322,6 @@ function MainContent({
   const resetZoom = () => setZoomWithCompensation(() => 1);
   const toggleFollow = () => setFollowPlayhead((v) => !v);
 
-  // Handle asset drop
   const handleDrop = (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -373,7 +332,6 @@ function MainContent({
 
       const dropData = JSON.parse(data);
       if (dropData.type === "asset" && onAssetDrop) {
-        // Get drop position to calculate timeline position
         const rect = e.currentTarget.getBoundingClientRect();
         const dropX = e.clientX - rect.left - timelineMetrics.leftOffsetPx;
         const pxPerMs =
@@ -381,10 +339,9 @@ function MainContent({
         const timelinePositionMs =
           pxPerMs > 0 ? Math.max(0, dropX / pxPerMs) : 0;
 
-        // Determine which track (if any) was targeted
         const dropY = e.clientY - rect.top;
-        const trackHeight = TRACK_HEIGHT_PX; // Fixed height
-        const rulerHeight = 40; // Approximate ruler height
+        const trackHeight = TRACK_HEIGHT_PX;
+        const rulerHeight = 40;
         const trackIndex = Math.floor((dropY - rulerHeight) / trackHeight);
         const targetTrackId =
           trackIndex >= 0 && trackIndex < tracks.length
@@ -398,13 +355,10 @@ function MainContent({
     }
   };
 
-  // Handle Ctrl/Cmd + Click + Drag to create a cut range on the selected segment
   const handleTracksMouseDown = (e) => {
     const modifierPressed = e.ctrlKey || e.metaKey;
-    // Only modifier + left button
     if (!(modifierPressed && e.button === 0)) return;
 
-    // Eat this event so TrackLane's drag handler never sees it
     e.preventDefault();
     e.stopPropagation();
     if (
@@ -417,7 +371,6 @@ function MainContent({
     const container = e.currentTarget;
     const containerRect = container.getBoundingClientRect();
 
-    // Find which track-wrapper the mouse is over
     const wrappers = Array.from(
       container.getElementsByClassName("track-wrapper")
     );
@@ -440,7 +393,6 @@ function MainContent({
     if (!track || !Array.isArray(track.segments) || track.segments.length === 0)
       return;
 
-    // Prefer measuring the waveform area (timeline) instead of the full track wrapper
     let highlightTopPx = trackTopPx;
     let highlightHeightPx = trackHeightPx;
     const timelineEl = wrappers[trackIndex].querySelector(
@@ -452,10 +404,8 @@ function MainContent({
       highlightHeightPx = timelineRect.height;
     }
 
-    // Time where mouse went down
     const rawStartMs = msFromClientX(e.clientX);
 
-    // Find segment on this track that contains that time
     let segmentIndex = -1;
     let seg = null;
     for (let i = 0; i < track.segments.length; i++) {
@@ -473,11 +423,9 @@ function MainContent({
     }
 
     if (segmentIndex === -1 || !seg) {
-      // Ctrl-drag on empty part of track: do nothing
       return;
     }
 
-    // Prevent the "click" after drag from clearing our selection once
     suppressBackgroundClickRef.current = true;
 
     const segStartMs =
@@ -487,7 +435,6 @@ function MainContent({
 
     const startMs = Math.max(segStartMs, Math.min(segEndMs, rawStartMs));
 
-    // Update selection so the rest of the UI knows which segment is active
     if (typeof setSelectedTrackId === "function") {
       setSelectedTrackId(track.id);
     }
@@ -497,7 +444,6 @@ function MainContent({
       segmentIndex,
     });
 
-    // Start the cut box, store the actual row top/height in pixels
     setCutBox({
       trackId: track.id,
       segmentIndex,
@@ -543,12 +489,11 @@ function MainContent({
       suppressBackgroundClickRef.current = false;
       e.preventDefault();
       e.stopPropagation();
-      return; // don't clear selection after an Ctrl-drag
+      return;
     }
     handleBackgroundClick();
   };
 
-  // “Cut” button that actually calls your handler
   const handleCutBoxApply = useCallback(() => {
     if (!cutBox || !onCutSegmentRange) return;
 
@@ -570,13 +515,19 @@ function MainContent({
     setCutBox(null);
   }, [clearSegmentSelection]);
 
+  // NEW: Handle timeline click to seek playhead
+  const handleTimelineSeek = useCallback((ms) => {
+    if (typeof progressStore.requestSeek === "function") {
+      progressStore.requestSeek(ms);
+    }
+  }, []);
+
   return (
     <DraggableDiv
       className={`maincontent ${isEffectsMenuOpen ? styles.blurred : ""}`}
       style={timelineStyle}
       disableSectionPadding
     >
-      {/* Effects Menu */}
       {isEffectsMenuOpen && (
         <div className={styles.effectsMenuContainer}>
           <EffectsMenu />
@@ -596,6 +547,7 @@ function MainContent({
               totalLengthMs={totalLengthMs}
               timelineWidth={timelineMetrics.widthPx}
               timelineLeftOffsetPx={timelineMetrics.leftOffsetPx}
+              onSeek={handleTimelineSeek}
             />
             <div
               className="timeline-scroll-content"
@@ -623,7 +575,6 @@ function MainContent({
                   position: "relative",
                 }}
               >
-                {/* Full-height red playhead that runs through all tracks */}
                 <div
                   className="global-playhead-rail-full"
                   style={{
@@ -637,7 +588,6 @@ function MainContent({
                   />
                 </div>
 
-                {/* CUT BOX OVERLAY */}
                 {cutBox &&
                   (() => {
                     const startX = msToTimelineX(cutBox.startMs);
@@ -645,7 +595,7 @@ function MainContent({
                     const left = Math.min(startX, endX);
                     const width = Math.max(2, Math.abs(endX - startX));
                     const top = cutBox.topPx ?? 0;
-                    const height = cutBox.heightPx ?? TRACK_HEIGHT_PX; // Fixed height
+                    const height = cutBox.heightPx ?? TRACK_HEIGHT_PX;
 
                     return (
                       <div
@@ -659,7 +609,7 @@ function MainContent({
                           width: `${width}px`,
                           height: `${height}px`,
                           border: "1px solid #e6c200",
-                          backgroundColor: "rgba(255, 255, 153, 0.6)", // light yellow
+                          backgroundColor: "rgba(255, 255, 153, 0.6)",
                           boxSizing: "border-box",
                         }}
                       >
@@ -718,6 +668,7 @@ function MainContent({
                         onSegmentSelected={handleSegmentSelected}
                         onClearSegmentSelection={handleClearSegmentSelection}
                         onSegmentDelete={onSegmentDelete}
+                        onTimelineSeek={handleTimelineSeek}
                       />
                     </div>
                   ))}

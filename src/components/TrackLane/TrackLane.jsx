@@ -14,10 +14,6 @@ const createContextMenuState = (overrides = {}) => ({
   ...overrides,
 });
 
-/**
- * TrackLane
- * Renders a single track container with proportional waveform sizing
- */
 const TrackLane = memo(function TrackLane({
   track,
   showTitle = true,
@@ -42,10 +38,13 @@ const TrackLane = memo(function TrackLane({
   onSegmentSelected = () => {},
   onClearSegmentSelection = () => {},
   onSegmentDelete = () => {},
+  onTimelineSeek = () => {},
 }) {
   if (!track) return null;
 
   const segments = Array.isArray(track.segments) ? track.segments : [];
+  const lastClickTimeRef = useRef(0);
+  const DOUBLE_CLICK_THRESHOLD = 300; // ms
 
   const getInitialState = () => {
     try {
@@ -126,7 +125,6 @@ const TrackLane = memo(function TrackLane({
     event.preventDefault();
     event.stopPropagation();
 
-    // Select this track when opening the context menu
     onSelect?.(track.id);
 
     const menuWidth = 200;
@@ -177,7 +175,8 @@ const TrackLane = memo(function TrackLane({
     }
   };
 
-  const toggleMute = () => {
+  const toggleMute = (e) => {
+    e.stopPropagation(); // Prevent track selection
     const next = !muted;
     setMuted(next);
     try {
@@ -187,7 +186,8 @@ const TrackLane = memo(function TrackLane({
     }
   };
 
-  const toggleSolo = () => {
+  const toggleSolo = (e) => {
+    e.stopPropagation(); // Prevent track selection
     const next = !soloed;
     setSoloed(next);
     try {
@@ -197,7 +197,8 @@ const TrackLane = memo(function TrackLane({
     }
   };
 
-  const handleDelete = () => {
+  const handleDelete = (e) => {
+    e.stopPropagation(); // Prevent track selection
     try {
       onDelete && onDelete(track.id);
     } catch (e) {
@@ -241,7 +242,18 @@ const TrackLane = memo(function TrackLane({
       ? {minWidth: `${rowWidthPx}px`, width: `${rowWidthPx}px`}
       : undefined;
 
-  const handleTrackClick = (e) => {
+  // NEW: Handle single click on header area to select track
+  const handleHeaderClick = (e) => {
+    e.stopPropagation();
+    if (typeof onClearSegmentSelection === "function") {
+      onClearSegmentSelection();
+    }
+    setSelectedSegmentIndex(null);
+    onSelect(track.id);
+  };
+
+  // NEW: Handle double-click anywhere on track to select track
+  const handleTrackDoubleClick = (e) => {
     e.stopPropagation();
     if (typeof onClearSegmentSelection === "function") {
       onClearSegmentSelection();
@@ -496,6 +508,34 @@ const TrackLane = memo(function TrackLane({
     clearDropPreview();
   };
 
+  // NEW: Handle single click on timeline (empty space)
+  const handleTimelineClick = (e) => {
+    // Don't handle if clicking on a segment or drop preview
+    if (
+      e.target.closest(".tracklane-segment-positioned") ||
+      e.target.closest(".tracklane-drop-preview")
+    ) {
+      return;
+    }
+
+    // Check for double-click
+    const now = Date.now();
+    const timeSinceLastClick = now - lastClickTimeRef.current;
+    lastClickTimeRef.current = now;
+
+    if (timeSinceLastClick < DOUBLE_CLICK_THRESHOLD) {
+      // Double-click detected
+      handleTrackDoubleClick(e);
+      return;
+    }
+
+    // Single click - seek playhead
+    const timelineMs = getTimelinePositionFromEvent(e);
+    if (typeof onTimelineSeek === "function") {
+      onTimelineSeek(timelineMs);
+    }
+  };
+
   const contextMenuPortal =
     contextMenu.open && typeof document !== "undefined"
       ? createPortal(
@@ -579,10 +619,10 @@ const TrackLane = memo(function TrackLane({
       <div
         className="tracklane-root"
         style={{...rowWidthStyle, ...selectionStyle}}
-        onClick={handleTrackClick}
+        onDoubleClick={handleTrackDoubleClick}
         onContextMenu={handleContextMenu}
       >
-        <div className="tracklane-side">
+        <div className="tracklane-side" onClick={handleHeaderClick}>
           {showTitle && (
             <div className="tracklane-header">
               <div className="tracklane-title">
@@ -631,6 +671,7 @@ const TrackLane = memo(function TrackLane({
           <div
             className={`tracklane-timeline ${dropPreview ? "tracklane-timeline--drop" : ""}`}
             style={tracklaneTimelineStyle}
+            onClick={handleTimelineClick}
             onDragEnter={handleTimelineDragEnter}
             onDragLeave={handleTimelineDragLeave}
             onDragOver={handleTimelineDragOver}

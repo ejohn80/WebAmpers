@@ -3,11 +3,13 @@ import React, {useMemo} from "react";
 /**
  * TimelineRuler
  * Draws a time ruler with tick marks aligned to the start of the waveform area.
+ * Now supports clicking to seek playhead position.
  */
 export default function TimelineRuler({
   totalLengthMs = 0,
   timelineWidth = 0,
   timelineLeftOffsetPx = 0,
+  onSeek = null,
 }) {
   const {
     majorTicks,
@@ -113,15 +115,31 @@ export default function TimelineRuler({
     return `${m}:${ss}`;
   };
 
+  const handleRulerClick = (e) => {
+    if (!onSeek || !totalLengthMs || !timelineWidth) return;
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const ratio = Math.max(0, Math.min(1, clickX / timelineWidth));
+    const ms = Math.round(ratio * totalLengthMs);
+    
+    onSeek(ms);
+  };
+
   if (!totalLengthMs || timelineWidth <= 0) return null;
 
   const rulerStyle = {
     marginLeft: `${timelineLeftOffsetPx}px`,
     width: `${Math.max(0, Math.round(timelineWidth))}px`,
+    cursor: onSeek ? 'pointer' : 'default',
   };
 
   return (
-    <div className="timeline-ruler-bar" style={rulerStyle}>
+    <div 
+      className="timeline-ruler-bar" 
+      style={rulerStyle}
+      onClick={handleRulerClick}
+    >
       {preHighlightWidthPx > 0 && (
         <div
           className="timeline-pre-highlight"

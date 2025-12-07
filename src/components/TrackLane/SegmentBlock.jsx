@@ -26,6 +26,7 @@ const SegmentBlock = ({
   const segmentRef = useRef(null);
   const pxPerMsRef = useRef(pxPerMs || 0);
   const dragPlayheadMsRef = useRef(null);
+  const hasDraggedRef = useRef(false); // Track if user actually dragged
 
   useEffect(() => {
     pxPerMsRef.current = pxPerMs || 0;
@@ -47,6 +48,7 @@ const SegmentBlock = ({
       console.warn("[SegmentBlock] Failed to enter scrub mode:", err);
     }
     setIsDragging(true);
+    hasDraggedRef.current = true;
   };
 
   const handleMouseMove = (e) => {
@@ -70,9 +72,6 @@ const SegmentBlock = ({
       `[SegmentBlock] Finalizing drag, saved playhead was ${savedMs}ms`
     );
 
-    // Don't call requestSeek here - the handleSegmentMove will restore the playhead
-    // after the engine reload completes. Just unlock and end the scrub session.
-
     progressStore.setScrubLocked(false);
     progressStore.endScrub();
     dragPlayheadMsRef.current = null;
@@ -84,10 +83,19 @@ const SegmentBlock = ({
     document.removeEventListener("mousemove", handleMouseMove);
     document.removeEventListener("mouseup", handleMouseUp);
 
+    // Check if this was a click (no drag) or an actual drag
+    const wasClick = !hasDraggedRef.current;
+
     if (dragPlayheadMsRef.current === null) {
       // Click without dragging; no position change or scrub session
       setIsDragging(false);
       setDragOffset(0);
+      hasDraggedRef.current = false;
+      
+      // If it was just a click, select the segment
+      if (wasClick && onSelect) {
+        onSelect(segmentIndex);
+      }
       return;
     }
 
@@ -111,6 +119,7 @@ const SegmentBlock = ({
 
     setIsDragging(false);
     setDragOffset(0);
+    hasDraggedRef.current = false;
 
     const finish = () => {
       finalizeDragPlaybackState();
@@ -152,14 +161,10 @@ const SegmentBlock = ({
     e.preventDefault();
     e.stopPropagation();
 
-    // Select this segment
-    if (onSelect) {
-      onSelect(segmentIndex);
-    }
-
     dragStartX.current = e.clientX;
     originalPosition.current = startOnTimelineMs;
     dragPlayheadMsRef.current = null;
+    hasDraggedRef.current = false;
 
     // Add global listeners
     document.addEventListener("mousemove", handleMouseMove);

@@ -3,7 +3,7 @@ import {progressStore} from "../../playback/progressStore";
 
 /**
  * GlobalPlayhead
- * Renders a single vertical red bar spanning the tracks area.
+ * Renders a vertical red bar with an upside-down triangle at the top.
  * Optimized: Uses direct DOM manipulation to avoid React render cycles during playback.
  */
 export default function GlobalPlayhead({totalLengthMs = 0, timelineWidth = 0}) {
@@ -39,6 +39,9 @@ export default function GlobalPlayhead({totalLengthMs = 0, timelineWidth = 0}) {
       ref={playheadRef}
       className="global-playhead"
       style={{left: 0, willChange: "transform"}}
-    />
+    >
+      <div className="playhead-triangle" />
+      <div className="playhead-line" />
+    </div>
   );
 }
