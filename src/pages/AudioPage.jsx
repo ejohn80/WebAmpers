@@ -845,6 +845,8 @@ function AudioPage() {
 
       console.log("Track data for DB:", trackData);
 
+      console.log("Segment data being saved to DB:", trackData.segments);
+
       // Save to database with current session
       const dbId = await dbManager.addTrack(trackData, activeSession);
       console.log("Track saved to DB with ID:", dbId);

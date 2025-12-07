@@ -154,6 +154,14 @@ class AudioManager {
               : undefined;
 
         try {
+          console.log(`[AudioManager] Reconstructing segment:`, {
+            id: s.id,
+            name: s.name,
+            fileName: s.fileName,
+            hasName: !!s.name,
+            hasFileName: !!s.fileName,
+          });
+
           const seg = new AudioSegment({
             buffer: segToneBuf,
             offset: offsetSec,
