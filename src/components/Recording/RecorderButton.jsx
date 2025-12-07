@@ -23,7 +23,9 @@ export default function RecorderButton({onComplete, onStart, onStop}) {
       try {
         mediaRef.current?.recorder?.stop?.();
         mediaRef.current?.stream?.getTracks?.().forEach((t) => t.stop());
-      } catch {}
+      } catch {
+        // Intentionally empty
+      }
       if (timerIdRef.current) {
         clearInterval(timerIdRef.current);
         timerIdRef.current = null;
@@ -75,7 +77,9 @@ export default function RecorderButton({onComplete, onStart, onStop}) {
         } finally {
           try {
             stream.getTracks().forEach((t) => t.stop());
-          } catch {}
+          } catch {
+            // Intentionally empty
+          }
           mediaRef.current = null;
           setRecording(false);
           // no visualizer resources to stop
@@ -93,7 +97,9 @@ export default function RecorderButton({onComplete, onStart, onStop}) {
       // notify parent so main waveform can show live preview
       try {
         onStart && onStart({stream, startTs: startTimeRef.current});
-      } catch {}
+      } catch {
+        // Intentionally empty
+      }
     } catch (e) {
       console.error("Recording start failed", e);
       setSupport(false);
@@ -104,7 +110,9 @@ export default function RecorderButton({onComplete, onStart, onStop}) {
     if (!recording) return;
     try {
       mediaRef.current?.recorder?.stop?.();
-    } catch {}
+    } catch {
+      // Intentionally empty
+    }
     // stop elapsed timer; onstop will finalize state
     if (timerIdRef.current) {
       clearInterval(timerIdRef.current);
@@ -113,7 +121,9 @@ export default function RecorderButton({onComplete, onStart, onStop}) {
     // notify parent live preview to stop immediately
     try {
       onStop && onStop();
-    } catch {}
+    } catch {
+      // Intentionally empty
+    }
   };
 
   if (!support) {

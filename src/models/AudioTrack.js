@@ -117,7 +117,9 @@ export class AudioTrack {
         } else {
           this.channel.volume = this._volumeDb;
         }
-      } catch (e) {}
+      } catch {
+        // Intentionally empty
+      }
     }
   }
 
@@ -135,7 +137,7 @@ export class AudioTrack {
         } else {
           this.channel.pan = this._pan;
         }
-      } catch (e) {
+      } catch {
         // swallow
       }
     }
@@ -164,11 +166,15 @@ export class AudioTrack {
    * Effect parameters for this track (e.g. {pitch: 5, volume: 100})
    * @type {Object<string, number>}
    */
+  // eslint-disable-next-line no-dupe-class-members
   get effects() {
+    // ES-lint false positive
     return this._effects;
   }
 
+  // eslint-disable-next-line no-dupe-class-members
   set effects(newEffects) {
+    // ES-lint false positive
     this._effects = newEffects;
   }
 

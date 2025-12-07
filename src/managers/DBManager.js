@@ -341,7 +341,7 @@ class DBManager {
       let request;
       if (isClientGeneratedString || !hasId) {
         // Remove the client-generated ID so IndexedDB assigns a numeric one
-        const {id, ...withoutId} = storableTrack;
+        const {id: _id, ...withoutId} = storableTrack;
         request = store.add(withoutId);
       } else if (typeof storableTrack.id === "number") {
         // Numeric ID: try to update existing record, or add if it doesn't exist
@@ -661,12 +661,13 @@ class DBManager {
    */
   async deleteSession(sessionId) {
     const db = await this.openDB();
-    return new Promise(async (resolve, reject) => {
-      try {
-        // First delete all tracks for this session
-        await this.clearAllTracks(sessionId);
 
-        // Then delete the session itself
+    // First delete all tracks for this session
+    await this.clearAllTracks(sessionId);
+
+    // Then delete the session itself
+    return new Promise((resolve, reject) => {
+      try {
         const transaction = db.transaction([SESSIONS_STORE_NAME], "readwrite");
         const store = transaction.objectStore(SESSIONS_STORE_NAME);
         const request = store.delete(sessionId);
@@ -679,6 +680,14 @@ class DBManager {
         request.onerror = (event) => {
           console.error("Error deleting session:", event.target.error);
           reject(new Error("Could not delete session"));
+        };
+
+        transaction.onerror = (event) => {
+          console.error(
+            "Transaction failed while deleting session:",
+            event.target.error
+          );
+          reject(new Error("Transaction failed while deleting session"));
         };
       } catch (e) {
         reject(e);
