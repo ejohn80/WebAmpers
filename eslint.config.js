@@ -11,9 +11,6 @@ export default defineConfig([
     "src/playback/**",
     "src/components/Waveform/**",
     "src/components/TrackLane/**",
-    "src/context/AppContext.jsx",
-    "src/components/Layout/Header.jsx",
-    "src/components/Layout/Sidebar.jsx",
     "src/components/Recording/RecorderButton.jsx",
     "src/managers/DBManager.js",
     "src/models/AudioTrack.js",
@@ -47,6 +44,7 @@ export default defineConfig([
         "error",
         {varsIgnorePattern: "^[A-Z_]", argsIgnorePattern: "^_"},
       ],
+      "react-refresh/only-export-components": "off",
     },
   },
 ]);

@@ -97,12 +97,6 @@ const AppContextProvider = ({children}) => {
 
   const [engineRef, setEngineRef] = useState(null);
 
-  const masterVolumeStateRef = useRef({
-    volume: 50,
-    muted: false,
-    lastGainValue: 0.5,
-  });
-
   // Effects Menu State
   const [isEffectsMenuOpen, setIsEffectsMenuOpen] = useState(false);
 
@@ -165,7 +159,8 @@ const AppContextProvider = ({children}) => {
         }
       } catch (e) {
         console.warn(
-          "Could not lock master gain before track effect application"
+          "Could not lock master gain before track effect application",
+          e
         );
       }
 
@@ -193,7 +188,8 @@ const AppContextProvider = ({children}) => {
           }
         } catch (e) {
           console.warn(
-            "Could not verify master gain after track effect application"
+            "Could not verify master gain after track effect application",
+            e
           );
         }
       }
@@ -616,7 +612,9 @@ const AppContextProvider = ({children}) => {
         if (engineRef.current.master?.gain?.gain) {
           masterGainBefore = engineRef.current.master.gain.gain.value;
         }
-      } catch (e) {}
+      } catch (e) {
+        console.error(e);
+      }
 
       try {
         if (
@@ -633,7 +631,9 @@ const AppContextProvider = ({children}) => {
         if (masterGainBefore !== null && engineRef.current.master?.gain?.gain) {
           engineRef.current.master.gain.gain.value = masterGainBefore;
         }
-      } catch (e) {}
+      } catch (e) {
+        console.log(e);
+      }
     },
     [engineRef, selectedTrackId]
   );
@@ -680,7 +680,9 @@ const AppContextProvider = ({children}) => {
           String(activeSession)
         );
       }
-    } catch {}
+    } catch (e) {
+      console.error(e);
+    }
 
     // Only run this block once per actual session change
     if (lastSessionRef.current !== activeSession) {
@@ -714,7 +716,9 @@ const AppContextProvider = ({children}) => {
         if (wasMuted) {
           masterGainBefore = 0;
         }
-      } catch (e) {}
+      } catch (e) {
+        console.log(e);
+      }
 
       // Apply master-level session effects
       if (engineRef?.current) {
@@ -735,7 +739,8 @@ const AppContextProvider = ({children}) => {
             }
           } catch (e) {
             console.warn(
-              "Could not restore master volume after session change"
+              "Could not restore master volume after session change",
+              e
             );
           }
         }
@@ -752,7 +757,9 @@ const AppContextProvider = ({children}) => {
               masterGainBeforeTrackEffects =
                 engineRef.current.master.gain.gain.value;
             }
-          } catch (e) {}
+          } catch (e) {
+            console.error(e);
+          }
 
           try {
             // Reapply effects for all tracks currently present
@@ -782,7 +789,9 @@ const AppContextProvider = ({children}) => {
                   engineRef.current.master.gain.gain.value =
                     masterGainBeforeTrackEffects;
                 }
-              } catch (e) {}
+              } catch (e) {
+                console.error(e);
+              }
             }
 
             return true; // Successfully applied
@@ -862,7 +871,9 @@ const AppContextProvider = ({children}) => {
       if (!engineRef && window.__WebAmpEngineRef) {
         setEngineRef(window.__WebAmpEngineRef);
       }
-    } catch {}
+    } catch (e) {
+      console.warn(e);
+    }
   }, [engineRef]);
 
   const refreshDB = useCallback(() => {
