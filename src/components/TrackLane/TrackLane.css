@@ -9,9 +9,6 @@
   padding-right: 6px;
   background: var(--surface-strong);
   box-shadow: 6px 0 12px rgba(0, 0, 0, 0.45);
-  position: sticky;
-  left: 0;
-  z-index: 5;
 }
 
 .tracklane-root {
@@ -26,7 +23,6 @@
     var(--timeline-left-offset) + var(--timeline-content-width, 100%)
   );
   position: relative;
-  contain: layout style;
   box-sizing: border-box;
 }
 
