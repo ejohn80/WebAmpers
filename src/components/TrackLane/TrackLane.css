@@ -26,7 +26,6 @@
     var(--timeline-left-offset) + var(--timeline-content-width, 100%)
   );
   position: relative;
-  contain: layout style;
   box-sizing: border-box;
   /* border: 0.1px solid lime; */
 }

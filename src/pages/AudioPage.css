@@ -21,7 +21,7 @@ html,
 .app-container {
   height: 100vh;
   display: grid;
-  grid-template-rows: 40px 1fr 40px;
+  grid-template-rows: 40px minmax(0, 1fr) 40px;
 }
 
 /* Ensure other sections have lower z-index */
@@ -54,6 +54,8 @@ html,
   height: 100%;
   position: relative;
   z-index: 1; /* Ensure main content is below header */
+  min-height: 0; /* allow internal scroll containers to shrink */
+  overflow: hidden; /* keep footer visible and delegate scroll to children */
 }
 
 /* --- Movable Divider Styling --- */

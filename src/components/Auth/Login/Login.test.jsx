@@ -1,3 +1,6 @@
+/* global vi, beforeEach, test, expect */
+// ^ Ignores for Vitest globals. ESlint sees these as undefined otherwise.
+
 // Hoisted handle for assertions
 const {mockNavigate} = vi.hoisted(() => ({mockNavigate: vi.fn()}));
 

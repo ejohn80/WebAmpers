@@ -1,3 +1,6 @@
+/* global global */
+// ^ Ignores for Vitest globals. ESlint sees these as undefined otherwise.
+
 // src/tests/CloudStorageManager.test.jsx
 import {describe, it, expect, vi, beforeEach} from "vitest";
 import {cloudStorageManager} from "../managers/CloudStorageManager";
@@ -247,10 +250,7 @@ describe("CloudStorageManager", () => {
       dbManager.createSession.mockResolvedValue(42);
       dbManager.addTrack.mockResolvedValue(1);
 
-      const result = await cloudStorageManager.loadFromFirebase(
-        "user123",
-        "project1_123"
-      );
+      await cloudStorageManager.loadFromFirebase("user123", "project1_123");
 
       // Should match by base name (ignoring the (2) suffix)
       expect(dbManager.addAsset).not.toHaveBeenCalled();

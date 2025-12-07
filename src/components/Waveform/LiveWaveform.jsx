@@ -87,13 +87,19 @@ export default function LiveWaveform({stream, startTs, pixelsPerSecond = 120}) {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       try {
         nodesRef.current.source?.disconnect?.();
-      } catch {}
+      } catch {
+        // Intentionally empty
+      }
       try {
         nodesRef.current.analyser?.disconnect?.();
-      } catch {}
+      } catch {
+        // Intentionally empty
+      }
       try {
         nodesRef.current.audioCtx?.close?.();
-      } catch {}
+      } catch {
+        // Intentionally empty
+      }
       nodesRef.current = {audioCtx: null, source: null, analyser: null};
     };
   }, [stream, startTs, pixelsPerSecond]);

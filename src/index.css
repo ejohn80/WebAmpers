@@ -2,7 +2,6 @@
 *::before,
 *::after {
   box-sizing: border-box;
-  overflow: hidden;
 }
 
 :root {
@@ -55,6 +54,12 @@
   --timeline-tick-color: rgba(239, 233, 233, 0.6);
   --timeline-pre-line: rgba(233, 224, 224, 0.5);
   --timeline-pre-fill: rgba(25, 25, 25, 0.9);
+  --timeline-ruler-height: 32px;
+  --timeline-ruler-gap: 12px;
+  --timeline-scrub-indicator-size: 12px;
+  --playhead-color: #ff5a5a;
+  --playhead-line-width: 1px;
+  --playhead-indicator-offset: 0px;
   --zoom-bg: rgba(0, 0, 0, 0.7);
   --zoom-border: rgba(255, 255, 255, 0.12);
   --zoom-btn-bg: rgba(255, 255, 255, 0.08);
@@ -300,6 +305,12 @@
     rgba(234, 41, 41, 0.12),
     rgba(234, 41, 41, 0)
   );
+  --timeline-ruler-height: 32px;
+  --timeline-ruler-gap: 12px;
+  --timeline-scrub-indicator-size: 12px;
+  --playhead-color: #d64545;
+  --playhead-line-width: 1px;
+  --playhead-indicator-offset: 0px;
   --zoom-bg: rgba(255, 255, 255, 0.9);
   --zoom-border: rgba(0, 0, 0, 0.08);
   --zoom-btn-bg: rgba(0, 0, 0, 0.05);
