@@ -11,6 +11,7 @@
   left: 0;
   z-index: 5;
   border-radius: 6px;
+  /* border: 0.1px solid lime; */
 }
 
 .tracklane-root {
@@ -27,6 +28,7 @@
   position: relative;
   contain: layout style;
   box-sizing: border-box;
+  /* border: 0.1px solid lime; */
 }
 
 .tracklane-main {
@@ -36,6 +38,7 @@
   display: flex;
   flex-direction: column;
   background: var(--tracklane-button-box);
+  /* border: 1px solid red; */
 }
 
 .tracklane-title {
@@ -45,7 +48,7 @@
 }
 
 .tracklane-track-number {
-  font-size: 12px;
+  font-size: 10px;
   color: var(--track-text);
   font-weight: 600;
 }
@@ -66,21 +69,24 @@
   flex-direction: column;
   align-items: stretch;
   justify-content: center;
-  gap: 6px;
+  gap: 7px;
+  /* border: 0.5px solid pink; */
 }
 
 .tracklane-controls {
   display: flex;
   gap: 8px;
+  padding: 2px 6px;
   align-items: center;
+  /* border: 0.1px solid yellow; */
 }
 
 .tl-btn {
   background: var(--mute-btn-bg, var(--surface-subtle));
   color: var(--app-text);
-  padding: 6px 8px;
+  padding: 6px;
   border-radius: 3px;
-  font-size: 13px;
+  font-size: 12px;
   cursor: pointer;
   transition: all 0.15s ease;
   letter-spacing: -0.55px;
@@ -193,13 +199,13 @@
 
 .tracklane-segment {
   background: var(--surface-subtle);
-  border: 1px solid var(--surface-border);
-  padding: 8px;
   border-radius: 6px;
+  padding: 1px;
   height: 100%;
   display: flex;
   flex-direction: column;
   flex: 1 1 auto;
+  /* border: 0.1px solid hotpink; */
 }
 
 .segment-waveform {
@@ -283,74 +289,11 @@
   background: var(--context-divider);
 }
 
-.tracklane-title-overlay {
-  position: absolute;
-  top: 8px;
-  left: 8px;
-  z-index: 10;
-  background: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(8px);
-  padding: 6px 10px;
-  border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  pointer-events: none; /* allows clicking through to waveform */
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.tracklane-title-overlay .tracklane-title {
-  font-weight: 600;
-  color: var(--app-text);
-  font-size: 14px;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
-}
-
-.tracklane-title-overlay .tracklane-track-number {
-  font-size: 10px;
-  color: var(--muted-text);
-  font-weight: 400;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
-}
-
-/* Remove the header from tracklane-side since we moved it */
-/* Comment out or remove these rules from .tracklane-side if you want */
-.tracklane-side .tracklane-header {
-  display: none; /* hide the old position */
-}
-
-/* Add this to your TrackLane.css */
-
-.tracklane-title-overlay {
-  position: absolute;
-  top: 8px;
-  left: 8px;
-  z-index: 10;
-  background: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(8px);
-  padding: 6px 10px;
-  border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  pointer-events: none; /* allows clicking through to waveform */
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  max-width: calc(100% - 16px); /* prevent overflow */
-  /* Ensure it responds to parent width changes */
-  transform: translate3d(0, 0, 0);
-  will-change: transform;
-  transition:
-    opacity 0.2s ease,
-    transform 0.2s ease;
-}
-
 /* Hide track name overlay when timeline is very narrow */
 .tracklane-timeline[data-narrow="true"] .tracklane-title-overlay {
   display: none;
 }
-
-/* Shrink track name overlay for medium width */
-.tracklane-timeline[data-medium="true"] .tracklane-title-overlay {
+*/ .tracklane-timeline[data-medium="true"] .tracklane-title-overlay {
   padding: 4px 6px;
 }
 
@@ -358,28 +301,4 @@
   .tracklane-title-overlay
   .tracklane-title {
   font-size: 11px;
-}
-
-.tracklane-title-overlay .tracklane-title {
-  font-weight: 600;
-  color: var(--app-text);
-  font-size: 14px;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100%;
-}
-
-.tracklane-title-overlay .tracklane-track-number {
-  font-size: 10px;
-  color: var(--muted-text);
-  font-weight: 400;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
-}
-
-/* Remove the header from tracklane-side since we moved it */
-/* Comment out or remove these rules from .tracklane-side if you want */
-.tracklane-side .tracklane-header {
-  display: none; /* hide the old position */
 }

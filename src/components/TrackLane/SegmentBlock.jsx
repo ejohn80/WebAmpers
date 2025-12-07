@@ -235,11 +235,6 @@ const SegmentBlock = ({
             }}
           >
             <div className="segment-name">{segmentName}</div>
-            {segmentWidthPx >= 80 && (
-              <div className="segment-duration">
-                {formatDuration(durationMs)}
-              </div>
-            )}
           </div>
         )}
 
