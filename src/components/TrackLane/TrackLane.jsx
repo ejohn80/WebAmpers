@@ -534,15 +534,6 @@ const TrackLane = memo(function TrackLane({
                 {soloed ? "Unsolo" : "Solo"}
               </button>
               <button
-                className="context-menu-item context-menu-item--danger"
-                onClick={() => handleMenuAction(handleDelete)}
-                role="menuitem"
-              >
-                Delete Track
-              </button>
-            </div>
-            <div className="context-menu-divider" />
-            <button
               className={`context-menu-item${
                 onCutTrack ? "" : " context-menu-item--disabled"
               }`}
@@ -572,6 +563,14 @@ const TrackLane = memo(function TrackLane({
             >
               Paste
             </button>
+            <button
+                className="context-menu-item context-menu-item--danger"
+                onClick={() => handleMenuAction(handleDelete)}
+                role="menuitem"
+              >
+                Delete Track
+              </button>
+            </div>
           </div>,
           document.body
         )
