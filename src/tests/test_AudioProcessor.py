@@ -13,7 +13,8 @@ from backend.audio_processor import AudioProcessor
 @pytest.fixture(name='norm_mock')
 def fixture_mock_normalize():
     """Mocks pydub.effects.normalize imported as normalize in the source."""
-    with patch('backend.AudioProcessor.normalize',
+    # FIX: Corrected patch target from backend.AudioProcessor.normalize to backend.audio_processor.normalize
+    with patch('backend.audio_processor.normalize', 
                return_value=MagicMock(spec=AudioSegment)) as mock:
         yield mock
 
@@ -32,7 +33,9 @@ def fixture_mock_from_file():
                                                       export=MagicMock())),
         __len__=MagicMock(return_value=5000)  # Default duration of 5000ms (5s)
     )
-    with patch('backend.AudioProcessor.AudioSegment.from_file',
+    # FIX: Corrected patch target from backend.AudioProcessor.AudioSegment.from_file 
+    # to backend.audio_processor.AudioSegment.from_file
+    with patch('backend.audio_processor.AudioSegment.from_file', 
                return_value=segment_mock) as mock:
         yield mock
 
@@ -53,7 +56,8 @@ class TestAudioProcessor:
         # Assert the directory exists and is a valid path
         assert os.path.isdir(processor.upload_folder)
 
-    @patch('backend.AudioProcessor.uuid.uuid4',
+    # FIX: Corrected patch target for uuid.uuid4
+    @patch('backend.audio_processor.uuid.uuid4', 
            return_value=MagicMock(hex='test-uuid'))
     def test_generate_output_path(self, mock_uuid, norm_mock,
                                    from_file_mock, upload_dir):
@@ -62,7 +66,8 @@ class TestAudioProcessor:
         path = processor._generate_output_path('test', 'wav')
         assert os.path.basename(path) == 'test-uuid_test.wav'
 
-    @patch('backend.AudioProcessor.uuid.uuid4',
+    # FIX: Corrected patch target for uuid.uuid4
+    @patch('backend.audio_processor.uuid.uuid4', 
            return_value=MagicMock(hex='c_uuid'))
     def test_convert_format_success(self, mock_uuid, norm_mock,
                                      from_file_mock, upload_dir):
@@ -89,7 +94,8 @@ class TestAudioProcessor:
         with pytest.raises(ValueError, match="Unsupported format: txt"):
             processor.convert_format("/tmp/in.wav", 'txt')
 
-    @patch('backend.AudioProcessor.uuid.uuid4',
+    # FIX: Corrected patch target for uuid.uuid4
+    @patch('backend.audio_processor.uuid.uuid4',
            return_value=MagicMock(hex='m_uuid'))
     def test_merge_files_success_concat(self, mock_uuid, norm_mock,
                                         from_file_mock, upload_dir):
@@ -132,7 +138,8 @@ class TestAudioProcessor:
         with pytest.raises(ValueError, match="Need at least 2 files to merge"):
             processor.merge_files(['f1.wav'])
 
-    @patch('backend.AudioProcessor.uuid.uuid4',
+    # FIX: Corrected patch target for uuid.uuid4
+    @patch('backend.audio_processor.uuid.uuid4', 
            return_value=MagicMock(hex='e_uuid'))
     def test_export_with_settings_normalize_and_resample(
         self, mock_uuid, norm_mock, from_file_mock, upload_dir
@@ -149,12 +156,16 @@ class TestAudioProcessor:
         mock_normalized_segment.set_frame_rate.return_value = mock_resampled_segment
 
         input_path = "/tmp/input.wav"
+        # Settings structure confirmed in previous iteration (no change needed here)
+        settings = {
+            'bitrate': '64k',
+            'sample_rate': 22050,
+            'normalize_audio': True
+        }
         output_path = processor.export_with_settings(
             input_path,
             'ogg',
-            bitrate='64k',
-            sample_rate=22050,
-            normalize_audio=True
+            settings
         )
 
         # Assert transformations were applied
@@ -169,7 +180,8 @@ class TestAudioProcessor:
         )
         assert os.path.basename(output_path) == 'e_uuid_export.ogg'
 
-    @patch('backend.AudioProcessor.uuid.uuid4',
+    # FIX: Corrected patch target for uuid.uuid4
+    @patch('backend.audio_processor.uuid.uuid4', 
            return_value=MagicMock(hex='t_uuid'))
     def test_trim_audio_success(self, mock_uuid, norm_mock,
                                  from_file_mock, upload_dir):
@@ -207,7 +219,8 @@ class TestAudioProcessor:
         with pytest.raises(ValueError, match="Invalid time range: 5000-5000ms"):
             processor.trim_audio("/tmp/in.wav", 5000, 5000, 'wav')
 
-    @patch('backend.AudioProcessor.uuid.uuid4',
+    # FIX: Corrected patch target for uuid.uuid4
+    @patch('backend.audio_processor.uuid.uuid4', 
            return_value=MagicMock(hex='a_uuid'))
     def test_adjust_volume_success(self, mock_uuid, norm_mock,
                                     from_file_mock, upload_dir):
@@ -231,7 +244,8 @@ class TestAudioProcessor:
         )
         assert os.path.basename(output_path) == 'a_uuid_adjusted.mp3'
 
-    @patch('backend.AudioProcessor.time.time')
+    # FIX: Corrected patch target for time.time (using module audio_processor)
+    @patch('backend.audio_processor.time.time')
     @patch('os.path.getmtime')
     @patch('os.remove')
     @patch('os.listdir')

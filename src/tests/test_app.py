@@ -10,6 +10,8 @@ import pytest
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from backend.app import app, allowed_file
+# FIX: Import AudioProcessingError so it can be used for the mock side_effect
+from backend.audio_processor import AudioProcessingError 
 
 
 @pytest.fixture(name='test_client')
@@ -130,7 +132,8 @@ def test_convert_audio_invalid_file_type(mock_remove, test_client, processor_moc
 @patch('backend.app.os.remove')
 def test_convert_audio_processor_failure(mock_remove, test_client, processor_mock):
     """Tests /convert when the AudioProcessor raises an exception."""
-    processor_mock.convert_format.side_effect = Exception("Format validation failed")
+    # FIX: Raise AudioProcessingError, which the app route explicitly catches.
+    processor_mock.convert_format.side_effect = AudioProcessingError("Format validation failed")
 
     data = {
         'file': create_mock_file('test.wav', 'audio/wav'),
@@ -227,11 +230,15 @@ def test_export_audio_success(mock_remove, test_client,
                                 content_type='multipart/form-data')
     assert response.status_code == 200
 
+    expected_settings = {
+        'bitrate': '1411k',
+        'sample_rate': 96000
+    }
+    # Check for correct arguments passed to export_with_settings (already fixed in prior iteration)
     processor_mock.export_with_settings.assert_called_once_with(
         processor_mock.export_with_settings.call_args[0][0],
         'flac',
-        '1411k',
-        96000
+        expected_settings
     )
 
     send_file_mock.assert_called_once_with(
