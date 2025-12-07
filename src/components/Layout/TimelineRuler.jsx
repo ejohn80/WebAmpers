@@ -1,9 +1,9 @@
-import React, {useMemo} from "react";
+import React, {useMemo, useRef} from "react";
+import {progressStore} from "../../playback/progressStore";
 
 /**
  * TimelineRuler
  * Draws a time ruler with tick marks aligned to the start of the waveform area.
- * Now supports clicking to seek playhead position.
  */
 export default function TimelineRuler({
   totalLengthMs = 0,
@@ -11,6 +11,98 @@ export default function TimelineRuler({
   timelineLeftOffsetPx = 0,
   onSeek = null,
 }) {
+  const [isDragging, setIsDragging] = React.useState(false);
+  const dragStartXRef = useRef(null);
+  const rulerRef = useRef(null);
+
+  const handleMouseDown = (e) => {
+    if (!onSeek || !totalLengthMs || !timelineWidth) return;
+
+    setIsDragging(true);
+    dragStartXRef.current = e.clientX;
+
+    // Start scrubbing mode
+    progressStore.beginScrub({pauseTransport: true});
+  };
+
+  const lastUpdateRef = useRef(0);
+  const THROTTLE_MS = 16; // ~60fps
+
+  const handleMouseMove = React.useCallback(
+    (e) => {
+      if (!isDragging || !totalLengthMs || !timelineWidth) return;
+
+      const now = Date.now();
+      if (now - lastUpdateRef.current < THROTTLE_MS) return;
+      lastUpdateRef.current = now;
+
+      requestAnimationFrame(() => {
+        const rulerBar = rulerRef.current;
+        if (!rulerBar) return;
+
+        const rect = rulerBar.getBoundingClientRect();
+
+        // Clamp to valid range
+        const clickX = Math.max(
+          0,
+          Math.min(timelineWidth, e.clientX - rect.left)
+        );
+        const ratio = Math.max(0, Math.min(1, clickX / timelineWidth));
+        const ms = Math.max(
+          0,
+          Math.min(totalLengthMs, Math.round(ratio * totalLengthMs))
+        );
+
+        // Update visual position
+        progressStore.setMs(ms);
+      });
+    },
+    [isDragging, totalLengthMs, timelineWidth]
+  );
+
+  const handleMouseUp = React.useCallback(
+    (e) => {
+      if (!isDragging) return;
+
+      const rulerBar = rulerRef.current;
+      if (!rulerBar) {
+        setIsDragging(false);
+        dragStartXRef.current = null;
+        progressStore.endScrub();
+        return;
+      }
+
+      const rect = rulerBar.getBoundingClientRect();
+      const clickX = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
+      const ratio = clickX / timelineWidth;
+      const ms = Math.round(ratio * totalLengthMs);
+
+      // End scrubbing mode
+      progressStore.endScrub();
+
+      // Always seek to the final position (whether click or drag)
+      if (onSeek) {
+        onSeek(ms);
+      }
+
+      setIsDragging(false);
+      dragStartXRef.current = null;
+    },
+    [isDragging, totalLengthMs, timelineWidth, onSeek]
+  );
+
+  React.useEffect(() => {
+    if (isDragging) {
+      document.addEventListener("mousemove", handleMouseMove);
+      document.addEventListener("mouseup", handleMouseUp);
+
+      return () => {
+        document.removeEventListener("mousemove", handleMouseMove);
+        document.removeEventListener("mouseup", handleMouseUp);
+      };
+    }
+  }, [isDragging, handleMouseMove, handleMouseUp]);
+
   const {
     majorTicks,
     minorTicks,
@@ -115,30 +207,21 @@ export default function TimelineRuler({
     return `${m}:${ss}`;
   };
 
-  const handleRulerClick = (e) => {
-    if (!onSeek || !totalLengthMs || !timelineWidth) return;
-
-    const rect = e.currentTarget.getBoundingClientRect();
-    const clickX = e.clientX - rect.left;
-    const ratio = Math.max(0, Math.min(1, clickX / timelineWidth));
-    const ms = Math.round(ratio * totalLengthMs);
-
-    onSeek(ms);
-  };
-
   if (!totalLengthMs || timelineWidth <= 0) return null;
 
   const rulerStyle = {
     marginLeft: `${timelineLeftOffsetPx}px`,
     width: `${Math.max(0, Math.round(timelineWidth))}px`,
-    cursor: onSeek ? "pointer" : "default",
+    cursor: onSeek ? (isDragging ? "grabbing" : "grab") : "default",
+    userSelect: "none",
   };
 
   return (
     <div
+      ref={rulerRef}
       className="timeline-ruler-bar"
       style={rulerStyle}
-      onClick={handleRulerClick}
+      onMouseDown={handleMouseDown}
     >
       {preHighlightWidthPx > 0 && (
         <div

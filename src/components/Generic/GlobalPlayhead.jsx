@@ -17,24 +17,24 @@ export default function GlobalPlayhead({totalLengthMs = 0, timelineWidth = 0}) {
       const denom = totalLengthMs > 0 ? totalLengthMs : lengthMs || 0;
       const cappedRatio = denom > 0 ? Math.max(0, Math.min(1, ms / denom)) : 0;
       const leftPx = cappedRatio * timelineWidth;
-      
+
       // Get the ruler bar element to calculate screen position
-      const rulerBar = document.querySelector('.timeline-ruler-bar');
-      const scrollArea = document.querySelector('.timeline-scroll-area');
-      const tracksContainer = document.querySelector('.tracks-container');
-      
+      const rulerBar = document.querySelector(".timeline-ruler-bar");
+      const scrollArea = document.querySelector(".timeline-scroll-area");
+      const tracksContainer = document.querySelector(".tracks-container");
+
       if (rulerBar && scrollArea && tracksContainer) {
         const rulerRect = rulerBar.getBoundingClientRect();
         const tracksRect = tracksContainer.getBoundingClientRect();
-        
+
         // Calculate horizontal position
         const screenX = rulerRect.left + leftPx;
         playheadRef.current.style.left = `${screenX}px`;
-        
+
         // Position at top of ruler
         const topY = rulerRect.top;
         playheadRef.current.style.top = `${topY}px`;
-        
+
         // Height extends to bottom of tracks
         const height = Math.max(0, tracksRect.bottom - rulerRect.top);
         playheadRef.current.style.height = `${height}px`;
@@ -50,30 +50,30 @@ export default function GlobalPlayhead({totalLengthMs = 0, timelineWidth = 0}) {
     });
 
     // Update position on scroll
-    const scrollArea = document.querySelector('.timeline-scroll-area');
+    const scrollArea = document.querySelector(".timeline-scroll-area");
     const handleScroll = () => {
       const currentState = progressStore.getState();
       updatePosition(currentState.ms || 0, currentState.lengthMs || 0);
     };
-    
+
     if (scrollArea) {
-      scrollArea.addEventListener('scroll', handleScroll);
+      scrollArea.addEventListener("scroll", handleScroll);
     }
-    
+
     // Update position on resize
     const handleResize = () => {
       const currentState = progressStore.getState();
       updatePosition(currentState.ms || 0, currentState.lengthMs || 0);
     };
-    
-    window.addEventListener('resize', handleResize);
+
+    window.addEventListener("resize", handleResize);
 
     return () => {
       unsubscribe();
       if (scrollArea) {
-        scrollArea.removeEventListener('scroll', handleScroll);
+        scrollArea.removeEventListener("scroll", handleScroll);
       }
-      window.removeEventListener('resize', handleResize);
+      window.removeEventListener("resize", handleResize);
     };
   }, [totalLengthMs, timelineWidth]);
 
