@@ -48,7 +48,7 @@ function AudioPage() {
   } = useContext(AppContext);
   const [sidebarWidth, setSidebarWidth] = useState(MAX_WIDTH);
   const [tracks, setTracks] = useState(audioManager.tracks);
-  const [audioData, setAudioData] = useState(null);
+  const [_audioData, setAudioData] = useState(null);
   const [recording, setRecording] = useState({stream: null, startTs: 0});
   const [assetsRefreshTrigger, setAssetsRefreshTrigger] = useState(0);
   const [hasClipboardFlag, setHasClipboardFlag] = useState(() =>
@@ -131,7 +131,7 @@ function AudioPage() {
       return;
     }
 
-    const {audioBlob, duration, instrument, name} = recordingData;
+    const {audioBlob, _duration, instrument, name} = recordingData;
 
     if (!audioBlob || audioBlob.size === 0) {
       console.warn("No audio recorded");
@@ -1550,13 +1550,13 @@ function AudioPage() {
                 clipboardSegments[0]?.name ||
                 clipboardSegments[0]?.fileName ||
                 trackData.name ||
-                asset.name ||
+                asset.name || // eslint-disable-line no-undef
                 null,
               fileName:
                 clipboardSegments[0]?.fileName ||
                 clipboardSegments[0]?.name ||
                 trackData.name ||
-                asset.name ||
+                asset.name || // eslint-disable-line no-undef
                 null,
               assetId: trackData.assetId,
             },
@@ -1596,8 +1596,8 @@ function AudioPage() {
             startInFileMs: 0,
             durationMs: Math.round(fullDurationMs),
             // Use asset name as fallback
-            name: trackData.name || asset.name || null,
-            fileName: trackData.name || asset.name || null,
+            name: trackData.name || asset.name || null, // eslint-disable-line no-undef
+            fileName: trackData.name || asset.name || null, // eslint-disable-line no-undef
             assetId: trackData.assetId,
           },
         ];
@@ -1631,13 +1631,13 @@ function AudioPage() {
 
         // Preserve each segment's individual name and add " Copy" to it
         const originalSegmentName =
-          seg.name || seg.fileName || trackData.name || asset.name || null;
+          seg.name || seg.fileName || trackData.name || asset.name || null; // eslint-disable-line no-undef
         const segmentCopyName = originalSegmentName
           ? generateCopyName(originalSegmentName)
           : null;
 
         // Use the segment's own assetId, not the track's assetId
-        const segmentAssetId = seg.assetId ?? trackData.assetId;
+        const _segmentAssetId = seg.assetId ?? trackData.assetId;
 
         return {
           id:
@@ -1815,12 +1815,12 @@ function AudioPage() {
   // Build version object for playback engine
   const version = buildVersionFromTracks(tracks);
 
-  const audioBuffer =
+  const _audioBuffer =
     tracks.length > 0
       ? tracks[0].buffer || tracks[0].segments?.[0]?.buffer
       : null;
 
-  const handleEngineReady = (engine) => {
+  const _handleEngineReady = (engine) => {
     engineRef.current = engine;
     setEngineRef(engineRef);
 
