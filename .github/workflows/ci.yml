@@ -48,10 +48,28 @@ jobs:
         env:
           CI: true
 
-      # - name: Upload coverage
-      #   if: always()
-      #   uses: actions/upload-artifact@v4
-      #   with:
-      #     name: coverage
-      #     path: coverage/
-      #     if-no-files-found: ignore
+  python-ci:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: src/backend/requirements.txt
+
+      - name: Install FFmpeg (Linux)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Install backend dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run backend tests (pytest)
+        run: pytest
