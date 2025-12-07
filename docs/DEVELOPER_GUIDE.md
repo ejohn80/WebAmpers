@@ -84,6 +84,14 @@ WebAmpers/
 
 Run the commands in your terminal:
 
+First ensure you are in the WebAmper directory:
+
+```bash
+cd WebAmpers
+```
+
+Then...
+
 ```bash
 # 1. Install dependencies
 npm install
@@ -97,6 +105,47 @@ npm run dev
    Navigate and open http://localhost:5173/
 
 4. Setup Python Backend:
+
+### Backend Prerequisites:
+
+- **Python 3.12**
+- **FFmpeg**
+
+### FFmpeg Installation
+
+FFmpeg can be installed directly from the terminal on macOS, Linux, and Windows.
+
+**macOS (Homebrew)**
+
+```bash
+brew install ffmpeg
+```
+
+**Linux (Ubuntu / Debian)**
+
+```bash
+sudo apt update
+sudo apt install ffmpeg
+```
+
+**Windows (Terminal)**
+
+Using winget
+
+```bash
+winget install Gyan.FFmpeg
+```
+
+**Verify Installation**
+
+```bash
+ffmpeg -version
+```
+
+**Install Directly From Website**
+
+If you are having issues with these commands, please follow the instructions on the FFmpeg page.  
+Download FFmpeg from: [https://ffmpeg.org/download.html](https://ffmpeg.org/download.html)
 
 ### Create a Virtual Environment
 
