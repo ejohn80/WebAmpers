@@ -13,6 +13,18 @@ export class AudioSegment {
   id;
 
   /**
+   * The name of the segment (e.g., the original filename).
+   * @type {string}
+   */
+  name;
+
+  /**
+   * The original filename of the audio asset.
+   * @type {string}
+   */
+  fileName;
+
+  /**
    * A reference to the full audio buffer (e.g., a Tone.ToneAudioBuffer).
    * @type {Tone.ToneAudioBuffer}
    */
@@ -39,6 +51,8 @@ export class AudioSegment {
   /**
    * @param {object} options - The initial properties of the segment.
    * @param {Tone.ToneAudioBuffer} options.buffer - The full audio buffer. This is required.
+   * @param {string} [options.name] - The display name for the segment.
+   * @param {string} [options.fileName] - The original filename of the audio asset.
    * @param {number} [options.offset=0] - The start offset in seconds.
    * @param {number} [options.duration] - The duration in seconds. Defaults to the buffer's duration minus the offset.
    * @param {Array<any>} [options.effects=[]] - An initial list of effects for this segment.
@@ -50,6 +64,11 @@ export class AudioSegment {
 
     this.id =
       options.id || `segment_${Math.random().toString(36).substring(2, 9)}`;
+
+    // Store name and fileName
+    this.name = options.name || options.fileName || null;
+    this.fileName = options.fileName || options.name || null;
+
     this.buffer = options.buffer;
     this.offset = options.offset || 0;
 
@@ -94,5 +113,21 @@ export class AudioSegment {
     Tone.Transport.scheduleOnce(() => {
       player.dispose();
     }, stopTime);
+  }
+
+  /**
+   * Returns a plain object representation for serialization.
+   * @returns {object}
+   */
+  toJSON() {
+    return {
+      id: this.id,
+      name: this.name,
+      fileName: this.fileName,
+      offset: this.offset,
+      duration: this.duration,
+      // Note: buffer is not serialized, it should be stored separately
+      // effects: this.effects, // Serialize effects if needed
+    };
   }
 }

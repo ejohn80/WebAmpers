@@ -18,8 +18,8 @@ import EffectsMenu from "./Effects/EffectsMenu";
 import styles from "./MainContent.module.css";
 import "./MainContent.css";
 
-const TRACK_CONTROLS_WIDTH = 180;
-const TRACK_CONTROLS_GAP = 12;
+const TRACK_CONTROLS_WIDTH = 70;
+const TRACK_CONTROLS_GAP = 37;
 const TRACK_ROW_PADDING = 8; // Keep in sync with --track-row-padding in CSS
 const TRACK_HEIGHT_PX = 96; // Base track height (fixed for horizontal-only zoom)
 const DEFAULT_TIMELINE_LEFT_OFFSET =
@@ -458,7 +458,13 @@ function MainContent({
             ? tracks[trackIndex]?.id
             : null;
 
-        onAssetDrop(dropData.assetId, targetTrackId, timelinePositionMs);
+        // Pass the asset name along with the drop data
+        onAssetDrop(
+          dropData.assetId,
+          targetTrackId,
+          timelinePositionMs,
+          dropData.name // Add this to pass the asset name
+        );
       }
     } catch (err) {
       console.error("Error handling drop:", err);

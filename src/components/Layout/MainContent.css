@@ -9,8 +9,8 @@
   padding: 0;
   position: relative;
   min-height: 0;
-  --track-controls-width: 180px;
-  --track-controls-gap: 12px;
+  --track-controls-width: 100px;
+  --track-controls-gap: 5px;
   --track-row-padding: 8px;
   --timeline-left-offset: calc(
     var(--track-row-padding, 0px) + var(--track-controls-width) +
@@ -153,8 +153,6 @@
   width: var(--timeline-content-width, 100%);
   height: var(--timeline-ruler-height, 32px);
   background: var(--timeline-ruler-bg);
-  border-bottom: 1px solid var(--timeline-ruler-border);
-  box-shadow: var(--timeline-ruler-shadow);
   pointer-events: none;
   z-index: 11;
   margin-bottom: var(--timeline-ruler-gap, 12px);
@@ -182,7 +180,6 @@
   top: 0;
   bottom: 0;
   background: var(--timeline-pre-fill);
-  border-right: 1px solid var(--timeline-pre-line);
   pointer-events: none;
 }
 
