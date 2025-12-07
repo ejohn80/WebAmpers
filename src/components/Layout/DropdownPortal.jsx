@@ -155,7 +155,7 @@ function DropdownPortal({
   const handleDelete = (e) => {
     e.preventDefault();
     if (!selectedTrackId) return;
-    onDeleteTrack?.(selectedTrackId); 
+    onDeleteTrack?.(selectedTrackId);
     setActiveDropdown(null);
   };
 
@@ -401,7 +401,6 @@ function DropdownPortal({
         }}
         onMouseLeave={handleDropdownMouseLeave}
       >
-
         {/* ENABLED/DISABLED - Cut (depends on track selection) */}
         <a
           href="#"
