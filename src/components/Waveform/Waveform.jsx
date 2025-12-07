@@ -323,10 +323,7 @@ const Waveform = ({
     if (e.button !== 0) return; // left button only
     if (!interactive || isScrubLocked()) return;
     draggingRef.current = true;
-    progressStore.beginScrub({
-      pauseTransport: true,
-      silenceDuringScrub: false,
-    });
+    progressStore.beginScrub({pauseTransport: false});
     const target = msAtClientX(e.clientX);
     if (typeof target === "number") {
       // preview only: move the playhead visually without seeking audio
@@ -370,11 +367,18 @@ const Waveform = ({
     const el = containerRef.current;
     if (!el) return;
 
-    // Use whichever axis has the stronger signal so normal mouse wheels work
-    const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+    const absX = Math.abs(e.deltaX);
+    const absY = Math.abs(e.deltaY);
 
-    if (delta === 0) return;
+    // Let vertical scrolls (without Shift) bubble to parent scroll areas
+    if (absY >= absX && !e.shiftKey) {
+      return;
+    }
 
+    const delta = absX > 0 ? e.deltaX : e.deltaY;
+    if (!delta) return;
+
+    e.preventDefault();
     el.scrollLeft += delta;
   };
 
@@ -394,10 +398,7 @@ const Waveform = ({
     if (!e.touches || e.touches.length === 0) return;
     if (!interactive || isScrubLocked()) return;
     draggingRef.current = true;
-    progressStore.beginScrub({
-      pauseTransport: true,
-      silenceDuringScrub: false,
-    });
+    progressStore.beginScrub({pauseTransport: false});
     const target = msAtClientX(e.touches[0].clientX);
     if (typeof target === "number") {
       progressStore.setMs(target);
