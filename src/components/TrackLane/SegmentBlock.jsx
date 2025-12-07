@@ -91,7 +91,7 @@ const SegmentBlock = ({
       setIsDragging(false);
       setDragOffset(0);
       hasDraggedRef.current = false;
-      
+
       // If it was just a click, select the segment
       if (wasClick && onSelect) {
         onSelect(segmentIndex);

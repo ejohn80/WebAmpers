@@ -122,7 +122,7 @@ export default function TimelineRuler({
     const clickX = e.clientX - rect.left;
     const ratio = Math.max(0, Math.min(1, clickX / timelineWidth));
     const ms = Math.round(ratio * totalLengthMs);
-    
+
     onSeek(ms);
   };
 
@@ -131,12 +131,12 @@ export default function TimelineRuler({
   const rulerStyle = {
     marginLeft: `${timelineLeftOffsetPx}px`,
     width: `${Math.max(0, Math.round(timelineWidth))}px`,
-    cursor: onSeek ? 'pointer' : 'default',
+    cursor: onSeek ? "pointer" : "default",
   };
 
   return (
-    <div 
-      className="timeline-ruler-bar" 
+    <div
+      className="timeline-ruler-bar"
       style={rulerStyle}
       onClick={handleRulerClick}
     >
