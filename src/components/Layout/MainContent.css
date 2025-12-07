@@ -47,16 +47,41 @@
   );
 }
 
+/* UPDATED: Global playhead with triangle indicator */
 .global-playhead {
   position: absolute;
   top: 0;
   bottom: 0;
-  width: 2px;
-  background: red;
   pointer-events: none;
-  z-index: 10;
+  z-index: 100;
+  width: 2px;
   will-change: transform;
   transform: translate3d(0, 0, 0);
+}
+
+/* NEW: Triangle indicator at top of playhead */
+.playhead-triangle {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-top: 10px solid #ff0000;
+  z-index: 101;
+}
+
+/* NEW: Playhead line (starts below triangle) */
+.playhead-line {
+  position: absolute;
+  top: 10px;
+  left: 0;
+  width: 2px;
+  height: calc(100% - 10px);
+  background-color: #ff0000;
+  z-index: 100;
 }
 
 /* Rail that matches the timeline area (to the right of track controls) */
@@ -66,8 +91,8 @@
   height: 32px;
   left: var(--timeline-left-offset);
   width: var(--timeline-content-width, 100%);
-  pointer-events: auto;
-  z-index: 10;
+  pointer-events: none;
+  z-index: 99;
 }
 
 /* Full-height rail behind all tracks, only for drawing the red playhead */
@@ -75,8 +100,8 @@
   position: absolute;
   top: 0;
   bottom: 0;
-  pointer-events: none; /* don't block clicking on tracks */
-  z-index: 9; /* under handles & timeline header, above track bg */
+  pointer-events: none;
+  z-index: 99;
 }
 
 /* Trim selection side handles */
@@ -100,8 +125,8 @@
 /* Trim controls (✓ / ✕) */
 .trim-controls {
   position: absolute;
-  top: 4px; /* tweak if you want it higher/lower */
-  transform: translateX(-66px); /* small offset to the right of the handle */
+  top: 4px;
+  transform: translateX(-66px);
   display: flex;
   gap: 4px;
   z-index: 40;
@@ -121,12 +146,12 @@
 }
 
 .trim-confirm {
-  background: #26a269; /* green */
+  background: #26a269;
   color: #fff;
 }
 
 .trim-cancel {
-  background: #c01c28; /* red */
+  background: #c01c28;
   color: #fff;
 }
 
@@ -144,14 +169,14 @@
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.45) inset;
 }
 
-/* Selected track during trim (this already existed, but we’ll now use it) */
+/* Selected track during trim */
 .track-wrapper-trim-selected {
   outline: 2px solid #ffcc33;
   outline-offset: -2px;
   background-color: rgba(255, 204, 51, 0.06);
 }
 
-/* Timeline ruler overlay */
+/* UPDATED: Timeline ruler overlay - now clickable */
 .timeline-ruler-bar {
   position: sticky;
   top: 0;
@@ -161,10 +186,16 @@
   background: var(--timeline-ruler-bg);
   border-bottom: 1px solid var(--timeline-ruler-border);
   box-shadow: var(--timeline-ruler-shadow);
-  pointer-events: none;
+  pointer-events: auto; /* CHANGED from none to auto */
+  cursor: pointer; /* NEW: Show it's clickable */
   z-index: 11;
   margin-bottom: 12px;
   overflow: visible;
+}
+
+/* NEW: Hover effect for ruler */
+.timeline-ruler-bar:hover {
+  background: var(--timeline-ruler-hover-bg, rgba(255, 255, 255, 0.05));
 }
 
 .timeline-pre-highlight {
@@ -179,9 +210,8 @@
 .timeline-tick {
   position: absolute;
   top: 0;
-  transform: translateX(
-    -1px
-  ); /* center the 2px line on the computed position */
+  transform: translateX(-1px);
+  pointer-events: none; /* NEW: Ticks shouldn't block clicks */
 }
 
 .timeline-tick-line {
@@ -284,7 +314,6 @@
 }
 
 .track-wrapper {
-  /* Add a subtle separator between tracks */
   border-bottom: 1px solid var(--track-separator);
   padding-bottom: 16px;
 }
@@ -322,8 +351,8 @@
 
 /* Ensure smooth scrolling */
 .timeline-scroll-area::-webkit-scrollbar {
-  width: 8px; /* vertical */
-  height: 12px; /* horizontal */
+  width: 8px;
+  height: 12px;
 }
 
 .timeline-scroll-area::-webkit-scrollbar-track {
@@ -339,7 +368,7 @@
   background: var(--scrollbar-thumb-hover);
 }
 
-/* Timeline width is driven by global CSS var; can be < or > viewport based on zoom */
+/* Timeline width is driven by global CSS var */
 .tracklane-timeline {
   width: var(--timeline-content-width, 100%);
 }
