@@ -757,7 +757,6 @@ function MainContent({
                   position: "relative",
                 }}
               >
-
                 {/* CUT BOX OVERLAY */}
                 {cutBox &&
                   (() => {

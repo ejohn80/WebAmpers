@@ -132,7 +132,9 @@ export default function TimelineRuler({
         playheadWidthPx = parsed;
       }
 
-      const offsetRaw = rootStyles.getPropertyValue("--playhead-indicator-offset");
+      const offsetRaw = rootStyles.getPropertyValue(
+        "--playhead-indicator-offset"
+      );
       const offsetParsed = parseFloat(offsetRaw);
       if (!Number.isNaN(offsetParsed)) {
         indicatorOffsetPx = offsetParsed;
