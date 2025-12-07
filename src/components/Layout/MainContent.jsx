@@ -5,7 +5,6 @@ import React, {
   useState,
   useContext,
   useCallback,
-  useLayoutEffect,
 } from "react";
 import {createPortal} from "react-dom";
 import DraggableDiv from "../Generic/DraggableDiv";
@@ -22,8 +21,6 @@ const TRACK_CONTROLS_WIDTH = 180;
 const TRACK_CONTROLS_GAP = 12;
 const TRACK_ROW_PADDING = 8; // Keep in sync with --track-row-padding in CSS
 const TRACK_HEIGHT_PX = 96; // Base track height (fixed for horizontal-only zoom)
-const DEFAULT_TIMELINE_LEFT_OFFSET =
-  TRACK_ROW_PADDING + TRACK_CONTROLS_WIDTH + TRACK_CONTROLS_GAP;
 
 function MainContent({
   tracks = [],
@@ -56,10 +53,8 @@ function MainContent({
   // Follow-mode toggle to auto-scroll the timeline during playback
   const [followPlayhead, setFollowPlayhead] = useState(false);
   const [timelineContentWidth, setTimelineContentWidth] = useState(0);
-  const [measuredLeftOffsetPx, setMeasuredLeftOffsetPx] = useState(null);
   const [scrollAreaWidth, setScrollAreaWidth] = useState(0);
   const scrollAreaRef = useRef(null);
-  const tracksRelativeRef = useRef(null);
   const [selectedSegment, setSelectedSegment] = useState(null);
   const [backgroundMenu, setBackgroundMenu] = useState({
     open: false,
@@ -143,22 +138,18 @@ function MainContent({
     }
   }, [tracks, selectedSegment, clearSegmentSelection]);
 
-  const resolvedLeftOffsetPx = Number.isFinite(measuredLeftOffsetPx)
-    ? measuredLeftOffsetPx
-    : DEFAULT_TIMELINE_LEFT_OFFSET;
-
   const timelineStyle = useMemo(
     () => ({
       "--timeline-content-width": `${Math.max(1, timelineContentWidth)}px`,
       // Track height is now fixed, adhering to horizontal-only zoom.
       "--track-height": `${TRACK_HEIGHT_PX}px`,
-      "--timeline-left-offset": `${resolvedLeftOffsetPx}px`,
     }),
-    [timelineContentWidth, resolvedLeftOffsetPx]
+    [timelineContentWidth]
   );
 
   const timelineMetrics = useMemo(() => {
-    const leftOffsetPx = resolvedLeftOffsetPx;
+    const leftOffsetPx =
+      TRACK_ROW_PADDING + TRACK_CONTROLS_WIDTH + TRACK_CONTROLS_GAP;
     const minimumTimelineWidth = Math.max(
       1,
       Math.round(scrollAreaWidth - (leftOffsetPx + TRACK_ROW_PADDING))
@@ -170,59 +161,7 @@ function MainContent({
     );
     const rowWidthPx = widthPx + leftOffsetPx + TRACK_ROW_PADDING;
     return {widthPx, leftOffsetPx, rowWidthPx};
-  }, [timelineContentWidth, scrollAreaWidth, resolvedLeftOffsetPx]);
-
-  useLayoutEffect(() => {
-    const container = tracksRelativeRef.current;
-    if (!container) {
-      setMeasuredLeftOffsetPx(null);
-      return undefined;
-    }
-
-    let frame = null;
-
-    const measure = () => {
-      if (frame) {
-        cancelAnimationFrame(frame);
-      }
-      frame = requestAnimationFrame(() => {
-        const timelineEl = container.querySelector(
-          ".tracklane-root .tracklane-main"
-        );
-        if (!timelineEl) return;
-
-        const containerRect = container.getBoundingClientRect();
-        const timelineRect = timelineEl.getBoundingClientRect();
-        const offset = Math.round(timelineRect.left - containerRect.left);
-        if (Number.isFinite(offset) && offset >= 0) {
-          setMeasuredLeftOffsetPx((prev) => (prev === offset ? prev : offset));
-        }
-      });
-    };
-
-    measure();
-
-    if (typeof ResizeObserver !== "undefined") {
-      const observer = new ResizeObserver(measure);
-      observer.observe(container);
-      return () => {
-        observer.disconnect();
-        if (frame) cancelAnimationFrame(frame);
-      };
-    }
-
-    if (typeof window !== "undefined") {
-      window.addEventListener("resize", measure);
-      return () => {
-        window.removeEventListener("resize", measure);
-        if (frame) cancelAnimationFrame(frame);
-      };
-    }
-
-    return () => {
-      if (frame) cancelAnimationFrame(frame);
-    };
-  }, [tracks.length, zoom, scrollAreaWidth]);
+  }, [timelineContentWidth, scrollAreaWidth]);
 
   const handleTrackSelected = useCallback(
     (trackId) => {
@@ -736,7 +675,7 @@ function MainContent({
         onDragOver={handleDragOver}
       >
         {hasTracks ? (
-          <div className="timeline-stack">
+          <>
             <TimelineRuler
               totalLengthMs={totalLengthMs}
               timelineWidth={timelineMetrics.widthPx}
@@ -750,13 +689,38 @@ function MainContent({
               }}
             >
               <div
+                className="global-playhead-rail"
+                style={{
+                  left: `${timelineMetrics.leftOffsetPx}px`,
+                  width: `${timelineMetrics.widthPx}px`,
+                }}
+              >
+                <GlobalPlayhead
+                  totalLengthMs={totalLengthMs}
+                  timelineWidth={timelineMetrics.widthPx}
+                />
+              </div>
+              <div
                 className="tracks-relative"
-                ref={tracksRelativeRef}
                 style={{
                   width: `${timelineMetrics.rowWidthPx}px`,
                   position: "relative",
                 }}
               >
+                {/* Full-height red playhead that runs through all tracks */}
+                <div
+                  className="global-playhead-rail-full"
+                  style={{
+                    left: `${timelineMetrics.leftOffsetPx}px`,
+                    width: `${timelineMetrics.widthPx}px`,
+                  }}
+                >
+                  <GlobalPlayhead
+                    totalLengthMs={totalLengthMs}
+                    timelineWidth={timelineMetrics.widthPx}
+                  />
+                </div>
+
                 {/* CUT BOX OVERLAY */}
                 {cutBox &&
                   (() => {
@@ -844,19 +808,7 @@ function MainContent({
                 </div>
               </div>
             </div>
-            <div
-              className="global-playhead-overlay"
-              style={{
-                left: `${timelineMetrics.leftOffsetPx}px`,
-                width: `${timelineMetrics.widthPx}px`,
-              }}
-            >
-              <GlobalPlayhead
-                totalLengthMs={totalLengthMs}
-                timelineWidth={timelineMetrics.widthPx}
-              />
-            </div>
-          </div>
+          </>
         ) : (
           <div className="empty-state" role="status" aria-live="polite">
             Import an audio file

@@ -155,7 +155,7 @@ class PlaybackEngine {
 
     // If we're at the end, restart from the beginning
     const len = this.version?.lengthMs;
-    const currentMs = this._toDisplayMs(this.getPositionMs());
+    const currentMs = this.getPositionMs();
     if (typeof len === "number" && len > 0 && currentMs >= len) {
       this.seekMs(0);
       this.ended = false;
@@ -194,22 +194,6 @@ class PlaybackEngine {
   /** Get the current playback position in milliseconds */
   getPositionMs() {
     return Tone.Transport.seconds * 1000;
-  }
-
-  _getJogMs() {
-    return Math.max(0, Number(this.jogLatencySec || 0) * 1000);
-  }
-
-  _toDisplayMs(rawMs) {
-    const len = this.version?.lengthMs;
-    const safeRaw = Number(rawMs);
-    const jogMs = this._getJogMs();
-    let adjusted = Number.isFinite(safeRaw) ? safeRaw - jogMs : 0;
-    adjusted = Math.max(0, adjusted);
-    if (typeof len === "number" && len >= 0) {
-      adjusted = Math.min(adjusted, len);
-    }
-    return adjusted;
   }
 
   /** Define a loop range for the transport */
@@ -1589,23 +1573,23 @@ class PlaybackEngine {
    */
   _startRaf() {
     const tick = () => {
-      const rawMs = this.getPositionMs();
+      let ms = this.getPositionMs();
       const len = this.version?.lengthMs;
-      let displayMs = this._toDisplayMs(rawMs);
-
-      if (typeof len === "number" && len > 0 && displayMs >= len) {
-        displayMs = len;
-        if (!this.ended) {
-          try {
-            Tone.Transport.pause();
-          } catch {}
-          this.seekMs(len);
-          this._emitTransport(false);
-          this.ended = true;
+      if (typeof len === "number" && len > 0) {
+        if (ms >= len) {
+          // Clamp and auto-pause exactly at the end once
+          ms = len;
+          if (!this.ended) {
+            try {
+              Tone.Transport.pause();
+            } catch {}
+            this.seekMs(len);
+            this._emitTransport(false);
+            this.ended = true;
+          }
         }
       }
-
-      this.events.onProgress && this.events.onProgress(displayMs);
+      this.events.onProgress && this.events.onProgress(ms);
       this.rafId = requestAnimationFrame(tick);
     };
     this.rafId = requestAnimationFrame(tick);
@@ -1633,7 +1617,7 @@ class PlaybackEngine {
     this.events.onTransport &&
       this.events.onTransport({
         playing,
-        positionMs: this._toDisplayMs(this.getPositionMs()),
+        positionMs: this.getPositionMs(),
         bpm: this.version?.bpm || 120,
       });
   }
