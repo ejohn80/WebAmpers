@@ -39,6 +39,7 @@ function DropdownPortal({
   onCutTrack,
   onCopyTrack,
   onPasteTrack,
+  onDeleteTrack,
   selectedTrackId,
   hasClipboard,
   onSamplerRecording,
@@ -149,6 +150,13 @@ function DropdownPortal({
 
   const handleMouseLeave = () => {
     setTooltip({show: false, text: "", x: 0, y: 0});
+  };
+
+  const handleDelete = (e) => {
+    e.preventDefault();
+    if (!selectedTrackId) return;
+    onDeleteTrack?.(selectedTrackId); 
+    setActiveDropdown(null);
   };
 
   useEffect(() => {
@@ -477,8 +485,16 @@ function DropdownPortal({
         {/* DISABLED - Delete */}
         <a
           href="#"
-          className="dropdown-item-disabled"
-          onClick={(e) => e.preventDefault()}
+          className={!selectedTrackId ? "dropdown-item-disabled" : ""}
+          onClick={handleDelete}
+          onMouseEnter={(e) =>
+            !selectedTrackId &&
+            handleMouseEnter("Please select a track first", e)
+          }
+          onMouseLeave={handleMouseLeave}
+          style={{
+            cursor: selectedTrackId ? "pointer" : "not-allowed",
+          }}
         >
           <span
             style={{

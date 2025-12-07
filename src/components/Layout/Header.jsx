@@ -10,6 +10,7 @@ function Header({
   onCutTrack,
   onCopyTrack,
   onPasteTrack,
+  onDeleteTrack,
   selectedTrackId,
   hasClipboard,
   onSamplerRecording,
@@ -30,6 +31,7 @@ function Header({
             onCutTrack={onCutTrack}
             onCopyTrack={onCopyTrack}
             onPasteTrack={onPasteTrack}
+            onDeleteTrack={onDeleteTrack}
             selectedTrackId={selectedTrackId}
             hasClipboard={hasClipboard}
             onSamplerRecording={onSamplerRecording}

@@ -1753,6 +1753,7 @@ function AudioPage() {
         onCutTrack={handleCutTrack}
         onCopyTrack={handleCopyTrack}
         onPasteTrack={handlePasteTrack}
+        onDeleteTrack={handleDeleteTrack}
         selectedTrackId={selectedTrackId}
         hasClipboard={hasClipboardFlag}
         onSamplerRecording={handleSamplerRecording}
