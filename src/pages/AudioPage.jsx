@@ -23,7 +23,7 @@ import {insertSegmentWithSpacing} from "../utils/segmentPlacement";
 const MIN_WIDTH = 0;
 const MAX_WIDTH = 300;
 
-// Buffer cache to share audio buffers across tracks from the same asset
+// Buffer cache to share audio buffers tracks from the same asset
 const assetBufferCache = new Map(); // assetId -> Tone.ToneAudioBuffer
 
 // Empty version constant for reuse
@@ -64,15 +64,17 @@ function AudioPage() {
   // Keyboard shortcuts for cut/copy/paste
   useEffect(() => {
     const handleKeyDown = (e) => {
-      // Check if we're in an input or textarea
       const activeElement = document.activeElement;
-      const isInputField =
-        activeElement.tagName === "INPUT" ||
+      const isTextEntry =
         activeElement.tagName === "TEXTAREA" ||
-        activeElement.isContentEditable;
+        activeElement.isContentEditable ||
+        (activeElement.tagName === "INPUT" &&
+          !["range", "checkbox", "radio", "button", "submit", "file"].includes(
+            activeElement.type
+          ));
 
-      // Don't trigger shortcuts if typing in an input field
-      if (isInputField) return;
+      // Don't trigger shortcuts if typing in a text field
+      if (isTextEntry) return;
 
       // Check for Ctrl/Cmd + X (Cut)
       if ((e.ctrlKey || e.metaKey) && e.key === "x") {
@@ -446,7 +448,6 @@ function AudioPage() {
     return vs;
   };
 
-  // Load tracks for active session
   // Load tracks for active session
   useEffect(() => {
     if (!activeSession) return;
