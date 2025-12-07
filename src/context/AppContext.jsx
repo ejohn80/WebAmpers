@@ -80,6 +80,7 @@ const AppContextProvider = ({children}) => {
   const {userData, loading} = useUserData();
 
   const [activeProject, setActiveProject] = useState();
+  const [dbRefreshTrigger, setDbRefreshTrigger] = useState(0);
 
   // Active session state with localStorage persistence
   const [activeSession, setActiveSession] = useState(getInitialActiveSession);
@@ -864,6 +865,10 @@ const AppContextProvider = ({children}) => {
     } catch {}
   }, [engineRef]);
 
+  const refreshDB = useCallback(() => {
+    setDbRefreshTrigger((prev) => prev + 1);
+  }, []);
+
   const contextValue = useMemo(
     () => ({
       userData,
@@ -914,6 +919,9 @@ const AppContextProvider = ({children}) => {
       setSelectedTrackActiveEffects,
 
       applyFilteredEffectsToTrack,
+
+      refreshDB,
+      dbRefreshTrigger,
     }),
     [
       userData,
@@ -946,6 +954,8 @@ const AppContextProvider = ({children}) => {
       selectedTrackActiveEffects,
       setSelectedTrackActiveEffects,
       applyFilteredEffectsToTrack,
+      refreshDB,
+      dbRefreshTrigger,
     ]
   );
 

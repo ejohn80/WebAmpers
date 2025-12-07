@@ -544,15 +544,9 @@ const TrackLane = memo(function TrackLane({
             style={{top: `${contextMenu.y}px`, left: `${contextMenu.x}px`}}
             role="menu"
           >
-            <button
-              className="context-menu-item"
-              onClick={() => handleMenuAction(toggleMute)}
-              role="menuitem"
-            >
-              {muted ? "Unmute" : "Mute"}
-            </button>
             {contextMenu.target === "segment" && (
               <>
+                <div className="context-menu-section-title">Segment</div>
                 <button
                   className="context-menu-item context-menu-item--danger"
                   onClick={handleSegmentDeleteAction}
@@ -563,13 +557,30 @@ const TrackLane = memo(function TrackLane({
                 <div className="context-menu-divider" />
               </>
             )}
-            <button
-              className="context-menu-item"
-              onClick={() => handleMenuAction(toggleSolo)}
-              role="menuitem"
-            >
-              {soloed ? "Unsolo" : "Solo"}
-            </button>
+            <div className="context-menu-section-title">Track</div>
+            <div className="context-menu-stack">
+              <button
+                className="context-menu-item"
+                onClick={() => handleMenuAction(toggleMute)}
+                role="menuitem"
+              >
+                {muted ? "Unmute" : "Mute"}
+              </button>
+              <button
+                className="context-menu-item"
+                onClick={() => handleMenuAction(toggleSolo)}
+                role="menuitem"
+              >
+                {soloed ? "Unsolo" : "Solo"}
+              </button>
+              <button
+                className="context-menu-item context-menu-item--danger"
+                onClick={() => handleMenuAction(handleDelete)}
+                role="menuitem"
+              >
+                Delete Track
+              </button>
+            </div>
             <div className="context-menu-divider" />
             <button
               className={`context-menu-item${
@@ -600,14 +611,6 @@ const TrackLane = memo(function TrackLane({
               disabled={!hasClipboard}
             >
               Paste
-            </button>
-            <div className="context-menu-divider" />
-            <button
-              className="context-menu-item context-menu-item--danger"
-              onClick={() => handleMenuAction(handleDelete)}
-              role="menuitem"
-            >
-              Delete Track
             </button>
           </div>,
           document.body

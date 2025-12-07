@@ -8,8 +8,13 @@ import {dbManager} from "../../../managers/DBManager";
 import styles from "../Layout.module.css";
 
 function SessionsTab() {
-  const {activeSession, setActiveSession, effects, setEffects} =
-    useContext(AppContext);
+  const {
+    activeSession,
+    setActiveSession,
+    effects,
+    setEffects,
+    dbRefreshTrigger,
+  } = useContext(AppContext);
 
   const [isLoading, setIsLoading] = useState(true);
   const [sessions, setSessions] = useState([]);
@@ -100,8 +105,14 @@ function SessionsTab() {
     setActiveSession,
   ]);
 
+  // Reload sessions when dbRefreshTrigger changes (from loading cloud saves)
+  useEffect(() => {
+    if (hasInitialized) {
+      loadSessions();
+    }
+  }, [dbRefreshTrigger, hasInitialized, loadSessions]);
+
   // Load session effects when active session changes
-  // This ensures effects parameters are loaded from IndexedDB when switching sessions
   useEffect(() => {
     if (!activeSession || !hasInitialized) return;
 
@@ -120,8 +131,7 @@ function SessionsTab() {
     loadSessionEffects();
   }, [activeSession, hasInitialized, setEffects]);
 
-  // Save effects when they change (REINSTATED)
-  // This ensures effects parameters are saved to IndexedDB for persistence across refreshes
+  // Save effects when they change
   useEffect(() => {
     if (!activeSession || !hasInitialized) return;
 
@@ -145,7 +155,7 @@ function SessionsTab() {
       const sessionNumber = sessions.length + 1;
       const newSessionName = `Session ${sessionNumber}`;
 
-      // FIX: Use clean default effects (prevents copying)
+      // Use clean default effects
       const newSessionId = await dbManager.createSession(newSessionName, {
         effects: createDefaultEffects(),
       });

@@ -1,5 +1,3 @@
-import {useUserData} from "../../hooks/useUserData";
-import {useNavigate} from "react-router-dom";
 import DropdownPortal from "./DropdownPortal";
 import "./Header.css";
 
@@ -16,15 +14,12 @@ function Header({
   hasClipboard,
   onSamplerRecording,
 }) {
-  const navigate = useNavigate();
-  const {userData, loading} = useUserData();
-
   return (
     <div className="header">
       <div className="container">
         {/* container for logo + dropdown */}
         <div className="leftContainer">
-          <span className="webampText">Webamp</span>
+          <span className="webampText">WebAmp</span>
           <DropdownPortal
             side="left"
             tracks={tracks}
