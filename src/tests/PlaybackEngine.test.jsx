@@ -112,6 +112,16 @@ const makeVersion = (tracks) => ({
   loop: {enabled: false},
 });
 
+const createDeferred = () => {
+  let resolve;
+  let reject;
+  const promise = new Promise((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return {promise, resolve, reject};
+};
+
 describe("PlaybackEngine mute/solo behavior (via WebAmpPlayback)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -324,5 +334,46 @@ describe("PlaybackEngine segment scheduling", () => {
       offset: 1,
       duration: 2,
     });
+  });
+});
+
+describe("PlaybackEngine load coordination", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("serializes overlapping load requests", async () => {
+    const engine = new PlaybackEngine({});
+    const deferred = createDeferred();
+    const order = [];
+
+    const versionA = makeVersion([{id: "a"}]);
+    const versionB = makeVersion([{id: "b"}]);
+
+    const perfSpy = vi
+      .spyOn(engine, "_performLoad")
+      .mockImplementationOnce(async (version) => {
+        order.push(`start-${version.tracks[0].id}`);
+        await deferred.promise;
+        order.push(`end-${version.tracks[0].id}`);
+      })
+      .mockImplementationOnce(async (version) => {
+        order.push(`start-${version.tracks[0].id}`);
+        order.push(`end-${version.tracks[0].id}`);
+      });
+
+    const p1 = engine.load(versionA);
+    const p2 = engine.load(versionB);
+
+    // Allow event loop to process queued calls; second load should not start yet
+    await Promise.resolve();
+    expect(perfSpy).toHaveBeenCalledTimes(1);
+
+    deferred.resolve();
+    await Promise.all([p1, p2]);
+
+    expect(order).toEqual(["start-a", "end-a", "start-b", "end-b"]);
+
+    perfSpy.mockRestore();
   });
 });

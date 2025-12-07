@@ -81,6 +81,11 @@ class PlaybackEngine {
     this.renderAheadSec = 0.2; // small pre-buffer before playback starts
     this.jogLatencySec = 0.02; // latency compensation for seeking
     this.defaultFadeMs = 5; // default fade time in milliseconds
+
+    // load serialization state
+    this._pendingLoadVersion = null;
+    this._isLoadRunning = false;
+    this._loadPromise = Promise.resolve();
   }
 
   /** Ensure Tone.js AudioContext is running (required by browsers for playback) */
@@ -91,62 +96,27 @@ class PlaybackEngine {
   }
 
   /** Load a new project ("version") into the playback engine */
-  /** Load a new project ("version") into the playback engine */
   async load(version) {
-    await this.ensureAudioUnlocked();
+    this._pendingLoadVersion = version;
 
-    // Reset Tone.Transport and clear previous state
-    Tone.Transport.stop();
-    Tone.Transport.cancel(0);
-    this._cancelRaf();
-    this._disposeAll();
-    Tone.Transport.cancel(0);
-    this._disposeMaster();
-    this._emitTransport(false);
-
-    // Save the version reference
-    this.version = version;
-    this.ended = false;
-
-    // Configure transport tempo and time signature
-    Tone.Transport.bpm.value = version.bpm || 120;
-    const ts = Array.isArray(version.timeSig) ? version.timeSig : [4, 4];
-    Tone.Transport.timeSignature = ts;
-
-    // Create master bus using the effects defined in the project's masterChain
-    this.master = this._createMasterChain(version.masterChain);
-
-    // Create all track buses and connect them to master
-    (version.tracks || []).forEach((t) => {
-      const bus = this._makeTrackBus(t);
-      this.trackBuses.set(t.id, bus);
-      (bus.fxOut ?? bus.pan).connect(this.master.fxIn);
-    });
-
-    (version.tracks || []).forEach((t) => {
-      // Apply pan if it exists in effects
-      if (t.effects && t.effects.pan !== undefined && t.effects.pan !== 0) {
-        this.setTrackPan(t.id, t.effects.pan);
-      }
-
-      // Apply other effects - FIXED: Pass empty enabled map and silent flag
-      if (t.effects) {
-        this.setTrackEffects(t.id, t.effects, t.enabledEffects || {}, true);
-      }
-    });
-
-    // Prepare all audio segments (Tone.Player instances)
-    await this._prepareSegments(version);
-
-    // Enable or clear looping if defined
-    if (version.loop && version.loop.enabled) {
-      this.setLoop(version.loop.startMs, version.loop.endMs);
-    } else {
-      this.clearLoop();
+    if (this._isLoadRunning) {
+      return this._loadPromise;
     }
 
-    // Start updating progress via requestAnimationFrame
-    this._startRaf();
+    this._isLoadRunning = true;
+    this._loadPromise = (async () => {
+      try {
+        while (this._pendingLoadVersion) {
+          const nextVersion = this._pendingLoadVersion;
+          this._pendingLoadVersion = null;
+          await this._performLoad(nextVersion);
+        }
+      } finally {
+        this._isLoadRunning = false;
+      }
+    })();
+
+    return this._loadPromise;
   }
 
   /** Start playback of the Tone.Transport */
@@ -1278,6 +1248,69 @@ class PlaybackEngine {
   }
 
   // ---------- Internal methods ----------
+
+  /**
+   * Actual implementation for loading a version once queued serialization allows it.
+   * @private
+   */
+  async _performLoad(version) {
+    if (!version) return;
+
+    await this.ensureAudioUnlocked();
+
+    // Reset Tone.Transport and clear previous state
+    Tone.Transport.stop();
+    Tone.Transport.cancel(0);
+    this._cancelRaf();
+    this._disposeAll();
+    Tone.Transport.cancel(0);
+    this._disposeMaster();
+    this._emitTransport(false);
+
+    // Save the version reference
+    this.version = version;
+    this.ended = false;
+
+    // Configure transport tempo and time signature
+    Tone.Transport.bpm.value = version.bpm || 120;
+    const ts = Array.isArray(version.timeSig) ? version.timeSig : [4, 4];
+    Tone.Transport.timeSignature = ts;
+
+    // Create master bus using the effects defined in the project's masterChain
+    this.master = this._createMasterChain(version.masterChain);
+
+    // Create all track buses and connect them to master
+    (version.tracks || []).forEach((t) => {
+      const bus = this._makeTrackBus(t);
+      this.trackBuses.set(t.id, bus);
+      (bus.fxOut ?? bus.pan).connect(this.master.fxIn);
+    });
+
+    (version.tracks || []).forEach((t) => {
+      // Apply pan if it exists in effects
+      if (t.effects && t.effects.pan !== undefined && t.effects.pan !== 0) {
+        this.setTrackPan(t.id, t.effects.pan);
+      }
+
+      // Apply other effects - FIXED: Pass empty enabled map and silent flag
+      if (t.effects) {
+        this.setTrackEffects(t.id, t.effects, t.enabledEffects || {}, true);
+      }
+    });
+
+    // Prepare all audio segments (Tone.Player instances)
+    await this._prepareSegments(version);
+
+    // Enable or clear looping if defined
+    if (version.loop && version.loop.enabled) {
+      this.setLoop(version.loop.startMs, version.loop.endMs);
+    } else {
+      this.clearLoop();
+    }
+
+    // Start updating progress via requestAnimationFrame
+    this._startRaf();
+  }
 
   /** Prepare all segments (audio clips) and schedule them for playback */
   async _prepareSegments(version) {
