@@ -1,3 +1,5 @@
+/* Import button styling */
+
 .import-button {
   background-color: var(--import-btn-bg, #efefef);
   margin-top: 20px;

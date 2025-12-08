@@ -7,7 +7,7 @@ const CLIPBOARD_STORAGE_KEY = "webamp.clipboard";
 
 class ClipboardManager {
   constructor() {
-    this.clipboard = this.loadFromStorage();
+    this.clipboard = this.loadFromStorage(); // Load saved clipboard on init
   }
 
   /**

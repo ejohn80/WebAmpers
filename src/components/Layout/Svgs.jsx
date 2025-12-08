@@ -1,3 +1,15 @@
+/**
+ * SVG Icon Components
+ *
+ * This file contains reusable SVG icons used throughout the application.
+ *
+ * Usage: Import individual icons as needed
+ * Example: import { NewIcon } from './Svgs'
+ *
+ * To add a new icon:
+ * 1. Export a new component function with descriptive name
+ * 2. Maintain consistent sizing and styling
+ */
 export function NewIcon() {
   return (
     <svg

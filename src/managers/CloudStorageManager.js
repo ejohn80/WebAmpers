@@ -1,3 +1,10 @@
+/**
+ * CloudStorageManager.js - Firebase cloud storage integration for DAW projects
+ *
+ * Handles saving/loading complete DAW sessions to Firebase Cloud Storage with MP3 compression.
+ * Manages: session metadata, audio tracks, and assets with efficient storage and duplicate prevention.
+ */
+
 import {
   ref,
   uploadBytes,
@@ -11,14 +18,18 @@ import {dbManager} from "./DBManager";
 import ExportManager from "../components/AudioExport/ExportManager";
 import * as Tone from "tone";
 
+/**
+ * CloudStorageManager - Manages Firebase Cloud Storage operations for DAW sessions
+ * Handles saving/loading sessions with MP3-compressed audio assets
+ */
 class CloudStorageManager {
   constructor() {
-    this.STORAGE_PATH = "users";
-    this.exportManager = new ExportManager();
+    this.STORAGE_PATH = "users"; // Base storage path in Firebase
+    this.exportManager = new ExportManager(); // For MP3 encoding/decoding
   }
 
   /**
-   * Decode MP3 blob back to AudioBuffer
+   * Decode MP3 blob back to AudioBuffer for playback
    */
   async _decodeMp3(mp3Blob) {
     const arrayBuffer = await mp3Blob.arrayBuffer();
@@ -29,14 +40,22 @@ class CloudStorageManager {
   // -----------------------------------------------
   // SAVE: session + tracks + assets (with MP3 compression)
   // -----------------------------------------------
+  /**
+   * Save complete session to Firebase with MP3-compressed assets
+   * @param {string} userId - Firebase auth user ID
+   * @param {string} projectName - Name for the saved project
+   * @returns {string} Download URL of metadata file
+   */
   async saveToFirebase(userId, projectName) {
+    // Get current session from localStorage
     const sessionId = Number(localStorage.getItem("webamp.activeSession"));
     if (!sessionId) throw new Error("No active session");
 
+    // Load session and tracks from IndexedDB
     const session = await dbManager.getSession(sessionId);
     const tracks = await dbManager.getAllTracks(sessionId);
 
-    // Get all unique asset IDs from tracks
+    // Collect all unique asset IDs from tracks and segments
     const assetIds = new Set();
     tracks.forEach((track) => {
       if (track.assetId) assetIds.add(track.assetId);
@@ -49,6 +68,7 @@ class CloudStorageManager {
 
     console.log(`Saving ${tracks.length} tracks and ${assetIds.size} assets`);
 
+    // Create timestamped folder path: users/{userId}/saves/{projectName}_{timestamp}
     const folder = `${this.STORAGE_PATH}/${userId}/saves/${projectName}_${Date.now()}`;
 
     // Save each asset as compressed MP3
@@ -58,7 +78,7 @@ class CloudStorageManager {
         const asset = await dbManager.getAsset(assetId);
         if (!asset || !asset.buffer) continue;
 
-        // Reconstruct AudioBuffer from serialized format
+        // Reconstruct AudioBuffer from IndexedDB serialized format
         const Tone = await import("tone");
         const {numberOfChannels, length, sampleRate, channels} = asset.buffer;
 
@@ -68,6 +88,7 @@ class CloudStorageManager {
           sampleRate
         );
 
+        // Copy channel data back to AudioBuffer
         for (let i = 0; i < numberOfChannels; i++) {
           if (channels[i]) {
             const channelData = new Float32Array(channels[i]);
@@ -75,15 +96,16 @@ class CloudStorageManager {
           }
         }
 
-        // Compress to MP3 using ExportManager (use lower bitrate for smaller files)
+        // Compress to MP3 using ExportManager (192kbps for size/quality balance)
         const mp3Blob = this.exportManager.encodeMp3(nativeBuffer, 192);
 
-        // Upload MP3 to Firebase
+        // Upload MP3 to Firebase Storage
         const assetRef = ref(storage, `${folder}/assets/${assetId}.mp3`);
         await uploadBytes(assetRef, mp3Blob, {contentType: "audio/mp3"});
 
         const mp3Url = await getDownloadURL(assetRef);
 
+        // Store metadata for later reconstruction
         assetMetadata.push({
           id: asset.id,
           name: asset.name,
@@ -99,7 +121,7 @@ class CloudStorageManager {
       }
     }
 
-    // Save session metadata
+    // Save session metadata as JSON file
     const metadata = new Blob(
       [
         JSON.stringify(
@@ -125,10 +147,17 @@ class CloudStorageManager {
   // -----------------------------------------------
   // LOAD: session + tracks + assets (decompress MP3)
   // -----------------------------------------------
+  /**
+   * Load session from Firebase, decompress MP3 assets
+   * @param {string} userId - Firebase auth user ID
+   * @param {string} folderName - Name of saved folder
+   * @returns {Object} Load stats and new session ID
+   */
   async loadFromFirebase(userId, folderName) {
     const folder = `${this.STORAGE_PATH}/${userId}/saves/${folderName}`;
     const metaRef = ref(storage, `${folder}/metadata.json`);
 
+    // Download and parse metadata
     const url = await getDownloadURL(metaRef);
     const data = await fetch(url).then((r) => r.json());
 
@@ -136,25 +165,24 @@ class CloudStorageManager {
 
     console.log(`Loading: ${tracks.length} tracks, ${assets.length} assets`);
 
-    // Extract project name from folder name (remove timestamp)
+    // Extract project name from timestamped folder name (remove timestamp)
     const projectName = folderName.replace(/_\d+$/, "");
 
-    // Download and decode MP3 assets
-    const assetIdMap = new Map();
+    // Download and decode MP3 assets, map old IDs to new IDs
+    const assetIdMap = new Map(); // oldId → newId
     for (const assetMeta of assets) {
       try {
         const oldId = assetMeta.id;
 
-        // Get base name by removing (2), (3) etc suffix
+        // Remove duplicate suffix (e.g., " (2)", " (3)")
         const getBaseName = (name) => {
           return name.replace(/\s*\(\d+\)$/, "").trim();
         };
 
         const baseNameToFind = getBaseName(assetMeta.name);
 
-        // Check if this exact asset already exists
+        // Check if asset already exists in IndexedDB (avoid duplicates)
         const existingAssets = await dbManager.getAllAssets();
-
         const existingAsset = existingAssets.find((a) => {
           const existingBaseName = getBaseName(a.name);
           const nameMatch = existingBaseName === baseNameToFind;
@@ -162,16 +190,17 @@ class CloudStorageManager {
           return nameMatch;
         });
 
+        // Use existing asset if found (prevents duplicates)
         if (existingAsset) {
           assetIdMap.set(oldId, existingAsset.id);
           continue;
         }
 
-        // Download MP3 file
+        // Download MP3 file from Firebase
         const mp3Response = await fetch(assetMeta.mp3Url);
         const mp3Blob = await mp3Response.blob();
 
-        // Decode MP3 to AudioBuffer
+        // Decode MP3 back to AudioBuffer
         const audioBuffer = await this._decodeMp3(mp3Blob);
 
         // Serialize AudioBuffer for IndexedDB storage
@@ -188,7 +217,7 @@ class CloudStorageManager {
           serializedBuffer.channels.push(Array.from(channelData));
         }
 
-        // Store asset in IndexedDB with BASE NAME
+        // Store in IndexedDB with base name (no duplicate suffix)
         const assetToStore = {
           name: baseNameToFind,
           duration: assetMeta.duration,
@@ -207,21 +236,23 @@ class CloudStorageManager {
       }
     }
 
-    // Create a new session with the project name
+    // Create new session with loaded project name
     const newSessionId = await dbManager.createSession(projectName, {
       effects: session.effects || {pitch: 0, volume: 100, reverb: 0},
     });
 
-    // Recreate tracks with the new session ID and updated asset IDs
+    // Recreate tracks with new session ID and updated asset IDs
     for (const track of tracks) {
       const clean = {...track};
-      delete clean.id;
+      delete clean.id; // Remove old ID for new creation
       clean.sessionId = newSessionId;
 
+      // Update asset references using the ID mapping
       if (clean.assetId && assetIdMap.has(clean.assetId)) {
         clean.assetId = assetIdMap.get(clean.assetId);
       }
 
+      // Update segment asset references
       if (clean.segments) {
         clean.segments = clean.segments.map((seg) => ({
           ...seg,
@@ -235,6 +266,7 @@ class CloudStorageManager {
       await dbManager.addTrack(clean, newSessionId);
     }
 
+    // Set as active session in localStorage
     localStorage.setItem("webamp.activeSession", String(newSessionId));
 
     return {
@@ -245,6 +277,9 @@ class CloudStorageManager {
     };
   }
 
+  /**
+   * Quick load from standard "quicksave" folder
+   */
   async quickLoad(userId) {
     return this.loadFromFirebase(userId, "quicksave");
   }
@@ -252,6 +287,11 @@ class CloudStorageManager {
   // -----------------------------------------------
   // LIST SAVES
   // -----------------------------------------------
+  /**
+   * List all saved sessions for a user
+   * @param {string} userId - Firebase auth user ID
+   * @returns {Array} List of saved sessions sorted by date
+   */
   async listSaves(userId) {
     const base = ref(storage, `${this.STORAGE_PATH}/${userId}/saves`);
     const res = await listAll(base);
@@ -261,9 +301,8 @@ class CloudStorageManager {
       try {
         const metaRef = ref(storage, `${folder.fullPath}/metadata.json`);
         const meta = await getMetadata(metaRef);
-        // const url = await getDownloadURL(metaRef);
 
-        // Extract project name from folder name (remove timestamp)
+        // Extract clean project name from timestamped folder
         const folderName = folder.name;
         const projectName = folderName.replace(/_\d+$/, "");
 
@@ -272,19 +311,23 @@ class CloudStorageManager {
           projectName: projectName,
           savedAt: meta.timeCreated,
           size: meta.size,
-          // url
+          // url: url // Optionally include direct URL
         });
       } catch (e) {
         console.log(e);
       }
     }
 
+    // Sort by most recent first
     return out.sort((a, b) => new Date(b.savedAt) - new Date(a.savedAt));
   }
 
   // -----------------------------------------------
   // DELETE SAVE
   // -----------------------------------------------
+  /**
+   * Delete a saved session folder and all contents
+   */
   async deleteSave(userId, folderName) {
     const folderRef = ref(
       storage,
@@ -297,7 +340,7 @@ class CloudStorageManager {
       // Delete all files in the main folder
       await Promise.all(res.items.map((item) => deleteObject(item)));
 
-      // Delete all files in subfolders (like assets/)
+      // Delete all files in subfolders (e.g., assets/)
       for (const subFolder of res.prefixes) {
         const subRes = await listAll(subFolder);
         await Promise.all(subRes.items.map((item) => deleteObject(item)));
@@ -312,4 +355,5 @@ class CloudStorageManager {
   }
 }
 
+// Export singleton instance
 export const cloudStorageManager = new CloudStorageManager();

@@ -3,43 +3,54 @@ import Waveform from "../Waveform/Waveform";
 import {progressStore} from "../../playback/progressStore";
 import "./SegmentBlock.css";
 
+// Minimum mouse movement required to start dragging (prevents accidental drags from clicks)
 const DRAG_ACTIVATION_THRESHOLD_PX = 3;
 
 /**
  * SegmentBlock - A draggable audio segment within a track lane
+ * Displays audio waveform and allows repositioning via drag-and-drop
  */
 const SegmentBlock = ({
-  segment,
-  trackColor,
-  pxPerMs,
-  totalLengthMs,
-  onSegmentMove,
-  segmentIndex,
-  isSelected = false,
-  onSelect,
-  onSegmentContextMenu = null,
+  segment, // Audio segment data object
+  trackColor, // Color for waveform display
+  pxPerMs, // Pixels per millisecond for positioning
+  totalLengthMs, // Total timeline length in ms
+  onSegmentMove, // Callback when segment is moved
+  segmentIndex, // Index of this segment in parent array
+  isSelected = false, // Whether this segment is currently selected
+  onSelect, // Callback when segment is clicked/selected
+  onSegmentContextMenu = null, // Right-click context menu handler
 }) => {
+  // State for drag operation
   const [isDragging, setIsDragging] = useState(false);
-  const [dragOffset, setDragOffset] = useState(0);
-  const dragStartX = useRef(0);
-  const originalPosition = useRef(0);
-  const segmentRef = useRef(null);
-  const pxPerMsRef = useRef(pxPerMs || 0);
-  const dragPlayheadMsRef = useRef(null);
-  const onSegmentMoveRef = useRef(onSegmentMove);
+  const [dragOffset, setDragOffset] = useState(0); // Current drag offset in pixels
 
+  // Refs for tracking drag state and values that need persistence
+  const dragStartX = useRef(0); // Mouse X position when drag started
+  const originalPosition = useRef(0); // Original timeline position in ms
+  const segmentRef = useRef(null); // Reference to DOM element
+  const pxPerMsRef = useRef(pxPerMs || 0); // Cached pxPerMs value
+  const dragPlayheadMsRef = useRef(null); // Saved playhead position during drag
+  const onSegmentMoveRef = useRef(onSegmentMove); // Cached move callback
+
+  // Update the move callback ref when prop changes
   useEffect(() => {
     onSegmentMoveRef.current = onSegmentMove;
   }, [onSegmentMove]);
 
+  // Update the pxPerMs ref when prop changes
   useEffect(() => {
     pxPerMsRef.current = pxPerMs || 0;
   }, [pxPerMs]);
 
+  // Extract audio buffer from segment data (supports multiple property names)
   const audioBuffer = segment.buffer ?? segment.fileBuffer ?? null;
+
+  // Calculate segment position and duration with safety bounds
   const startOnTimelineMs = Math.max(0, segment.startOnTimelineMs || 0);
   const durationMs = Math.max(0, segment.durationMs || 0);
 
+  // Debug logging for segment data
   useEffect(() => {
     console.log(`[SegmentBlock ${segmentIndex}] Segment data:`, {
       id: segment.id,
@@ -52,39 +63,46 @@ const SegmentBlock = ({
     });
   }, [segment, segmentIndex]);
 
+  // Determine display name for the segment
   const segmentName =
     segment.name || segment.fileName || `Segment ${segmentIndex + 1}`;
 
+  // Start scrub session for audio playback during drag
   const startDragSession = useCallback(() => {
-    if (dragPlayheadMsRef.current !== null) return;
+    if (dragPlayheadMsRef.current !== null) return; // Already in drag session
 
     const savedMs = progressStore.getState().ms;
-    dragPlayheadMsRef.current = savedMs;
+    dragPlayheadMsRef.current = savedMs; // Save current playhead position
+
     try {
+      // Begin scrubbing mode to pause playback and enable seeking
       progressStore.beginScrub({pauseTransport: true});
-      progressStore.setScrubLocked(true);
+      progressStore.setScrubLocked(true); // Lock scrub state
     } catch (err) {
       console.warn("[SegmentBlock] Failed to enter scrub mode:", err);
     }
-    setIsDragging(true);
+    setIsDragging(true); // Set dragging flag
   }, []);
 
+  // Handle mouse movement during drag operation
   const handleMouseMove = useCallback(
     (e) => {
       const deltaX = e.clientX - dragStartX.current;
 
+      // Check if we're past the drag activation threshold
       if (dragPlayheadMsRef.current === null) {
         if (Math.abs(deltaX) < DRAG_ACTIVATION_THRESHOLD_PX) {
-          return;
+          return; // Not enough movement yet
         }
-        startDragSession();
+        startDragSession(); // Start drag session once threshold crossed
       }
 
-      setDragOffset(deltaX);
+      setDragOffset(deltaX); // Update visual drag offset
     },
     [startDragSession]
   );
 
+  // Clean up scrub session after drag ends
   const finalizeDragPlaybackState = useCallback(() => {
     if (dragPlayheadMsRef.current === null) return;
 
@@ -93,6 +111,7 @@ const SegmentBlock = ({
       `[SegmentBlock] Finalizing drag, saved playhead was ${savedMs}ms`
     );
 
+    // Restore normal playback state
     progressStore.setScrubLocked(false);
     progressStore.endScrub();
     dragPlayheadMsRef.current = null;
@@ -100,18 +119,21 @@ const SegmentBlock = ({
     console.log(`[SegmentBlock] Scrub lock released, endScrub called`);
   }, []);
 
+  // Handle mouse up to finalize drag operation
   const handleMouseUp = useCallback(
     (e) => {
+      // Clean up global event listeners
       document.removeEventListener("mousemove", handleMouseMove);
       document.removeEventListener("mouseup", handleMouseUp);
 
+      // If no drag session was started (just a click)
       if (dragPlayheadMsRef.current === null) {
-        // Click without dragging; no position change or scrub session
         setIsDragging(false);
         setDragOffset(0);
         return;
       }
 
+      // Calculate new position based on drag distance
       const deltaX = e.clientX - dragStartX.current;
       const currentPxPerMs = pxPerMsRef.current;
       const deltaMs = currentPxPerMs > 0 ? deltaX / currentPxPerMs : 0;
@@ -121,6 +143,7 @@ const SegmentBlock = ({
       const snapMs = 10;
       const snappedPositionMs = Math.round(newPositionMs / snapMs) * snapMs;
 
+      // Call move handler if provided
       let movePromise = null;
       const moveHandler = onSegmentMoveRef.current;
       if (moveHandler) {
@@ -131,13 +154,16 @@ const SegmentBlock = ({
         }
       }
 
+      // Reset drag state
       setIsDragging(false);
       setDragOffset(0);
 
+      // Finalize scrub session
       const finish = () => {
         finalizeDragPlaybackState();
       };
 
+      // Handle promise if moveHandler returns one
       if (movePromise && typeof movePromise.finally === "function") {
         movePromise.finally(finish);
       } else {
@@ -147,11 +173,12 @@ const SegmentBlock = ({
     [handleMouseMove, segmentIndex, finalizeDragPlaybackState]
   );
 
-  // Calculate position style
+  // Calculate position style based on pxPerMs or percentage
   let positionStyle;
   let segmentWidthPx = 0;
 
   if (pxPerMs) {
+    // Calculate pixel-based positioning
     const leftPx =
       Math.round(startOnTimelineMs * pxPerMs) + (isDragging ? dragOffset : 0);
     const widthPx = Math.max(2, Math.round(durationMs * pxPerMs));
@@ -161,6 +188,7 @@ const SegmentBlock = ({
       width: `${widthPx}px`,
     };
   } else {
+    // Fallback to percentage-based positioning
     const leftPercent =
       totalLengthMs > 0 ? (startOnTimelineMs / totalLengthMs) * 100 : 0;
     const widthPercent =
@@ -174,27 +202,32 @@ const SegmentBlock = ({
   // Determine if overlay should be shown based on width
   const showOverlay = segmentWidthPx === 0 || segmentWidthPx >= 60;
 
+  // Handle mouse down to start drag or select segment
   const handleMouseDown = useCallback(
     (e) => {
-      if (e.button !== 0) return;
+      if (e.button !== 0) return; // Only handle left mouse button
 
       e.preventDefault();
       e.stopPropagation();
 
+      // Select segment if callback provided
       if (onSelect) {
         onSelect(segmentIndex);
       }
 
+      // Initialize drag tracking
       dragStartX.current = e.clientX;
       originalPosition.current = startOnTimelineMs;
       dragPlayheadMsRef.current = null;
 
+      // Add global event listeners for drag tracking
       document.addEventListener("mousemove", handleMouseMove);
       document.addEventListener("mouseup", handleMouseUp);
     },
     [handleMouseMove, handleMouseUp, onSelect, segmentIndex, startOnTimelineMs]
   );
 
+  // Clean up event listeners on unmount
   useEffect(() => {
     return () => {
       document.removeEventListener("mousemove", handleMouseMove);
@@ -203,6 +236,7 @@ const SegmentBlock = ({
     };
   }, [handleMouseMove, handleMouseUp, finalizeDragPlaybackState]);
 
+  // Build CSS class names based on state
   const segmentClassName = `tracklane-segment-positioned ${
     isDragging ? "dragging" : ""
   } ${isSelected ? "selected" : ""}`;
@@ -214,9 +248,9 @@ const SegmentBlock = ({
       style={{
         position: "absolute",
         height: "100%",
-        cursor: isDragging ? "grabbing" : "grab",
-        zIndex: isDragging ? 1000 : 1,
-        opacity: isDragging ? 0.8 : 1,
+        cursor: isDragging ? "grabbing" : "grab", // Change cursor based on drag state
+        zIndex: isDragging ? 1000 : 1, // Bring to front when dragging
+        opacity: isDragging ? 0.8 : 1, // Slightly transparent when dragging
         ...positionStyle,
       }}
       onMouseDown={handleMouseDown}

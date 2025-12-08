@@ -1,9 +1,11 @@
+/* Universal box-sizing for consistent sizing */
 *,
 *::before,
 *::after {
   box-sizing: border-box;
 }
 
+/* CSS Custom Properties (variables) for dark theme (default) */
 :root {
   --app-bg: #1e1d20;
   --app-text: #e5e5e5;
@@ -248,12 +250,12 @@
   --songname-color: rgb(209, 209, 209);
   --segment-overlay: rgba(0, 0, 0, 0.75);
   --segment-name: #ffffff;
+  --side-bar-hover: #1e3c43;
 }
 
 /* ======================================================================
-   Light mode themes
+   Light mode theme override
    ====================================================================== */
-
 .theme-light {
   --app-bg: #f4f6fb;
   --app-text: #1f1f2a;
@@ -510,15 +512,17 @@
   --segment-overlay: rgba(179, 179, 179, 0.75);
   --segment-name: black;
   --mute-btn-hover: #52cbd465;
+  --side-bar-hover: #52cbd4;
 }
 
+/* Base body styles */
 html,
 body {
   font-family: "Roboto";
 }
 
 body {
-  background-color: var(--app-bg);
+  background-color: var(--app-bg); /* Use theme variable */
   color: var(--app-text);
   margin: 0;
 }

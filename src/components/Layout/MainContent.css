@@ -1,5 +1,6 @@
 /* MainContent.css - Styles for multi-track display */
 
+/* Main container for timeline and tracks */
 .maincontent {
   display: flex;
   flex-direction: column;
@@ -12,12 +13,14 @@
   --track-controls-width: 100px;
   --track-controls-gap: 5px;
   --track-row-padding: 8px;
+  /* Calculate left offset for track controls + spacing */
   --timeline-left-offset: calc(
     var(--track-row-padding, 0px) + var(--track-controls-width) +
       var(--track-controls-gap)
   );
 }
 
+/* Scrollable timeline area */
 .timeline-scroll-area {
   flex: 1 1 auto;
   overflow: auto;
@@ -26,6 +29,7 @@
   min-height: 0;
 }
 
+/* Content wrapper with minimum width for zoom */
 .timeline-scroll-content {
   position: relative;
   min-width: calc(
@@ -34,10 +38,12 @@
   padding-bottom: 24px;
 }
 
+/* Stack timeline ruler, tracks, and playhead */
 .timeline-stack {
   position: relative;
 }
 
+/* Container for all audio tracks */
 .tracks-container {
   display: flex;
   flex-direction: column;
@@ -45,7 +51,7 @@
   width: 100%;
 }
 
-/* Wrapper to position global playhead across all tracks */
+/* Wrapper for positioning relative elements (cut box, playhead) */
 .tracks-relative {
   position: relative;
   min-width: calc(
@@ -53,6 +59,7 @@
   );
 }
 
+/* Global playhead line across all tracks */
 .global-playhead {
   position: absolute;
   top: 0;
@@ -65,6 +72,7 @@
   transform: translate3d(0, 0, 0);
 }
 
+/* Overlay container for playhead positioning */
 .global-playhead-overlay {
   position: absolute;
   top: 0;
@@ -73,7 +81,7 @@
   z-index: 14;
 }
 
-/* Trim selection side handles */
+/* Trim handles for segment editing */
 .trim-handle {
   position: absolute;
   top: 0;
@@ -85,22 +93,23 @@
   z-index: 15;
 }
 
-/* Center each handle on its percentage position */
+/* Left/right trim handle positioning */
 .trim-handle-left,
 .trim-handle-right {
   transform: translateX(-50%);
 }
 
-/* Trim controls (✓ / ✕) */
+/* Trim action buttons (confirm/cancel) */
 .trim-controls {
   position: absolute;
-  top: 4px; /* tweak if you want it higher/lower */
-  transform: translateX(-66px); /* small offset to the right of the handle */
+  top: 4px;
+  transform: translateX(-66px);
   display: flex;
   gap: 4px;
   z-index: 40;
 }
 
+/* Trim button base styles */
 .trim-btn {
   width: 22px;
   height: 22px;
@@ -114,17 +123,19 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
 }
 
+/* Confirm trim button (green) */
 .trim-confirm {
-  background: #26a269; /* green */
+  background: #26a269;
   color: #fff;
 }
 
+/* Cancel trim button (red) */
 .trim-cancel {
-  background: #c01c28; /* red */
+  background: #c01c28;
   color: #fff;
 }
 
-/* When trim mode is active, all tracks get a subtle highlight + pointer cursor */
+/* Track highlight during trim mode */
 .track-wrapper-trim-hover {
   cursor: pointer;
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.28) inset;
@@ -133,19 +144,18 @@
     background-color 0.12s ease-out;
 }
 
-/* Slightly stronger highlight on hover */
 .track-wrapper-trim-hover:hover {
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.45) inset;
 }
 
-/* Selected track during trim (this already existed, but we’ll now use it) */
+/* Selected track during trim editing */
 .track-wrapper-trim-selected {
   outline: 2px solid #ffcc33;
   outline-offset: -2px;
   background-color: rgba(255, 204, 51, 0.06);
 }
 
-/* Timeline ruler overlay */
+/* Timeline ruler with time markers */
 .timeline-ruler-bar {
   position: sticky;
   top: 0;
@@ -159,6 +169,7 @@
   overflow: visible;
 }
 
+/* Triangle indicator for timeline scrubbing */
 .timeline-scrub-indicator {
   position: absolute;
   top: 0;
@@ -175,6 +186,7 @@
   z-index: 12;
 }
 
+/* Background highlight for timeline area */
 .timeline-pre-highlight {
   position: absolute;
   top: 0;
@@ -183,12 +195,11 @@
   pointer-events: none;
 }
 
+/* Timeline tick marks and labels */
 .timeline-tick {
   position: absolute;
   top: 0;
-  transform: translateX(
-    -1px
-  ); /* center the 2px line on the computed position */
+  transform: translateX(-1px);
 }
 
 .timeline-tick-line {
@@ -204,6 +215,7 @@
   white-space: nowrap;
 }
 
+/* Pre-tick styling (minor subdivisions) */
 .timeline-tick.pre .timeline-tick-line {
   height: 14px;
   opacity: 0.3;
@@ -213,7 +225,7 @@
   display: none;
 }
 
-/* Zoom controls bar at bottom */
+/* Zoom controls bar (bottom-right) */
 .zoom-controls-bar {
   position: sticky;
   bottom: 0;
@@ -251,9 +263,11 @@
 .zoom-btn:hover {
   background: var(--zoom-btn-hover);
 }
+
 .zoom-btn.reset {
   opacity: 0.85;
 }
+
 .zoom-label {
   font-size: 12px;
   color: var(--zoom-label);
@@ -261,6 +275,7 @@
   text-align: center;
 }
 
+/* Follow playhead toggle */
 .follow-toggle {
   display: inline-flex;
   align-items: center;
@@ -280,7 +295,7 @@
   cursor: pointer;
 }
 
-/* Shorter in-between (minor) ticks */
+/* Minor timeline ticks (shorter) */
 .timeline-tick.minor .timeline-tick-line {
   height: 10px;
   background: var(--timeline-pre-line);
@@ -290,8 +305,8 @@
   display: none;
 }
 
+/* Individual track wrapper with separator */
 .track-wrapper {
-  /* Add a subtle separator between tracks */
   border-bottom: 1px solid var(--track-separator);
   padding-bottom: 16px;
 }
@@ -301,7 +316,7 @@
   padding-bottom: 0;
 }
 
-/* Yellow overlay covering the entire selected track (single-track trim) */
+/* Yellow highlight for selected track during trim */
 .track-trim-highlight {
   position: absolute;
   top: 0;
@@ -313,6 +328,7 @@
   z-index: 14;
 }
 
+/* Empty state when no tracks exist */
 .empty-state {
   flex: 1 1 auto;
   display: flex;
@@ -327,10 +343,10 @@
   padding: 32px 16px;
 }
 
-/* Ensure smooth scrolling */
+/* Custom scrollbar styling */
 .timeline-scroll-area::-webkit-scrollbar {
-  width: 8px; /* vertical */
-  height: 12px; /* horizontal */
+  width: 8px;
+  height: 12px;
 }
 
 .timeline-scroll-area::-webkit-scrollbar-track {
@@ -346,7 +362,7 @@
   background: var(--scrollbar-thumb-hover);
 }
 
-/* Timeline width is driven by global CSS var; can be < or > viewport based on zoom */
+/* Timeline width controlled by CSS variable for zoom */
 .tracklane-timeline {
   width: var(--timeline-content-width, 100%);
 }

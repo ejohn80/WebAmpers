@@ -1,3 +1,8 @@
+/**
+ * AudioManager.js - Singleton class for managing audio tracks in the DAW.
+ * Handles track creation from audio buffers, segment reconstruction, and resource management.
+ */
+
 import {AudioTrack} from "../models/AudioTrack";
 import {AudioSegment} from "../models/AudioSegment";
 import {createDefaultEffects} from "../context/effectsStorage";
@@ -8,7 +13,7 @@ import * as Tone from "tone";
  */
 class AudioManager {
   constructor() {
-    this.tracks = [];
+    this.tracks = []; // Array of AudioTrack instances
   }
 
   /**
@@ -22,10 +27,7 @@ class AudioManager {
       return null;
     }
 
-    // Accept multiple shapes:
-    // - { buffer: Tone.ToneAudioBuffer }
-    // - { segments: [{ buffer: { channels, sampleRate, length, numberOfChannels } }] } from IndexedDB
-    // Attempt to resolve or reconstruct a Tone.ToneAudioBuffer
+    // Convert various buffer formats to Tone.ToneAudioBuffer
     let toneBuffer = audioData.buffer || null;
     if (!toneBuffer) {
       try {
@@ -45,7 +47,6 @@ class AudioManager {
               : null;
           if (native) {
             for (let i = 0; i < b.numberOfChannels; i++) {
-              // If channels[i] is a typed array, copy directly; else coerce
               const arr = b.channels[i];
               if (arr && typeof native.copyToChannel === "function") {
                 native.copyToChannel(arr, i);
@@ -67,7 +68,7 @@ class AudioManager {
       return null;
     }
 
-    // Check if this track already exists by ID to prevent duplicates
+    // Prevent duplicate tracks by ID
     if (audioData.id && this.tracks.some((t) => t.id === audioData.id)) {
       console.warn(
         `Track with ID ${audioData.id} already exists, skipping duplicate`
@@ -75,7 +76,7 @@ class AudioManager {
       return this.tracks.find((t) => t.id === audioData.id);
     }
 
-    // Generate a unique color for this track
+    // Generate unique color for the track
     const colors = [
       "#00e5ff",
       "#1aff00",
@@ -89,12 +90,12 @@ class AudioManager {
     ];
     const color = colors[this.tracks.length % colors.length];
 
-    // Build segments
+    // Build segments from audio data
     let builtSegments = [];
     if (Array.isArray(audioData.segments) && audioData.segments.length > 0) {
       // Rehydrate each segment from stored data
       for (const s of audioData.segments) {
-        let segToneBuf = s.buffer || toneBuffer;
+        let segToneBuf = s.buffer || toneBuffer; // Use segment buffer or fallback to track buffer
 
         console.log(`[AudioManager] Processing segment ${s.id}:`, {
           hasOwnBuffer: !!s.buffer,
@@ -105,8 +106,7 @@ class AudioManager {
           assetId: s.assetId,
         });
 
-        // Try to reconstruct buffer from serialized data if present
-        // (This is only needed for segments with inline buffers, not asset references)
+        // Reconstruct buffer from serialized data if needed
         if (!segToneBuf) {
           try {
             const b = s?.buffer;
@@ -135,11 +135,11 @@ class AudioManager {
               `[AudioManager] Failed to reconstruct buffer for segment ${s.id}, using track buffer:`,
               err
             );
-            // fallback to main toneBuffer
             segToneBuf = toneBuffer;
           }
         }
 
+        // Calculate offset and duration in seconds
         const offsetSec =
           typeof s.offset === "number"
             ? s.offset
@@ -162,6 +162,7 @@ class AudioManager {
             hasFileName: !!s.fileName,
           });
 
+          // Create AudioSegment instance
           const seg = new AudioSegment({
             buffer: segToneBuf,
             offset: offsetSec,
@@ -170,7 +171,7 @@ class AudioManager {
             fileName: s.fileName || s.name || null,
           });
 
-          // Preserve metadata used by UI/engine
+          // Preserve metadata from serialized segment
           if (typeof s.durationMs === "number") seg.durationMs = s.durationMs;
           if (typeof s.startOnTimelineMs === "number")
             seg.startOnTimelineMs = s.startOnTimelineMs;
@@ -210,7 +211,7 @@ class AudioManager {
         );
       });
     } else {
-      // Single segment built from the provided buffer
+      // Create single segment from provided buffer
       const segment = new AudioSegment({
         buffer: toneBuffer,
         offset: 0,
@@ -231,11 +232,12 @@ class AudioManager {
       builtSegments = [segment];
     }
 
+    // Initialize track effects from data or defaults
     const trackEffects = audioData.effects || createDefaultEffects();
     const trackActiveEffectsList = audioData.activeEffectsList || [];
     const trackEnabledEffects = audioData.enabledEffects || {};
 
-    // Create the new track
+    // Create the new AudioTrack
     const track = new AudioTrack({
       id: audioData.id,
       name:

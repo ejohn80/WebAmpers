@@ -1,3 +1,30 @@
+// WEBAMP PLAYBACK MODULE
+// ============================================================================
+// Core audio playback engine and UI component for DAW
+//
+// MAIN COMPONENTS:
+// 1. PlaybackEngine Class - Audio processing engine using Tone.js
+// 2. WebAmpPlayback Component - React UI wrapper with controls
+//
+// KEY FEATURES:
+// - Multi-track audio playback with individual track buses
+// - Real-time audio effects processing (EQ, reverb, delay, pitch shift, etc.)
+// - Master volume control with mute persistence
+// - Timeline synchronization and transport control
+// - Interactive waveform scrubbing with audio ducking
+// - Keyboard shortcuts for common operations
+// - Offline audio rendering with effects
+// - Track mute/solo functionality
+// - Loop point support
+// - Audio file preloading and caching
+//
+// DEPENDENCIES:
+// - Tone.js (audio processing and scheduling)
+// - React Context (global state management)
+// - progressStore (timeline synchronization)
+//
+// ============================================================================
+
 import React, {
   useCallback,
   useContext,

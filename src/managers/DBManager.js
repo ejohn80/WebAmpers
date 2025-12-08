@@ -1,14 +1,24 @@
+/**
+ * DBManager.js - IndexedDB wrapper for WebAmp DAW
+ * Manages audio tracks, sessions, and assets with serialization support.
+ */
+
+// Database configuration constants
 const DB_NAME = "WebAmpDB";
 const DB_VERSION = 3;
-const TRACKS_STORE_NAME = "tracks";
-const SESSIONS_STORE_NAME = "sessions";
-const ASSETS_STORE_NAME = "assets";
+const TRACKS_STORE_NAME = "tracks"; // Store for audio tracks
+const SESSIONS_STORE_NAME = "sessions"; // Store for DAW sessions/projects
+const ASSETS_STORE_NAME = "assets"; // Store for audio assets/files
 
 class DBManager {
   constructor() {
-    this.db = null;
+    this.db = null; // IndexedDB connection
   }
 
+  /**
+   * Serialize AudioBuffer for IndexedDB storage
+   * Converts Float32Array channel data to storable format
+   */
   serializeBufferForStorage(buffer) {
     if (!buffer) return null;
 
@@ -23,6 +33,7 @@ class DBManager {
 
     const channels = [];
     if (typeof buffer.getChannelData === "function") {
+      // Native AudioBuffer - extract channel data
       for (let i = 0; i < numberOfChannels; i++) {
         try {
           const channelData = buffer.getChannelData(i);
@@ -37,6 +48,7 @@ class DBManager {
         }
       }
     } else if (Array.isArray(buffer.channels)) {
+      // Already serialized format - preserve Float32Arrays
       for (let i = 0; i < numberOfChannels; i++) {
         const channel = buffer.channels[i] || [];
         channels.push(
@@ -56,9 +68,14 @@ class DBManager {
     };
   }
 
+  /**
+   * Extract native AudioBuffer from various buffer formats
+   * Handles ToneAudioBuffer and other wrapper types
+   */
   extractBufferCandidate(candidate) {
     if (!candidate) return null;
 
+    // Direct AudioBuffer
     if (
       typeof AudioBuffer !== "undefined" &&
       candidate instanceof AudioBuffer
@@ -66,6 +83,7 @@ class DBManager {
       return candidate;
     }
 
+    // Tone.js ToneAudioBuffer (has .get() method)
     if (typeof candidate.get === "function") {
       try {
         const result = candidate.get();
@@ -75,6 +93,7 @@ class DBManager {
       }
     }
 
+    // Nested buffer property
     if (candidate.buffer) {
       if (
         typeof AudioBuffer !== "undefined" &&
@@ -98,6 +117,7 @@ class DBManager {
       }
     }
 
+    // Already has AudioBuffer-like properties
     if (
       typeof candidate.numberOfChannels === "number" &&
       typeof candidate.length === "number"
@@ -108,9 +128,14 @@ class DBManager {
     return null;
   }
 
+  /**
+   * Serialize segment data for IndexedDB storage
+   * Handles buffer serialization and asset ID mapping
+   */
   serializeSegmentForStorage(segment, defaultAssetId = null) {
     if (!segment) return null;
 
+    // Determine asset ID (prefer segment.assetId, fallback to track.assetId)
     const segAssetId =
       segment.assetId ?? segment.asset?.id ?? defaultAssetId ?? null;
 
@@ -136,12 +161,14 @@ class DBManager {
       fileName: segment.fileName || null,
     };
 
+    // Generate ID if missing
     if (!serialized.id) {
       serialized.id = `seg_${Date.now()}_${Math.random()
         .toString(36)
         .slice(2, 7)}`;
     }
 
+    // If no assetId, serialize the buffer directly into the segment
     if (!segAssetId) {
       const bufferCandidate =
         segment.buffer || segment.bufferData || segment.audioBuffer;
@@ -155,6 +182,9 @@ class DBManager {
     return serialized;
   }
 
+  /**
+   * Serialize multiple segments for storage
+   */
   serializeSegmentsForStorage(segments = [], defaultAssetId = null) {
     return segments
       .map((segment) =>
@@ -163,6 +193,9 @@ class DBManager {
       .filter(Boolean);
   }
 
+  /**
+   * Open IndexedDB connection with schema migration
+   */
   async openDB() {
     if (this.db) {
       return this.db;
@@ -199,7 +232,7 @@ class DBManager {
           });
         }
 
-        // Create assets store (v3)
+        // Create assets store (added in v3)
         if (!db.objectStoreNames.contains(ASSETS_STORE_NAME)) {
           const assetsStore = db.createObjectStore(ASSETS_STORE_NAME, {
             keyPath: "id",
@@ -278,6 +311,9 @@ class DBManager {
     });
   }
 
+  /**
+   * Add track to database with session association
+   */
   async addTrack(trackData, sessionId = null) {
     const db = await this.openDB();
     return new Promise((resolve, reject) => {
@@ -365,6 +401,9 @@ class DBManager {
     });
   }
 
+  /**
+   * Get tracks - either all or filtered by session
+   */
   async getAllTracks(sessionId = null) {
     const db = await this.openDB();
     return new Promise((resolve, reject) => {
@@ -709,6 +748,7 @@ class DBManager {
 
   /**
    * Add an asset (imported audio file) to the database
+   * Handles duplicate names by adding numeric suffixes
    * @param {Object} assetData - Asset metadata and buffer
    * @returns {Promise<number>} - Asset ID
    */
@@ -819,6 +859,7 @@ class DBManager {
 
   /**
    * Check if an asset is being used by any tracks
+   * Prevents deletion of in-use assets
    * @param {number} assetId
    * @returns {Promise<boolean>}
    */
@@ -919,4 +960,5 @@ class DBManager {
   }
 }
 
+// Export singleton instance
 export const dbManager = new DBManager();

@@ -1,3 +1,40 @@
+/**
+ * DropdownPortal Component
+ *
+ * Main header navigation with dropdown menus (File, Edit, Tools, Settings, User).
+ * Uses React portals for proper overlay behavior and z-index handling.
+ *
+ * Features:
+ * - Portal-rendered dropdowns with click-outside close behavior
+ * - Fullscreen toggle (cross-browser)
+ * - Light/Dark theme switch
+ * - Tool access (Equalizer, Sampler)
+ * - Audio import/export (with success/error callbacks)
+ * - Track editing: Cut/Copy/Paste/Delete
+ * - Conditional UI based on auth state
+ * - Cloud save/load for authenticated users
+ *
+ * Props:
+ * @param {string} side — Position ("left" or "right")
+ * @param {Array} tracks — Audio track list (validates export availability)
+ * @param {number} totalLengthMs — Total audio duration
+ * @param {function} onExportComplete
+ * @param {function} onImportSuccess
+ * @param {function} onImportError
+ * @param {function} onCutTrack
+ * @param {function} onCopyTrack
+ * @param {function} onPasteTrack
+ * @param {function} onDeleteTrack
+ * @param {string|null} selectedTrackId
+ * @param {boolean} hasClipboard
+ * @param {function} onSamplerRecording
+ *
+ * Dependencies:
+ * - AppContext (auth, theme, session, effects)
+ * - react-router-dom (navigation)
+ * - Icon components (./Svgs)
+ * - Tools: Equalizer, Sampler, AudioExportButton, AudioImportButton
+ */
 import React, {useState, useEffect, useRef, useContext} from "react";
 import {logout} from "../Auth/AuthUtils";
 import {AppContext} from "../../context/AppContext";
@@ -14,10 +51,7 @@ import "./Header.css";
 import {
   ExportIcon,
   ImportIcon,
-  UndoIcon,
-  RedoIcon,
   CutIcon,
-  TrimIcon,
   CopyIcon,
   PasteIcon,
   DeleteIcon,
@@ -42,57 +76,124 @@ function DropdownPortal({
   hasClipboard,
   onSamplerRecording,
 }) {
-  const navigate = useNavigate();
-  const {userData, closeEffectsMenu, setActiveSession, theme, setTheme} =
-    useContext(AppContext); // closes effects menu
+  // ================================
+  // Hooks and Context
+  // ================================
 
+  /**
+   * Navigation hook for redirecting to login/register pages
+   */
+  const navigate = useNavigate();
+
+  /**
+   * Application context providing user data, theme, and session management
+   * closeEffectsMenu: Function to close any open effects panels when menu is interacted with
+   */
+  const {userData, closeEffectsMenu, setActiveSession, theme, setTheme} =
+    useContext(AppContext);
+
+  // ================================
+  // State Management
+  // ================================
+
+  /**
+   * Currently active dropdown menu (null if none)
+   * Possible values: "file", "edit", "tools", "settings", "guest"
+   */
   const [activeDropdown, setActiveDropdown] = useState(null);
+
+  /**
+   * Currently active submenu within a dropdown (null if none)
+   * Currently used for "themes" submenu
+   */
   const [activeSubmenu, setActiveSubmenu] = useState(null);
+
+  /**
+   * Screen coordinates for positioning dropdowns relative to their trigger buttons
+   */
   const [position, setPosition] = useState({top: 0, left: 0});
 
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [isEQOpen, setIsEQOpen] = useState(false);
-  const [isSamplerOpen, setIsSamplerOpen] = useState(false);
-  const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
-  const [isLoadModalOpen, setIsLoadModalOpen] = useState(false);
+  /**
+   * Modal and tool states
+   */
+  const [isFullscreen, setIsFullscreen] = useState(false); // Tracks fullscreen state
+  const [isEQOpen, setIsEQOpen] = useState(false); // Equalizer modal visibility
+  const [isSamplerOpen, setIsSamplerOpen] = useState(false); // Sampler modal visibility
+  const [isSaveModalOpen, setIsSaveModalOpen] = useState(false); // Save modal visibility
+  const [isLoadModalOpen, setIsLoadModalOpen] = useState(false); // Load modal visibility
 
-  // Tooltip state
+  /**
+   * Tooltip state for displaying hints on disabled menu items
+   */
   const [tooltip, setTooltip] = useState({show: false, text: "", x: 0, y: 0});
 
+  // ================================
+  // DOM References
+  // ================================
+
+  /**
+   * References to menu button elements for calculating dropdown positions
+   */
   const fileButtonRef = useRef(null);
   const editButtonRef = useRef(null);
   const toolsButtonRef = useRef(null);
   const settingsButtonRef = useRef(null);
   const guestButtonRef = useRef(null);
 
+  /**
+   * References to dropdown container elements for click-outside detection
+   */
   const fileDropdownRef = useRef(null);
   const editDropdownRef = useRef(null);
   const toolsDropdownRef = useRef(null);
   const settingsDropdownRef = useRef(null);
   const guestDropdownRef = useRef(null);
 
-  // Check if there are any tracks available for export
+  // ================================
+  // Derived Values
+  // ================================
+
+  /**
+   * Determines if export functionality should be enabled
+   * Export requires at least one audio track to be present
+   */
   const hasTracksForExport = tracks && tracks.length > 0;
 
+  // ================================
+  // Event Handlers - Menu Actions
+  // ================================
+
+  /**
+   * Handles menu item selection and navigation
+   * @param {string} action - The action identifier (e.g., "Login", "Register")
+   */
   const handleMenuItemClick = (action) => {
     console.log(`Selected: ${action}`);
 
+    // Navigation actions
     if (action === "Login") {
       navigate("/login");
     } else if (action === "Register") {
       navigate("/register");
     }
 
-    // Don't close dropdown for Import/Export (handled by their wrappers)
+    // Close dropdown for all actions except Import/Export
+    // Import/Export are handled by their wrapper components
     if (action !== "Import" && action !== "Export") {
       setActiveDropdown(null);
     }
   };
 
+  /**
+   * Handles dropdown button clicks - toggles dropdown visibility
+   * @param {string} dropdownName - Identifier for which dropdown to toggle
+   * @param {React.RefObject} buttonRef - Reference to the clicked button element
+   */
   const handleButtonClick = (dropdownName, buttonRef) => {
-    // Close effects menu when any header button is clicked
+    // Close any open effects menu when header button is clicked
     closeEffectsMenu();
 
+    // Calculate dropdown position based on button location
     if (buttonRef.current) {
       const rect = buttonRef.current.getBoundingClientRect();
       setPosition({
@@ -101,64 +202,110 @@ function DropdownPortal({
       });
     }
 
+    // Toggle dropdown: open if closed, close if already open
     setActiveDropdown(activeDropdown === dropdownName ? null : dropdownName);
   };
 
+  /**
+   * Handles mouse leaving dropdown area - closes dropdown if mouse completely exits
+   * @param {MouseEvent} event - The mouse leave event
+   */
   const handleDropdownMouseLeave = (event) => {
     const relatedTarget = event.relatedTarget;
     const dropdown = event.currentTarget;
 
+    // Only close if mouse left the dropdown entirely (not just moving between child elements)
     if (!dropdown.contains(relatedTarget)) {
       setActiveDropdown(null);
     }
   };
 
-  // Handle Cut/Copy/Paste actions
+  // ================================
+  // Event Handlers - Edit Operations
+  // ================================
+
+  /**
+   * Handles cut operation on selected track
+   * @param {Event} e - Click event
+   */
   const handleCut = (e) => {
     e.preventDefault();
-    if (!selectedTrackId) return;
+    if (!selectedTrackId) return; // Require track selection
     onCutTrack?.();
-    setActiveDropdown(null);
+    setActiveDropdown(null); // Close dropdown after action
   };
 
+  /**
+   * Handles copy operation on selected track
+   * @param {Event} e - Click event
+   */
   const handleCopy = (e) => {
     e.preventDefault();
-    if (!selectedTrackId) return;
+    if (!selectedTrackId) return; // Require track selection
     onCopyTrack?.();
-    setActiveDropdown(null);
+    setActiveDropdown(null); // Close dropdown after action
   };
 
+  /**
+   * Handles paste operation from clipboard
+   * @param {Event} e - Click event
+   */
   const handlePaste = (e) => {
     e.preventDefault();
-    if (!hasClipboard) return;
+    if (!hasClipboard) return; // Require clipboard data
     onPasteTrack?.();
-    setActiveDropdown(null);
+    setActiveDropdown(null); // Close dropdown after action
   };
 
-  // Tooltip handlers
+  // ================================
+  // Event Handlers - Tooltips
+  // ================================
+
+  /**
+   * Shows tooltip when hovering over disabled menu items
+   * @param {string} text - Tooltip text to display
+   * @param {MouseEvent} event - Mouse enter event for positioning
+   */
   const handleMouseEnter = (text, event) => {
     const rect = event.currentTarget.getBoundingClientRect();
     setTooltip({
       show: true,
       text,
-      x: rect.left + rect.width / 2,
-      y: rect.bottom + 5,
+      x: rect.left + rect.width / 2, // Center tooltip horizontally
+      y: rect.bottom + 5, // Position just below element
     });
   };
 
+  /**
+   * Hides tooltip when mouse leaves element
+   */
   const handleMouseLeave = () => {
     setTooltip({show: false, text: "", x: 0, y: 0});
   };
 
+  /**
+   * Handles delete operation on selected track
+   * @param {Event} e - Click event
+   */
   const handleDelete = (e) => {
     e.preventDefault();
-    if (!selectedTrackId) return;
+    if (!selectedTrackId) return; // Require track selection
     onDeleteTrack?.(selectedTrackId);
-    setActiveDropdown(null);
+    setActiveDropdown(null); // Close dropdown after action
   };
 
+  // ================================
+  // Effects & Side Effects
+  // ================================
+
+  /**
+   * Effect: Sets up click-outside detection for closing dropdowns
+   * Listens for clicks anywhere in document and closes dropdown if click is outside
+   * both the dropdown and its trigger button
+   */
   useEffect(() => {
     function handleClickOutside(event) {
+      // Map dropdown names to their refs for easy lookup
       const dropdownRefs = {
         file: fileDropdownRef,
         edit: editDropdownRef,
@@ -178,6 +325,7 @@ function DropdownPortal({
       const activeRef = dropdownRefs[activeDropdown];
       const activeButtonRef = buttonRefs[activeDropdown];
 
+      // Close dropdown if click is outside both dropdown and its trigger button
       if (
         activeRef &&
         activeRef.current &&
@@ -194,26 +342,25 @@ function DropdownPortal({
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, [activeDropdown]);
+  }, [activeDropdown]); // Re-run effect when activeDropdown changes
 
-  const getButtonClass = (buttonType, dropdownName) => {
-    const baseClass = `dropdown-btn${buttonType ? `-${buttonType}` : ""}`;
-    return activeDropdown === dropdownName ? `${baseClass} active` : baseClass;
-  };
-
+  /**
+   * Effect: Sets up fullscreen change listeners
+   * Updates isFullscreen state when browser enters/exits fullscreen mode
+   */
   useEffect(() => {
     const handleFullscreenChange = () => {
       setIsFullscreen(checkFullscreen());
     };
 
-    // Fullscreen
+    // Add listeners for all browser-specific fullscreen events
     document.addEventListener("fullscreenchange", handleFullscreenChange);
     document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
     document.addEventListener("mozfullscreenchange", handleFullscreenChange);
     document.addEventListener("MSFullscreenChange", handleFullscreenChange);
 
     return () => {
-      // Fullscreen
+      // Clean up all listeners
       document.removeEventListener("fullscreenchange", handleFullscreenChange);
       document.removeEventListener(
         "webkitfullscreenchange",
@@ -228,18 +375,45 @@ function DropdownPortal({
         handleFullscreenChange
       );
     };
-  }, []);
+  }, []); // Empty dependency array - runs once on mount
 
+  /**
+   * Effect: Clears active submenu when dropdown closes
+   * Ensures submenus don't remain open when parent dropdown closes
+   */
   useEffect(() => {
     if (!activeDropdown) {
       setActiveSubmenu(null);
     }
   }, [activeDropdown]);
 
+  // ================================
+  // Helper Functions - UI
+  // ================================
+
+  /**
+   * Generates CSS class for dropdown buttons with active state
+   * @param {string} buttonType - Optional button type suffix for styling
+   * @param {string} dropdownName - Name of the dropdown this button controls
+   * @returns {string} CSS class string with active state if applicable
+   */
+  const getButtonClass = (buttonType, dropdownName) => {
+    const baseClass = `dropdown-btn${buttonType ? `-${buttonType}` : ""}`;
+    return activeDropdown === dropdownName ? `${baseClass} active` : baseClass;
+  };
+
+  // ================================
+  // Helper Functions - Fullscreen
+  // ================================
+
+  /**
+   * Enters fullscreen mode using browser-specific APIs
+   */
   const enterFullScreen = () => {
     let element = document.documentElement;
     setIsFullscreen(true);
 
+    // Try all browser-specific fullscreen APIs
     if (element.requestFullscreen) {
       element.requestFullscreen();
     } else if (element.mozRequestFullScreen) {
@@ -254,6 +428,9 @@ function DropdownPortal({
     }
   };
 
+  /**
+   * Exits fullscreen mode using browser-specific APIs
+   */
   const exitFullscreen = () => {
     setIsFullscreen(false);
     if (document.exitFullscreen) {
@@ -271,6 +448,10 @@ function DropdownPortal({
     }
   };
 
+  /**
+   * Checks if document is currently in fullscreen mode
+   * @returns {boolean} True if in fullscreen, false otherwise
+   */
   const checkFullscreen = () => {
     return Boolean(
       document.fullscreenElement || // Standard
@@ -280,12 +461,31 @@ function DropdownPortal({
     );
   };
 
+  // ================================
+  // Configuration Data
+  // ================================
+
+  /**
+   * Theme options for the theme selection submenu
+   */
   const themeOptions = [
     {id: "dark", label: "Dark Mode"},
     {id: "light", label: "Light Mode"},
   ];
 
+  // ================================
+  // Dropdown Content Definitions
+  // ================================
+
+  /**
+   * JSX content for each dropdown menu
+   * Each dropdown is defined as a separate component for clarity
+   */
   const dropdownContent = {
+    /**
+     * File menu: Save, Load, Import Audio, Export Audio
+     * Conditionally enabled based on user authentication and track availability
+     */
     file: (
       <div
         ref={fileDropdownRef}
@@ -294,28 +494,31 @@ function DropdownPortal({
           position: "fixed",
           top: position.top,
           left: position.left,
-          zIndex: 99999,
+          zIndex: 99999, // High z-index for overlay
         }}
         onMouseLeave={handleDropdownMouseLeave}
       >
+        {/* Save option - disabled for guest users */}
         <a
           href="#"
           className={!userData ? "dropdown-item-disabled" : ""}
           onClick={(e) => {
             e.preventDefault();
-            if (!userData) return;
+            if (!userData) return; // Only for authenticated users
             setIsSaveModalOpen(true);
             setActiveDropdown(null);
           }}
         >
           <span>Save</span>
         </a>
+
+        {/* Load option - disabled for guest users */}
         <a
           href="#"
           className={!userData ? "dropdown-item-disabled" : ""}
           onClick={(e) => {
             e.preventDefault();
-            if (!userData) return;
+            if (!userData) return; // Only for authenticated users
             setIsLoadModalOpen(true);
             setActiveDropdown(null);
           }}
@@ -323,7 +526,7 @@ function DropdownPortal({
           <span>Load</span>
         </a>
 
-        {/* ENABLED - Import Audio */}
+        {/* Import Audio - always enabled, wrapped in AudioImportButton component */}
         <AudioImportButton
           onImportSuccess={onImportSuccess}
           onImportError={onImportError}
@@ -349,7 +552,7 @@ function DropdownPortal({
           </a>
         </AudioImportButton>
 
-        {/* ENABLED/DISABLED - Export (conditional based on tracks) */}
+        {/* Export Audio - conditionally enabled based on track availability */}
         <AudioExportButton
           tracks={tracks}
           totalLengthMs={totalLengthMs}
@@ -385,6 +588,10 @@ function DropdownPortal({
       </div>
     ),
 
+    /**
+     * Edit menu: Cut, Copy, Paste, Delete
+     * Conditionally enabled based on track selection and clipboard state
+     */
     edit: (
       <div
         ref={editDropdownRef}
@@ -399,7 +606,7 @@ function DropdownPortal({
         }}
         onMouseLeave={handleDropdownMouseLeave}
       >
-        {/* ENABLED/DISABLED - Cut (depends on track selection) */}
+        {/* Cut - requires track selection */}
         <a
           href="#"
           className={!selectedTrackId ? "dropdown-item-disabled" : ""}
@@ -426,7 +633,7 @@ function DropdownPortal({
           </span>
         </a>
 
-        {/* ENABLED/DISABLED - Copy (depends on track selection) */}
+        {/* Copy - requires track selection */}
         <a
           href="#"
           className={!selectedTrackId ? "dropdown-item-disabled" : ""}
@@ -453,7 +660,7 @@ function DropdownPortal({
           </span>
         </a>
 
-        {/* ENABLED/DISABLED - Paste (depends on clipboard) */}
+        {/* Paste - requires clipboard data */}
         <a
           href="#"
           className={!hasClipboard ? "dropdown-item-disabled" : ""}
@@ -479,7 +686,7 @@ function DropdownPortal({
           </span>
         </a>
 
-        {/* DISABLED - Delete */}
+        {/* Delete - requires track selection */}
         <a
           href="#"
           className={!selectedTrackId ? "dropdown-item-disabled" : ""}
@@ -508,6 +715,10 @@ function DropdownPortal({
       </div>
     ),
 
+    /**
+     * Tools menu: Equalizer and Sampler
+     * Opens respective tool modals when clicked
+     */
     tools: (
       <div
         ref={toolsDropdownRef}
@@ -524,7 +735,7 @@ function DropdownPortal({
           href="#"
           onClick={(e) => {
             e.preventDefault();
-            setIsEQOpen((prev) => !prev);
+            setIsEQOpen((prev) => !prev); // Toggle Equalizer modal
           }}
         >
           Equalizer
@@ -533,7 +744,7 @@ function DropdownPortal({
           href="#"
           onClick={(e) => {
             e.preventDefault();
-            setIsSamplerOpen((prev) => !prev);
+            setIsSamplerOpen((prev) => !prev); // Toggle Sampler modal
           }}
         >
           Sampler
@@ -541,6 +752,10 @@ function DropdownPortal({
       </div>
     ),
 
+    /**
+     * Settings menu: Themes submenu, Fullscreen toggle, About link
+     * Includes hover-based submenu for theme selection
+     */
     settings: (
       <div
         ref={settingsDropdownRef}
@@ -553,6 +768,7 @@ function DropdownPortal({
         }}
         onMouseLeave={handleDropdownMouseLeave}
       >
+        {/* Themes with hover submenu */}
         <div
           className={`dropdown-item-with-submenu${
             activeSubmenu === "themes" ? " open" : ""
@@ -577,6 +793,7 @@ function DropdownPortal({
               <span>Themes</span>
             </span>
           </a>
+          {/* Theme selection submenu */}
           {activeSubmenu === "themes" && (
             <div className="dropdown-submenu">
               {themeOptions.map((option) => (
@@ -600,6 +817,8 @@ function DropdownPortal({
             </div>
           )}
         </div>
+
+        {/* Fullscreen toggle - shows different icon/text based on current state */}
         <a
           href="#"
           onClick={() =>
@@ -618,6 +837,8 @@ function DropdownPortal({
             <span>{isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}</span>
           </span>
         </a>
+
+        {/* About link - opens GitHub README in new tab */}
         <a
           href="https://github.com/ejohn80/WebAmpers/blob/main/README.md"
           target="_blank"
@@ -628,6 +849,9 @@ function DropdownPortal({
       </div>
     ),
 
+    /**
+     * Guest/User menu: Shows Login/Register for guests, Logout for authenticated users
+     */
     guest: (
       <div
         ref={guestDropdownRef}
@@ -641,6 +865,7 @@ function DropdownPortal({
         onMouseLeave={handleDropdownMouseLeave}
       >
         {userData ? (
+          // Authenticated user: Logout option
           <a
             href="#"
             onClick={(e) => {
@@ -651,6 +876,7 @@ function DropdownPortal({
             Logout
           </a>
         ) : (
+          // Guest user: Login and Register options
           <>
             <a
               href="#"
@@ -676,14 +902,18 @@ function DropdownPortal({
     ),
   };
 
+  // ================================
+  // Main Component Render
+  // ================================
+
   return (
     <>
-      {/* Buttons stay in normal flow */}
+      {/* Main button container - stays in normal document flow */}
       <div className="FETS-container">
-        {/* Menu Buttons */}
+        {/* Left-side menus: File, Edit, Tools, Settings */}
         {side == "left" && (
           <>
-            {/* File Dropdown */}
+            {/* File Dropdown Button */}
             <div className="dropdown">
               <button
                 ref={fileButtonRef}
@@ -694,7 +924,7 @@ function DropdownPortal({
               </button>
             </div>
 
-            {/* Edit Dropdown */}
+            {/* Edit Dropdown Button */}
             <div className="dropdown">
               <button
                 ref={editButtonRef}
@@ -705,7 +935,7 @@ function DropdownPortal({
               </button>
             </div>
 
-            {/* Tools Dropdown */}
+            {/* Tools Dropdown Button */}
             <div className="dropdown">
               <button
                 ref={toolsButtonRef}
@@ -716,7 +946,7 @@ function DropdownPortal({
               </button>
             </div>
 
-            {/* Settings Dropdown */}
+            {/* Settings Dropdown Button */}
             <div className="dropdown">
               <button
                 ref={settingsButtonRef}
@@ -729,7 +959,7 @@ function DropdownPortal({
           </>
         )}
 
-        {/* Guest Button */}
+        {/* Right-side guest/user button */}
         {side == "right" && (
           <div className="dropdown">
             <button
@@ -745,6 +975,12 @@ function DropdownPortal({
           </div>
         )}
       </div>
+
+      {/* ================================
+         Modal & Tool Portals
+         ================================ */}
+
+      {/* Equalizer Modal - renders when isEQOpen is true */}
       {isEQOpen && (
         <Equalizer
           isOpen={true}
@@ -756,10 +992,12 @@ function DropdownPortal({
             position: "fixed",
             top: "100px",
             left: "100px",
-            zIndex: 999999,
+            zIndex: 999999, // Higher than dropdowns
           }}
         />
       )}
+
+      {/* Sampler Modal - renders when isSamplerOpen is true */}
       {isSamplerOpen && (
         <Sampler
           isOpen={isSamplerOpen}
@@ -769,10 +1007,12 @@ function DropdownPortal({
             position: "fixed",
             top: "100px",
             left: "100px",
-            zIndex: 999999,
+            zIndex: 999999, // Higher than dropdowns
           }}
         />
       )}
+
+      {/* Save Modal - renders when isSaveModalOpen is true */}
       {isSaveModalOpen && (
         <SaveLoadModal
           mode="save"
@@ -780,6 +1020,8 @@ function DropdownPortal({
           onClose={() => setIsSaveModalOpen(false)}
         />
       )}
+
+      {/* Load Modal - renders when isLoadModalOpen is true */}
       {isLoadModalOpen && (
         <SaveLoadModal
           mode="load"
@@ -788,16 +1030,24 @@ function DropdownPortal({
           onLoadComplete={(stats) => {
             console.log("Session loaded:", stats);
 
-            // Switch to the newly created session
+            // Switch to the newly loaded session
             setActiveSession(stats.sessionId);
           }}
         />
       )}
-      {/* Dropdowns rendered via portal */}
+
+      {/* ================================
+         Dropdown Portals
+         ================================
+         All dropdowns are rendered via React portals to document.body
+         This ensures proper z-index stacking and escape from parent containers */}
       {activeDropdown &&
         ReactDOM.createPortal(dropdownContent[activeDropdown], document.body)}
 
-      {/* Tooltip rendered via portal */}
+      {/* ================================
+         Tooltip Portal
+         ================================
+         Tooltips are also rendered via portal for proper overlay behavior */}
       {tooltip.show &&
         ReactDOM.createPortal(
           <div
@@ -813,7 +1063,7 @@ function DropdownPortal({
               fontSize: "12px",
               whiteSpace: "nowrap",
               pointerEvents: "none",
-              zIndex: 100000,
+              zIndex: 100000, // Higher than dropdowns
               boxShadow: "0 2px 8px rgba(0, 0, 0, 0.3)",
             }}
           >

@@ -11,6 +11,7 @@ import SegmentBlock from "./SegmentBlock";
 import "./TrackLane.css";
 import {resolveSegmentStart} from "../../utils/segmentPlacement";
 
+// Helper to create context menu state with defaults
 const createContextMenuState = (overrides = {}) => ({
   open: false,
   x: 0,
@@ -22,8 +23,8 @@ const createContextMenuState = (overrides = {}) => ({
 });
 
 /**
- * TrackLane
- * Renders a single track container with proportional waveform sizing
+ * TrackLane - Renders a single track container with waveform segments
+ * Manages segment placement, drag-drop, context menus, and track controls
  */
 const TrackLane = memo(function TrackLane({
   track,
@@ -50,11 +51,11 @@ const TrackLane = memo(function TrackLane({
   onSegmentDelete = () => {},
 }) {
   //if (!track) return null;
-
   const segments = useMemo(() => {
     return Array.isArray(track.segments) ? track.segments : [];
   }, [track.segments]);
 
+  // Initialize track state from localStorage or props
   const getInitialState = () => {
     try {
       const saved = localStorage.getItem(`webamp.track.${track.id}`);
@@ -66,19 +67,24 @@ const TrackLane = memo(function TrackLane({
     }
   };
 
+  // Track state
   const [muted, setMuted] = useState(getInitialState().muted);
   const [soloed, setSoloed] = useState(getInitialState().soloed);
   const [contextMenu, setContextMenu] = useState(createContextMenuState());
   const [selectedSegmentIndex, setSelectedSegmentIndex] = useState(null);
-  const [dropPreview, setDropPreview] = useState(null);
+  const [dropPreview, setDropPreview] = useState(null); // Drag-drop preview state
+
+  // Refs for tracking state without re-renders
   const dragHoverDepthRef = useRef(0);
   const pendingPreviewAssetRef = useRef(null);
   const segmentsRef = useRef(segments);
 
+  // Keep segments ref current
   useEffect(() => {
     segmentsRef.current = segments;
   }, [segments]);
 
+  // Persist track state to localStorage
   useEffect(() => {
     try {
       localStorage.setItem(
@@ -90,6 +96,7 @@ const TrackLane = memo(function TrackLane({
     }
   }, [muted, soloed, track.id]);
 
+  // Sync with prop changes
   useEffect(() => {
     setMuted(!!track.mute);
   }, [track.mute, track.id]);
@@ -98,10 +105,12 @@ const TrackLane = memo(function TrackLane({
     setSoloed(!!track.solo);
   }, [track.solo, track.id]);
 
+  // Close context menu helper
   const closeContextMenu = useCallback(() => {
     setContextMenu(createContextMenuState());
   }, []);
 
+  // Close context menu on outside click or Escape
   useEffect(() => {
     if (!contextMenu.open) return undefined;
 
@@ -130,6 +139,7 @@ const TrackLane = memo(function TrackLane({
     };
   }, [contextMenu.open, closeContextMenu]);
 
+  // Open context menu at coordinates
   const openContextMenuAt = (event, overrides = {}) => {
     event.preventDefault();
     event.stopPropagation();
@@ -145,10 +155,12 @@ const TrackLane = memo(function TrackLane({
     setContextMenu(createContextMenuState({open: true, x, y, ...overrides}));
   };
 
+  // Handle track context menu
   const handleContextMenu = (event) => {
     openContextMenuAt(event, {target: "track"});
   };
 
+  // Handle segment context menu
   const handleSegmentContextMenu = (segmentIndex, event) => {
     const segment = segments[segmentIndex];
     if (!segment) return;
@@ -165,6 +177,7 @@ const TrackLane = memo(function TrackLane({
     });
   };
 
+  // Delete segment from context menu
   const handleSegmentDeleteAction = async () => {
     if (contextMenu.segmentIndex === null) return;
 
@@ -185,6 +198,7 @@ const TrackLane = memo(function TrackLane({
     }
   };
 
+  // Track control handlers
   const toggleMute = () => {
     const next = !muted;
     setMuted(next);
@@ -213,6 +227,7 @@ const TrackLane = memo(function TrackLane({
     }
   };
 
+  // Context menu action handler
   const handleMenuAction = (action, disabled) => {
     if (disabled) return;
     if (typeof action === "function") {
@@ -221,6 +236,7 @@ const TrackLane = memo(function TrackLane({
     closeContextMenu();
   };
 
+  // Calculate timeline dimensions and scaling
   const parsedTimelineWidth =
     typeof timelineWidth === "number"
       ? timelineWidth
@@ -234,6 +250,7 @@ const TrackLane = memo(function TrackLane({
       ? numericTimelineWidth / totalLengthMs
       : null;
 
+  // CSS styles for layout
   const tracklaneMainStyle =
     numericTimelineWidth > 0
       ? {
@@ -249,6 +266,7 @@ const TrackLane = memo(function TrackLane({
       ? {minWidth: `${rowWidthPx}px`, width: `${rowWidthPx}px`}
       : undefined;
 
+  // Handle track click (select track, clear segment selection)
   const handleTrackClick = (e) => {
     e.stopPropagation();
     if (typeof onClearSegmentSelection === "function") {
@@ -258,6 +276,7 @@ const TrackLane = memo(function TrackLane({
     onSelect(track.id);
   };
 
+  // Visual selection style
   const selectionStyle = isSelected
     ? {
         outline: "2px solid #17E1FF",
@@ -266,6 +285,7 @@ const TrackLane = memo(function TrackLane({
       }
     : {};
 
+  // Extract asset data from drag event
   const getDragAssetFromEvent = useCallback((event) => {
     if (event?.dataTransfer) {
       try {
@@ -288,6 +308,7 @@ const TrackLane = memo(function TrackLane({
     return null;
   }, []);
 
+  // Fetch asset duration for drop preview
   const ensurePreviewDuration = useCallback(
     (assetId) => {
       if (!assetId || typeof requestAssetPreview !== "function") {
@@ -348,6 +369,7 @@ const TrackLane = memo(function TrackLane({
     [requestAssetPreview, segments]
   );
 
+  // Format duration for display
   const formatDurationLabel = (ms) => {
     if (!ms) return "";
     const totalSeconds = Math.max(0, Math.round(ms / 1000));
@@ -356,12 +378,14 @@ const TrackLane = memo(function TrackLane({
     return `${minutes}:${seconds}`;
   };
 
+  // Clear drop preview state
   const clearDropPreview = useCallback(() => {
     dragHoverDepthRef.current = 0;
     pendingPreviewAssetRef.current = null;
     setDropPreview(null);
   }, []);
 
+  // Calculate timeline position from mouse event
   const getTimelinePositionFromEvent = useCallback(
     (event) => {
       const timelineElement = event.currentTarget;
@@ -375,6 +399,7 @@ const TrackLane = memo(function TrackLane({
     [pxPerMs]
   );
 
+  // Update drop preview position
   const updateDropPreview = useCallback(
     (event, assetData) => {
       if (!assetData) return;
@@ -407,10 +432,12 @@ const TrackLane = memo(function TrackLane({
     [segments, getTimelinePositionFromEvent, ensurePreviewDuration]
   );
 
+  // Clear drop preview when track changes
   useEffect(() => {
     clearDropPreview();
   }, [track.id, clearDropPreview]);
 
+  // Segment movement handler
   const handleSegmentMove = (segmentIndex, newPositionMs) => {
     console.log(`Moving segment ${segmentIndex} to ${newPositionMs}ms`);
     if (onSegmentMove) {
@@ -419,6 +446,7 @@ const TrackLane = memo(function TrackLane({
     return null;
   };
 
+  // Segment selection handler
   const handleSegmentSelect = (segmentIndex) => {
     setSelectedSegmentIndex(segmentIndex);
     const segment = segments[segmentIndex];
@@ -428,6 +456,7 @@ const TrackLane = memo(function TrackLane({
     onSelect(track.id);
   };
 
+  // Sync selected segment with parent state
   useEffect(() => {
     if (!selectedSegment || selectedSegment.trackId !== track.id) {
       if (selectedSegmentIndex !== null) {
@@ -450,6 +479,7 @@ const TrackLane = memo(function TrackLane({
     }
   }, [selectedSegment, track.id, segments, selectedSegmentIndex]);
 
+  // Drag event handlers for timeline
   const handleTimelineDragEnter = (e) => {
     if (!getDragAssetFromEvent(e)) return;
     dragHoverDepthRef.current += 1;
@@ -511,6 +541,7 @@ const TrackLane = memo(function TrackLane({
     clearDropPreview();
   };
 
+  // Create context menu portal
   const contextMenuPortal =
     contextMenu.open && typeof document !== "undefined"
       ? createPortal(
@@ -591,6 +622,7 @@ const TrackLane = memo(function TrackLane({
         )
       : null;
 
+  // Main render
   return (
     <>
       <div
@@ -659,6 +691,7 @@ const TrackLane = memo(function TrackLane({
               </div>
             )}
 
+            {/* Drop preview overlay */}
             {dropPreview && (
               <div
                 className={`tracklane-drop-preview ${dropPreview.isLoadingDuration ? "loading" : ""}`}
@@ -702,6 +735,7 @@ const TrackLane = memo(function TrackLane({
               </div>
             )}
 
+            {/* Render all segments */}
             {segments.map((seg, index) => (
               <SegmentBlock
                 key={seg.id || seg.fileUrl || `segment-${index}`}

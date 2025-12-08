@@ -1,6 +1,6 @@
 import React, {useRef} from "react";
 import AudioImporter from "./AudioImporter";
-import {ImportIcon} from "../Layout/Svgs";
+
 import * as Tone from "tone";
 
 /**

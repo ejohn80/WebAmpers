@@ -1,3 +1,28 @@
+/**
+ * AudioPage.jsx - Main audio editing interface
+ *
+ * Core component for the Digital Audio Workstation (DAW) interface. Manages:
+ * - Audio track creation, editing, and organization
+ * - Timeline-based audio segment manipulation
+ * - Playback engine integration (Tone.js)
+ * - Persistent storage via IndexedDB
+ * - Import/export functionality
+ * - Real-time recording
+ * - Clipboard operations for cut/copy/paste
+ *
+ * Key Responsibilities:
+ * 1. Session management - Loading/saving tracks per project
+ * 2. Buffer caching - Optimizes audio loading via assetBufferCache
+ * 3. Engine coordination - Bridges UI with Tone.js playback engine
+ * 4. State synchronization - Keeps UI, audioManager, and DB in sync
+ * 5. User interactions - Handles drag-drop, keyboard shortcuts, editing tools
+ *
+ * Architecture:
+ * - Uses Context API for global state (AppContext)
+ * - Manages side effects with useEffect hooks
+ * - Implements optimistic updates for responsive UI
+ * - Coordinates multiple managers (audioManager, dbManager, clipboardManager)
+ */
 import React, {
   useState,
   useEffect,
@@ -8,10 +33,13 @@ import React, {
 import "./AudioPage.css";
 import * as Tone from "tone";
 
+// Component imports
 import Header from "../components/Layout/Header";
 import Sidebar from "../components/Layout/Sidebar";
 import MainContent from "../components/Layout/MainContent";
 import Footer from "../components/Layout/Footer";
+
+// Manager imports
 import {audioManager} from "../managers/AudioManager";
 import {dbManager} from "../managers/DBManager";
 import {AppContext} from "../context/AppContext";
@@ -20,14 +48,15 @@ import {saveAsset} from "../utils/assetUtils";
 import {clipboardManager} from "../managers/ClipboardManager";
 import {insertSegmentWithSpacing} from "../utils/segmentPlacement";
 
-const MIN_WIDTH = 0;
-const MAX_WIDTH = 300;
-const TRACK_END_PADDING_MS = 2000;
+// Constants for UI and track layout
+const MIN_WIDTH = 0; // Minimum sidebar width (collapsed)
+const MAX_WIDTH = 300; // Maximum sidebar width (expanded)
+const TRACK_END_PADDING_MS = 2000; // Padding at end of timeline
 
-// Buffer cache to share audio buffers tracks from the same asset
+// Global buffer cache for audio assets (shared across component instances)
 const assetBufferCache = new Map(); // assetId -> Tone.ToneAudioBuffer
 
-// Empty version constant for reuse
+// Empty version object for initializing playback engine
 const EMPTY_VERSION = {
   bpm: 120,
   timeSig: [4, 4],
@@ -39,6 +68,7 @@ const EMPTY_VERSION = {
 };
 
 function AudioPage() {
+  // Context state for global application data
   const {
     setEngineRef,
     applyEffectsToEngine,
@@ -46,6 +76,8 @@ function AudioPage() {
     selectedTrackId,
     setSelectedTrackId,
   } = useContext(AppContext);
+
+  // UI state
   const [sidebarWidth, setSidebarWidth] = useState(MAX_WIDTH);
   const [tracks, setTracks] = useState(audioManager.tracks);
   const [_audioData, setAudioData] = useState(null);
@@ -55,23 +87,19 @@ function AudioPage() {
     clipboardManager.hasClipboard()
   );
 
+  // Refs for engine and caching
   const engineRef = React.useRef(null);
-  const lastSessionRef = useRef(null);
-  const assetPreviewCacheRef = useRef(new Map());
+  const lastSessionRef = useRef(null); // Track last session to prevent reload loops
+  const assetPreviewCacheRef = useRef(new Map()); // Cache for asset preview durations
+
+  // Callback to refresh clipboard UI indicator
   const refreshClipboardFlag = useCallback(() => {
     setHasClipboardFlag(clipboardManager.hasClipboard());
   }, []);
 
-  // Keyboard shortcuts for cut/copy/paste handled later once handlers are defined
-
   /**
    * Handle saving a sampler recording as a new track
-   * @param {Object} recordingData - Data from the Sampler component
-   * @param {Array} recordingData.events - Array of note events with timestamps
-   * @param {number} recordingData.duration - Total duration in ms
-   * @param {string} recordingData.instrument - 'piano' or 'drum'
-   * @param {Blob} recordingData.audioBlob - Recorded audio as WebM blob
-   * @param {string} recordingData.name - Suggested name for the track
+   * Processes MIDI keyboard recordings into audio tracks
    */
   const handleSamplerRecording = async (recordingData) => {
     if (!activeSession) {
@@ -89,6 +117,7 @@ function AudioPage() {
     }
 
     try {
+      // Format duration for display (MM:SS)
       const formatDuration = (ms) => {
         const totalSeconds = Math.floor(ms / 1000);
         const minutes = Math.floor(totalSeconds / 60);
@@ -97,15 +126,15 @@ function AudioPage() {
       };
       console.log(`[AudioPage] Processing sampler recording: ${name}`);
 
-      // Convert blob to ArrayBuffer and decode
+      // Decode WebM blob to audio buffer
       const arrayBuffer = await audioBlob.arrayBuffer();
       const audioBuffer =
         await Tone.context.rawContext.decodeAudioData(arrayBuffer);
 
-      // Create ToneAudioBuffer
+      // Create ToneAudioBuffer for playback
       const toneBuffer = new Tone.ToneAudioBuffer(audioBuffer);
 
-      // Serialize buffer for DB storage
+      // Serialize buffer for IndexedDB storage
       const serializedBuffer = {
         numberOfChannels: audioBuffer.numberOfChannels,
         length: audioBuffer.length,
@@ -118,12 +147,12 @@ function AudioPage() {
         serializedBuffer.channels.push(audioBuffer.getChannelData(i));
       }
 
-      // Generate unique track name
+      // Generate unique IDs
       const trackName = name;
       const segmentId = `seg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       const durationMs = Math.round(audioBuffer.duration * 1000);
 
-      // Save as asset first
+      // Save as asset in database first
       const assetData = {
         name: trackName,
         duration: formatDuration(audioBuffer.duration * 1000),
@@ -136,10 +165,10 @@ function AudioPage() {
       const assetId = await dbManager.addAsset(assetData);
       console.log(`[AudioPage] Sampler recording saved as asset ${assetId}`);
 
-      // Cache the buffer
+      // Cache buffer for performance
       assetBufferCache.set(assetId, toneBuffer);
 
-      // Create track data for DB
+      // Create track data for database
       const trackData = {
         name: trackName,
         color: instrument === "piano" ? "#45B7D1" : "#FFA07A", // Blue for piano, coral for drums
@@ -162,11 +191,11 @@ function AudioPage() {
         solo: false,
       };
 
-      // Save track to DB
+      // Save track to database with session association
       const dbId = await dbManager.addTrack(trackData, activeSession);
       console.log(`[AudioPage] Sampler track saved with ID: ${dbId}`);
 
-      // Create track for audioManager
+      // Create track object for audioManager
       const newTrack = {
         id: dbId,
         name: trackName,
@@ -192,15 +221,16 @@ function AudioPage() {
         solo: false,
       };
 
-      // Add to audioManager
+      // Add to audioManager and update UI state
       audioManager.addTrackFromBuffer(newTrack);
       console.log(`[AudioPage] Track added to audioManager`);
 
       setTracks([...audioManager.tracks]);
 
-      // Asset refresh
+      // Trigger assets sidebar refresh
       setAssetsRefreshTrigger((prev) => prev + 1);
 
+      // Reload playback engine with new track
       const newVersion = buildVersionFromTracks(audioManager.tracks);
       if (newVersion && engineRef.current) {
         await engineRef.current.load(newVersion);
@@ -216,7 +246,7 @@ function AudioPage() {
     }
   };
 
-  // Helper function to deserialize audio buffer from DB format
+  // Deserialize audio buffer from IndexedDB format to native AudioBuffer
   const deserializeAudioBuffer = useCallback((serializedBuffer) => {
     const audioBuffer = Tone.context.createBuffer(
       serializedBuffer.numberOfChannels,
@@ -236,6 +266,7 @@ function AudioPage() {
     return audioBuffer;
   }, []);
 
+  // Create Tone.js buffer from serialized data
   const createToneBufferFromSerialized = useCallback(
     (serializedBuffer) => {
       const audioBuffer = deserializeAudioBuffer(serializedBuffer);
@@ -244,10 +275,12 @@ function AudioPage() {
     [deserializeAudioBuffer]
   );
 
+  // Build Tone buffer from asset record (handles both serialized and blob formats)
   const buildToneBufferFromAssetRecord = useCallback(
     async (asset) => {
       if (!asset) return null;
 
+      // Try deserializing stored buffer first
       if (asset.buffer?.channels?.length) {
         try {
           return createToneBufferFromSerialized(asset.buffer);
@@ -259,6 +292,7 @@ function AudioPage() {
         }
       }
 
+      // Fallback to decoding file blob
       if (asset.fileBlob) {
         try {
           const arrayBuffer = await asset.fileBlob.arrayBuffer();
@@ -278,17 +312,19 @@ function AudioPage() {
     [createToneBufferFromSerialized]
   );
 
+  // Get preview info (duration) for assets, with caching
   const getAssetPreviewInfo = useCallback(
     async (assetId) => {
       if (!assetId) return null;
 
+      // Check cache first
       if (assetPreviewCacheRef.current.has(assetId)) {
         return assetPreviewCacheRef.current.get(assetId);
       }
 
       try {
+        // Get or build Tone buffer
         let toneBuffer = assetBufferCache.get(assetId);
-
         if (!toneBuffer) {
           const asset = await dbManager.getAsset(assetId);
           if (!asset) return null;
@@ -300,6 +336,7 @@ function AudioPage() {
 
         if (!toneBuffer) return null;
 
+        // Extract duration from buffer
         const durationSeconds =
           typeof toneBuffer.duration === "number"
             ? toneBuffer.duration
@@ -318,18 +355,20 @@ function AudioPage() {
     [buildToneBufferFromAssetRecord]
   );
 
-  // Helper function to generate a unique copy name
+  // Generate unique name for copied tracks (e.g., "Song Copy", "Song Copy 2")
   const generateCopyName = useCallback(
     (baseName) => {
       const cleanName = baseName.replace(/\s+Copy(\s+\d+)?$/, "");
 
       const existingNames = new Set(tracks.map((t) => t.name));
 
+      // Try "BaseName Copy" first
       const firstCopyName = `${cleanName} Copy`;
       if (!existingNames.has(firstCopyName)) {
         return firstCopyName;
       }
 
+      // Find next available number
       let counter = 2;
       let newName;
       do {
@@ -342,7 +381,7 @@ function AudioPage() {
     [tracks]
   );
 
-  // Helper function to build version from tracks
+  // Build version object for playback engine from track data
   const buildVersionFromTracks = useCallback((tracksArray) => {
     if (!tracksArray || tracksArray.length === 0) return null;
 
@@ -358,6 +397,7 @@ function AudioPage() {
 
     let maxEndMs = 0;
 
+    // Convert tracks to engine format
     tracksArray.forEach((track) => {
       vs.tracks.push({
         id: track.id,
@@ -372,6 +412,7 @@ function AudioPage() {
         activeEffectsList: track.activeEffectsList,
       });
 
+      // Convert segments to engine format
       (track.segments || []).forEach((s) => {
         const fileUrl = s.buffer ?? s.fileUrl ?? null;
         const startOnTimelineMs =
@@ -395,21 +436,21 @@ function AudioPage() {
           fades: s.fades ?? {inMs: 5, outMs: 5},
         });
 
+        // Track max timeline position for total length calculation
         const endMs = startOnTimelineMs + (durationMs || 0);
         if (endMs > maxEndMs) maxEndMs = endMs;
       });
     });
 
+    // Add padding at end of timeline
     const paddedLengthMs = maxEndMs > 0 ? maxEndMs + TRACK_END_PADDING_MS : 0;
     vs.lengthMs = paddedLengthMs || 60000;
     return vs;
   }, []);
 
-  // Load tracks for active session
+  // Load tracks when session changes
   useEffect(() => {
     if (!activeSession) return;
-
-    // Skip if session hasn't changed
     if (lastSessionRef.current === activeSession) return;
 
     console.log(`[AudioPage] Loading session ${activeSession}`);
@@ -422,17 +463,22 @@ function AudioPage() {
           `[AudioPage] Found ${savedTracks.length} tracks for session ${activeSession}`
         );
 
-        // Clear current tracks
+        // Clear current tracks in audioManager
         audioManager.clearAllTracks();
 
+        // Local cache for this load session to avoid duplicate fetches
         const localAssetBufferCache = new Map();
+
+        // Helper to get buffers for assets
         const getToneBufferForAsset = async (assetId) => {
           if (!assetId) return null;
 
+          // Check global cache first
           if (assetBufferCache.has(assetId)) {
             return assetBufferCache.get(assetId);
           }
 
+          // Check local session cache
           if (localAssetBufferCache.has(assetId)) {
             return localAssetBufferCache.get(assetId);
           }
@@ -441,6 +487,7 @@ function AudioPage() {
             const asset = await dbManager.getAsset(assetId);
             const toneBuffer = await buildToneBufferFromAssetRecord(asset);
             if (toneBuffer) {
+              // Cache in both caches
               assetBufferCache.set(assetId, toneBuffer);
               localAssetBufferCache.set(assetId, toneBuffer);
               return toneBuffer;
@@ -453,13 +500,14 @@ function AudioPage() {
           return null;
         };
 
-        // Reconstruct tracks from DB
+        // Reconstruct tracks from database
         for (const savedTrack of savedTracks) {
           const hydratedSegments = [];
           if (Array.isArray(savedTrack.segments)) {
             for (const segment of savedTrack.segments) {
               const segAssetId = segment.assetId ?? savedTrack.assetId ?? null;
 
+              // Get buffer for segment
               let segmentToneBuffer = await getToneBufferForAsset(segAssetId);
               if (!segmentToneBuffer && segment?.buffer?.channels) {
                 const audioBuffer = deserializeAudioBuffer(segment.buffer);
@@ -473,7 +521,7 @@ function AudioPage() {
                 continue;
               }
 
-              // Preserve name and fileName from saved segment
+              // Preserve segment metadata
               hydratedSegments.push({
                 ...segment,
                 assetId: segAssetId,
@@ -484,6 +532,7 @@ function AudioPage() {
             }
           }
 
+          // Get primary buffer for track
           let primaryBuffer = hydratedSegments[0]?.buffer ?? null;
           if (!primaryBuffer && savedTrack.assetId) {
             primaryBuffer = await getToneBufferForAsset(savedTrack.assetId);
@@ -507,6 +556,7 @@ function AudioPage() {
             continue;
           }
 
+          // Create track object for audioManager
           const trackData = {
             ...savedTrack,
             buffer: primaryBuffer,
@@ -519,9 +569,10 @@ function AudioPage() {
           audioManager.addTrackFromBuffer(trackData);
         }
 
+        // Update React state with loaded tracks
         setTracks([...audioManager.tracks]);
 
-        // Reload engine
+        // Reload engine with loaded tracks
         const newVersion = buildVersionFromTracks(audioManager.tracks);
         if (engineRef.current) {
           try {
@@ -548,12 +599,14 @@ function AudioPage() {
     deserializeAudioBuffer,
   ]);
 
+  // Toggle sidebar visibility
   const toggleSidebar = () => {
     setSidebarWidth((prevWidth) =>
       prevWidth > MIN_WIDTH ? MIN_WIDTH : MAX_WIDTH
     );
   };
 
+  // Handle successful audio import
   const handleImportSuccess = async (importedAudioData, assetId) => {
     if (!activeSession) {
       console.error("No active session!");
@@ -564,31 +617,30 @@ function AudioPage() {
       `[AudioPage] Creating track from asset ${assetId} in session ${activeSession}`
     );
 
-    // Get the cached buffer if available (should be cached by AssetsTab)
+    // Get cached buffer or create new one
     let toneBuffer = assetId ? assetBufferCache.get(assetId) : null;
-
     if (!toneBuffer && importedAudioData.buffer) {
-      // Fallback: create ToneBuffer from imported buffer if not cached
-      console.log("[AudioPage] Buffer not cached, creating new ToneBuffer");
       toneBuffer = new Tone.ToneAudioBuffer(importedAudioData.buffer);
     }
 
-    // Create track data with the buffer and assetId
+    // Create track data
     const trackData = {
       ...importedAudioData,
       buffer: toneBuffer || importedAudioData.buffer,
       assetId: assetId,
-      enabledEffects: importedAudioData.enabledEffects || {}, // Ensure enabledEffects is set
+      enabledEffects: importedAudioData.enabledEffects || {},
     };
 
+    // Add to audioManager
     const createdTrack = audioManager.addTrackFromBuffer(trackData);
     setTracks([...audioManager.tracks]);
 
+    // Legacy: store audio data if this is the first track
     if (audioManager.tracks.length === 1) {
       setAudioData(importedAudioData);
     }
 
-    // Save track to DB with sessionId and assetId
+    // Save track to database
     try {
       if (createdTrack) {
         createdTrack.assetId = assetId;
@@ -601,7 +653,7 @@ function AudioPage() {
           `Track saved to session ${activeSession} with ID: ${assignedId}, assetId: ${assetId}`
         );
 
-        // Update track ID
+        // Update track ID if database assigned a different one
         if (assignedId !== undefined && assignedId !== createdTrack.id) {
           createdTrack.id = assignedId;
           setTracks([...audioManager.tracks]);
@@ -612,41 +664,41 @@ function AudioPage() {
     }
   };
 
-  // Handler for File dropdown imports (needs to save to assets first)
+  // Handle file dropdown imports (saves to assets first)
   const handleFileDropdownImport = async (importResult) => {
     try {
       console.log("[AudioPage] File dropdown import - saving to assets first");
 
       const {buffer} = importResult;
 
-      // Save asset to DB (this will handle duplicate names)
+      // Save asset to database (handles duplicate names)
       const assetId = await saveAsset(importResult, dbManager);
 
-      // Get the saved asset to retrieve the potentially renamed name
+      // Get saved asset for potentially renamed name
       const savedAsset = await dbManager.getAsset(assetId);
       if (!savedAsset) {
         console.error("Failed to retrieve saved asset");
         return;
       }
 
-      // Update importResult with the actual saved name
+      // Update with saved name
       const updatedImportResult = {
         ...importResult,
         name: savedAsset.name,
-        enabledEffects: {}, // Initialize empty enabledEffects
+        enabledEffects: {},
       };
 
-      // Cache the buffer
+      // Cache buffer
       if (buffer) {
         const toneBuffer = new Tone.ToneAudioBuffer(buffer);
         assetBufferCache.set(assetId, toneBuffer);
         console.log(`[AudioPage] Cached buffer for asset ${assetId}`);
       }
 
-      // Trigger assets refresh in sidebar
+      // Refresh assets sidebar
       setAssetsRefreshTrigger((prev) => prev + 1);
 
-      // Now create the track with the assetId and updated name
+      // Create track with asset
       await handleImportSuccess(updatedImportResult, assetId);
     } catch (error) {
       console.error("Failed to handle file dropdown import:", error);
@@ -654,15 +706,17 @@ function AudioPage() {
     }
   };
 
+  // Handle import errors
   const handleImportError = (error) => {
     alert(`Import failed: ${error.message}`);
   };
 
+  // Handle export completion
   const handleExportComplete = () => {
     console.log("Export process complete.");
   };
 
-  // Handle dropping an asset from the assets tab to create a new track OR append to existing
+  // Handle dropping asset from sidebar to timeline
   const handleAssetDrop = async (
     assetId,
     targetTrackId = null,
@@ -673,10 +727,10 @@ function AudioPage() {
       console.log(`Dropping asset ${assetId}`, {
         targetTrackId,
         timelinePositionMs,
-        assetName, // Log it
+        assetName,
       });
 
-      // Get the asset from the database first
+      // Get asset from database
       const asset = await dbManager.getAsset(assetId);
       if (!asset) {
         console.error("Asset not found:", assetId);
@@ -684,19 +738,15 @@ function AudioPage() {
         return;
       }
 
-      // Use the name from the parameter if provided, otherwise from the asset
-      // This ensures we always have a name even if the parameter wasn't passed
+      // Use provided name or database name
       const segmentName = assetName || asset.name;
       console.log(
         `[handleAssetDrop] Using segment name: "${segmentName}" (from ${assetName ? "parameter" : "database"})`
       );
 
-      // Check if we have a cached buffer for this asset
+      // Get or create buffer for asset
       let toneBuffer = assetBufferCache.get(assetId);
-
-      if (toneBuffer) {
-        console.log(`Using cached buffer for asset ${assetId}`);
-      } else {
+      if (!toneBuffer) {
         console.log(`Decoding buffer for asset ${assetId}`);
         toneBuffer = await buildToneBufferFromAssetRecord(asset);
 
@@ -706,13 +756,14 @@ function AudioPage() {
           return;
         }
 
+        // Cache for future use
         assetBufferCache.set(assetId, toneBuffer);
         console.log(
           `Cached buffer for asset ${assetId}, cache size: ${assetBufferCache.size}`
         );
       }
 
-      // Get the native AudioBuffer from toneBuffer for metadata
+      // Get AudioBuffer for metadata
       const audioBuffer =
         typeof toneBuffer.get === "function" ? toneBuffer.get() : null;
 
@@ -726,7 +777,7 @@ function AudioPage() {
       const durationSeconds = audioBuffer.duration;
       const durationMs = Math.round(durationSeconds * 1000);
 
-      // If targetTrackId is provided, append to existing track
+      // Append to existing track if targetTrackId provided
       if (targetTrackId) {
         const track = audioManager.getTrack(targetTrackId);
         if (!track) {
@@ -739,7 +790,7 @@ function AudioPage() {
           `Appending segment to track ${targetTrackId} at ${timelinePositionMs}ms`
         );
 
-        // Create new segment WITH name and fileName
+        // Create new segment
         const newSegment = {
           id: segmentId,
           assetId,
@@ -753,21 +804,21 @@ function AudioPage() {
           startInFileMs: 0,
         };
 
-        // Add segment to track with automatic spacing
+        // Add segment with automatic spacing
         const positionedSegments = insertSegmentWithSpacing(
           track.segments,
           newSegment
         );
         track.segments = positionedSegments;
 
-        // Update in database
+        // Update database
         await dbManager.updateTrack(track);
         console.log("Track updated with new segment");
 
-        // Update React state
+        // Update state
         setTracks([...audioManager.tracks]);
 
-        // Rebuild and reload engine
+        // Reload engine
         const newVersion = buildVersionFromTracks(audioManager.tracks);
         if (newVersion && engineRef.current) {
           await engineRef.current.load(newVersion);
@@ -778,12 +829,12 @@ function AudioPage() {
         return;
       }
 
-      // Otherwise, create a new track
+      // Otherwise create new track
       console.log(`Creating new track from asset ${assetId}`);
 
-      // Save to database first with current session to get the DB-assigned ID
+      // Prepare track data for database
       const trackData = {
-        name: segmentName, // Use the segment name for the track too
+        name: segmentName,
         color: `hsl(${Math.random() * 360}, 70%, 50%)`,
         assetId: assetId,
         enabledEffects: {},
@@ -807,17 +858,16 @@ function AudioPage() {
       };
 
       console.log("Track data for DB:", trackData);
-
       console.log("Segment data being saved to DB:", trackData.segments);
 
-      // Save to database with current session
+      // Save to database
       const dbId = await dbManager.addTrack(trackData, activeSession);
       console.log("Track saved to DB with ID:", dbId);
 
-      // Now create the track for audioManager
+      // Create track for audioManager
       const newTrack = {
         id: dbId,
-        name: segmentName, // Use the segment name for the track too
+        name: segmentName,
         color: trackData.color,
         buffer: toneBuffer,
         enabledEffects: {},
@@ -847,10 +897,10 @@ function AudioPage() {
       const createdTrack = audioManager.addTrackFromBuffer(newTrack);
       console.log("Track added to audioManager:", createdTrack);
 
-      // Update React state
+      // Update state
       setTracks([...audioManager.tracks]);
 
-      // Rebuild and reload engine
+      // Reload engine
       const newVersion = buildVersionFromTracks(audioManager.tracks);
       if (newVersion && engineRef.current) {
         await engineRef.current.load(newVersion);
@@ -865,11 +915,12 @@ function AudioPage() {
     }
   };
 
+  // Cut segment into three parts (left, cut, right)
   function cutSegmentByRange(segment, cutStartMs, cutEndMs) {
     if (!segment)
       return {leftSegment: null, cutSegment: null, rightSegment: null};
 
-    // Normalize order just in case
+    // Normalize order
     const startMs = Math.min(cutStartMs, cutEndMs);
     const endMs = Math.max(cutStartMs, cutEndMs);
 
@@ -881,23 +932,22 @@ function AudioPage() {
         : 0);
     const segEndTimelineMs = segStartTimelineMs + segDurationMs;
 
-    // Clamp the cut range to the segment
+    // Clamp cut range to segment bounds
     const clampedStart = Math.max(segStartTimelineMs, Math.min(startMs, endMs));
     const clampedEnd = Math.min(segEndTimelineMs, Math.max(startMs, endMs));
 
     if (clampedEnd <= clampedStart) {
-      // no overlap, nothing to cut
+      // No overlap
       return {leftSegment: null, cutSegment: null, rightSegment: null};
     }
 
     const totalDurMs = segDurationMs;
     const fileStartMs = segment.startInFileMs ?? 0;
 
-    // Position inside the segment
+    // Calculate positions
     const offsetStartInsideSegMs = clampedStart - segStartTimelineMs;
     const offsetEndInsideSegMs = clampedEnd - segStartTimelineMs;
 
-    // Corresponding positions in the underlying file
     const cutStartInFileMs = fileStartMs + offsetStartInsideSegMs;
     const cutEndInFileMs = fileStartMs + offsetEndInsideSegMs;
 
@@ -908,6 +958,7 @@ function AudioPage() {
     const base = segment;
     const makeId = (suffix) => `${segment.id}_${suffix}_${Date.now()}`;
 
+    // Create left segment
     const leftSegment =
       leftDurMs > 0
         ? {
@@ -922,6 +973,7 @@ function AudioPage() {
           }
         : null;
 
+    // Create cut segment (goes to clipboard)
     const cutSegment =
       cutDurMs > 0
         ? {
@@ -936,6 +988,7 @@ function AudioPage() {
           }
         : null;
 
+    // Create right segment
     const rightSegment =
       rightDurMs > 0
         ? {
@@ -953,6 +1006,7 @@ function AudioPage() {
     return {leftSegment, cutSegment, rightSegment};
   }
 
+  // Handle cutting a range from a segment
   const handleCutSegmentRange = async (
     trackId,
     segmentIndex,
@@ -970,6 +1024,7 @@ function AudioPage() {
 
       const originalSegment = track.segments[segmentIndex];
 
+      // Cut segment into three parts
       const {leftSegment, cutSegment, rightSegment} = cutSegmentByRange(
         originalSegment,
         cutStartMs,
@@ -981,7 +1036,7 @@ function AudioPage() {
         return;
       }
 
-      // Build new segments list: left + right, drop the middle
+      // Build new segments list (remove middle)
       const newSegments = [
         ...track.segments.slice(0, segmentIndex),
         ...(leftSegment ? [leftSegment] : []),
@@ -991,7 +1046,7 @@ function AudioPage() {
 
       track.segments = newSegments;
 
-      // Make sure track has assetId (similar pattern to your copy/cut)
+      // Get assetId from database for clipboard
       try {
         const allTracks = await dbManager.getAllTracks(activeSession);
         const dbTrack = allTracks.find((t) => t.id === trackId);
@@ -1003,7 +1058,7 @@ function AudioPage() {
         console.warn("[cut] Failed to enrich track with assetId", e);
       }
 
-      // Put the CUT piece into clipboard as a tiny "track-like" object
+      // Create clipboard object with cut segment
       const clipTrack = {
         id: `clip_${track.id}_${Date.now()}`,
         name: `${track.name} (cut)`,
@@ -1015,7 +1070,7 @@ function AudioPage() {
         solo: false,
         effects: track.effects || {},
         activeEffectsList: track.activeEffectsList || [],
-        // important: only this one segment, starting at 0 on timeline
+        // Only include the cut segment
         segments: [
           {
             ...cutSegment,
@@ -1023,21 +1078,22 @@ function AudioPage() {
             startOnTimeline: 0,
           },
         ],
-        // extra metadata so paste can know file region
+        // Metadata for pasting
         clipStartInFileMs: cutSegment.startInFileMs ?? 0,
         clipDurationMs: cutSegment.durationMs ?? 0,
       };
 
+      // Set clipboard and update UI
       clipboardManager.setClipboard(clipTrack, "cut");
       refreshClipboardFlag();
 
-      // Persist to DB
+      // Persist changes to database
       await dbManager.updateTrack(track);
 
-      // Update React state
+      // Update state
       setTracks([...audioManager.tracks]);
 
-      // Rebuild & reload engine (and restore playhead)
+      // Reload engine and restore playhead
       const newVersion = buildVersionFromTracks(audioManager.tracks);
       if (newVersion && engineRef.current) {
         await engineRef.current.load(newVersion);
@@ -1058,7 +1114,7 @@ function AudioPage() {
     }
   };
 
-  // Handle segment movement within a track
+  // Handle moving a segment within a track
   const handleSegmentMove = async (trackId, segmentIndex, newPositionMs) => {
     const {ms: preservedMs} = progressStore.getState();
     try {
@@ -1086,6 +1142,7 @@ function AudioPage() {
         assetId: segment.assetId || assetId,
       };
 
+      // Remove segment then reinsert with spacing
       const remainingSegments = track.segments.filter(
         (_seg, idx) => idx !== segmentIndex
       );
@@ -1105,11 +1162,13 @@ function AudioPage() {
         )?.startOnTimelineMs,
       });
 
+      // Update database
       await dbManager.updateTrack(track);
       console.log("Segment position updated in database");
 
       setTracks([...audioManager.tracks]);
 
+      // Reload engine and restore playhead
       const newVersion = buildVersionFromTracks(audioManager.tracks);
       if (newVersion) {
         console.log(
@@ -1146,8 +1205,7 @@ function AudioPage() {
           `[handleSegmentMove] Restoring playhead to ${clampedMs}ms (preserved: ${preservedMs}ms)`
         );
 
-        // Seek the engine immediately - this must happen before endScrub is called
-        // so that when playback resumes, it starts from the correct position
+        // Seek engine to preserved position
         try {
           engineRef.current.seekMs(clampedMs);
           progressStore.setMs(clampedMs);
@@ -1172,6 +1230,7 @@ function AudioPage() {
     }
   };
 
+  // Handle deleting a segment
   const handleSegmentDelete = async (trackId, segmentId, segmentIndex) => {
     const {ms: preservedMs} = progressStore.getState();
     try {
@@ -1182,6 +1241,7 @@ function AudioPage() {
       }
 
       const segmentsBefore = track.segments.length;
+      // Filter out the segment to delete
       track.segments = track.segments.filter((seg, idx) => {
         if (Number.isFinite(segmentIndex)) {
           return idx !== segmentIndex;
@@ -1194,9 +1254,11 @@ function AudioPage() {
         return;
       }
 
+      // Update database and state
       await dbManager.updateTrack(track);
       setTracks([...audioManager.tracks]);
 
+      // Reload engine and restore playhead
       const newVersion = buildVersionFromTracks(audioManager.tracks);
       if (newVersion && engineRef.current) {
         await engineRef.current.load(newVersion);
@@ -1221,12 +1283,13 @@ function AudioPage() {
     }
   };
 
-  // Handle track deletion with proper cleanup
+  // Handle deleting a track with cleanup
   const handleDeleteTrack = useCallback(
     async (trackId) => {
       try {
         console.log(`Deleting track ${trackId}...`);
 
+        // Stop Tone.js transport
         try {
           Tone.Transport.stop();
           Tone.Transport.cancel(0);
@@ -1280,12 +1343,12 @@ function AudioPage() {
             console.warn("Failed to delete track from DB:", e);
           }
 
-          // Deselect if this was the selected track
+          // Deselect if this was selected
           if (selectedTrackId === trackId) {
             setSelectedTrackId(null);
           }
 
-          // Update React state
+          // Update state
           setTracks([...audioManager.tracks]);
 
           // Reset progress store
@@ -1296,7 +1359,7 @@ function AudioPage() {
             console.warn("Failed to reset progress store:", e);
           }
 
-          // Reload engine
+          // Reload engine (empty or with remaining tracks)
           if (audioManager.tracks.length === 0) {
             console.log("No tracks remaining - loading empty version");
 
@@ -1354,6 +1417,7 @@ function AudioPage() {
       return;
     }
 
+    // Get assetId from database
     try {
       const allTracks = await dbManager.getAllTracks(activeSession);
       const dbTrack = allTracks.find((t) => t.id === selectedTrackId);
@@ -1367,9 +1431,11 @@ function AudioPage() {
       console.warn("Failed to retrieve assetId from DB:", error);
     }
 
+    // Copy to clipboard
     clipboardManager.setClipboard(track, "cut");
     refreshClipboardFlag();
 
+    // Delete the track
     await handleDeleteTrack(selectedTrackId);
 
     console.log(`Track cut to clipboard: ${track.name}`);
@@ -1401,6 +1467,7 @@ function AudioPage() {
       }))
     );
 
+    // Get assetId from database
     try {
       const allTracks = await dbManager.getAllTracks(activeSession);
       const dbTrack = allTracks.find((t) => t.id === selectedTrackId);
@@ -1414,6 +1481,7 @@ function AudioPage() {
       console.warn("Failed to retrieve assetId from DB:", error);
     }
 
+    // Copy to clipboard
     clipboardManager.setClipboard(track, "copy");
     refreshClipboardFlag();
 
@@ -1421,7 +1489,6 @@ function AudioPage() {
   }, [activeSession, refreshClipboardFlag, selectedTrackId]);
 
   // Paste track from clipboard
-  // In AudioPage.jsx, replace the handlePasteTrack function with this fixed version:
   const handlePasteTrack = useCallback(async () => {
     const clipboardData = clipboardManager.getClipboard();
 
@@ -1449,7 +1516,7 @@ function AudioPage() {
     }
 
     try {
-      // Helper function to get buffer for a specific asset (The consolidated, correct version)
+      // Helper to get buffer for asset
       const getBufferForAsset = async (assetId) => {
         // Check cache first
         let buffer = assetBufferCache.get(assetId);
@@ -1476,7 +1543,7 @@ function AudioPage() {
         return toneBuffer;
       };
 
-      // Get the primary asset buffer
+      // Get primary asset buffer
       const primaryBuffer = await getBufferForAsset(trackData.assetId);
       if (!primaryBuffer) {
         alert("Cannot paste track: primary asset not found");
@@ -1490,14 +1557,14 @@ function AudioPage() {
         ? trackData.segments
         : [];
 
-      // Prefer explicit region (single cut) - this is ONLY for single-segment cut operations
+      // Check for single-segment cut operation
       const hasTopLevelRegion =
         typeof trackData.clipStartInFileMs === "number" &&
         typeof trackData.clipDurationMs === "number" &&
         trackData.clipDurationMs > 0;
 
       const baseSegments = (() => {
-        // Only use top-level region if it's a single-segment cut AND we have exactly 1 segment
+        // Handle single-segment cut
         if (hasTopLevelRegion && clipboardSegments.length <= 1) {
           return [
             {
@@ -1510,7 +1577,7 @@ function AudioPage() {
                 1,
                 Math.min(trackData.clipDurationMs, fullDurationMs)
               ),
-              // Preserve name and fileName from clipboard
+              // Preserve name from clipboard
               name:
                 clipboardSegments[0]?.name ||
                 clipboardSegments[0]?.fileName ||
@@ -1528,11 +1595,10 @@ function AudioPage() {
           ];
         }
 
-        // *If we have multiple segments, preserve ALL of them
+        // Handle multiple segments
         if (clipboardSegments.length > 0) {
           return clipboardSegments.map((seg) => ({
             ...seg,
-            // Ensure all properties are preserved
             id:
               seg.id ??
               `seg_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
@@ -1553,14 +1619,13 @@ function AudioPage() {
           }));
         }
 
-        // Fallback: full asset as one segment
+        // Fallback: full asset
         return [
           {
             id: `seg_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
             startOnTimelineMs: 0,
             startInFileMs: 0,
             durationMs: Math.round(fullDurationMs),
-            // Use asset name as fallback
             name: trackData.name || asset.name || null, // eslint-disable-line no-undef
             fileName: trackData.name || asset.name || null, // eslint-disable-line no-undef
             assetId: trackData.assetId,
@@ -1568,6 +1633,7 @@ function AudioPage() {
         ];
       })();
 
+      // Normalize segment data
       const normalizedSegments = baseSegments.map((seg, idx) => {
         const startOnTimelineMs = Math.max(
           0,
@@ -1594,15 +1660,12 @@ function AudioPage() {
           )
         );
 
-        // Preserve each segment's individual name and add " Copy" to it
+        // Generate copy name for segment
         const originalSegmentName =
           seg.name || seg.fileName || trackData.name || asset.name || null; // eslint-disable-line no-undef
         const segmentCopyName = originalSegmentName
           ? generateCopyName(originalSegmentName)
           : null;
-
-        // Use the segment's own assetId, not the track's assetId
-        const _segmentAssetId = seg.assetId ?? trackData.assetId;
 
         return {
           id:
@@ -1616,17 +1679,16 @@ function AudioPage() {
           offset: startInFileMs / 1000,
           durationMs,
           duration: durationMs / 1000,
-          assetId: seg.assetId || trackData.assetId, // Use segment's own assetId
-          // Use the individual segment's copy name
+          assetId: seg.assetId || trackData.assetId,
           name: segmentCopyName,
           fileName: segmentCopyName,
         };
       });
 
-      // Generate a unique copy name
+      // Generate unique name for track
       const copyName = generateCopyName(trackData.name);
 
-      // Create new track data for DB
+      // Create track data for database
       const newTrackData = {
         name: copyName,
         color: trackData.color || `hsl(${Math.random() * 360}, 70%, 50%)`,
@@ -1645,7 +1707,6 @@ function AudioPage() {
           durationMs: seg.durationMs,
           startOnTimelineMs: seg.startOnTimelineMs,
           startInFileMs: seg.startInFileMs,
-          // Include name and fileName in DB save
           name: seg.name,
           fileName: seg.fileName,
           assetId: seg.assetId,
@@ -1660,7 +1721,7 @@ function AudioPage() {
         enabledEffects: newTrackData.enabledEffects,
       });
 
-      // Build the track object for audioManager
+      // Load buffers for all segments
       const segmentsWithBuffers = await Promise.all(
         normalizedSegments.map(async (seg) => {
           const segmentBuffer = await getBufferForAsset(seg.assetId);
@@ -1672,12 +1733,12 @@ function AudioPage() {
           }
           return {
             ...seg,
-            buffer: segmentBuffer, // Each segment gets its own buffer
+            buffer: segmentBuffer,
           };
         })
       );
 
-      // Filter out any segments that failed to load
+      // Filter valid segments
       const validSegments = segmentsWithBuffers.filter(Boolean);
 
       if (validSegments.length === 0) {
@@ -1685,11 +1746,12 @@ function AudioPage() {
         return;
       }
 
+      // Create track object for audioManager
       const pastedTrack = {
         id: dbId,
         name: copyName,
         color: newTrackData.color,
-        buffer: primaryBuffer, // Track-level buffer for compatibility
+        buffer: primaryBuffer,
         assetId: trackData.assetId,
         volume: newTrackData.volume,
         pan: newTrackData.pan,
@@ -1698,13 +1760,11 @@ function AudioPage() {
         effects: newTrackData.effects,
         activeEffectsList: newTrackData.activeEffectsList,
         enabledEffects: newTrackData.enabledEffects,
-        segments: validSegments, // Each segment has the correct buffer
+        segments: validSegments,
       };
 
-      // Add to audioManager
+      // Add to audioManager and update state
       audioManager.addTrackFromBuffer(pastedTrack);
-
-      // Update React state
       setTracks([...audioManager.tracks]);
 
       // Reload engine
@@ -1730,7 +1790,7 @@ function AudioPage() {
     setTracks,
   ]);
 
-  // Keyboard shortcuts for cut/copy/paste
+  // Keyboard shortcuts for cut/copy/paste/delete
   useEffect(() => {
     const handleKeyDown = (e) => {
       const activeElement = document.activeElement;
@@ -1742,8 +1802,10 @@ function AudioPage() {
             activeElement.type
           ));
 
+      // Skip shortcuts during text entry
       if (isTextEntry) return;
 
+      // Ctrl/Cmd + X - Cut track
       if ((e.ctrlKey || e.metaKey) && e.key === "x") {
         e.preventDefault();
         if (selectedTrackId) {
@@ -1751,6 +1813,7 @@ function AudioPage() {
         }
       }
 
+      // Ctrl/Cmd + C - Copy track
       if ((e.ctrlKey || e.metaKey) && e.key === "c") {
         e.preventDefault();
         if (selectedTrackId) {
@@ -1758,6 +1821,7 @@ function AudioPage() {
         }
       }
 
+      // Ctrl/Cmd + V - Paste track
       if ((e.ctrlKey || e.metaKey) && e.key === "v") {
         e.preventDefault();
         if (clipboardManager.hasClipboard()) {
@@ -1766,6 +1830,7 @@ function AudioPage() {
         }
       }
 
+      // Backspace/Delete - Delete track
       if (e.key === "Backspace" || e.key === "Delete") {
         e.preventDefault();
         if (selectedTrackId) {
@@ -1785,7 +1850,7 @@ function AudioPage() {
     selectedTrackId,
   ]);
 
-  // Handle asset deletion - clear from buffer cache and clipboard
+  // Handle asset deletion with cache cleanup
   const handleAssetDelete = (assetId) => {
     if (assetBufferCache.has(assetId)) {
       console.log(`Clearing cached buffer for deleted asset ${assetId}`);
@@ -1800,7 +1865,7 @@ function AudioPage() {
     }
   };
 
-  // Generic handler for track property updates
+  // Generic handler for track property updates (mute, solo, etc.)
   const handleTrackPropertyUpdate = async (
     trackId,
     property,
@@ -1835,8 +1900,10 @@ function AudioPage() {
     }
   };
 
+  // Determine if sidebar is collapsed
   const isSidebarCollapsed = sidebarWidth <= MIN_WIDTH;
 
+  // CSS variable for sidebar width
   const mainContentStyle = {
     "--sidebar-width": `${sidebarWidth}px`,
   };
@@ -1844,22 +1911,27 @@ function AudioPage() {
   // Build version object for playback engine
   const version = buildVersionFromTracks(tracks);
 
+  // Legacy audio buffer reference (for compatibility)
   const _audioBuffer =
     tracks.length > 0
       ? tracks[0].buffer || tracks[0].segments?.[0]?.buffer
       : null;
 
+  // Handle engine ready callback
   const _handleEngineReady = (engine) => {
     engineRef.current = engine;
     setEngineRef(engineRef);
 
+    // Apply effects after engine is ready
     setTimeout(() => {
       applyEffectsToEngine();
     }, 100);
   };
 
+  // Main render
   return (
     <div className="app-container">
+      {/* Top header with controls and menus */}
       <Header
         tracks={tracks}
         totalLengthMs={version?.lengthMs || 0}
@@ -1875,7 +1947,9 @@ function AudioPage() {
         onSamplerRecording={handleSamplerRecording}
       />
 
+      {/* Main workspace area with sidebar and timeline */}
       <div className="main-content-area" style={mainContentStyle}>
+        {/* Left sidebar for assets and imports */}
         <Sidebar
           width={sidebarWidth}
           onImportSuccess={handleImportSuccess}
@@ -1885,6 +1959,7 @@ function AudioPage() {
           assetBufferCache={assetBufferCache}
         />
 
+        {/* Collapsible sidebar divider */}
         <button
           type="button"
           className="divider"
@@ -1898,6 +1973,7 @@ function AudioPage() {
           <span aria-hidden="true">{isSidebarCollapsed ? "›" : "‹"}</span>
         </button>
 
+        {/* Main timeline and track area */}
         <MainContent
           tracks={tracks}
           recording={recording}
@@ -1921,11 +1997,12 @@ function AudioPage() {
         />
       </div>
 
+      {/* Bottom footer with transport controls and recording */}
       <Footer
         version={version}
         onRecordComplete={handleImportSuccess}
         onRecordStart={({stream, startTs}) => {
-          // STOP PLAYBACK when recording starts
+          // Stop playback when recording starts
           if (engineRef.current) {
             try {
               engineRef.current.stop();

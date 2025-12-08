@@ -1,7 +1,13 @@
+/**
+ * SessionsTab Component
+ *
+ * Tab panel for managing user sessions.
+ * Handles session creation, renaming, deletion, and switching between sessions.
+ * Each session maintains its own effect settings and track data in IndexedDB.
+ */
+
 import {useState, useEffect, useContext, useRef, useCallback} from "react";
 import {MoonLoader} from "react-spinners";
-import {RxCross2} from "react-icons/rx";
-import {FaTrash} from "react-icons/fa";
 import {AppContext} from "../../../context/AppContext";
 import {createDefaultEffects} from "../../../context/effectsStorage";
 import {dbManager} from "../../../managers/DBManager";
@@ -9,6 +15,7 @@ import styles from "../Layout.module.css";
 import {DeleteIcon} from "../Svgs.jsx";
 
 function SessionsTab() {
+  // Access session management from AppContext
   const {
     activeSession,
     setActiveSession,
@@ -17,6 +24,7 @@ function SessionsTab() {
     dbRefreshTrigger,
   } = useContext(AppContext);
 
+  // Component state
   const [isLoading, setIsLoading] = useState(true);
   const [sessions, setSessions] = useState([]);
   const [error, setError] = useState(null);
@@ -25,14 +33,16 @@ function SessionsTab() {
   const [renameValue, setRenameValue] = useState("");
   const initializingRef = useRef(false);
 
-  // Load sessions from IndexedDB
+  /**
+   * Load all sessions from IndexedDB
+   */
   const loadSessions = useCallback(async () => {
     try {
       setIsLoading(true);
       const allSessions = await dbManager.getAllSessions();
       setSessions(allSessions);
 
-      // If there's an active session ID but the session doesn't exist, clear it
+      // Clear active session if it no longer exists
       if (activeSession && !allSessions.find((s) => s.id === activeSession)) {
         setActiveSession(null);
       }
@@ -47,7 +57,12 @@ function SessionsTab() {
     }
   }, [activeSession, setActiveSession]);
 
-  // Initialize: Create default session if none exist
+  /**
+   * Initialize sessions on mount:
+   * - Load existing sessions
+   * - Create default session if none exist
+   * - Set active session
+   */
   useEffect(() => {
     if (hasInitialized || initializingRef.current) return;
     initializingRef.current = true;
@@ -56,7 +71,7 @@ function SessionsTab() {
       try {
         const allSessions = await loadSessions();
 
-        // If no sessions exist, create a default one
+        // Create default session if none exist
         if (allSessions.length === 0) {
           try {
             const defaultSessionId = await dbManager.createSession(
@@ -72,14 +87,14 @@ function SessionsTab() {
             console.error("Failed to create default session:", e);
           }
         } else if (!activeSession) {
-          // If sessions exist but none is active, activate the first one
+          // Set first session as active if none selected
           console.log(
             "Setting active session to first available:",
             allSessions[0].id
           );
           setActiveSession(allSessions[0].id);
         } else {
-          // Active session exists, load its effects
+          // Load effects for existing active session
           console.log("Loading existing active session:", activeSession);
           try {
             const session = await dbManager.getSession(activeSession);
@@ -106,14 +121,18 @@ function SessionsTab() {
     setActiveSession,
   ]);
 
-  // Reload sessions when dbRefreshTrigger changes (from loading cloud saves)
+  /**
+   * Reload sessions when database trigger changes (e.g., cloud save loads)
+   */
   useEffect(() => {
     if (hasInitialized) {
       loadSessions();
     }
   }, [dbRefreshTrigger, hasInitialized, loadSessions]);
 
-  // Load session effects when active session changes
+  /**
+   * Load session effects when active session changes
+   */
   useEffect(() => {
     if (!activeSession || !hasInitialized) return;
 
@@ -132,7 +151,9 @@ function SessionsTab() {
     loadSessionEffects();
   }, [activeSession, hasInitialized, setEffects]);
 
-  // Save effects when they change
+  /**
+   * Save effects to session when they change (debounced)
+   */
   useEffect(() => {
     if (!activeSession || !hasInitialized) return;
 
@@ -148,21 +169,24 @@ function SessionsTab() {
     return () => clearTimeout(timer);
   }, [effects, activeSession, hasInitialized]);
 
+  /**
+   * Create a new session with auto-generated name
+   */
   const createSession = async () => {
     setError(null);
 
     try {
-      // Auto-generate session name based on count
+      // Generate sequential session name
       const sessionNumber = sessions.length + 1;
       const newSessionName = `Session ${sessionNumber}`;
 
-      // Use clean default effects
+      // Create with default effects
       const newSessionId = await dbManager.createSession(newSessionName, {
         effects: createDefaultEffects(),
       });
       await loadSessions();
 
-      // Set the newly created session as active
+      // Switch to new session
       setActiveSession(newSessionId);
     } catch (e) {
       console.error(e);
@@ -170,6 +194,11 @@ function SessionsTab() {
     }
   };
 
+  /**
+   * Rename a session with duplicate name validation
+   * @param {number} sessionId - ID of session to rename
+   * @param {string} newName - New session name
+   */
   const handleRenameSession = async (sessionId, newName) => {
     if (!newName.trim()) {
       setError("Session name cannot be empty");
@@ -177,7 +206,7 @@ function SessionsTab() {
     }
 
     try {
-      // Check for duplicate
+      // Check for duplicate names
       const exists = await dbManager.sessionExists(newName);
       const session = sessions.find((s) => s.id === sessionId);
 
@@ -197,15 +226,25 @@ function SessionsTab() {
     }
   };
 
+  /**
+   * Start rename mode on double-click
+   * @param {Object} session - Session object
+   */
   const handleDoubleClick = (session) => {
     setRenamingSessionId(session.id);
     setRenameValue(session.name);
   };
 
+  /**
+   * Delete a session with confirmation
+   * Prevents deleting the last session
+   * @param {number} sessionId - ID of session to delete
+   * @param {Event} event - Click event for stopPropagation
+   */
   const handleDeleteSession = async (sessionId, event) => {
     event.stopPropagation();
 
-    // Prevent deleting the last session
+    // Prevent deleting last session
     if (sessions.length <= 1) {
       setError("Cannot delete the last session.");
       return;
@@ -222,7 +261,7 @@ function SessionsTab() {
     try {
       await dbManager.deleteSession(sessionId);
 
-      // If we deleted the active session, switch to another one
+      // Switch to another session if deleting active one
       if (activeSession === sessionId) {
         const remainingSessions = sessions.filter((s) => s.id !== sessionId);
         if (remainingSessions.length > 0) {
@@ -239,15 +278,18 @@ function SessionsTab() {
 
   return (
     <div className={styles.container}>
+      {/* Loading State */}
       {isLoading ? (
         <div className={styles.spinner}>
           <MoonLoader color="white" />
         </div>
       ) : (
         <div>
+          {/* Empty State */}
           {sessions.length === 0 ? (
             <p className={styles.emptyMessage}>No sessions yet.</p>
           ) : (
+            /* Sessions List */
             <ul className={styles.projectsList}>
               {[...sessions]
                 .sort((a, b) => a.name.localeCompare(b.name))
@@ -262,6 +304,7 @@ function SessionsTab() {
                     onDoubleClick={() => handleDoubleClick(s)}
                     className={`${styles.projectItem} ${s.id === activeSession ? styles.activeProject : ""}`}
                   >
+                    {/* Rename Input or Session Name */}
                     {renamingSessionId === s.id ? (
                       <input
                         type="text"
@@ -287,6 +330,8 @@ function SessionsTab() {
                     ) : (
                       <span>{s.name}</span>
                     )}
+
+                    {/* Delete Button */}
                     <button
                       onClick={(e) => handleDeleteSession(s.id, e)}
                       className={styles.deleteButton}
@@ -301,8 +346,10 @@ function SessionsTab() {
         </div>
       )}
 
+      {/* Error Display */}
       {error && <p className={styles.error}>{error}</p>}
 
+      {/* Create Session Button */}
       <button className={styles.createButton} onClick={() => createSession()}>
         Create a session
       </button>

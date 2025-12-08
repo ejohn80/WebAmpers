@@ -1,3 +1,11 @@
+/**
+ * EffectsTab Component
+ *
+ * Tab panel for managing audio effects on the selected track.
+ * Provides sliders, toggles, reset/delete controls, and effect configuration.
+ * Integrates with AppContext for effect state management.
+ */
+
 import {useContext, useCallback, useState, useRef, useEffect} from "react";
 import {AppContext} from "../../../context/AppContext";
 import styles from "../Layout.module.css";
@@ -11,6 +19,7 @@ import {
 } from "../Svgs.jsx";
 
 function EffectsTab() {
+  // Access effect management functions and state from AppContext
   const {
     selectedTrackEffects,
     updateEffect,
@@ -22,18 +31,19 @@ function EffectsTab() {
     isEffectsMenuOpen,
     removeEffect,
     activeEffects,
-    enabledEffects, // Changed from enabledEffectsByTrack to enabledEffects
+    enabledEffects,
     toggleEffect,
     toggleAllEffects,
     selectedTrackId,
   } = useContext(AppContext);
 
-  // Local state for smooth dragging
+  // Local state for smooth slider interactions
   const [localValues, setLocalValues] = useState({});
   const [draggingSlider, setDraggingSlider] = useState(null);
   const updateTimeoutRef = useRef({});
   const lastTrackIdRef = useRef(null);
 
+  // Configuration for all available effects
   const effectConfigs = [
     {
       name: "pitch",
@@ -157,11 +167,14 @@ function EffectsTab() {
     },
   ];
 
-  // Filter effects to only show active ones based on the context list
+  // Filter to only show active effects for the current track
   const activeEffectConfigs = (activeEffects || [])
     .map((effectId) => effectConfigs.find((config) => config.name === effectId))
     .filter(Boolean);
 
+  /**
+   * Toggle effects menu visibility
+   */
   const toggleEffectsMenu = () => {
     if (isEffectsMenuOpen) {
       closeEffectsMenu();
@@ -170,11 +183,17 @@ function EffectsTab() {
     }
   };
 
+  /**
+   * Get current value for an effect with priority:
+   * 1. Local dragging value
+   * 2. Local cached value
+   * 3. Track stored value
+   * 4. Default value
+   */
   const getCurrentValue = useCallback(
     (config) => {
       const effectName = config.name;
 
-      // Priority 1: If actively dragging, use local value
       if (
         draggingSlider === effectName &&
         localValues[effectName] !== undefined
@@ -182,12 +201,10 @@ function EffectsTab() {
         return localValues[effectName];
       }
 
-      // Priority 2: If we have a local value (from recent change), use it
       if (localValues[effectName] !== undefined) {
         return localValues[effectName];
       }
 
-      // Priority 3: Use the track's persisted value
       if (
         selectedTrackEffects &&
         selectedTrackEffects[effectName] !== undefined
@@ -195,26 +212,28 @@ function EffectsTab() {
         return selectedTrackEffects[effectName];
       }
 
-      // Priority 4: Default value
       return config.default;
     },
     [draggingSlider, localValues, selectedTrackEffects]
   );
 
-  // Update local state immediately and debounce the persist
+  /**
+   * Handle slider change with debounced persistence
+   * Updates local state immediately for smooth UI
+   */
   const handleChange = useCallback(
     (name) => (e) => {
       const value = Number(e.target.value);
 
-      // ALWAYS update local state immediately for smooth UI
+      // Immediate local update for responsive UI
       setLocalValues((prev) => ({...prev, [name]: value}));
 
-      // Clear any existing timeout for this effect
+      // Clear existing debounce timer
       if (updateTimeoutRef.current[name]) {
         clearTimeout(updateTimeoutRef.current[name]);
       }
 
-      // Debounce the actual update
+      // Debounce the database update
       updateTimeoutRef.current[name] = setTimeout(() => {
         updateEffect(name, value);
         delete updateTimeoutRef.current[name];
@@ -223,82 +242,79 @@ function EffectsTab() {
     [updateEffect]
   );
 
-  // Check if effect is at default value
+  /**
+   * Check if an effect is at its default value
+   */
   const isAtDefaultValue = useCallback(
     (config) => {
       const currentValue = getCurrentValue(config);
-
       return Math.abs(currentValue - config.default) < 0.01;
     },
     [getCurrentValue]
   );
 
-  // Check if ALL effects are at their default values
+  /**
+   * Check if ALL active effects are at default values
+   */
   const areAllEffectsAtDefault = useCallback(() => {
     return activeEffectConfigs.every((config) => isAtDefaultValue(config));
   }, [activeEffectConfigs, isAtDefaultValue]);
 
-  // Handle reset all with immediate local state update
+  /**
+   * Reset all effects with immediate visual feedback
+   */
   const handleResetAll = useCallback(() => {
     if (areAllEffectsAtDefault()) return;
 
-    // Clear all pending timeouts
+    // Clear pending update timers
     Object.keys(updateTimeoutRef.current).forEach((key) => {
       clearTimeout(updateTimeoutRef.current[key]);
       delete updateTimeoutRef.current[key];
     });
 
-    // Build new local values with all defaults
+    // Set all local values to defaults for instant UI update
     const newLocalValues = {};
     activeEffectConfigs.forEach((config) => {
       newLocalValues[config.name] = config.default;
     });
 
-    // Update local state immediately for instant visual feedback
     setLocalValues(newLocalValues);
-
-    // Call resetAllEffects which will persist the changes
     resetAllEffects();
   }, [activeEffectConfigs, resetAllEffects, areAllEffectsAtDefault]);
 
+  /**
+   * Track slider drag start/end for visual feedback
+   */
   const handleSliderStart = useCallback((name) => {
     setDraggingSlider(name);
   }, []);
 
   const handleSliderEnd = useCallback(() => {
-    // Keep dragging state for a moment to prevent flicker
     setTimeout(() => {
       setDraggingSlider(null);
     }, 200);
   }, []);
 
+  /**
+   * Calculate slider fill percentage for visual indicator
+   */
   const getSliderFillPercentage = (config, value) => {
     const currentValue = value ?? config.default;
     return ((currentValue - config.min) / (config.max - config.min)) * 100;
   };
 
-  // Use enabledEffects from context (comes from track's enabledEffects in IndexedDB)
+  // Get enabled effects from track (pan is always enabled)
   const trackEnabled = enabledEffects || {};
-
-  // Check if effect is enabled (default to true if not set)
   const isEffectEnabled = (effectId) => trackEnabled[effectId] !== false;
 
-  // Check if any effects are enabled (for master toggle) - exclude pan
+  // Check if any non-pan effects are enabled for master toggle
   const areAnyEffectsEnabled = activeEffectConfigs
     .filter((config) => config.name !== "pan")
     .some((config) => isEffectEnabled(config.name));
 
-  // Check if all effects are enabled - exclude pan
-  // const areAllEffectsEnabled =
-  //   activeEffectConfigs.filter((config) => config.name !== "pan").length > 0 &&
-  //   activeEffectConfigs
-  //     .filter((config) => config.name !== "pan")
-  //     .every((config) => isEffectEnabled(config.name));
-
-  // Check if there are any active effects
   const hasActiveEffects = activeEffectConfigs.length > 0;
 
-  // Clear local values when track changes
+  // Clear local values when track selection changes
   useEffect(() => {
     if (selectedTrackId !== lastTrackIdRef.current) {
       setLocalValues({});
@@ -333,6 +349,7 @@ function EffectsTab() {
     };
   }, []);
 
+  // No track selected message
   if (!selectedTrackId) {
     return (
       <div className={styles.container}>
@@ -355,6 +372,7 @@ function EffectsTab() {
 
   return (
     <div className={styles.container}>
+      {/* Add/Close Effects Button */}
       <button
         className={`${styles.addEffectsButton} ${isEffectsMenuOpen ? styles.addEffectsButtonActive : ""}`}
         onClick={toggleEffectsMenu}
@@ -365,10 +383,10 @@ function EffectsTab() {
         </span>
       </button>
 
-      {/* Master Toggle and Reset All Buttons - Side by Side */}
+      {/* Master Toggle and Reset All Row */}
       {hasActiveEffects && (
         <div className={styles.toggleResetRow}>
-          {/* Enable/Disable All Button - Left Side */}
+          {/* Master Toggle Button */}
           <button
             className={styles.masterToggleButton}
             onClick={toggleAllEffects}
@@ -383,7 +401,7 @@ function EffectsTab() {
             </span>
           </button>
 
-          {/* Reset All Effects Button - Right Side */}
+          {/* Reset All Button */}
           <button
             className={`${styles.resetAllButton} ${
               areAllEffectsAtDefault() ? styles.resetAllButtonDisabled : ""
@@ -403,18 +421,14 @@ function EffectsTab() {
         </div>
       )}
 
-      {/* Effect sliders - only show active effects in addition order */}
+      {/* Active Effects List */}
       <div className={styles.effectsList}>
         {activeEffectConfigs.map((config) => {
           const currentValue = getCurrentValue(config);
           const fillPercentage = getSliderFillPercentage(config, currentValue);
           const isDefault = isAtDefaultValue(config);
-
-          // Pan should always be considered enabled since it's not part of the toggle system
           const isEnabled =
             config.name === "pan" ? true : isEffectEnabled(config.name);
-
-          // For pan, we don't show disabled styling even if master toggle is off
           const shouldShowDisabled = config.name === "pan" ? false : !isEnabled;
 
           return (
@@ -424,7 +438,7 @@ function EffectsTab() {
                 shouldShowDisabled ? styles.effectDisabled : ""
               }`}
             >
-              {/* Close button in top right */}
+              {/* Remove Effect Button */}
               <button
                 className={styles.closeEffectButton}
                 onClick={() => removeEffect(config.name)}
@@ -433,7 +447,7 @@ function EffectsTab() {
                 <XIcon />
               </button>
 
-              {/* Individual Toggle Switch - don't show for pan */}
+              {/* Individual Toggle Switch (not for pan) */}
               {config.name !== "pan" && (
                 <button
                   className={styles.effectToggleButton}
@@ -452,12 +466,13 @@ function EffectsTab() {
                 </button>
               )}
 
+              {/* Effect Header */}
               <div className={styles.header}>
                 <span className={styles.label}>{config.label}</span>
                 <div className={styles.description}>{config.description}</div>
               </div>
 
-              {/* Custom Slider - pan should never be disabled */}
+              {/* Custom Slider */}
               <div
                 className={`${styles.sliderContainer} ${
                   draggingSlider === config.name ? styles.dragging : ""
@@ -492,10 +507,11 @@ function EffectsTab() {
                   onTouchStart={() => handleSliderStart(config.name)}
                   onTouchEnd={() => handleSliderEnd(config.name)}
                   className={styles.sliderInput}
-                  disabled={config.name !== "pan" && !isEnabled} // Pan is never disabled
+                  disabled={config.name !== "pan" && !isEnabled}
                 />
               </div>
 
+              {/* Bottom Row: Value Display and Reset Button */}
               <div className={styles.bottomRow}>
                 <span
                   className={`${styles.value} ${
@@ -535,6 +551,7 @@ function EffectsTab() {
           );
         })}
 
+        {/* Empty State */}
         {activeEffectConfigs.length === 0 && (
           <div className={styles.noEffectsMessage}>
             No effects yet. Add one to get started

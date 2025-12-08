@@ -1,3 +1,4 @@
+// Helper function to safely clamp and round millisecond values
 const clampMs = (value) => {
   if (!Number.isFinite(value)) {
     const parsed = Number(value);
@@ -6,10 +7,12 @@ const clampMs = (value) => {
   return Math.max(0, Math.round(value));
 };
 
+// Create a shallow copy of a segment object
 const cloneSegment = (segment) => ({
   ...segment,
 });
 
+// Extract start time in ms from segment object (handles both formats)
 const getStartMs = (segment) => {
   if (!segment) return 0;
   if (Number.isFinite(segment.startOnTimelineMs)) {
@@ -21,6 +24,7 @@ const getStartMs = (segment) => {
   return 0;
 };
 
+// Extract duration in ms from segment object (handles both formats)
 const getDurationMs = (segment) => {
   if (!segment) return 0;
   if (Number.isFinite(segment.durationMs)) {
@@ -32,6 +36,7 @@ const getDurationMs = (segment) => {
   return 0;
 };
 
+// Apply start time to segment object (sets both ms and seconds properties)
 const applyStartTime = (segment, startMs) => {
   const safeStart = clampMs(startMs);
   segment.startOnTimelineMs = safeStart;
@@ -39,9 +44,14 @@ const applyStartTime = (segment, startMs) => {
   return segment;
 };
 
+/**
+ * Merge overlapping segments into consolidated time ranges
+ * Used to detect conflicts and find available space
+ */
 const buildMergedSegments = (segments) => {
   const bounds = [];
 
+  // Convert segments to start-end ranges
   segments.forEach((segment) => {
     if (!segment) return;
     const start = getStartMs(segment);
@@ -50,20 +60,24 @@ const buildMergedSegments = (segments) => {
     bounds.push({start, end: start + duration});
   });
 
+  // Sort by start time
   bounds.sort((a, b) => a.start - b.start);
 
   if (bounds.length === 0) {
     return bounds;
   }
 
+  // Merge overlapping ranges
   const merged = [bounds[0]];
 
   for (let i = 1; i < bounds.length; i += 1) {
     const current = bounds[i];
     const last = merged[merged.length - 1];
     if (current.start <= last.end) {
+      // Overlap detected - merge by extending end time
       last.end = Math.max(last.end, current.end);
     } else {
+      // No overlap - add as new range
       merged.push({...current});
     }
   }
@@ -71,11 +85,15 @@ const buildMergedSegments = (segments) => {
   return merged;
 };
 
+/**
+ * Simple push-forward strategy: move segment forward until it clears all overlaps
+ */
 const pushForwardPastOverlaps = (mergedSegments, desiredStart) => {
   let resolved = clampMs(desiredStart);
 
   mergedSegments.forEach(({start, end}) => {
     if (start <= resolved && end > resolved) {
+      // Overlap detected - push to end of this segment
       resolved = end;
     }
   });
@@ -83,6 +101,10 @@ const pushForwardPastOverlaps = (mergedSegments, desiredStart) => {
   return clampMs(resolved);
 };
 
+/**
+ * Smart gap-finding strategy: find nearest available gap that fits the segment
+ * Prioritizes gaps closest to desired position
+ */
 const findNearestGapPlacement = (mergedSegments, desiredStart, durationMs) => {
   const safeDesired = clampMs(desiredStart);
   const safeDuration = clampMs(durationMs);
@@ -94,6 +116,7 @@ const findNearestGapPlacement = (mergedSegments, desiredStart, durationMs) => {
   let cursor = 0;
   const gaps = [];
 
+  // Identify all gaps between merged segments
   mergedSegments.forEach(({start, end}) => {
     if (start > cursor) {
       gaps.push({start: cursor, end: start});
@@ -101,18 +124,23 @@ const findNearestGapPlacement = (mergedSegments, desiredStart, durationMs) => {
     cursor = Math.max(cursor, end);
   });
 
+  // Add final gap (from last segment to infinity)
   gaps.push({start: cursor, end: Number.POSITIVE_INFINITY});
 
   let bestStart = null;
   let smallestDelta = Number.POSITIVE_INFINITY;
 
+  // Find best gap placement (closest to desired position)
   gaps.forEach(({start, end}) => {
     const isInfinite = end === Number.POSITIVE_INFINITY;
     const gapSpan = isInfinite ? Number.POSITIVE_INFINITY : end - start;
+
+    // Skip gaps too small for our segment
     if (!isInfinite && gapSpan < safeDuration) {
       return;
     }
 
+    // For infinite gap, skip if desired position is before gap start
     if (isInfinite && safeDesired < start) {
       return;
     }
@@ -120,6 +148,7 @@ const findNearestGapPlacement = (mergedSegments, desiredStart, durationMs) => {
     const maxStart = isInfinite ? Number.POSITIVE_INFINITY : end - safeDuration;
     let candidate = safeDesired;
 
+    // Clamp candidate position within gap boundaries
     if (candidate < start) {
       candidate = start;
     } else if (candidate > maxStart) {
@@ -130,6 +159,7 @@ const findNearestGapPlacement = (mergedSegments, desiredStart, durationMs) => {
       return;
     }
 
+    // Track best (closest) candidate
     const delta = Math.abs(candidate - safeDesired);
     if (
       bestStart === null ||
@@ -163,9 +193,11 @@ export const resolveSegmentStart = (
   }
 
   if (safeDuration <= 0) {
+    // Zero-length segment: just push past overlaps
     return pushForwardPastOverlaps(mergedSegments, safeDesired);
   }
 
+  // Try smart gap placement first
   const nearestGap = findNearestGapPlacement(
     mergedSegments,
     safeDesired,
@@ -176,6 +208,7 @@ export const resolveSegmentStart = (
     return clampMs(nearestGap);
   }
 
+  // Fallback to simple push-forward
   return pushForwardPastOverlaps(mergedSegments, safeDesired);
 };
 
@@ -189,12 +222,15 @@ export const insertSegmentWithSpacing = (segments = [], candidateSegment) => {
     return Array.isArray(segments) ? segments.slice() : [];
   }
 
+  // Create working copy of segments
   const working = Array.isArray(segments)
     ? segments.map((segment) => cloneSegment(segment))
     : [];
 
   const newSegment = cloneSegment(candidateSegment);
   const segmentDuration = getDurationMs(newSegment);
+
+  // Ensure duration properties exist
   if (!Number.isFinite(newSegment.durationMs) && segmentDuration > 0) {
     newSegment.durationMs = segmentDuration;
   }
@@ -202,11 +238,13 @@ export const insertSegmentWithSpacing = (segments = [], candidateSegment) => {
     newSegment.duration = segmentDuration / 1000;
   }
 
+  // Calculate non-overlapping start position
   applyStartTime(
     newSegment,
     resolveSegmentStart(working, newSegment.startOnTimelineMs, segmentDuration)
   );
 
+  // Add to array and sort by start time
   working.push(newSegment);
   working.sort(
     (a, b) => clampMs(a.startOnTimelineMs) - clampMs(b.startOnTimelineMs)
@@ -222,6 +260,7 @@ export const insertSegmentWithSpacing = (segments = [], candidateSegment) => {
     const prevEnd = prevStart + clampMs(prev.durationMs);
 
     if (clampMs(curr.startOnTimelineMs) < prevEnd) {
+      // Overlap detected - push this segment forward
       working[i] = applyStartTime(cloneSegment(curr), prevEnd);
     }
   }
@@ -229,6 +268,7 @@ export const insertSegmentWithSpacing = (segments = [], candidateSegment) => {
   return working;
 };
 
+// Expose internal helpers for testing
 export const __private__ = {
   clampMs,
   applyStartTime,

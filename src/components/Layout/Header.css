@@ -1,3 +1,6 @@
+/* Header Styles */
+
+/* Main header container - flex layout with left/right sections */
 .container {
   display: flex;
   align-items: flex-start;
@@ -6,13 +9,14 @@
   height: 40px;
 }
 
-/* Container for Webamp and FETS */
+/* Left container: Logo + File/Edit/Tools/Settings */
 .leftContainer {
   display: flex;
   align-items: flex-start;
   gap: 13px;
 }
 
+/* WebAmp logo text */
 .webampText {
   color: #17e1ff;
   font-family: "Roboto", sans-serif;
@@ -22,13 +26,13 @@
   padding-left: 10px;
 }
 
-/* File/Edit/Tools/Settings container */
+/* Menu buttons container (File/Edit/Tools/Settings) */
 .FETS-container {
   display: flex;
   position: relative;
 }
 
-/* Ensure header icons follow the active text color (works for light mode) */
+/* Icon styling for theme compatibility */
 .FETS-container svg {
   color: var(--menu-text);
 }
@@ -45,23 +49,7 @@
   fill: currentColor !important;
 }
 
-.dropdown-content svg {
-  color: var(--menu-text);
-}
-.dropdown-content svg path,
-.dropdown-content svg polyline,
-.dropdown-content svg line,
-.dropdown-content svg rect,
-.dropdown-content svg circle {
-  stroke: currentColor !important;
-}
-.dropdown-content svg path[fill]:not([fill="none"]),
-.dropdown-content svg rect[fill]:not([fill="none"]),
-.dropdown-content svg circle[fill]:not([fill="none"]) {
-  fill: currentColor !important;
-}
-
-/* File and Edit buttons styling */
+/* Dropdown menu button base styles */
 .dropdown-btn {
   background: var(--panel-bg);
   color: var(--menu-text);
@@ -77,7 +65,7 @@
   background-color: var(--panel-hover);
 }
 
-/* Tools button styling */
+/* Tools button - wider than File/Edit */
 .dropdown-btn-tools {
   background: var(--panel-bg);
   color: var(--menu-text);
@@ -93,7 +81,7 @@
   background-color: var(--panel-hover);
 }
 
-/* Settings button styling */
+/* Settings button - widest menu button */
 .dropdown-btn-settings {
   background: var(--panel-bg);
   color: var(--menu-text);
@@ -109,6 +97,7 @@
   background-color: var(--panel-hover);
 }
 
+/* Dropdown container */
 .dropdown {
   position: relative;
   display: inline-block;
@@ -116,7 +105,7 @@
   overflow: visible;
 }
 
-/* Base dropdown content styling */
+/* Base dropdown menu styling */
 .dropdown-content {
   position: absolute;
   background: var(--panel-bg);
@@ -127,31 +116,28 @@
   overflow: visible;
 }
 
-/* File dropdown */
+/* Individual dropdown dimensions */
 .dropdown-content-file {
   width: 200px;
   height: 170px;
 }
 
-/* Edit dropdown */
 .dropdown-content-edit {
   width: 180px;
   height: 182px;
 }
 
-/* Tools dropdown */
 .dropdown-content-tools {
   width: 160px;
   height: 86px;
 }
 
-/* Settings dropdown */
 .dropdown-content-settings {
   width: 220px;
   height: auto;
 }
 
-/* Dropdown menu text */
+/* Dropdown menu items */
 .dropdown-content a {
   color: var(--menu-text);
   padding: 12px 16px;
@@ -161,21 +147,21 @@
   display: block;
   font-size: 14px;
   cursor: pointer;
-  background-color: var(--panel-bg); /* Explicitly set background color */
+  background-color: var(--panel-bg);
 }
 
 .dropdown-content a:hover {
   background-color: var(--panel-hover);
 }
 
-/* Active state for buttons when dropdown is open */
+/* Active state for open dropdown buttons */
 .dropdown-btn.active,
 .dropdown-btn-tools.active,
 .dropdown-btn-settings.active {
   background-color: var(--panel-hover);
 }
 
-/* Guest Button Styling */
+/* Guest/User button styling */
 .dropdown-btn-guest {
   margin-right: 10px;
   background: var(--panel-bg);
@@ -183,7 +169,6 @@
   padding: 4px 8px;
   border: none;
   cursor: pointer;
-  /* height: 30px; */
   font-size: 16px;
   display: flex;
   gap: 8px;
@@ -202,12 +187,14 @@
   width: 111px;
 }
 
+/* Disabled menu item styling */
 .dropdown-item-disabled {
   color: var(--menu-muted);
   cursor: not-allowed;
   opacity: 0.65;
 }
 
+/* Submenu container (for Themes) */
 .dropdown-item-with-submenu {
   position: relative;
   overflow: visible;
@@ -219,11 +206,13 @@
   justify-content: space-between;
 }
 
+/* Submenu arrow indicator */
 .submenu-arrow {
   font-size: 14px;
   opacity: 0.7;
 }
 
+/* Theme selection submenu */
 .dropdown-submenu {
   position: absolute;
   top: 0;
@@ -239,6 +228,7 @@
   gap: 4px;
 }
 
+/* Submenu items (Dark/Light mode options) */
 .submenu-item {
   background: transparent;
   border: none;
@@ -262,6 +252,7 @@
   font-weight: 600;
 }
 
+/* Checkmark for selected theme */
 .submenu-check {
   margin-left: 8px;
 }

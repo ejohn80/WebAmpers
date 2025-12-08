@@ -1,3 +1,6 @@
+/* Sampler.module.css - Styles for sampler */
+
+/* Main sampler panel */
 .samplerPanel {
   position: fixed;
   z-index: 10000;
@@ -12,6 +15,7 @@
   overflow: hidden;
 }
 
+/* Dragging state */
 .samplerPanel.dragging {
   cursor: grabbing;
   box-shadow:
@@ -19,6 +23,7 @@
     0 0 0 1px rgba(23, 225, 255, 0.2);
 }
 
+/* Panel header with drag handle */
 .header {
   display: flex;
   justify-content: space-between;
@@ -36,6 +41,7 @@
   cursor: grabbing;
 }
 
+/* Title area */
 .titleSection {
   display: flex;
   align-items: center;
@@ -51,6 +57,7 @@
   flex-shrink: 0;
 }
 
+/* Close button */
 .closeButton {
   width: 24px;
   height: 24px;
@@ -67,11 +74,11 @@
 }
 
 .closeButton:hover {
-  /* Using the new danger hover variables */
   background: var(--sampler-danger-hover-bg, #dd4b4b);
   color: var(--sampler-danger-hover-text, #fff);
 }
 
+/* Instrument selector (piano/drums) */
 .instrumentSelector {
   display: flex;
   gap: 8px;
@@ -108,12 +115,14 @@
   color: var(--sampler-strong, #17e1ff);
 }
 
+/* Main keyboard/pad container */
 .keyboardContainer {
   padding: 16px 12px;
   background: var(--sampler-curve-bg, #0f0f0f);
   cursor: default;
 }
 
+/* Piano keyboard layout */
 .pianoKeyboard {
   display: flex;
   position: relative;
@@ -124,6 +133,7 @@
   gap: 2px;
 }
 
+/* White piano keys */
 .pianoKey {
   position: relative;
   flex: 1;
@@ -158,6 +168,7 @@
   box-shadow: 0 2px 8px var(--sampler-active-shadow, rgba(23, 225, 255, 0.4));
 }
 
+/* Black piano keys (positioned absolutely) */
 .pianoKey.black {
   position: absolute;
   width: 28px;
@@ -195,6 +206,7 @@
   color: var(--sampler-muted, #888);
 }
 
+/* Key labels and bindings */
 .keyLabel {
   font-size: 10px;
   color: var(--sampler-muted-darker, #666);
@@ -212,6 +224,7 @@
   text-transform: uppercase;
 }
 
+/* Drum pad grid layout */
 .drumPadGrid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -221,6 +234,7 @@
   border-radius: 6px;
 }
 
+/* Individual drum pads */
 .drumPad {
   aspect-ratio: 1;
   background: var(
@@ -276,10 +290,10 @@
 
 .drumPad.active .padLabel,
 .drumPad.active .keyBinding {
-  /* Using a dark color for text on the bright active button */
   color: var(--sampler-panel-bg-darker, #1a1a1a);
 }
 
+/* Recording controls area */
 .recordingControls {
   display: flex;
   align-items: center;
@@ -295,6 +309,7 @@
   gap: 10px;
 }
 
+/* Record button */
 .recordButton {
   width: 44px;
   height: 44px;
@@ -334,6 +349,7 @@
   background: var(--sampler-record-icon-active, #fff);
 }
 
+/* Recording timer */
 .recordingTime {
   font-family: monospace;
   font-size: 14px;
@@ -350,6 +366,7 @@
   color: var(--sampler-muted-darker, #555);
 }
 
+/* Save/discard buttons */
 .saveControls {
   display: flex;
   gap: 8px;
@@ -401,6 +418,7 @@
   opacity: 0.5;
 }
 
+/* Volume controls (currently unused in component) */
 .volumeSection {
   display: flex;
   align-items: center;
@@ -447,6 +465,7 @@
   text-align: right;
 }
 
+/* Loading overlay for samples */
 .loadingOverlay {
   position: absolute;
   inset: 0;

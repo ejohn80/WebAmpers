@@ -11,19 +11,20 @@ class MockAudioBuffer {
     this.length = length;
     this.sampleRate = sampleRate;
 
-    // Create a mock Float32Array for each channel.
-    // We use a small mock array of zeros since content doesn't matter for WAV size check.
+    // Create mock Float32Arrays for each channel (filled with small values)
+    // Content doesn't matter for WAV size calculation - just needs valid structure
     this.channelData = Array(numberOfChannels)
       .fill(0)
       .map(() => new Float32Array(length).fill(0.1));
   }
 
+  // Required method for AudioBuffer interface
   getChannelData(channel) {
     return this.channelData[channel];
   }
 }
 
-// Mock ToneAudioBuffer class
+// Mock ToneAudioBuffer class - mimics the actual Tone.js class
 export class ToneAudioBuffer {
   constructor(numberOfChannels, length, sampleRate = 44100) {
     this.numberOfChannels = numberOfChannels;
@@ -32,7 +33,7 @@ export class ToneAudioBuffer {
     this.mockBuffer = new MockAudioBuffer(numberOfChannels, length, sampleRate);
   }
 
-  // The get() method is used by the bufferToWavFile to access channel data
+  // The get() method is used by bufferToWavFile to access the underlying AudioBuffer
   get() {
     return this.mockBuffer;
   }
