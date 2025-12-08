@@ -4,6 +4,23 @@
   scrollbar-width: thin;
   scrollbar-color: #333239 #1e1d20;
   background: var(--panel-bg);
+  transition:
+    width 0.25s ease,
+    min-width 0.25s ease,
+    opacity 0.2s ease;
+}
+
+.sidebar-container.is-collapsed,
+.sidebar-container[data-collapsed="true"] {
+  padding: 0 !important;
+  opacity: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.sidebar-container[data-collapsed="true"] .sidebar-tabs,
+.sidebar-container[data-collapsed="true"] > div {
+  display: none;
 }
 
 /* Webkit browsers (Chrome, Safari, Edge) */

@@ -38,9 +38,12 @@ function Sidebar({
   onAssetDelete,
   assetsRefreshTrigger,
   assetBufferCache,
+  width = 0,
 }) {
   const [currentTab, setCurrentTab] = useState(getInitialTab);
   const {closeEffectsMenu} = useContext(AppContext); // Get closeEffectsMenu from context
+  const clampedWidth = Number.isFinite(width) ? Math.max(0, width) : 0;
+  const isCollapsed = clampedWidth <= 0;
 
   const tabs = [
     {
@@ -87,7 +90,17 @@ function Sidebar({
   }, [currentTab]);
 
   return (
-    <DraggableDiv color="1E1D20" className="sidebar-container">
+    <DraggableDiv
+      color="1E1D20"
+      className={`sidebar-container${isCollapsed ? " is-collapsed" : ""}`}
+      style={{
+        width: `${clampedWidth}px`,
+        minWidth: `${clampedWidth}px`,
+        padding: isCollapsed ? 0 : undefined,
+      }}
+      aria-hidden={isCollapsed}
+      data-collapsed={isCollapsed ? "true" : undefined}
+    >
       <div className="sidebar-tabs">
         {tabs.map(({key, label}, index) => (
           <button
