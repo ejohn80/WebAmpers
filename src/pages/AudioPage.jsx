@@ -244,36 +244,39 @@ function AudioPage() {
     [deserializeAudioBuffer]
   );
 
-  const buildToneBufferFromAssetRecord = useCallback(async (asset) => {
-    if (!asset) return null;
+  const buildToneBufferFromAssetRecord = useCallback(
+    async (asset) => {
+      if (!asset) return null;
 
-    if (asset.buffer?.channels?.length) {
-      try {
-        return createToneBufferFromSerialized(asset.buffer);
-      } catch (error) {
-        console.warn(
-          `[AudioPage] Failed to deserialize stored buffer for asset ${asset.id}:`,
-          error
-        );
+      if (asset.buffer?.channels?.length) {
+        try {
+          return createToneBufferFromSerialized(asset.buffer);
+        } catch (error) {
+          console.warn(
+            `[AudioPage] Failed to deserialize stored buffer for asset ${asset.id}:`,
+            error
+          );
+        }
       }
-    }
 
-    if (asset.fileBlob) {
-      try {
-        const arrayBuffer = await asset.fileBlob.arrayBuffer();
-        const audioBuffer =
-          await Tone.context.rawContext.decodeAudioData(arrayBuffer);
-        return new Tone.ToneAudioBuffer(audioBuffer);
-      } catch (error) {
-        console.warn(
-          `[AudioPage] Failed to decode blob for asset ${asset.id}:`,
-          error
-        );
+      if (asset.fileBlob) {
+        try {
+          const arrayBuffer = await asset.fileBlob.arrayBuffer();
+          const audioBuffer =
+            await Tone.context.rawContext.decodeAudioData(arrayBuffer);
+          return new Tone.ToneAudioBuffer(audioBuffer);
+        } catch (error) {
+          console.warn(
+            `[AudioPage] Failed to decode blob for asset ${asset.id}:`,
+            error
+          );
+        }
       }
-    }
 
-    return null;
-  }, [createToneBufferFromSerialized]);
+      return null;
+    },
+    [createToneBufferFromSerialized]
+  );
 
   const getAssetPreviewInfo = useCallback(
     async (assetId) => {
@@ -1221,112 +1224,121 @@ function AudioPage() {
   // Handle track deletion with proper cleanup
   const handleDeleteTrack = useCallback(
     async (trackId) => {
-    try {
-      console.log(`Deleting track ${trackId}...`);
-
       try {
-        Tone.Transport.stop();
-        Tone.Transport.cancel(0);
-        Tone.Transport.seconds = 0;
-        console.log("Tone.Transport stopped and reset");
-      } catch (e) {
-        console.error("Failed to stop Tone.Transport:", e);
-      }
+        console.log(`Deleting track ${trackId}...`);
 
-      // Dispose engine resources
-      if (engineRef.current) {
         try {
-          // Unsync and dispose all players
-          if (engineRef.current.playersBySegment) {
-            engineRef.current.playersBySegment.forEach((playerObj) => {
+          Tone.Transport.stop();
+          Tone.Transport.cancel(0);
+          Tone.Transport.seconds = 0;
+          console.log("Tone.Transport stopped and reset");
+        } catch (e) {
+          console.error("Failed to stop Tone.Transport:", e);
+        }
+
+        // Dispose engine resources
+        if (engineRef.current) {
+          try {
+            // Unsync and dispose all players
+            if (engineRef.current.playersBySegment) {
+              engineRef.current.playersBySegment.forEach((playerObj) => {
+                try {
+                  if (
+                    playerObj.player &&
+                    typeof playerObj.player.unsync === "function"
+                  ) {
+                    playerObj.player.unsync();
+                  }
+                  if (
+                    playerObj.player &&
+                    typeof playerObj.player.stop === "function"
+                  ) {
+                    playerObj.player.stop();
+                  }
+                } catch (e) {
+                  console.warn("Failed to unsync/stop player:", e);
+                }
+              });
+            }
+
+            engineRef.current._disposeAll();
+            console.log("All engine resources disposed");
+          } catch (e) {
+            console.warn("Failed to dispose engine:", e);
+          }
+        }
+
+        // Delete from audioManager
+        const deleted = audioManager.deleteTrack(trackId);
+
+        if (deleted) {
+          // Delete from database
+          try {
+            await dbManager.deleteTrack(trackId);
+            console.log(`Track ${trackId} deleted from database`);
+          } catch (e) {
+            console.warn("Failed to delete track from DB:", e);
+          }
+
+          // Deselect if this was the selected track
+          if (selectedTrackId === trackId) {
+            setSelectedTrackId(null);
+          }
+
+          // Update React state
+          setTracks([...audioManager.tracks]);
+
+          // Reset progress store
+          try {
+            progressStore.setMs(0);
+            progressStore.setLengthMs(0);
+          } catch (e) {
+            console.warn("Failed to reset progress store:", e);
+          }
+
+          // Reload engine
+          if (audioManager.tracks.length === 0) {
+            console.log("No tracks remaining - loading empty version");
+
+            if (engineRef.current) {
               try {
-                if (
-                  playerObj.player &&
-                  typeof playerObj.player.unsync === "function"
-                ) {
-                  playerObj.player.unsync();
-                }
-                if (
-                  playerObj.player &&
-                  typeof playerObj.player.stop === "function"
-                ) {
-                  playerObj.player.stop();
-                }
+                await engineRef.current.load(EMPTY_VERSION);
+                console.log("Engine loaded with empty version");
               } catch (e) {
-                console.warn("Failed to unsync/stop player:", e);
+                console.error("Failed to load empty version:", e);
               }
-            });
-          }
-
-          engineRef.current._disposeAll();
-          console.log("All engine resources disposed");
-        } catch (e) {
-          console.warn("Failed to dispose engine:", e);
-        }
-      }
-
-      // Delete from audioManager
-      const deleted = audioManager.deleteTrack(trackId);
-
-      if (deleted) {
-        // Delete from database
-        try {
-          await dbManager.deleteTrack(trackId);
-          console.log(`Track ${trackId} deleted from database`);
-        } catch (e) {
-          console.warn("Failed to delete track from DB:", e);
-        }
-
-        // Deselect if this was the selected track
-        if (selectedTrackId === trackId) {
-          setSelectedTrackId(null);
-        }
-
-        // Update React state
-        setTracks([...audioManager.tracks]);
-
-        // Reset progress store
-        try {
-          progressStore.setMs(0);
-          progressStore.setLengthMs(0);
-        } catch (e) {
-          console.warn("Failed to reset progress store:", e);
-        }
-
-        // Reload engine
-        if (audioManager.tracks.length === 0) {
-          console.log("No tracks remaining - loading empty version");
-
-          if (engineRef.current) {
-            try {
-              await engineRef.current.load(EMPTY_VERSION);
-              console.log("Engine loaded with empty version");
-            } catch (e) {
-              console.error("Failed to load empty version:", e);
             }
-          }
-        } else {
-          console.log(
-            `Reloading engine with ${audioManager.tracks.length} remaining track(s)`
-          );
+          } else {
+            console.log(
+              `Reloading engine with ${audioManager.tracks.length} remaining track(s)`
+            );
 
-          const newVersion = buildVersionFromTracks(audioManager.tracks);
+            const newVersion = buildVersionFromTracks(audioManager.tracks);
 
-          if (newVersion && engineRef.current) {
-            try {
-              await engineRef.current.load(newVersion);
-              console.log("Engine reloaded successfully");
-            } catch (e) {
-              console.error("Failed to reload engine after track deletion:", e);
+            if (newVersion && engineRef.current) {
+              try {
+                await engineRef.current.load(newVersion);
+                console.log("Engine reloaded successfully");
+              } catch (e) {
+                console.error(
+                  "Failed to reload engine after track deletion:",
+                  e
+                );
+              }
             }
           }
         }
+      } catch (error) {
+        console.error("Failed to delete track:", error);
       }
-    } catch (error) {
-      console.error("Failed to delete track:", error);
-    }
     },
-    [buildVersionFromTracks, engineRef, selectedTrackId, setSelectedTrackId, setTracks]
+    [
+      buildVersionFromTracks,
+      engineRef,
+      selectedTrackId,
+      setSelectedTrackId,
+      setTracks,
+    ]
   );
 
   // Cut selected track to clipboard
