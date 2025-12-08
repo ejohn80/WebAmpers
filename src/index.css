@@ -250,6 +250,7 @@
   --songname-color: rgb(209, 209, 209);
   --segment-overlay: rgba(0, 0, 0, 0.75);
   --segment-name: #ffffff;
+  --side-bar-hover: #1e3c43;
 }
 
 /* ======================================================================
@@ -511,6 +512,7 @@
   --segment-overlay: rgba(179, 179, 179, 0.75);
   --segment-name: black;
   --mute-btn-hover: #52cbd465;
+  --side-bar-hover: #52cbd4;
 }
 
 /* Base body styles */

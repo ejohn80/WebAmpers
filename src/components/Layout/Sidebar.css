@@ -65,6 +65,8 @@
     background 0.2s ease,
     color 0.2s ease;
   position: relative;
+  letter-spacing: -0.4px;
+  font-size: 14px;
 }
 
 .sidebar-tab-button + .sidebar-tab-button {
@@ -82,8 +84,7 @@
 }
 
 .sidebar-tab-button:hover {
-  background: rgba(23, 225, 255, 0.12);
-  color: var(--sidebar-tab-active-text, #193338);
+  background-color: var(--side-bar-hover);
 }
 
 .sidebar-tab-button:focus-visible {
