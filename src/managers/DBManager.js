@@ -3,19 +3,21 @@
  * Manages audio tracks, sessions, and assets with serialization support.
  */
 
+// Database configuration constants
 const DB_NAME = "WebAmpDB";
-const DB_VERSION = 3; // Increment for schema changes
-const TRACKS_STORE_NAME = "tracks";
-const SESSIONS_STORE_NAME = "sessions";
-const ASSETS_STORE_NAME = "assets"; // Added in v3
+const DB_VERSION = 3;
+const TRACKS_STORE_NAME = "tracks"; // Store for audio tracks
+const SESSIONS_STORE_NAME = "sessions"; // Store for DAW sessions/projects
+const ASSETS_STORE_NAME = "assets"; // Store for audio assets/files
 
 class DBManager {
   constructor() {
-    this.db = null; // IndexedDB database instance
+    this.db = null; // IndexedDB connection
   }
 
   /**
-   * Convert AudioBuffer/ToneAudioBuffer to serializable format for IndexedDB
+   * Serialize AudioBuffer for IndexedDB storage
+   * Converts Float32Array channel data to storable format
    */
   serializeBufferForStorage(buffer) {
     if (!buffer) return null;
@@ -25,14 +27,13 @@ class DBManager {
       return null;
     }
 
-    // Extract audio metadata
     const sampleRate = buffer.sampleRate ?? buffer._sampleRate ?? 44100;
     const length = buffer.length ?? buffer._length ?? 0;
     const duration = buffer.duration ?? buffer._duration ?? length / sampleRate;
 
-    // Serialize channel data to Float32Arrays
     const channels = [];
     if (typeof buffer.getChannelData === "function") {
+      // Native AudioBuffer - extract channel data
       for (let i = 0; i < numberOfChannels; i++) {
         try {
           const channelData = buffer.getChannelData(i);
@@ -47,6 +48,7 @@ class DBManager {
         }
       }
     } else if (Array.isArray(buffer.channels)) {
+      // Already serialized format - preserve Float32Arrays
       for (let i = 0; i < numberOfChannels; i++) {
         const channel = buffer.channels[i] || [];
         channels.push(
@@ -57,7 +59,6 @@ class DBManager {
       return null;
     }
 
-    // Return serialized buffer object for IndexedDB
     return {
       numberOfChannels,
       length,
@@ -68,27 +69,31 @@ class DBManager {
   }
 
   /**
-   * Extract AudioBuffer from various buffer wrapper formats
+   * Extract native AudioBuffer from various buffer formats
+   * Handles ToneAudioBuffer and other wrapper types
    */
   extractBufferCandidate(candidate) {
     if (!candidate) return null;
 
+    // Direct AudioBuffer
     if (
       typeof AudioBuffer !== "undefined" &&
       candidate instanceof AudioBuffer
     ) {
-      return candidate; // Already a native AudioBuffer
+      return candidate;
     }
 
+    // Tone.js ToneAudioBuffer (has .get() method)
     if (typeof candidate.get === "function") {
       try {
-        const result = candidate.get(); // ToneAudioBuffer.get()
+        const result = candidate.get();
         if (result) return result;
       } catch (e) {
         console.warn("Failed to read Tone buffer via get()", e);
       }
     }
 
+    // Nested buffer property
     if (candidate.buffer) {
       if (
         typeof AudioBuffer !== "undefined" &&
@@ -112,23 +117,25 @@ class DBManager {
       }
     }
 
+    // Already has AudioBuffer-like properties
     if (
       typeof candidate.numberOfChannels === "number" &&
       typeof candidate.length === "number"
     ) {
-      return candidate; // Already has AudioBuffer-like structure
+      return candidate;
     }
 
     return null;
   }
 
   /**
-   * Convert AudioSegment to serializable IndexedDB format
+   * Serialize segment data for IndexedDB storage
+   * Handles buffer serialization and asset ID mapping
    */
   serializeSegmentForStorage(segment, defaultAssetId = null) {
     if (!segment) return null;
 
-    // Determine asset ID (segment-level, track-level, or default)
+    // Determine asset ID (prefer segment.assetId, fallback to track.assetId)
     const segAssetId =
       segment.assetId ?? segment.asset?.id ?? defaultAssetId ?? null;
 
@@ -161,14 +168,14 @@ class DBManager {
         .slice(2, 7)}`;
     }
 
-    // If no asset ID, serialize the buffer data directly
+    // If no assetId, serialize the buffer directly into the segment
     if (!segAssetId) {
       const bufferCandidate =
         segment.buffer || segment.bufferData || segment.audioBuffer;
       const nativeBuffer = this.extractBufferCandidate(bufferCandidate);
       const buffer = this.serializeBufferForStorage(nativeBuffer);
       if (buffer) {
-        serialized.buffer = buffer; // Store buffer data inline
+        serialized.buffer = buffer;
       }
     }
 
@@ -176,22 +183,22 @@ class DBManager {
   }
 
   /**
-   * Serialize array of segments
+   * Serialize multiple segments for storage
    */
   serializeSegmentsForStorage(segments = [], defaultAssetId = null) {
     return segments
       .map((segment) =>
         this.serializeSegmentForStorage(segment, defaultAssetId)
       )
-      .filter(Boolean); // Remove any null/failed serializations
+      .filter(Boolean);
   }
 
   /**
-   * Open (or create) the IndexedDB database
+   * Open IndexedDB connection with schema migration
    */
   async openDB() {
     if (this.db) {
-      return this.db; // Already open
+      return this.db;
     }
 
     return new Promise((resolve, reject) => {
@@ -225,7 +232,7 @@ class DBManager {
           });
         }
 
-        // Create assets store (v3) for imported audio files
+        // Create assets store (added in v3)
         if (!db.objectStoreNames.contains(ASSETS_STORE_NAME)) {
           const assetsStore = db.createObjectStore(ASSETS_STORE_NAME, {
             keyPath: "id",
@@ -305,7 +312,7 @@ class DBManager {
   }
 
   /**
-   * Add or update a track in IndexedDB
+   * Add track to database with session association
    */
   async addTrack(trackData, sessionId = null) {
     const db = await this.openDB();
@@ -395,7 +402,7 @@ class DBManager {
   }
 
   /**
-   * Get all tracks, optionally filtered by session
+   * Get tracks - either all or filtered by session
    */
   async getAllTracks(sessionId = null) {
     const db = await this.openDB();
@@ -405,7 +412,7 @@ class DBManager {
 
       let request;
       if (sessionId !== null) {
-        // Get tracks for specific session using index
+        // Get tracks for specific session
         const index = store.index("sessionId");
         request = index.getAll(sessionId);
       } else {
@@ -455,6 +462,8 @@ class DBManager {
 
   /**
    * Update an existing track in IndexedDB
+   * @param {AudioTrack} track - The track to update
+   * @returns {Promise<void>}
    */
   async updateTrack(track) {
     const db = await this.openDB();
@@ -526,6 +535,8 @@ class DBManager {
 
   /**
    * Helper to serialize a track for storage
+   * @param {AudioTrack} track
+   * @returns {Object} Serializable track data
    */
   serializeTrack(track) {
     const serialized = {
@@ -540,7 +551,7 @@ class DBManager {
       sessionId: track.sessionId ?? track._sessionId,
       assetId: track.assetId ?? track._assetId,
       effects: track.effects || {},
-      enabledEffects: track.enabledEffects || {},
+      enabledEffects: track.enabledEffects || {}, // ADD THIS LINE
       activeEffectsList: track.activeEffectsList || [],
     };
 
@@ -559,6 +570,9 @@ class DBManager {
 
   /**
    * Create a new session
+   * @param {string} name - Session name
+   * @param {Object} data - Optional session data (effects, etc.)
+   * @returns {Promise<number>} - Session ID
    */
   async createSession(name, data = {}) {
     const db = await this.openDB();
@@ -590,6 +604,7 @@ class DBManager {
 
   /**
    * Get all sessions
+   * @returns {Promise<Array>}
    */
   async getAllSessions() {
     const db = await this.openDB();
@@ -611,6 +626,8 @@ class DBManager {
 
   /**
    * Get a single session by ID
+   * @param {number} sessionId
+   * @returns {Promise<Object|null>}
    */
   async getSession(sessionId) {
     const db = await this.openDB();
@@ -632,6 +649,9 @@ class DBManager {
 
   /**
    * Update a session
+   * @param {number} sessionId
+   * @param {Object} updates - Fields to update
+   * @returns {Promise<void>}
    */
   async updateSession(sessionId, updates) {
     const db = await this.openDB();
@@ -675,6 +695,8 @@ class DBManager {
 
   /**
    * Delete a session and all its tracks
+   * @param {number} sessionId
+   * @returns {Promise<void>}
    */
   async deleteSession(sessionId) {
     const db = await this.openDB();
@@ -714,6 +736,8 @@ class DBManager {
 
   /**
    * Check if a session with given name exists
+   * @param {string} name
+   * @returns {Promise<boolean>}
    */
   async sessionExists(name) {
     const sessions = await this.getAllSessions();
@@ -724,6 +748,9 @@ class DBManager {
 
   /**
    * Add an asset (imported audio file) to the database
+   * Handles duplicate names by adding numeric suffixes
+   * @param {Object} assetData - Asset metadata and buffer
+   * @returns {Promise<number>} - Asset ID
    */
   async addAsset(assetData) {
     const db = await this.openDB();
@@ -787,6 +814,7 @@ class DBManager {
 
   /**
    * Get all assets
+   * @returns {Promise<Array>}
    */
   async getAllAssets() {
     const db = await this.openDB();
@@ -808,6 +836,8 @@ class DBManager {
 
   /**
    * Get a single asset by ID
+   * @param {number} assetId
+   * @returns {Promise<Object|null>}
    */
   async getAsset(assetId) {
     const db = await this.openDB();
@@ -829,6 +859,9 @@ class DBManager {
 
   /**
    * Check if an asset is being used by any tracks
+   * Prevents deletion of in-use assets
+   * @param {number} assetId
+   * @returns {Promise<boolean>}
    */
   async isAssetInUse(assetId) {
     const db = await this.openDB();
@@ -857,6 +890,9 @@ class DBManager {
 
   /**
    * Update an asset's metadata (e.g., name)
+   * @param {number} assetId
+   * @param {Object} updates - Object containing fields to update
+   * @returns {Promise<void>}
    */
   async updateAsset(assetId, updates) {
     const db = await this.openDB();
@@ -901,6 +937,8 @@ class DBManager {
 
   /**
    * Delete an asset
+   * @param {number} assetId
+   * @returns {Promise<void>}
    */
   async deleteAsset(assetId) {
     const db = await this.openDB();

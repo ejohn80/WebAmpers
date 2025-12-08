@@ -19,13 +19,13 @@ import ExportManager from "../components/AudioExport/ExportManager";
 import * as Tone from "tone";
 
 /**
- * CloudStorageManager - Handles Firebase Cloud Storage operations
- * for saving/loading DAW sessions with audio asset compression
+ * CloudStorageManager - Manages Firebase Cloud Storage operations for DAW sessions
+ * Handles saving/loading sessions with MP3-compressed audio assets
  */
 class CloudStorageManager {
   constructor() {
-    this.STORAGE_PATH = "users"; // Base storage path
-    this.exportManager = new ExportManager(); // For MP3 encoding
+    this.STORAGE_PATH = "users"; // Base storage path in Firebase
+    this.exportManager = new ExportManager(); // For MP3 encoding/decoding
   }
 
   /**
@@ -37,10 +37,9 @@ class CloudStorageManager {
     return audioContext.decodeAudioData(arrayBuffer);
   }
 
-  // ===============================================
+  // -----------------------------------------------
   // SAVE: session + tracks + assets (with MP3 compression)
-  // ===============================================
-
+  // -----------------------------------------------
   /**
    * Save complete session to Firebase with MP3-compressed assets
    * @param {string} userId - Firebase auth user ID
@@ -48,9 +47,11 @@ class CloudStorageManager {
    * @returns {string} Download URL of metadata file
    */
   async saveToFirebase(userId, projectName) {
+    // Get current session from localStorage
     const sessionId = Number(localStorage.getItem("webamp.activeSession"));
     if (!sessionId) throw new Error("No active session");
 
+    // Load session and tracks from IndexedDB
     const session = await dbManager.getSession(sessionId);
     const tracks = await dbManager.getAllTracks(sessionId);
 
@@ -87,6 +88,7 @@ class CloudStorageManager {
           sampleRate
         );
 
+        // Copy channel data back to AudioBuffer
         for (let i = 0; i < numberOfChannels; i++) {
           if (channels[i]) {
             const channelData = new Float32Array(channels[i]);
@@ -94,7 +96,7 @@ class CloudStorageManager {
           }
         }
 
-        // Compress to MP3 (192kbps for size/quality balance)
+        // Compress to MP3 using ExportManager (192kbps for size/quality balance)
         const mp3Blob = this.exportManager.encodeMp3(nativeBuffer, 192);
 
         // Upload MP3 to Firebase Storage
@@ -119,7 +121,7 @@ class CloudStorageManager {
       }
     }
 
-    // Save session metadata (JSON file)
+    // Save session metadata as JSON file
     const metadata = new Blob(
       [
         JSON.stringify(
@@ -142,10 +144,9 @@ class CloudStorageManager {
     return getDownloadURL(metaRef);
   }
 
-  // ===============================================
+  // -----------------------------------------------
   // LOAD: session + tracks + assets (decompress MP3)
-  // ===============================================
-
+  // -----------------------------------------------
   /**
    * Load session from Firebase, decompress MP3 assets
    * @param {string} userId - Firebase auth user ID
@@ -164,7 +165,7 @@ class CloudStorageManager {
 
     console.log(`Loading: ${tracks.length} tracks, ${assets.length} assets`);
 
-    // Extract project name from timestamped folder name
+    // Extract project name from timestamped folder name (remove timestamp)
     const projectName = folderName.replace(/_\d+$/, "");
 
     // Download and decode MP3 assets, map old IDs to new IDs
@@ -184,9 +185,12 @@ class CloudStorageManager {
         const existingAssets = await dbManager.getAllAssets();
         const existingAsset = existingAssets.find((a) => {
           const existingBaseName = getBaseName(a.name);
-          return existingBaseName === baseNameToFind;
+          const nameMatch = existingBaseName === baseNameToFind;
+
+          return nameMatch;
         });
 
+        // Use existing asset if found (prevents duplicates)
         if (existingAsset) {
           assetIdMap.set(oldId, existingAsset.id);
           continue;
@@ -248,6 +252,7 @@ class CloudStorageManager {
         clean.assetId = assetIdMap.get(clean.assetId);
       }
 
+      // Update segment asset references
       if (clean.segments) {
         clean.segments = clean.segments.map((seg) => ({
           ...seg,
@@ -261,7 +266,7 @@ class CloudStorageManager {
       await dbManager.addTrack(clean, newSessionId);
     }
 
-    // Set as active session
+    // Set as active session in localStorage
     localStorage.setItem("webamp.activeSession", String(newSessionId));
 
     return {
@@ -279,10 +284,9 @@ class CloudStorageManager {
     return this.loadFromFirebase(userId, "quicksave");
   }
 
-  // ===============================================
+  // -----------------------------------------------
   // LIST SAVES
-  // ===============================================
-
+  // -----------------------------------------------
   /**
    * List all saved sessions for a user
    * @param {string} userId - Firebase auth user ID
@@ -307,19 +311,20 @@ class CloudStorageManager {
           projectName: projectName,
           savedAt: meta.timeCreated,
           size: meta.size,
+          // url: url // Optionally include direct URL
         });
       } catch (e) {
         console.log(e);
       }
     }
 
+    // Sort by most recent first
     return out.sort((a, b) => new Date(b.savedAt) - new Date(a.savedAt));
   }
 
-  // ===============================================
+  // -----------------------------------------------
   // DELETE SAVE
-  // ===============================================
-
+  // -----------------------------------------------
   /**
    * Delete a saved session folder and all contents
    */
