@@ -1835,6 +1835,8 @@ function AudioPage() {
     }
   };
 
+  const isSidebarCollapsed = sidebarWidth <= MIN_WIDTH;
+
   const mainContentStyle = {
     "--sidebar-width": `${sidebarWidth}px`,
   };
@@ -1883,11 +1885,18 @@ function AudioPage() {
           assetBufferCache={assetBufferCache}
         />
 
-        <div
+        <button
+          type="button"
           className="divider"
           onClick={toggleSidebar}
-          title="Toggle sidebar"
-        />
+          data-collapsed={isSidebarCollapsed ? "true" : undefined}
+          title={isSidebarCollapsed ? "Open sidebar" : "Collapse sidebar"}
+          aria-label={isSidebarCollapsed ? "Open sidebar" : "Collapse sidebar"}
+          aria-expanded={!isSidebarCollapsed}
+          aria-pressed={!isSidebarCollapsed}
+        >
+          <span aria-hidden="true">{isSidebarCollapsed ? "›" : "‹"}</span>
+        </button>
 
         <MainContent
           tracks={tracks}

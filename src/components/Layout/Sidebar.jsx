@@ -38,9 +38,12 @@ function Sidebar({
   onAssetDelete,
   assetsRefreshTrigger,
   assetBufferCache,
+  width = 0,
 }) {
   const [currentTab, setCurrentTab] = useState(getInitialTab);
   const {closeEffectsMenu} = useContext(AppContext); // Get closeEffectsMenu from context
+  const clampedWidth = Number.isFinite(width) ? Math.max(0, width) : 0;
+  const isCollapsed = clampedWidth <= 0;
 
   const tabs = [
     {
@@ -87,28 +90,29 @@ function Sidebar({
   }, [currentTab]);
 
   return (
-    <DraggableDiv color="1E1D20" className="sidebar-container">
-      <div style={{display: "flex", marginBottom: "10px", borderRadius: "8px"}}>
-        {tabs.map(({key, label}) => (
+    <DraggableDiv
+      color="1E1D20"
+      className={`sidebar-container${isCollapsed ? " is-collapsed" : ""}`}
+      style={{
+        width: `${clampedWidth}px`,
+        minWidth: `${clampedWidth}px`,
+        padding: isCollapsed ? 0 : undefined,
+      }}
+      aria-hidden={isCollapsed}
+      data-collapsed={isCollapsed ? "true" : undefined}
+    >
+      <div className="sidebar-tabs">
+        {tabs.map(({key, label}, index) => (
           <button
             key={key}
+            type="button"
             onClick={() => handleTabClick(key)}
-            style={{
-              flex: 1,
-              padding: "10px 0",
-              border: "none",
-              background:
-                currentTab === key
-                  ? "var(--sidebar-tab-active-bg, #17E1FF)"
-                  : "var(--sidebar-tab-bg, #193338)",
-              color:
-                currentTab === key
-                  ? "var(--sidebar-tab-active-text, #193338)"
-                  : "var(--sidebar-tab-text, #17E1FF)",
-              fontWeight: currentTab === key ? "bold" : "bold",
-              cursor: "pointer",
-              transition: "background 0.2s, color 0.2s",
-            }}
+            className={`sidebar-tab-button${
+              currentTab === key ? " is-active" : ""
+            }${index === 0 ? " is-first" : ""}${
+              index === tabs.length - 1 ? " is-last" : ""
+            }`}
+            aria-pressed={currentTab === key}
           >
             {label}
           </button>
