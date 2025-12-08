@@ -24,3 +24,53 @@
 .sidebar-container::-webkit-scrollbar-thumb:hover {
   background: #5c5b62;
 }
+
+.sidebar-tabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: 10px;
+}
+
+.sidebar-tab-button {
+  flex: 1;
+  padding: 10px 0;
+  border: none;
+  background: var(--sidebar-tab-bg, #193338);
+  color: var(--sidebar-tab-text, #17e1ff);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+  position: relative;
+}
+
+.sidebar-tab-button + .sidebar-tab-button {
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.sidebar-tab-button.is-first {
+  border-top-left-radius: 6px;
+  border-bottom-left-radius: 6px;
+}
+
+.sidebar-tab-button.is-last {
+  border-top-right-radius: 6px;
+  border-bottom-right-radius: 6px;
+}
+
+.sidebar-tab-button:hover {
+  background: rgba(23, 225, 255, 0.12);
+  color: var(--sidebar-tab-active-text, #193338);
+}
+
+.sidebar-tab-button:focus-visible {
+  outline: 2px solid rgba(23, 225, 255, 0.8);
+  outline-offset: -3px;
+}
+
+.sidebar-tab-button.is-active {
+  background: var(--sidebar-tab-active-bg, #17e1ff);
+  color: var(--sidebar-tab-active-text, #193338);
+  box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.2);
+}

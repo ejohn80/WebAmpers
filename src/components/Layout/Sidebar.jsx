@@ -88,27 +88,18 @@ function Sidebar({
 
   return (
     <DraggableDiv color="1E1D20" className="sidebar-container">
-      <div style={{display: "flex", marginBottom: "10px", borderRadius: "8px"}}>
-        {tabs.map(({key, label}) => (
+      <div className="sidebar-tabs">
+        {tabs.map(({key, label}, index) => (
           <button
             key={key}
+            type="button"
             onClick={() => handleTabClick(key)}
-            style={{
-              flex: 1,
-              padding: "10px 0",
-              border: "none",
-              background:
-                currentTab === key
-                  ? "var(--sidebar-tab-active-bg, #17E1FF)"
-                  : "var(--sidebar-tab-bg, #193338)",
-              color:
-                currentTab === key
-                  ? "var(--sidebar-tab-active-text, #193338)"
-                  : "var(--sidebar-tab-text, #17E1FF)",
-              fontWeight: currentTab === key ? "bold" : "bold",
-              cursor: "pointer",
-              transition: "background 0.2s, color 0.2s",
-            }}
+            className={`sidebar-tab-button${
+              currentTab === key ? " is-active" : ""
+            }${index === 0 ? " is-first" : ""}${
+              index === tabs.length - 1 ? " is-last" : ""
+            }`}
+            aria-pressed={currentTab === key}
           >
             {label}
           </button>
