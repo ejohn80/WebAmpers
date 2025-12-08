@@ -50,7 +50,8 @@ html,
 /* --- Main Content Area Styling (The Core Grid) --- */
 .main-content-area {
   display: grid;
-  grid-template-columns: var(--sidebar-width)
+  grid-template-columns:
+    var(--sidebar-width)
     var(--sidebar-toggle-width, 14px)
     minmax(0, 1fr);
   height: 100%;
@@ -76,7 +77,9 @@ html,
   font-size: 16px;
   font-weight: 600;
   font-family: inherit;
-  transition: background-color 0.2s ease, color 0.2s ease;
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease;
 }
 
 .divider span {

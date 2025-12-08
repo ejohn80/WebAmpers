@@ -1864,15 +1864,11 @@ function AudioPage() {
           onClick={toggleSidebar}
           data-collapsed={isSidebarCollapsed ? "true" : undefined}
           title={isSidebarCollapsed ? "Open sidebar" : "Collapse sidebar"}
-          aria-label={
-            isSidebarCollapsed ? "Open sidebar" : "Collapse sidebar"
-          }
+          aria-label={isSidebarCollapsed ? "Open sidebar" : "Collapse sidebar"}
           aria-expanded={!isSidebarCollapsed}
           aria-pressed={!isSidebarCollapsed}
         >
-          <span aria-hidden="true">
-            {isSidebarCollapsed ? "›" : "‹"}
-          </span>
+          <span aria-hidden="true">{isSidebarCollapsed ? "›" : "‹"}</span>
         </button>
 
         <MainContent
