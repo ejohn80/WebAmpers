@@ -50,7 +50,7 @@ const TrackLane = memo(function TrackLane({
   onClearSegmentSelection = () => {},
   onSegmentDelete = () => {},
 }) {
-  // Normalize segments array
+  //if (!track) return null;
   const segments = useMemo(() => {
     return Array.isArray(track.segments) ? track.segments : [];
   }, [track.segments]);

@@ -50,13 +50,19 @@ WebAmpers/
   README.md                       # Project overview + setup
   coding-guidelines.md            # Team code standards
   team-resources.md               # Internal references
+
   package.json                    # Frontend dependencies + scripts
-  package-lock.json
+  package-lock.json               # NPM lockfile
+  index.html                      # Vite entry HTML
   vite.config.js                  # Vite config
   vitest.config.mjs               # Vitest config
-  .gitignore
-  .eslintrc.json
-  .prettierrc.json
+  babel.config.js                 # Babel config
+
+  .gitignore                      # Git ignores
+  .eslintrc.json                  # ESLint config
+  eslint.config.js                # ESLint flat config (JS)
+  .prettierrc.json                # Prettier config
+  .prettierignore                 # Prettier ignore rules
   .pylintrc                       # Python backend linting
 
   .github/
@@ -70,39 +76,56 @@ WebAmpers/
   public/                         # Static assets
     soundwave.jpg
 
-  reports/                        # Weekly reports
+  reports/                        # Weekly reports / logs
+
+  node_modules/                   # Installed Node dependencies
+  uploads/                        # Root-level uploaded files (if used)
+  .venv/                          # Root Python virtual env (if used)
+  .pytest_cache/                  # Root Pytest cache (if used)
 
   src/
-    main.jsx
-    App.jsx
+    main.jsx                      # React entry
+    App.jsx                       # Main app component
+    Application.jsx               # Alternate/root app wrapper
     index.css                     # Global styles
+    App.css                       # App-specific styles
 
     assets/                       # Icons, images, UI assets
-      footer/
+      footer/                     # Footer-specific assets
 
-    backend/                      # Python backend + JS API wrapper
-      app.py
-      AudioProcessor.py
-      requirements.txt
+    backend/                      # Flask / pydub backend
+      app.py                      # Flask entrypoint
+      AudioProcessor.py           # Audio processing logic
+      requirements.txt            # Backend Python deps
+      uploads/                    # Backend-uploaded files
+      __pycache__/                # Python bytecode cache
+      .venv/                      # Backend-specific venv (if used)
+      .pytest_cache/              # Backend Pytest cache (if used)
+
+    CloudSaving/                  # Cloud save logic
 
     components/                   # All React components
-      AudioImport/
       AudioExport/
-      Layout/
+      AudioImport/
       Auth/
-      Waveform/
-      TrackLane/
-      Recording/
       Generic/
+      Layout/
+      Recording/
+      Tools/
+      TrackLane/
+      Waveform/
 
-    context/
-    firebase/                     # Firebase
-    hooks/                        # Custom hooks
-    managers/                     # Application logic
-    models/
-    pages/
-    playback/                     # Playback logic + UI
+    context/                      # React context / global state
+    firebase/                     # Firebase setup
+    hooks/                        # Custom React hooks
+    managers/                     # App managers (audio, DB, clipboard, etc.)
+    mocks/                        # Test mocks
+    models/                       # Data models
+    pages/                        # Page-level components (e.g., AudioPage)
+    playback/                     # Playback engine + UI
     tests/                        # Vitest tests (JS) + Pytest tests
+      __pycache__/                # Test cache
 
+    utils/                        # Shared utilities
 
 ```

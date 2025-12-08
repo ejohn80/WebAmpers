@@ -50,7 +50,10 @@ html,
 /* Three-column layout: Sidebar | Divider | MainContent */
 .main-content-area {
   display: grid;
-  grid-template-columns: var(--sidebar-width) 5px minmax(0, 1fr); /* Dynamic sidebar width */
+  grid-template-columns:
+    var(--sidebar-width)
+    var(--sidebar-toggle-width, 14px)
+    minmax(0, 1fr);
   height: 100%;
   position: relative;
   z-index: 1; /* Ensure main content is below header */
@@ -60,10 +63,42 @@ html,
 
 /* --- Movable Divider Styling --- */
 .divider {
-  cursor: ew-resize; /* East-west resize cursor */
-  width: 5px;
+  cursor: pointer;
+  width: var(--sidebar-toggle-width, 14px);
+  min-width: var(--sidebar-toggle-width, 14px);
   background-color: var(--divider-vertical);
   height: 100%;
+  border: none;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--divider-toggle-color, #17e1ff);
+  font-size: 16px;
+  font-weight: 600;
+  font-family: inherit;
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease;
+}
+
+.divider span {
+  pointer-events: none;
+  line-height: 1;
+}
+
+.divider:hover {
+  color: var(--divider-toggle-hover, #a8f6ff);
+  background-color: var(--divider-vertical-hover, rgba(23, 225, 255, 0.2));
+}
+
+.divider:focus-visible {
+  outline: 2px solid var(--focus-outline, #17e1ff);
+  outline-offset: -2px;
+}
+
+.divider[data-collapsed="true"] {
+  cursor: pointer;
 }
 
 /* Sidebar scrolling container */

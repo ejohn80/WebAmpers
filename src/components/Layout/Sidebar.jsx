@@ -1,8 +1,12 @@
 /**
- * Sidebar Component
- *
- * Main application sidebar with tabbed navigation for Assets, Effects, and Sessions.
- * Provides draggable interface and integrates with AppContext for effects menu management.
+ * Sidebar component for the application layout.
+ * Provides collapsible sidebar with tabs for Assets, Effects, and Sessions management.
+ * @param {function} props.onImportSuccess - Callback for successful audio import.
+ * @param {function} props.onImportError - Callback for failed audio import.
+ * @param {function} props.onAssetDelete - Callback for asset deletion.
+ * @param {number} props.assetsRefreshTrigger - Counter to trigger assets reload.
+ * @param {Map} props.assetBufferCache - Cache for shared audio buffers.
+ * @param {number} props.width - Current width of the sidebar (can be 0 when collapsed).
  */
 
 import {useState, useEffect, useContext} from "react";
@@ -13,14 +17,12 @@ import SessionsTab from "./Sidebar/SessionsTab";
 import {AppContext} from "../../context/AppContext";
 import "./Sidebar.css";
 
-// Key for storing sidebar tab preference in localStorage
+// Local storage key for persisting the active tab selection
 const SIDEBAR_TAB_KEY = "webamp.sidebarTab";
 
-/**
- * Retrieves the initial active tab from localStorage
- * Defaults to "assets" if no preference is stored
- */
+// Retrieve initial tab from localStorage, defaulting to "assets"
 const getInitialTab = () => {
+  // Guard against server-side rendering where localStorage isn't available
   if (
     typeof window === "undefined" ||
     typeof window.localStorage === "undefined"
@@ -30,9 +32,9 @@ const getInitialTab = () => {
 
   try {
     const stored = window.localStorage.getItem(SIDEBAR_TAB_KEY);
-    return stored || "assets";
+    return stored || "assets"; // Default to assets tab if nothing stored
   } catch {
-    return "assets";
+    return "assets"; // Fallback if localStorage access fails
   }
 };
 
@@ -42,14 +44,19 @@ function Sidebar({
   onAssetDelete,
   assetsRefreshTrigger,
   assetBufferCache,
+  width = 0,
 }) {
-  // State for currently active tab
+  // State for the currently active tab
   const [currentTab, setCurrentTab] = useState(getInitialTab);
 
-  // Access AppContext to close effects menu when needed
+  // Access closeEffectsMenu function from AppContext to close effects menu when needed
   const {closeEffectsMenu} = useContext(AppContext);
 
-  // Tab definitions - each maps to a component
+  // Ensure width is a valid number and at least 0
+  const clampedWidth = Number.isFinite(width) ? Math.max(0, width) : 0;
+  const isCollapsed = clampedWidth <= 0; // Sidebar is considered collapsed when width is 0 or less
+
+  // Tab configuration - defines available tabs and their components
   const tabs = [
     {
       key: "assets",
@@ -76,10 +83,7 @@ function Sidebar({
     },
   ];
 
-  /**
-   * Handles tab selection with side effect of closing effects menu
-   * @param {string} key - The tab key to switch to
-   */
+  // Handle tab click - switches tabs and closes effects menu if needed
   const handleTabClick = (key) => {
     // Close effects menu when switching to any tab except effects
     if (key !== "effects") {
@@ -88,7 +92,7 @@ function Sidebar({
     setCurrentTab(key);
   };
 
-  // Persist tab selection to localStorage when it changes
+  // Persist tab selection to localStorage whenever currentTab changes
   useEffect(() => {
     try {
       if (typeof window !== "undefined" && window.localStorage) {
@@ -100,41 +104,42 @@ function Sidebar({
   }, [currentTab]);
 
   return (
-    <DraggableDiv color="1E1D20" className="sidebar-container">
-      {/* Tab Navigation Buttons */}
-      <div style={{display: "flex", marginBottom: "10px", borderRadius: "8px"}}>
-        {tabs.map(({key, label}) => (
+    <DraggableDiv
+      color="1E1D20" // Background color for draggable component
+      className={`sidebar-container${isCollapsed ? " is-collapsed" : ""}`} // Add collapsed class when width is 0
+      style={{
+        width: `${clampedWidth}px`,
+        minWidth: `${clampedWidth}px`, // Ensure width doesn't shrink below clamped value
+        padding: isCollapsed ? 0 : undefined, // Remove padding when collapsed
+      }}
+      aria-hidden={isCollapsed} // Hide from screen readers when collapsed
+      data-collapsed={isCollapsed ? "true" : undefined} // Data attribute for CSS targeting
+    >
+      {/* Tab navigation buttons */}
+      <div className="sidebar-tabs">
+        {tabs.map(({key, label}, index) => (
           <button
             key={key}
+            type="button"
             onClick={() => handleTabClick(key)}
-            style={{
-              flex: 1,
-              padding: "10px 0",
-              border: "none",
-              background:
-                currentTab === key
-                  ? "var(--sidebar-tab-active-bg, #17E1FF)"
-                  : "var(--sidebar-tab-bg, #193338)",
-              color:
-                currentTab === key
-                  ? "var(--sidebar-tab-active-text, #193338)"
-                  : "var(--sidebar-tab-text, #17E1FF)",
-              fontWeight: currentTab === key ? "bold" : "bold",
-              cursor: "pointer",
-              transition: "background 0.2s, color 0.2s",
-            }}
+            className={`sidebar-tab-button${
+              currentTab === key ? " is-active" : "" // Add active class for current tab
+            }${index === 0 ? " is-first" : ""}${
+              index === tabs.length - 1 ? " is-last" : "" // Add first/last classes for styling
+            }`}
+            aria-pressed={currentTab === key} // Accessibility attribute
           >
             {label}
           </button>
         ))}
       </div>
 
-      {/* Tab Content Area */}
+      {/* Tab content area */}
       <div>
         {tabs.map(({key, component}) => (
           <div
             key={key}
-            style={{display: currentTab === key ? "block" : "none"}}
+            style={{display: currentTab === key ? "block" : "none"}} // Only show active tab's content
           >
             {component}
           </div>

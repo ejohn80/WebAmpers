@@ -33,27 +33,30 @@ import React, {
 import "./AudioPage.css";
 import * as Tone from "tone";
 
+// Component imports
 import Header from "../components/Layout/Header";
 import Sidebar from "../components/Layout/Sidebar";
 import MainContent from "../components/Layout/MainContent";
 import Footer from "../components/Layout/Footer";
+
+// Manager imports
 import {audioManager} from "../managers/AudioManager";
 import {dbManager} from "../managers/DBManager";
 import {AppContext} from "../context/AppContext";
 import {progressStore} from "../playback/progressStore";
 import {saveAsset} from "../utils/assetUtils";
-import {clipboardManager} from "../managers/clipboardManager";
+import {clipboardManager} from "../managers/ClipboardManager";
 import {insertSegmentWithSpacing} from "../utils/segmentPlacement";
 
-// Constants for sidebar and track layout
-const MIN_WIDTH = 0;
-const MAX_WIDTH = 300;
-const TRACK_END_PADDING_MS = 2000;
+// Constants for UI and track layout
+const MIN_WIDTH = 0; // Minimum sidebar width (collapsed)
+const MAX_WIDTH = 300; // Maximum sidebar width (expanded)
+const TRACK_END_PADDING_MS = 2000; // Padding at end of timeline
 
-// Cache audio buffers by asset ID to avoid re-decoding
+// Global buffer cache for audio assets (shared across component instances)
 const assetBufferCache = new Map(); // assetId -> Tone.ToneAudioBuffer
 
-// Empty version constant for engine initialization
+// Empty version object for initializing playback engine
 const EMPTY_VERSION = {
   bpm: 120,
   timeSig: [4, 4],
@@ -64,12 +67,8 @@ const EMPTY_VERSION = {
   masterChain: [],
 };
 
-/**
- * Main audio editing page - handles track management, timeline, and playback
- * Integrates with Tone.js engine for audio processing and IndexedDB for persistence
- */
 function AudioPage() {
-  // Context and state management
+  // Context state for global application data
   const {
     setEngineRef,
     applyEffectsToEngine,
@@ -77,6 +76,8 @@ function AudioPage() {
     selectedTrackId,
     setSelectedTrackId,
   } = useContext(AppContext);
+
+  // UI state
   const [sidebarWidth, setSidebarWidth] = useState(MAX_WIDTH);
   const [tracks, setTracks] = useState(audioManager.tracks);
   const [_audioData, setAudioData] = useState(null);
@@ -88,68 +89,18 @@ function AudioPage() {
 
   // Refs for engine and caching
   const engineRef = React.useRef(null);
-  const lastSessionRef = useRef(null);
-  const assetPreviewCacheRef = useRef(new Map());
+  const lastSessionRef = useRef(null); // Track last session to prevent reload loops
+  const assetPreviewCacheRef = useRef(new Map()); // Cache for asset preview durations
 
-  // Update clipboard UI flag
+  // Callback to refresh clipboard UI indicator
   const refreshClipboardFlag = useCallback(() => {
     setHasClipboardFlag(clipboardManager.hasClipboard());
   }, []);
 
-  // Keyboard shortcuts for cut/copy/paste/delete
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      const activeElement = document.activeElement;
-      const isTextEntry =
-        activeElement.tagName === "TEXTAREA" ||
-        activeElement.isContentEditable ||
-        (activeElement.tagName === "INPUT" &&
-          !["range", "checkbox", "radio", "button", "submit", "file"].includes(
-            activeElement.type
-          ));
-
-      // Skip shortcuts during text entry
-      if (isTextEntry) return;
-
-      // Ctrl/Cmd + X - Cut track
-      if ((e.ctrlKey || e.metaKey) && e.key === "x") {
-        e.preventDefault();
-        if (selectedTrackId) {
-          handleCutTrack();
-        }
-      }
-
-      // Ctrl/Cmd + C - Copy track
-      if ((e.ctrlKey || e.metaKey) && e.key === "c") {
-        e.preventDefault();
-        if (selectedTrackId) {
-          handleCopyTrack();
-        }
-      }
-
-      // Ctrl/Cmd + V - Paste track
-      if ((e.ctrlKey || e.metaKey) && e.key === "v") {
-        e.preventDefault();
-        if (clipboardManager.hasClipboard()) {
-          handlePasteTrack();
-          refreshClipboardFlag();
-        }
-      }
-
-      // Backspace/Delete - Delete track
-      if (e.key === "Backspace" || e.key === "Delete") {
-        e.preventDefault();
-        if (selectedTrackId) {
-          handleDeleteTrack(selectedTrackId);
-        }
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [selectedTrackId, refreshClipboardFlag]);
-
-  // Handle sampler recordings (MIDI keyboard recordings)
+  /**
+   * Handle saving a sampler recording as a new track
+   * Processes MIDI keyboard recordings into audio tracks
+   */
   const handleSamplerRecording = async (recordingData) => {
     if (!activeSession) {
       console.error("No active session for sampler recording");
@@ -166,6 +117,13 @@ function AudioPage() {
     }
 
     try {
+      // Format duration for display (MM:SS)
+      const formatDuration = (ms) => {
+        const totalSeconds = Math.floor(ms / 1000);
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        return `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+      };
       console.log(`[AudioPage] Processing sampler recording: ${name}`);
 
       // Decode WebM blob to audio buffer
@@ -173,7 +131,7 @@ function AudioPage() {
       const audioBuffer =
         await Tone.context.rawContext.decodeAudioData(arrayBuffer);
 
-      // Create ToneAudioBuffer
+      // Create ToneAudioBuffer for playback
       const toneBuffer = new Tone.ToneAudioBuffer(audioBuffer);
 
       // Serialize buffer for IndexedDB storage
@@ -189,12 +147,12 @@ function AudioPage() {
         serializedBuffer.channels.push(audioBuffer.getChannelData(i));
       }
 
-      // Generate IDs and metadata
+      // Generate unique IDs
       const trackName = name;
       const segmentId = `seg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       const durationMs = Math.round(audioBuffer.duration * 1000);
 
-      // Save as asset in database
+      // Save as asset in database first
       const assetData = {
         name: trackName,
         duration: formatDuration(audioBuffer.duration * 1000),
@@ -233,7 +191,7 @@ function AudioPage() {
         solo: false,
       };
 
-      // Save track to database
+      // Save track to database with session association
       const dbId = await dbManager.addTrack(trackData, activeSession);
       console.log(`[AudioPage] Sampler track saved with ID: ${dbId}`);
 
@@ -263,7 +221,7 @@ function AudioPage() {
         solo: false,
       };
 
-      // Add to audioManager and update state
+      // Add to audioManager and update UI state
       audioManager.addTrackFromBuffer(newTrack);
       console.log(`[AudioPage] Track added to audioManager`);
 
@@ -288,16 +246,8 @@ function AudioPage() {
     }
   };
 
-  // Format duration helper for sampler recordings
-  const formatDuration = (ms) => {
-    const totalSeconds = Math.floor(ms / 1000);
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
-    return `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
-  };
-
-  // Deserialize audio buffer from IndexedDB format
-  const deserializeAudioBuffer = (serializedBuffer) => {
+  // Deserialize audio buffer from IndexedDB format to native AudioBuffer
+  const deserializeAudioBuffer = useCallback((serializedBuffer) => {
     const audioBuffer = Tone.context.createBuffer(
       serializedBuffer.numberOfChannels,
       serializedBuffer.length,
@@ -314,49 +264,55 @@ function AudioPage() {
     }
 
     return audioBuffer;
-  };
+  }, []);
 
-  // Create Tone buffer from serialized data
-  const createToneBufferFromSerialized = (serializedBuffer) => {
-    const audioBuffer = deserializeAudioBuffer(serializedBuffer);
-    return new Tone.ToneAudioBuffer(audioBuffer);
-  };
+  // Create Tone.js buffer from serialized data
+  const createToneBufferFromSerialized = useCallback(
+    (serializedBuffer) => {
+      const audioBuffer = deserializeAudioBuffer(serializedBuffer);
+      return new Tone.ToneAudioBuffer(audioBuffer);
+    },
+    [deserializeAudioBuffer]
+  );
 
   // Build Tone buffer from asset record (handles both serialized and blob formats)
-  const buildToneBufferFromAssetRecord = async (asset) => {
-    if (!asset) return null;
+  const buildToneBufferFromAssetRecord = useCallback(
+    async (asset) => {
+      if (!asset) return null;
 
-    // Try deserializing stored buffer first
-    if (asset.buffer?.channels?.length) {
-      try {
-        return createToneBufferFromSerialized(asset.buffer);
-      } catch (error) {
-        console.warn(
-          `[AudioPage] Failed to deserialize stored buffer for asset ${asset.id}:`,
-          error
-        );
+      // Try deserializing stored buffer first
+      if (asset.buffer?.channels?.length) {
+        try {
+          return createToneBufferFromSerialized(asset.buffer);
+        } catch (error) {
+          console.warn(
+            `[AudioPage] Failed to deserialize stored buffer for asset ${asset.id}:`,
+            error
+          );
+        }
       }
-    }
 
-    // Fallback to decoding file blob
-    if (asset.fileBlob) {
-      try {
-        const arrayBuffer = await asset.fileBlob.arrayBuffer();
-        const audioBuffer =
-          await Tone.context.rawContext.decodeAudioData(arrayBuffer);
-        return new Tone.ToneAudioBuffer(audioBuffer);
-      } catch (error) {
-        console.warn(
-          `[AudioPage] Failed to decode blob for asset ${asset.id}:`,
-          error
-        );
+      // Fallback to decoding file blob
+      if (asset.fileBlob) {
+        try {
+          const arrayBuffer = await asset.fileBlob.arrayBuffer();
+          const audioBuffer =
+            await Tone.context.rawContext.decodeAudioData(arrayBuffer);
+          return new Tone.ToneAudioBuffer(audioBuffer);
+        } catch (error) {
+          console.warn(
+            `[AudioPage] Failed to decode blob for asset ${asset.id}:`,
+            error
+          );
+        }
       }
-    }
 
-    return null;
-  };
+      return null;
+    },
+    [createToneBufferFromSerialized]
+  );
 
-  // Get preview info (duration) for assets
+  // Get preview info (duration) for assets, with caching
   const getAssetPreviewInfo = useCallback(
     async (assetId) => {
       if (!assetId) return null;
@@ -380,7 +336,7 @@ function AudioPage() {
 
         if (!toneBuffer) return null;
 
-        // Extract duration
+        // Extract duration from buffer
         const durationSeconds =
           typeof toneBuffer.duration === "number"
             ? toneBuffer.duration
@@ -399,30 +355,34 @@ function AudioPage() {
     [buildToneBufferFromAssetRecord]
   );
 
-  // Generate unique name for copied tracks
-  const generateCopyName = (baseName) => {
-    const cleanName = baseName.replace(/\s+Copy(\s+\d+)?$/, "");
-    const existingNames = new Set(audioManager.tracks.map((t) => t.name));
+  // Generate unique name for copied tracks (e.g., "Song Copy", "Song Copy 2")
+  const generateCopyName = useCallback(
+    (baseName) => {
+      const cleanName = baseName.replace(/\s+Copy(\s+\d+)?$/, "");
 
-    // Try "BaseName Copy" first
-    const firstCopyName = `${cleanName} Copy`;
-    if (!existingNames.has(firstCopyName)) {
-      return firstCopyName;
-    }
+      const existingNames = new Set(tracks.map((t) => t.name));
 
-    // Find next available number
-    let counter = 2;
-    let newName;
-    do {
-      newName = `${cleanName} Copy ${counter}`;
-      counter++;
-    } while (existingNames.has(newName));
+      // Try "BaseName Copy" first
+      const firstCopyName = `${cleanName} Copy`;
+      if (!existingNames.has(firstCopyName)) {
+        return firstCopyName;
+      }
 
-    return newName;
-  };
+      // Find next available number
+      let counter = 2;
+      let newName;
+      do {
+        newName = `${cleanName} Copy ${counter}`;
+        counter++;
+      } while (existingNames.has(newName));
+
+      return newName;
+    },
+    [tracks]
+  );
 
   // Build version object for playback engine from track data
-  const buildVersionFromTracks = (tracksArray) => {
+  const buildVersionFromTracks = useCallback((tracksArray) => {
     if (!tracksArray || tracksArray.length === 0) return null;
 
     const vs = {
@@ -476,7 +436,7 @@ function AudioPage() {
           fades: s.fades ?? {inMs: 5, outMs: 5},
         });
 
-        // Track max timeline position
+        // Track max timeline position for total length calculation
         const endMs = startOnTimelineMs + (durationMs || 0);
         if (endMs > maxEndMs) maxEndMs = endMs;
       });
@@ -486,7 +446,7 @@ function AudioPage() {
     const paddedLengthMs = maxEndMs > 0 ? maxEndMs + TRACK_END_PADDING_MS : 0;
     vs.lengthMs = paddedLengthMs || 60000;
     return vs;
-  };
+  }, []);
 
   // Load tracks when session changes
   useEffect(() => {
@@ -503,19 +463,22 @@ function AudioPage() {
           `[AudioPage] Found ${savedTracks.length} tracks for session ${activeSession}`
         );
 
-        // Clear current tracks
+        // Clear current tracks in audioManager
         audioManager.clearAllTracks();
 
+        // Local cache for this load session to avoid duplicate fetches
         const localAssetBufferCache = new Map();
 
         // Helper to get buffers for assets
         const getToneBufferForAsset = async (assetId) => {
           if (!assetId) return null;
 
+          // Check global cache first
           if (assetBufferCache.has(assetId)) {
             return assetBufferCache.get(assetId);
           }
 
+          // Check local session cache
           if (localAssetBufferCache.has(assetId)) {
             return localAssetBufferCache.get(assetId);
           }
@@ -524,6 +487,7 @@ function AudioPage() {
             const asset = await dbManager.getAsset(assetId);
             const toneBuffer = await buildToneBufferFromAssetRecord(asset);
             if (toneBuffer) {
+              // Cache in both caches
               assetBufferCache.set(assetId, toneBuffer);
               localAssetBufferCache.set(assetId, toneBuffer);
               return toneBuffer;
@@ -592,7 +556,7 @@ function AudioPage() {
             continue;
           }
 
-          // Create track object
+          // Create track object for audioManager
           const trackData = {
             ...savedTrack,
             buffer: primaryBuffer,
@@ -605,6 +569,7 @@ function AudioPage() {
           audioManager.addTrackFromBuffer(trackData);
         }
 
+        // Update React state with loaded tracks
         setTracks([...audioManager.tracks]);
 
         // Reload engine with loaded tracks
@@ -627,7 +592,12 @@ function AudioPage() {
     };
 
     loadSessionTracks();
-  }, [activeSession]);
+  }, [
+    activeSession,
+    buildToneBufferFromAssetRecord,
+    buildVersionFromTracks,
+    deserializeAudioBuffer,
+  ]);
 
   // Toggle sidebar visibility
   const toggleSidebar = () => {
@@ -661,14 +631,16 @@ function AudioPage() {
       enabledEffects: importedAudioData.enabledEffects || {},
     };
 
+    // Add to audioManager
     const createdTrack = audioManager.addTrackFromBuffer(trackData);
     setTracks([...audioManager.tracks]);
 
+    // Legacy: store audio data if this is the first track
     if (audioManager.tracks.length === 1) {
       setAudioData(importedAudioData);
     }
 
-    // Save to database
+    // Save track to database
     try {
       if (createdTrack) {
         createdTrack.assetId = assetId;
@@ -681,7 +653,7 @@ function AudioPage() {
           `Track saved to session ${activeSession} with ID: ${assignedId}, assetId: ${assetId}`
         );
 
-        // Update track ID if needed
+        // Update track ID if database assigned a different one
         if (assignedId !== undefined && assignedId !== createdTrack.id) {
           createdTrack.id = assignedId;
           setTracks([...audioManager.tracks]);
@@ -699,7 +671,7 @@ function AudioPage() {
 
       const {buffer} = importResult;
 
-      // Save asset to database
+      // Save asset to database (handles duplicate names)
       const assetId = await saveAsset(importResult, dbManager);
 
       // Get saved asset for potentially renamed name
@@ -784,6 +756,7 @@ function AudioPage() {
           return;
         }
 
+        // Cache for future use
         assetBufferCache.set(assetId, toneBuffer);
         console.log(
           `Cached buffer for asset ${assetId}, cache size: ${assetBufferCache.size}`
@@ -1311,116 +1284,128 @@ function AudioPage() {
   };
 
   // Handle deleting a track with cleanup
-  const handleDeleteTrack = async (trackId) => {
-    try {
-      console.log(`Deleting track ${trackId}...`);
-
-      // Stop Tone.js transport
+  const handleDeleteTrack = useCallback(
+    async (trackId) => {
       try {
-        Tone.Transport.stop();
-        Tone.Transport.cancel(0);
-        Tone.Transport.seconds = 0;
-        console.log("Tone.Transport stopped and reset");
-      } catch (e) {
-        console.error("Failed to stop Tone.Transport:", e);
-      }
+        console.log(`Deleting track ${trackId}...`);
 
-      // Dispose engine resources
-      if (engineRef.current) {
+        // Stop Tone.js transport
         try {
-          // Unsync and dispose all players
-          if (engineRef.current.playersBySegment) {
-            engineRef.current.playersBySegment.forEach((playerObj) => {
+          Tone.Transport.stop();
+          Tone.Transport.cancel(0);
+          Tone.Transport.seconds = 0;
+          console.log("Tone.Transport stopped and reset");
+        } catch (e) {
+          console.error("Failed to stop Tone.Transport:", e);
+        }
+
+        // Dispose engine resources
+        if (engineRef.current) {
+          try {
+            // Unsync and dispose all players
+            if (engineRef.current.playersBySegment) {
+              engineRef.current.playersBySegment.forEach((playerObj) => {
+                try {
+                  if (
+                    playerObj.player &&
+                    typeof playerObj.player.unsync === "function"
+                  ) {
+                    playerObj.player.unsync();
+                  }
+                  if (
+                    playerObj.player &&
+                    typeof playerObj.player.stop === "function"
+                  ) {
+                    playerObj.player.stop();
+                  }
+                } catch (e) {
+                  console.warn("Failed to unsync/stop player:", e);
+                }
+              });
+            }
+
+            engineRef.current._disposeAll();
+            console.log("All engine resources disposed");
+          } catch (e) {
+            console.warn("Failed to dispose engine:", e);
+          }
+        }
+
+        // Delete from audioManager
+        const deleted = audioManager.deleteTrack(trackId);
+
+        if (deleted) {
+          // Delete from database
+          try {
+            await dbManager.deleteTrack(trackId);
+            console.log(`Track ${trackId} deleted from database`);
+          } catch (e) {
+            console.warn("Failed to delete track from DB:", e);
+          }
+
+          // Deselect if this was selected
+          if (selectedTrackId === trackId) {
+            setSelectedTrackId(null);
+          }
+
+          // Update state
+          setTracks([...audioManager.tracks]);
+
+          // Reset progress store
+          try {
+            progressStore.setMs(0);
+            progressStore.setLengthMs(0);
+          } catch (e) {
+            console.warn("Failed to reset progress store:", e);
+          }
+
+          // Reload engine (empty or with remaining tracks)
+          if (audioManager.tracks.length === 0) {
+            console.log("No tracks remaining - loading empty version");
+
+            if (engineRef.current) {
               try {
-                if (
-                  playerObj.player &&
-                  typeof playerObj.player.unsync === "function"
-                ) {
-                  playerObj.player.unsync();
-                }
-                if (
-                  playerObj.player &&
-                  typeof playerObj.player.stop === "function"
-                ) {
-                  playerObj.player.stop();
-                }
+                await engineRef.current.load(EMPTY_VERSION);
+                console.log("Engine loaded with empty version");
               } catch (e) {
-                console.warn("Failed to unsync/stop player:", e);
+                console.error("Failed to load empty version:", e);
               }
-            });
-          }
-
-          engineRef.current._disposeAll();
-          console.log("All engine resources disposed");
-        } catch (e) {
-          console.warn("Failed to dispose engine:", e);
-        }
-      }
-
-      // Delete from audioManager
-      const deleted = audioManager.deleteTrack(trackId);
-
-      if (deleted) {
-        // Delete from database
-        try {
-          await dbManager.deleteTrack(trackId);
-          console.log(`Track ${trackId} deleted from database`);
-        } catch (e) {
-          console.warn("Failed to delete track from DB:", e);
-        }
-
-        // Deselect if this was selected
-        if (selectedTrackId === trackId) {
-          setSelectedTrackId(null);
-        }
-
-        // Update state
-        setTracks([...audioManager.tracks]);
-
-        // Reset progress store
-        try {
-          progressStore.setMs(0);
-          progressStore.setLengthMs(0);
-        } catch (e) {
-          console.warn("Failed to reset progress store:", e);
-        }
-
-        // Reload engine (empty or with remaining tracks)
-        if (audioManager.tracks.length === 0) {
-          console.log("No tracks remaining - loading empty version");
-
-          if (engineRef.current) {
-            try {
-              await engineRef.current.load(EMPTY_VERSION);
-              console.log("Engine loaded with empty version");
-            } catch (e) {
-              console.error("Failed to load empty version:", e);
             }
-          }
-        } else {
-          console.log(
-            `Reloading engine with ${audioManager.tracks.length} remaining track(s)`
-          );
+          } else {
+            console.log(
+              `Reloading engine with ${audioManager.tracks.length} remaining track(s)`
+            );
 
-          const newVersion = buildVersionFromTracks(audioManager.tracks);
+            const newVersion = buildVersionFromTracks(audioManager.tracks);
 
-          if (newVersion && engineRef.current) {
-            try {
-              await engineRef.current.load(newVersion);
-              console.log("Engine reloaded successfully");
-            } catch (e) {
-              console.error("Failed to reload engine after track deletion:", e);
+            if (newVersion && engineRef.current) {
+              try {
+                await engineRef.current.load(newVersion);
+                console.log("Engine reloaded successfully");
+              } catch (e) {
+                console.error(
+                  "Failed to reload engine after track deletion:",
+                  e
+                );
+              }
             }
           }
         }
+      } catch (error) {
+        console.error("Failed to delete track:", error);
       }
-    } catch (error) {
-      console.error("Failed to delete track:", error);
-    }
-  };
+    },
+    [
+      buildVersionFromTracks,
+      engineRef,
+      selectedTrackId,
+      setSelectedTrackId,
+      setTracks,
+    ]
+  );
 
   // Cut selected track to clipboard
-  const handleCutTrack = async () => {
+  const handleCutTrack = useCallback(async () => {
     if (!selectedTrackId) {
       console.warn("No track selected for cut");
       return;
@@ -1454,10 +1439,10 @@ function AudioPage() {
     await handleDeleteTrack(selectedTrackId);
 
     console.log(`Track cut to clipboard: ${track.name}`);
-  };
+  }, [activeSession, handleDeleteTrack, refreshClipboardFlag, selectedTrackId]);
 
   // Copy selected track to clipboard
-  const handleCopyTrack = async () => {
+  const handleCopyTrack = useCallback(async () => {
     if (!selectedTrackId) {
       console.warn("No track selected for copy");
       return;
@@ -1501,10 +1486,10 @@ function AudioPage() {
     refreshClipboardFlag();
 
     console.log(`Track copied to clipboard: ${track.name}`);
-  };
+  }, [activeSession, refreshClipboardFlag, selectedTrackId]);
 
   // Paste track from clipboard
-  const handlePasteTrack = async () => {
+  const handlePasteTrack = useCallback(async () => {
     const clipboardData = clipboardManager.getClipboard();
 
     if (!clipboardData) {
@@ -1796,7 +1781,74 @@ function AudioPage() {
       console.error("Error while pasting track:", error);
       alert("Failed to paste track. See console for details.");
     }
-  };
+  }, [
+    activeSession,
+    buildVersionFromTracks,
+    deserializeAudioBuffer,
+    engineRef,
+    generateCopyName,
+    setTracks,
+  ]);
+
+  // Keyboard shortcuts for cut/copy/paste/delete
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      const activeElement = document.activeElement;
+      const isTextEntry =
+        activeElement?.tagName === "TEXTAREA" ||
+        activeElement?.isContentEditable ||
+        (activeElement?.tagName === "INPUT" &&
+          !["range", "checkbox", "radio", "button", "submit", "file"].includes(
+            activeElement.type
+          ));
+
+      // Skip shortcuts during text entry
+      if (isTextEntry) return;
+
+      // Ctrl/Cmd + X - Cut track
+      if ((e.ctrlKey || e.metaKey) && e.key === "x") {
+        e.preventDefault();
+        if (selectedTrackId) {
+          handleCutTrack();
+        }
+      }
+
+      // Ctrl/Cmd + C - Copy track
+      if ((e.ctrlKey || e.metaKey) && e.key === "c") {
+        e.preventDefault();
+        if (selectedTrackId) {
+          handleCopyTrack();
+        }
+      }
+
+      // Ctrl/Cmd + V - Paste track
+      if ((e.ctrlKey || e.metaKey) && e.key === "v") {
+        e.preventDefault();
+        if (clipboardManager.hasClipboard()) {
+          handlePasteTrack();
+          refreshClipboardFlag();
+        }
+      }
+
+      // Backspace/Delete - Delete track
+      if (e.key === "Backspace" || e.key === "Delete") {
+        e.preventDefault();
+        if (selectedTrackId) {
+          handleDeleteTrack(selectedTrackId);
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [
+    handleCopyTrack,
+    handleCutTrack,
+    handleDeleteTrack,
+    handlePasteTrack,
+    refreshClipboardFlag,
+    selectedTrackId,
+  ]);
 
   // Handle asset deletion with cache cleanup
   const handleAssetDelete = (assetId) => {
@@ -1813,7 +1865,7 @@ function AudioPage() {
     }
   };
 
-  // Generic handler for track property updates
+  // Generic handler for track property updates (mute, solo, etc.)
   const handleTrackPropertyUpdate = async (
     trackId,
     property,
@@ -1848,6 +1900,9 @@ function AudioPage() {
     }
   };
 
+  // Determine if sidebar is collapsed
+  const isSidebarCollapsed = sidebarWidth <= MIN_WIDTH;
+
   // CSS variable for sidebar width
   const mainContentStyle = {
     "--sidebar-width": `${sidebarWidth}px`,
@@ -1856,7 +1911,7 @@ function AudioPage() {
   // Build version object for playback engine
   const version = buildVersionFromTracks(tracks);
 
-  // Legacy audio buffer reference
+  // Legacy audio buffer reference (for compatibility)
   const _audioBuffer =
     tracks.length > 0
       ? tracks[0].buffer || tracks[0].segments?.[0]?.buffer
@@ -1867,14 +1922,16 @@ function AudioPage() {
     engineRef.current = engine;
     setEngineRef(engineRef);
 
+    // Apply effects after engine is ready
     setTimeout(() => {
       applyEffectsToEngine();
     }, 100);
   };
 
-  // Render component
+  // Main render
   return (
     <div className="app-container">
+      {/* Top header with controls and menus */}
       <Header
         tracks={tracks}
         totalLengthMs={version?.lengthMs || 0}
@@ -1890,7 +1947,9 @@ function AudioPage() {
         onSamplerRecording={handleSamplerRecording}
       />
 
+      {/* Main workspace area with sidebar and timeline */}
       <div className="main-content-area" style={mainContentStyle}>
+        {/* Left sidebar for assets and imports */}
         <Sidebar
           width={sidebarWidth}
           onImportSuccess={handleImportSuccess}
@@ -1900,12 +1959,21 @@ function AudioPage() {
           assetBufferCache={assetBufferCache}
         />
 
-        <div
+        {/* Collapsible sidebar divider */}
+        <button
+          type="button"
           className="divider"
           onClick={toggleSidebar}
-          title="Toggle sidebar"
-        />
+          data-collapsed={isSidebarCollapsed ? "true" : undefined}
+          title={isSidebarCollapsed ? "Open sidebar" : "Collapse sidebar"}
+          aria-label={isSidebarCollapsed ? "Open sidebar" : "Collapse sidebar"}
+          aria-expanded={!isSidebarCollapsed}
+          aria-pressed={!isSidebarCollapsed}
+        >
+          <span aria-hidden="true">{isSidebarCollapsed ? "›" : "‹"}</span>
+        </button>
 
+        {/* Main timeline and track area */}
         <MainContent
           tracks={tracks}
           recording={recording}
@@ -1929,6 +1997,7 @@ function AudioPage() {
         />
       </div>
 
+      {/* Bottom footer with transport controls and recording */}
       <Footer
         version={version}
         onRecordComplete={handleImportSuccess}
