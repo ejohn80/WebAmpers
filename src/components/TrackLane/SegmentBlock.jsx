@@ -1,4 +1,4 @@
-import React, {useState, useRef, useEffect} from "react";
+import React, {useState, useRef, useEffect, useCallback} from "react";
 import Waveform from "../Waveform/Waveform";
 import {progressStore} from "../../playback/progressStore";
 import "./SegmentBlock.css";
@@ -26,6 +26,11 @@ const SegmentBlock = ({
   const segmentRef = useRef(null);
   const pxPerMsRef = useRef(pxPerMs || 0);
   const dragPlayheadMsRef = useRef(null);
+  const onSegmentMoveRef = useRef(onSegmentMove);
+
+  useEffect(() => {
+    onSegmentMoveRef.current = onSegmentMove;
+  }, [onSegmentMove]);
 
   useEffect(() => {
     pxPerMsRef.current = pxPerMs || 0;
@@ -35,7 +40,6 @@ const SegmentBlock = ({
   const startOnTimelineMs = Math.max(0, segment.startOnTimelineMs || 0);
   const durationMs = Math.max(0, segment.durationMs || 0);
 
-  // Debug log to see what properties the segment has
   useEffect(() => {
     console.log(`[SegmentBlock ${segmentIndex}] Segment data:`, {
       id: segment.id,
@@ -51,7 +55,7 @@ const SegmentBlock = ({
   const segmentName =
     segment.name || segment.fileName || `Segment ${segmentIndex + 1}`;
 
-  const startDragSession = () => {
+  const startDragSession = useCallback(() => {
     if (dragPlayheadMsRef.current !== null) return;
 
     const savedMs = progressStore.getState().ms;
@@ -63,22 +67,25 @@ const SegmentBlock = ({
       console.warn("[SegmentBlock] Failed to enter scrub mode:", err);
     }
     setIsDragging(true);
-  };
+  }, []);
 
-  const handleMouseMove = (e) => {
-    const deltaX = e.clientX - dragStartX.current;
+  const handleMouseMove = useCallback(
+    (e) => {
+      const deltaX = e.clientX - dragStartX.current;
 
-    if (dragPlayheadMsRef.current === null) {
-      if (Math.abs(deltaX) < DRAG_ACTIVATION_THRESHOLD_PX) {
-        return;
+      if (dragPlayheadMsRef.current === null) {
+        if (Math.abs(deltaX) < DRAG_ACTIVATION_THRESHOLD_PX) {
+          return;
+        }
+        startDragSession();
       }
-      startDragSession();
-    }
 
-    setDragOffset(deltaX);
-  };
+      setDragOffset(deltaX);
+    },
+    [startDragSession]
+  );
 
-  const finalizeDragPlaybackState = () => {
+  const finalizeDragPlaybackState = useCallback(() => {
     if (dragPlayheadMsRef.current === null) return;
 
     const savedMs = dragPlayheadMsRef.current;
@@ -91,48 +98,54 @@ const SegmentBlock = ({
     dragPlayheadMsRef.current = null;
 
     console.log(`[SegmentBlock] Scrub lock released, endScrub called`);
-  };
+  }, []);
 
-  const handleMouseUp = (e) => {
-    document.removeEventListener("mousemove", handleMouseMove);
-    document.removeEventListener("mouseup", handleMouseUp);
+  const handleMouseUp = useCallback(
+    (e) => {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
 
-    if (dragPlayheadMsRef.current === null) {
+      if (dragPlayheadMsRef.current === null) {
+        // Click without dragging; no position change or scrub session
+        setIsDragging(false);
+        setDragOffset(0);
+        return;
+      }
+
+      const deltaX = e.clientX - dragStartX.current;
+      const currentPxPerMs = pxPerMsRef.current;
+      const deltaMs = currentPxPerMs > 0 ? deltaX / currentPxPerMs : 0;
+      const newPositionMs = Math.max(0, originalPosition.current + deltaMs);
+
+      // Snap to 10ms grid for finer control
+      const snapMs = 10;
+      const snappedPositionMs = Math.round(newPositionMs / snapMs) * snapMs;
+
+      let movePromise = null;
+      const moveHandler = onSegmentMoveRef.current;
+      if (moveHandler) {
+        try {
+          movePromise = moveHandler(segmentIndex, snappedPositionMs);
+        } catch (err) {
+          console.error("Segment move failed:", err);
+        }
+      }
+
       setIsDragging(false);
       setDragOffset(0);
-      return;
-    }
 
-    const deltaX = e.clientX - dragStartX.current;
-    const currentPxPerMs = pxPerMsRef.current;
-    const deltaMs = currentPxPerMs > 0 ? deltaX / currentPxPerMs : 0;
-    const newPositionMs = Math.max(0, originalPosition.current + deltaMs);
+      const finish = () => {
+        finalizeDragPlaybackState();
+      };
 
-    const snapMs = 10;
-    const snappedPositionMs = Math.round(newPositionMs / snapMs) * snapMs;
-
-    let movePromise = null;
-    if (onSegmentMove) {
-      try {
-        movePromise = onSegmentMove(segmentIndex, snappedPositionMs);
-      } catch (err) {
-        console.error("Segment move failed:", err);
+      if (movePromise && typeof movePromise.finally === "function") {
+        movePromise.finally(finish);
+      } else {
+        finish();
       }
-    }
-
-    setIsDragging(false);
-    setDragOffset(0);
-
-    const finish = () => {
-      finalizeDragPlaybackState();
-    };
-
-    if (movePromise && typeof movePromise.finally === "function") {
-      movePromise.finally(finish);
-    } else {
-      finish();
-    }
-  };
+    },
+    [handleMouseMove, segmentIndex, finalizeDragPlaybackState]
+  );
 
   // Calculate position style
   let positionStyle;
@@ -161,23 +174,26 @@ const SegmentBlock = ({
   // Determine if overlay should be shown based on width
   const showOverlay = segmentWidthPx === 0 || segmentWidthPx >= 60;
 
-  const handleMouseDown = (e) => {
-    if (e.button !== 0) return;
+  const handleMouseDown = useCallback(
+    (e) => {
+      if (e.button !== 0) return;
 
-    e.preventDefault();
-    e.stopPropagation();
+      e.preventDefault();
+      e.stopPropagation();
 
-    if (onSelect) {
-      onSelect(segmentIndex);
-    }
+      if (onSelect) {
+        onSelect(segmentIndex);
+      }
 
-    dragStartX.current = e.clientX;
-    originalPosition.current = startOnTimelineMs;
-    dragPlayheadMsRef.current = null;
+      dragStartX.current = e.clientX;
+      originalPosition.current = startOnTimelineMs;
+      dragPlayheadMsRef.current = null;
 
-    document.addEventListener("mousemove", handleMouseMove);
-    document.addEventListener("mouseup", handleMouseUp);
-  };
+      document.addEventListener("mousemove", handleMouseMove);
+      document.addEventListener("mouseup", handleMouseUp);
+    },
+    [handleMouseMove, handleMouseUp, onSelect, segmentIndex, startOnTimelineMs]
+  );
 
   useEffect(() => {
     return () => {
@@ -185,7 +201,7 @@ const SegmentBlock = ({
       document.removeEventListener("mouseup", handleMouseUp);
       finalizeDragPlaybackState();
     };
-  }, []);
+  }, [handleMouseMove, handleMouseUp, finalizeDragPlaybackState]);
 
   const segmentClassName = `tracklane-segment-positioned ${
     isDragging ? "dragging" : ""

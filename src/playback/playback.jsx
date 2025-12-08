@@ -2259,7 +2259,7 @@ export default function WebAmpPlayback({version, onEngineReady}) {
   const skipFwd10 = useCallback(() => skipMs(10000), [skipMs]);
 
   // Jump to start (0:00)
-  const goToStart = () => {
+  const goToStart = useCallback(() => {
     try {
       engine.seekMs(0);
     } catch (err) {
@@ -2271,17 +2271,17 @@ export default function WebAmpPlayback({version, onEngineReady}) {
     } catch {
       // Intentionally empty
     }
-  };
+  }, [engine]);
 
-  // Jump to end of timeline
-  const goToEnd = () => {
-    const endMs = version?.lengthMs || 0;
+  // Jump to end (clamps to timeline length)
+  const goToEnd = useCallback(() => {
+    const endMs = Math.max(0, Number(version?.lengthMs) || 0);
+    if (endMs === 0) {
+      return;
+    }
+
     try {
       engine.seekMs(endMs);
-      // Also pause if currently playing
-      if (playing) {
-        engine.pause();
-      }
     } catch (err) {
       console.warn("goToEnd failed:", err);
     }
@@ -2291,7 +2291,7 @@ export default function WebAmpPlayback({version, onEngineReady}) {
     } catch {
       // Intentionally empty
     }
-  };
+  }, [engine, version?.lengthMs]);
 
   // Publish progress to store whenever local ms updates
   useEffect(() => {
