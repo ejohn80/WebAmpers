@@ -1,3 +1,6 @@
+/* EffectsMenu.module.css - Modal styling for adding audio effects */
+
+/* Overlay that covers the entire screen */
 .effectsMenuOverlay {
   position: absolute;
   top: 0;
@@ -12,6 +15,7 @@
   padding: 60px;
 }
 
+/* Modal container for effects selection */
 .effectsMenu {
   background: var(--effects-menu-bg, rgba(29, 29, 30, 0.95));
   border: 2px solid var(--effects-menu-border, #0fb1c9);
@@ -23,6 +27,7 @@
   flex-direction: column;
 }
 
+/* Modal header with title and subtitle */
 .header {
   padding: 10px 24px 1px;
   border-bottom: 1px solid var(--effects-menu-header-border, #333239);
@@ -42,18 +47,21 @@
   font-size: 14px;
 }
 
+/* Scrollable content area */
 .effectsContent {
   flex: 1;
   overflow-y: auto;
   padding: 10px 24px;
 }
 
+/* Grid layout for effect cards */
 .effectsGrid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   gap: 10px;
 }
 
+/* Individual effect card */
 .effectCard {
   background: var(--effects-card-bg, #1e1d20);
   border: 1px solid var(--effects-card-border, #333239);
@@ -71,16 +79,16 @@
   position: relative;
 }
 
-/* Remove the old hover effects */
+/* Hover effect: blue border only */
 .effectCard:hover {
-  border-color: #17e1ff; /* Keep original border color */
+  border-color: #17e1ff;
   transform: none;
   box-shadow: none;
   margin-bottom: 1px;
   margin-top: 1px;
 }
 
-/* Text gradient sweep animation */
+/* Text gradient sweep animation on hover */
 .effectCard:hover .effectName {
   background: linear-gradient(90deg, #17e1ff, #17e1ff, #17e1ff);
   background-size: 200% 100%;
@@ -91,12 +99,7 @@
 }
 
 .effectCard:hover .effectDescription {
-  background: linear-gradient(
-    90deg,
-    #17e1ff 0%,
-    /* start with blue */ #ff0080 65%,
-    /* pink starts at 65% */ #17e1ff 100% /* blue again */
-  );
+  background: linear-gradient(90deg, #17e1ff 0%, #ff0080 65%, #17e1ff 100%);
   background-size: 200% 100%;
   background-clip: text;
   -webkit-background-clip: text;
@@ -104,15 +107,17 @@
   animation: textSweepReverse 1.3s linear forwards;
 }
 
+/* Reverse sweep animation for description text */
 @keyframes textSweepReverse {
   0% {
-    background-position: 100% 0; /* start at end */
+    background-position: 100% 0;
   }
   100% {
-    background-position: 0% 0; /* move to start */
+    background-position: 0% 0;
   }
 }
 
+/* Effect name styling */
 .effectName {
   color: var(--effects-card-name, #e5e5e5);
   font-weight: 600;
@@ -122,6 +127,7 @@
   margin-top: 5px;
 }
 
+/* Effect description text */
 .effectDescription {
   color: var(--effects-card-desc, #888);
   font-size: 12px;
@@ -130,6 +136,7 @@
   position: relative;
 }
 
+/* Modal footer with close button */
 .footer {
   padding: 10px 24px;
   border-top: 1px solid var(--effects-menu-header-border, #333239);
@@ -137,6 +144,7 @@
   justify-content: flex-end;
 }
 
+/* Cancel/close button */
 .cancelButton {
   background: var(--effects-cancel-bg, #2a2a2a);
   color: var(--effects-cancel-text, #888);
@@ -157,7 +165,7 @@
   color: var(--effects-cancel-hover-text, #e5e5e5);
 }
 
-/* Scrollbar styling */
+/* Custom scrollbar styling */
 .effectsContent::-webkit-scrollbar {
   width: 6px;
 }
@@ -175,24 +183,23 @@
   background: var(--effects-scroll-thumb-hover, #5c5b62);
 }
 
-/* Styling for a disabled (already active) effect card */
+/* Disabled effect card (already added) */
 .effectCardDisabled {
-  opacity: 0.4; /* Visually grey out */
-  cursor: not-allowed !important; /* Change cursor */
-  border-color: #333239 !important; /* Subtle border */
-  /* Ensure it doesn't shift position */
+  opacity: 0.4;
+  cursor: not-allowed !important;
+  border-color: #333239 !important;
   margin-top: 2px !important;
   margin-bottom: 0 !important;
 }
 
-/* Remove hover effects on disabled card */
+/* Remove hover effects for disabled cards */
 .effectCardDisabled:hover {
   border-color: #333239 !important;
   transform: none !important;
   box-shadow: none !important;
 }
 
-/* Remove text gradient sweep animation for disabled cards */
+/* Remove text animations for disabled cards */
 .effectCardDisabled:hover .effectName,
 .effectCardDisabled:hover .effectDescription {
   background: none !important;
@@ -202,10 +209,11 @@
   animation: none !important;
 }
 
+/* Grey out text for disabled cards */
 .effectCardDisabled .effectName {
-  color: #888; /* Ensure name is also greyed */
+  color: #888;
 }
 
 .effectCardDisabled .effectDescription {
-  color: #666; /* Ensure description is also greyed */
+  color: #666;
 }

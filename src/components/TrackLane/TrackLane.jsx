@@ -1,22 +1,35 @@
+/**
+ * TrackLane.jsx
+ *
+ * Main timeline track component that handles:
+ * - Track controls (mute, solo, delete)
+ * - Segment display and positioning
+ * - Drag & drop for adding audio assets
+ * - Context menus for track/segment actions
+ * - Visual selection and drop previews
+ *
+ * Manages a single track row in the DAW timeline.
+ */
+
 import React, {useState, useEffect, memo, useCallback, useRef} from "react";
 import {createPortal} from "react-dom";
 import SegmentBlock from "./SegmentBlock";
 import "./TrackLane.css";
 import {resolveSegmentStart} from "../../utils/segmentPlacement";
 
+// Helper to create context menu state
 const createContextMenuState = (overrides = {}) => ({
   open: false,
   x: 0,
   y: 0,
-  target: "track",
+  target: "track", // 'track' or 'segment'
   segmentIndex: null,
   segmentId: null,
   ...overrides,
 });
 
 /**
- * TrackLane
- * Renders a single track container with proportional waveform sizing
+ * TrackLane - Single track row in the timeline
  */
 const TrackLane = memo(function TrackLane({
   track,
@@ -42,34 +55,25 @@ const TrackLane = memo(function TrackLane({
   onClearSegmentSelection = () => {},
   onSegmentDelete = () => {},
 }) {
-  //if (!track) return null;
-
+  // State
   const segments = Array.isArray(track.segments) ? track.segments : [];
-
-  const getInitialState = () => {
-    try {
-      const saved = localStorage.getItem(`webamp.track.${track.id}`);
-      return saved
-        ? JSON.parse(saved)
-        : {muted: !!track.mute, soloed: !!track.solo};
-    } catch {
-      return {muted: !!track.mute, soloed: !!track.solo};
-    }
-  };
-
-  const [muted, setMuted] = useState(getInitialState().muted);
-  const [soloed, setSoloed] = useState(getInitialState().soloed);
+  const [muted, setMuted] = useState(!!track.mute);
+  const [soloed, setSoloed] = useState(!!track.solo);
   const [contextMenu, setContextMenu] = useState(createContextMenuState());
   const [selectedSegmentIndex, setSelectedSegmentIndex] = useState(null);
-  const [dropPreview, setDropPreview] = useState(null);
-  const dragHoverDepthRef = useRef(0);
-  const pendingPreviewAssetRef = useRef(null);
-  const segmentsRef = useRef(segments);
+  const [dropPreview, setDropPreview] = useState(null); // Drag & drop preview
 
+  // Refs
+  const dragHoverDepthRef = useRef(0); // Track nested drag enters
+  const pendingPreviewAssetRef = useRef(null); // Asset currently loading
+  const segmentsRef = useRef(segments); // Current segments reference
+
+  // Update ref when segments change
   useEffect(() => {
     segmentsRef.current = segments;
   }, [segments]);
 
+  // Persist mute/solo state to localStorage
   useEffect(() => {
     try {
       localStorage.setItem(
@@ -81,6 +85,7 @@ const TrackLane = memo(function TrackLane({
     }
   }, [muted, soloed, track.id]);
 
+  // Sync with external track state changes
   useEffect(() => {
     setMuted(!!track.mute);
   }, [track.mute, track.id]);
@@ -89,10 +94,12 @@ const TrackLane = memo(function TrackLane({
     setSoloed(!!track.solo);
   }, [track.solo, track.id]);
 
+  // Close context menu
   const closeContextMenu = useCallback(() => {
     setContextMenu(createContextMenuState());
   }, []);
 
+  // Close context menu on outside click or Escape
   useEffect(() => {
     if (!contextMenu.open) return undefined;
 
@@ -121,11 +128,12 @@ const TrackLane = memo(function TrackLane({
     };
   }, [contextMenu.open, closeContextMenu]);
 
+  // Open context menu at position
   const openContextMenuAt = (event, overrides = {}) => {
     event.preventDefault();
     event.stopPropagation();
 
-    // Select this track when opening the context menu
+    // Select this track when opening menu
     onSelect?.(track.id);
 
     const menuWidth = 200;
@@ -136,14 +144,17 @@ const TrackLane = memo(function TrackLane({
     setContextMenu(createContextMenuState({open: true, x, y, ...overrides}));
   };
 
+  // Track context menu handler
   const handleContextMenu = (event) => {
     openContextMenuAt(event, {target: "track"});
   };
 
+  // Segment context menu handler
   const handleSegmentContextMenu = (segmentIndex, event) => {
     const segment = segments[segmentIndex];
     if (!segment) return;
 
+    // Select the segment
     if (typeof onSegmentSelected === "function") {
       onSegmentSelected(track.id, segment?.id ?? null, segmentIndex);
     }
@@ -156,6 +167,7 @@ const TrackLane = memo(function TrackLane({
     });
   };
 
+  // Delete segment from context menu
   const handleSegmentDeleteAction = async () => {
     if (contextMenu.segmentIndex === null) return;
 
@@ -176,6 +188,7 @@ const TrackLane = memo(function TrackLane({
     }
   };
 
+  // Mute toggle
   const toggleMute = () => {
     const next = !muted;
     setMuted(next);
@@ -186,6 +199,7 @@ const TrackLane = memo(function TrackLane({
     }
   };
 
+  // Solo toggle
   const toggleSolo = () => {
     const next = !soloed;
     setSoloed(next);
@@ -196,6 +210,7 @@ const TrackLane = memo(function TrackLane({
     }
   };
 
+  // Delete track
   const handleDelete = () => {
     try {
       onDelete && onDelete(track.id);
@@ -204,6 +219,7 @@ const TrackLane = memo(function TrackLane({
     }
   };
 
+  // Handle menu item click
   const handleMenuAction = (action, disabled) => {
     if (disabled) return;
     if (typeof action === "function") {
@@ -212,6 +228,7 @@ const TrackLane = memo(function TrackLane({
     closeContextMenu();
   };
 
+  // Calculate pixel-per-millisecond ratio
   const parsedTimelineWidth =
     typeof timelineWidth === "number"
       ? timelineWidth
@@ -225,6 +242,7 @@ const TrackLane = memo(function TrackLane({
       ? numericTimelineWidth / totalLengthMs
       : null;
 
+  // CSS styles for sizing
   const tracklaneMainStyle =
     numericTimelineWidth > 0
       ? {
@@ -240,6 +258,7 @@ const TrackLane = memo(function TrackLane({
       ? {minWidth: `${rowWidthPx}px`, width: `${rowWidthPx}px`}
       : undefined;
 
+  // Track click handler
   const handleTrackClick = (e) => {
     e.stopPropagation();
     if (typeof onClearSegmentSelection === "function") {
@@ -249,6 +268,7 @@ const TrackLane = memo(function TrackLane({
     onSelect(track.id);
   };
 
+  // Visual selection style
   const selectionStyle = isSelected
     ? {
         outline: "2px solid #17E1FF",
@@ -257,6 +277,7 @@ const TrackLane = memo(function TrackLane({
       }
     : {};
 
+  // Extract drag asset data from event
   const getDragAssetFromEvent = useCallback((event) => {
     if (event?.dataTransfer) {
       try {
@@ -279,6 +300,7 @@ const TrackLane = memo(function TrackLane({
     return null;
   }, []);
 
+  // Load asset duration for drop preview
   const ensurePreviewDuration = useCallback(
     (assetId) => {
       if (!assetId || typeof requestAssetPreview !== "function") {
@@ -339,6 +361,7 @@ const TrackLane = memo(function TrackLane({
     [requestAssetPreview, segments]
   );
 
+  // Format duration for display
   const formatDurationLabel = (ms) => {
     if (!ms) return "";
     const totalSeconds = Math.max(0, Math.round(ms / 1000));
@@ -347,12 +370,14 @@ const TrackLane = memo(function TrackLane({
     return `${minutes}:${seconds}`;
   };
 
+  // Clear drop preview state
   const clearDropPreview = useCallback(() => {
     dragHoverDepthRef.current = 0;
     pendingPreviewAssetRef.current = null;
     setDropPreview(null);
   }, []);
 
+  // Calculate timeline position from mouse event
   const getTimelinePositionFromEvent = (event) => {
     const timelineElement = event.currentTarget;
     if (!timelineElement) return 0;
@@ -363,6 +388,7 @@ const TrackLane = memo(function TrackLane({
     return pxPerMsValue > 0 ? Math.max(0, dropX / pxPerMsValue) : 0;
   };
 
+  // Update drop preview during drag
   const updateDropPreview = useCallback(
     (event, assetData) => {
       if (!assetData) return;
@@ -396,10 +422,12 @@ const TrackLane = memo(function TrackLane({
     [segments, pxPerMs, ensurePreviewDuration]
   );
 
+  // Clear drop preview when track changes
   useEffect(() => {
     clearDropPreview();
   }, [track.id, clearDropPreview]);
 
+  // Move segment handler
   const handleSegmentMove = (segmentIndex, newPositionMs) => {
     console.log(`Moving segment ${segmentIndex} to ${newPositionMs}ms`);
     if (onSegmentMove) {
@@ -408,6 +436,7 @@ const TrackLane = memo(function TrackLane({
     return null;
   };
 
+  // Segment selection handler
   const handleSegmentSelect = (segmentIndex) => {
     setSelectedSegmentIndex(segmentIndex);
     const segment = segments[segmentIndex];
@@ -417,6 +446,7 @@ const TrackLane = memo(function TrackLane({
     onSelect(track.id);
   };
 
+  // Sync selected segment with external state
   useEffect(() => {
     if (!selectedSegment || selectedSegment.trackId !== track.id) {
       if (selectedSegmentIndex !== null) {
@@ -439,6 +469,7 @@ const TrackLane = memo(function TrackLane({
     }
   }, [selectedSegment, track.id, segments, selectedSegmentIndex]);
 
+  // Drag & drop handlers
   const handleTimelineDragEnter = (e) => {
     if (!getDragAssetFromEvent(e)) return;
     dragHoverDepthRef.current += 1;
@@ -500,6 +531,7 @@ const TrackLane = memo(function TrackLane({
     clearDropPreview();
   };
 
+  // Context menu portal (renders outside component tree)
   const contextMenuPortal =
     contextMenu.open && typeof document !== "undefined"
       ? createPortal(
@@ -642,12 +674,14 @@ const TrackLane = memo(function TrackLane({
             onDragOver={handleTimelineDragOver}
             onDrop={handleTimelineDrop}
           >
+            {/* Empty state */}
             {segments.length === 0 && (
               <div className="tracklane-empty">
                 No segments — import audio or drag assets here to add segments.
               </div>
             )}
 
+            {/* Drop preview overlay */}
             {dropPreview && (
               <div
                 className={`tracklane-drop-preview ${dropPreview.isLoadingDuration ? "loading" : ""}`}
@@ -691,6 +725,7 @@ const TrackLane = memo(function TrackLane({
               </div>
             )}
 
+            {/* Render segments */}
             {segments.map((seg, index) => (
               <SegmentBlock
                 key={seg.id || seg.fileUrl || `segment-${index}`}

@@ -1,14 +1,18 @@
-/* MainContent.module.css */
+/* MainContent.module.css - Effects Menu Overlay Styles */
+
+/* Main container for effects menu positioning */
 .maincontent {
   position: relative;
   width: 100%;
   height: 100%;
 }
 
+/* Class applied when effects menu is open */
 .blurred {
   position: relative;
 }
 
+/* Background blur overlay when effects menu is active */
 .blurred::before {
   content: "";
   position: absolute;
@@ -16,19 +20,20 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(15, 15, 15, 0.6);
-  backdrop-filter: blur(2px);
+  background: rgba(15, 15, 15, 0.6); /* Dark semi-transparent overlay */
+  backdrop-filter: blur(2px); /* Subtle blur effect */
   z-index: 999;
-  pointer-events: none;
+  pointer-events: none; /* Allow clicks to pass through to effects menu */
 }
 
+/* Container for the effects menu modal/panel */
 .effectsMenuContainer {
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 1000;
+  z-index: 1000; /* Above the blur overlay */
   display: flex;
   align-items: center;
   justify-content: center;

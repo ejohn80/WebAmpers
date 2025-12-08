@@ -1,13 +1,19 @@
+/**
+ * SegmentBlock Component
+ *
+ * Draggable audio segment block within a track lane.
+ * Displays waveform, name overlay, and handles drag/resize operations.
+ * Integrates with playback scrub mode for visual feedback during drag.
+ */
+
 import React, {useState, useRef, useEffect} from "react";
 import Waveform from "../Waveform/Waveform";
 import {progressStore} from "../../playback/progressStore";
 import "./SegmentBlock.css";
 
+// Minimum mouse movement to initiate drag (prevents accidental drags)
 const DRAG_ACTIVATION_THRESHOLD_PX = 3;
 
-/**
- * SegmentBlock - A draggable audio segment within a track lane
- */
 const SegmentBlock = ({
   segment,
   trackColor,
@@ -19,23 +25,26 @@ const SegmentBlock = ({
   onSelect,
   onSegmentContextMenu = null,
 }) => {
+  // Drag state
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState(0);
   const dragStartX = useRef(0);
   const originalPosition = useRef(0);
   const segmentRef = useRef(null);
   const pxPerMsRef = useRef(pxPerMs || 0);
-  const dragPlayheadMsRef = useRef(null);
+  const dragPlayheadMsRef = useRef(null); // For playback scrubbing during drag
 
+  // Update pixels-per-millisecond reference
   useEffect(() => {
     pxPerMsRef.current = pxPerMs || 0;
   }, [pxPerMs]);
 
+  // Extract segment audio data
   const audioBuffer = segment.buffer ?? segment.fileBuffer ?? null;
   const startOnTimelineMs = Math.max(0, segment.startOnTimelineMs || 0);
   const durationMs = Math.max(0, segment.durationMs || 0);
 
-  // Debug log to see what properties the segment has
+  // Debug segment properties
   useEffect(() => {
     console.log(`[SegmentBlock ${segmentIndex}] Segment data:`, {
       id: segment.id,
@@ -48,9 +57,13 @@ const SegmentBlock = ({
     });
   }, [segment, segmentIndex]);
 
+  // Determine display name (prefer custom name, then filename, then generic)
   const segmentName =
     segment.name || segment.fileName || `Segment ${segmentIndex + 1}`;
 
+  /**
+   * Start drag session and enable playback scrubbing
+   */
   const startDragSession = () => {
     if (dragPlayheadMsRef.current !== null) return;
 
@@ -65,9 +78,14 @@ const SegmentBlock = ({
     setIsDragging(true);
   };
 
+  /**
+   * Handle mouse movement during drag
+   * Activates drag after threshold is crossed
+   */
   const handleMouseMove = (e) => {
     const deltaX = e.clientX - dragStartX.current;
 
+    // Check if we've crossed the activation threshold
     if (dragPlayheadMsRef.current === null) {
       if (Math.abs(deltaX) < DRAG_ACTIVATION_THRESHOLD_PX) {
         return;
@@ -78,6 +96,9 @@ const SegmentBlock = ({
     setDragOffset(deltaX);
   };
 
+  /**
+   * Restore playback state after drag completes
+   */
   const finalizeDragPlaybackState = () => {
     if (dragPlayheadMsRef.current === null) return;
 
@@ -93,24 +114,31 @@ const SegmentBlock = ({
     console.log(`[SegmentBlock] Scrub lock released, endScrub called`);
   };
 
+  /**
+   * Handle mouse up - finalize drag position and apply movement
+   */
   const handleMouseUp = (e) => {
     document.removeEventListener("mousemove", handleMouseMove);
     document.removeEventListener("mouseup", handleMouseUp);
 
+    // No drag session was started (click only)
     if (dragPlayheadMsRef.current === null) {
       setIsDragging(false);
       setDragOffset(0);
       return;
     }
 
+    // Calculate new position in milliseconds
     const deltaX = e.clientX - dragStartX.current;
     const currentPxPerMs = pxPerMsRef.current;
     const deltaMs = currentPxPerMs > 0 ? deltaX / currentPxPerMs : 0;
     const newPositionMs = Math.max(0, originalPosition.current + deltaMs);
 
+    // Snap to 10ms grid for cleaner positioning
     const snapMs = 10;
     const snappedPositionMs = Math.round(newPositionMs / snapMs) * snapMs;
 
+    // Call parent handler for segment movement
     let movePromise = null;
     if (onSegmentMove) {
       try {
@@ -120,9 +148,11 @@ const SegmentBlock = ({
       }
     }
 
+    // Reset drag state
     setIsDragging(false);
     setDragOffset(0);
 
+    // Restore playback state
     const finish = () => {
       finalizeDragPlaybackState();
     };
@@ -134,7 +164,9 @@ const SegmentBlock = ({
     }
   };
 
-  // Calculate position style
+  /**
+   * Calculate segment position and width based on timeline scale
+   */
   let positionStyle;
   let segmentWidthPx = 0;
 
@@ -158,27 +190,34 @@ const SegmentBlock = ({
     };
   }
 
-  // Determine if overlay should be shown based on width
+  // Only show name overlay if segment is wide enough (>= 60px)
   const showOverlay = segmentWidthPx === 0 || segmentWidthPx >= 60;
 
+  /**
+   * Handle mouse down - start drag tracking
+   */
   const handleMouseDown = (e) => {
-    if (e.button !== 0) return;
+    if (e.button !== 0) return; // Only left click
 
     e.preventDefault();
     e.stopPropagation();
 
+    // Select segment
     if (onSelect) {
       onSelect(segmentIndex);
     }
 
+    // Initialize drag state
     dragStartX.current = e.clientX;
     originalPosition.current = startOnTimelineMs;
     dragPlayheadMsRef.current = null;
 
+    // Add global mouse listeners
     document.addEventListener("mousemove", handleMouseMove);
     document.addEventListener("mouseup", handleMouseUp);
   };
 
+  // Cleanup global listeners on unmount
   useEffect(() => {
     return () => {
       document.removeEventListener("mousemove", handleMouseMove);
@@ -187,6 +226,7 @@ const SegmentBlock = ({
     };
   }, []);
 
+  // Dynamic segment class names
   const segmentClassName = `tracklane-segment-positioned ${
     isDragging ? "dragging" : ""
   } ${isSelected ? "selected" : ""}`;
@@ -211,12 +251,12 @@ const SegmentBlock = ({
       }
     >
       <div className="tracklane-segment">
-        {/* Segment name overlay - only show if segment is wide enough */}
+        {/* Segment name overlay (conditionally shown) */}
         {showOverlay && (
           <div
             className="segment-name-overlay"
             style={{
-              // Shrink overlay content for narrower segments
+              // Adjust styling for narrow segments
               ...(segmentWidthPx > 0 && segmentWidthPx < 100
                 ? {
                     padding: "3px 6px",
@@ -229,6 +269,7 @@ const SegmentBlock = ({
           </div>
         )}
 
+        {/* Waveform display */}
         <div className="segment-waveform">
           {audioBuffer ? (
             <Waveform

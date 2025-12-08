@@ -193,7 +193,7 @@ export class AudioTrack {
       segments: this.segments,
       effects: this.effects,
       activeEffectsList: this.activeEffectsList,
-      enabledEffects: this.enabledEffects, // ADD THIS LINE
+      enabledEffects: this.enabledEffects, // Added for effect toggle persistence
     };
   }
 
@@ -203,7 +203,7 @@ export class AudioTrack {
    * @returns {boolean} True if the effect is enabled, false if disabled
    */
   isEffectEnabled(effectId) {
-    return this.enabledEffects[effectId] !== false;
+    return this.enabledEffects[effectId] !== false; // Default to enabled if undefined
   }
 
   /**

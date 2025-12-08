@@ -6,26 +6,25 @@ html,
   padding: 0;
   height: 100%;
   font-family: sans-serif;
-  overflow: hidden;
+  overflow: hidden; /* Prevent page scrolling */
 }
 
-/* Header specific styling */
+/* Header specific styling - high z-index to stay above all content */
 .header {
   position: relative;
   z-index: 9999;
-  overflow: visible;
+  overflow: visible; /* Allow dropdowns to extend beyond header bounds */
   border-bottom: 2px solid var(--header-border);
 }
 
-/* Main application container, uses CSS Grid for overall layout */
+/* Main application container - uses CSS Grid for three-row layout */
 .app-container {
   height: 100vh;
   display: grid;
-  grid-template-rows: 40px minmax(0, 1fr) 40px;
+  grid-template-rows: 40px minmax(0, 1fr) 40px; /* Header, Main, Footer */
 }
 
-/* Ensure other sections have lower z-index */
-
+/* Ensure other sections have lower z-index than header */
 .footer {
   background-color: var(--footer-bg);
   z-index: 1; /* Lower than header */
@@ -48,9 +47,10 @@ html,
 }
 
 /* --- Main Content Area Styling (The Core Grid) --- */
+/* Three-column layout: Sidebar | Divider | MainContent */
 .main-content-area {
   display: grid;
-  grid-template-columns: var(--sidebar-width) 5px minmax(0, 1fr);
+  grid-template-columns: var(--sidebar-width) 5px minmax(0, 1fr); /* Dynamic sidebar width */
   height: 100%;
   position: relative;
   z-index: 1; /* Ensure main content is below header */
@@ -60,12 +60,13 @@ html,
 
 /* --- Movable Divider Styling --- */
 .divider {
-  cursor: ew-resize;
+  cursor: ew-resize; /* East-west resize cursor */
   width: 5px;
   background-color: var(--divider-vertical);
   height: 100%;
 }
 
+/* Sidebar scrolling container */
 .sidebar-container {
-  overflow-y: auto;
+  overflow-y: auto; /* Enable vertical scrolling for sidebar content */
 }

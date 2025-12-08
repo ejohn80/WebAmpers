@@ -1,3 +1,28 @@
+/**
+ * AppContext — Global State for WebAmpers
+ *
+ * Central React Context for:
+ * - User auth/session state
+ * - Theme preferences
+ * - Audio engine + effect management (master + per-track)
+ * - Track selection and global app state
+ *
+ * Architecture:
+ * - React Context API with useMemo optimizations
+ * - Independent master/track effects
+ * - LocalStorage persistence
+ * - Integrates with AudioManager and DBManager
+ *
+ * Effect Model:
+ * - Per-track effects with independent enable/disable states
+ * - Effects toggleable without removal
+ *
+ * Dependencies:
+ * - useUserData (auth)
+ * - AudioManager (audio ops)
+ * - DBManager (IndexedDB)
+ * - effectsStorage (defaults + merging)
+ */
 import {
   createContext,
   useState,
@@ -11,9 +36,24 @@ import {createDefaultEffects, mergeWithDefaults} from "./effectsStorage";
 import {audioManager} from "../managers/AudioManager";
 import {dbManager} from "../managers/DBManager";
 
+// ================================
+// Context Creation
+// ================================
+
+/**
+ * React Context for global application state
+ * Provides access to user data, theme, effects, and audio management
+ */
 export const AppContext = createContext();
 
-// Function to get the initial active session ID from Local Storage
+// ================================
+// Initialization Utilities
+// ================================
+
+/**
+ * Retrieves the initial active session ID from localStorage
+ * @returns {number|null} Session ID or null if not set/invalid
+ */
 const getInitialActiveSession = () => {
   if (
     typeof window === "undefined" ||
@@ -31,6 +71,11 @@ const getInitialActiveSession = () => {
   }
 };
 
+/**
+ * Loads effect parameters for a specific session from localStorage
+ * @param {number|null} activeSessionId - The session ID to load effects for
+ * @returns {Object} Effect parameters merged with defaults
+ */
 const loadEffectParametersForSession = (activeSessionId) => {
   if (typeof activeSessionId !== "number") {
     return createDefaultEffects();
@@ -52,6 +97,11 @@ const loadEffectParametersForSession = (activeSessionId) => {
   return createDefaultEffects();
 };
 
+/**
+ * Retrieves the initial theme preference from localStorage
+ * Defaults to "dark" theme if no preference is stored
+ * @returns {string} "dark" or "light"
+ */
 const getInitialTheme = () => {
   if (typeof window === "undefined" || !window.localStorage) {
     return "dark";
@@ -65,6 +115,13 @@ const getInitialTheme = () => {
   }
 };
 
+/**
+ * Performs shallow equality comparison of two effect objects
+ * Used to prevent unnecessary effect re-application
+ * @param {Object} a - First effects object
+ * @param {Object} b - Second effects object
+ * @returns {boolean} True if effects are shallowly equal
+ */
 const shallowEqualEffects = (a = {}, b = {}) => {
   const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
   for (const key of keys) {
@@ -75,48 +132,148 @@ const shallowEqualEffects = (a = {}, b = {}) => {
   return true;
 };
 
+// ================================
+// Context Provider Component
+// ================================
+
+/**
+ * AppContextProvider - Main provider component that manages all global state
+ * @param {Object} props - React component props
+ * @param {React.ReactNode} props.children - Child components that consume the context
+ */
 const AppContextProvider = ({children}) => {
-  // User Data
+  // ================================
+  // User & Authentication State
+  // ================================
+
+  /**
+   * User authentication data from useUserData hook
+   * Includes username, email, and authentication status
+   */
   const {userData, loading} = useUserData();
 
+  /**
+   * Currently active project in the workspace
+   */
   const [activeProject, setActiveProject] = useState();
+
+  /**
+   * Trigger for refreshing database-dependent components
+   * Incrementing this value forces re-fetching of DB data
+   */
   const [dbRefreshTrigger, setDbRefreshTrigger] = useState(0);
 
-  // Active session state with localStorage persistence
+  // ================================
+  // Session & Theme State
+  // ================================
+
+  /**
+   * Currently active session ID with localStorage persistence
+   * Sessions allow users to work on multiple projects independently
+   */
   const [activeSession, setActiveSession] = useState(getInitialActiveSession);
 
-  // Theme state
+  /**
+   * Application theme with localStorage persistence
+   * Controls dark/light mode visual styling
+   */
   const [theme, setTheme] = useState(getInitialTheme);
 
+  /**
+   * Reference to track the previous session for change detection
+   */
   const lastSessionRef = useRef(activeSession);
 
-  // Master Effect State (Global Session Effects)
+  // ================================
+  // Master Effects State (Global/Session-level)
+  // ================================
+
+  /**
+   * Master effects applied globally to the entire session
+   * These effects affect all audio output globally
+   */
   const [effects, setEffects] = useState(() =>
     loadEffectParametersForSession(activeSession)
   );
 
+  // ================================
+  // Audio Engine Reference
+  // ================================
+
+  /**
+   * Reference to the Web Audio API engine instance
+   * Used to apply effects and control audio processing
+   */
   const [engineRef, setEngineRef] = useState(null);
 
-  // Effects Menu State
+  // ================================
+  // Effects Menu UI State
+  // ================================
+
+  /**
+   * Controls visibility of the effects editing panel/modal
+   */
   const [isEffectsMenuOpen, setIsEffectsMenuOpen] = useState(false);
 
-  // Per-track effects state
+  // ================================
+  // Per-Track Effects State
+  // ================================
+
+  /**
+   * ID of the currently selected audio track
+   * Null indicates no track is selected
+   */
   const [selectedTrackId, setSelectedTrackId] = useState(null);
+
+  /**
+   * Effect parameter values for the currently selected track
+   * Contains key-value pairs of effect names to their current values
+   */
   const [selectedTrackEffects, setSelectedTrackEffects] = useState(null);
+
+  /**
+   * List of effect IDs that are currently active (added) for the selected track
+   * Does not indicate whether effects are enabled/disabled
+   */
   const [selectedTrackActiveEffects, setSelectedTrackActiveEffects] = useState(
     []
   );
+
+  /**
+   * Boolean map indicating which effects are enabled for the selected track
+   * Key: effect ID, Value: true (enabled) or false (disabled)
+   * Effects can be added but disabled (not applied to audio)
+   */
   const [selectedTrackEnabledEffects, setSelectedTrackEnabledEffects] =
     useState({});
 
-  // Derived state: The list of active effect IDs for the CURRENTLY selected track.
+  // ================================
+  // Derived State Values
+  // ================================
+
+  /**
+   * Derived: Active effect IDs for the currently selected track
+   * Alias for selectedTrackActiveEffects for clearer naming in context
+   */
   const activeEffects = selectedTrackActiveEffects;
 
-  // Enabled effects for the selected track
+  /**
+   * Derived: Enabled effects map for the currently selected track
+   * Alias for selectedTrackEnabledEffects for clearer naming in context
+   */
   const enabledEffects = selectedTrackEnabledEffects;
 
+  // ================================
+  // Effect Management Callbacks
+  // ================================
+
+  /**
+   * Refreshes the selected track's effects state from the audio manager
+   * Called when track selection changes or effects need synchronization
+   */
   const refreshSelectedTrackEffects = useCallback(() => {
     if (!selectedTrackId) {
+      // No track selected: clear all track effect state
       setSelectedTrackEffects(null);
       setSelectedTrackActiveEffects([]);
       setSelectedTrackEnabledEffects({});
@@ -125,24 +282,28 @@ const AppContextProvider = ({children}) => {
 
     const track = audioManager.getTrack(selectedTrackId);
     if (!track) {
+      // Track not found: clear state
       setSelectedTrackEffects(null);
       setSelectedTrackActiveEffects([]);
       setSelectedTrackEnabledEffects({});
       return;
     }
 
+    // Ensure track has effect data structures initialized
     if (!track.effects) track.effects = createDefaultEffects();
     if (!track.activeEffectsList) track.activeEffectsList = [];
     if (!track.enabledEffects) track.enabledEffects = {};
 
+    // Update React state with track's current effect data
     setSelectedTrackEffects({...track.effects});
     setSelectedTrackActiveEffects([...track.activeEffectsList]);
     setSelectedTrackEnabledEffects({...track.enabledEffects});
 
     const trackEnabled = track.enabledEffects || {};
 
+    // Apply effects to audio engine if available
     if (engineRef?.current?.setTrackEffects) {
-      // Pre-emptively lock master gain if muted
+      // Preserve master gain to prevent volume jumps during effect application
       let masterGainBefore = null;
       let wasMuted = false;
 
@@ -150,7 +311,7 @@ const AppContextProvider = ({children}) => {
         if (engineRef.current.master?.gain?.gain) {
           masterGainBefore = engineRef.current.master.gain.gain.value;
 
-          // If effectively muted (gain < 0.001), lock it NOW
+          // If effectively muted (gain < 0.001), lock it to prevent audio pops
           if (masterGainBefore < 0.001) {
             wasMuted = true;
             engineRef.current.master.gain.gain.cancelScheduledValues(0);
@@ -164,14 +325,14 @@ const AppContextProvider = ({children}) => {
         );
       }
 
-      // Apply track effects
+      // Apply track effects with enabled filter
       engineRef.current.setTrackEffects(
         selectedTrackId,
         track.effects,
         trackEnabled
       );
 
-      // Verify and restore master gain
+      // Restore master gain after effect application
       if (masterGainBefore !== null) {
         try {
           if (engineRef.current.master?.gain?.gain) {
@@ -181,7 +342,7 @@ const AppContextProvider = ({children}) => {
               0
             );
 
-            // Double-check if it was muted
+            // Re-apply mute if track was muted
             if (wasMuted) {
               engineRef.current.master.gain.gain.setValueAtTime(0, 0);
             }
@@ -196,11 +357,19 @@ const AppContextProvider = ({children}) => {
     }
   }, [selectedTrackId, engineRef]);
 
-  // Update effect when selection changes
+  /**
+   * Updates selected track effect state when track selection changes
+   */
   useEffect(() => {
     refreshSelectedTrackEffects();
   }, [selectedTrackId, refreshSelectedTrackEffects]);
 
+  /**
+   * Applies filtered effects to a specific track
+   * Only applies effects that are enabled for that track
+   * @param {string} trackId - ID of the track to apply effects to
+   * @param {Object} allEffects - Complete effect parameter values
+   */
   const applyFilteredEffectsToTrack = useCallback(
     (trackId, allEffects) => {
       if (!engineRef?.current || !trackId) return;
@@ -223,6 +392,16 @@ const AppContextProvider = ({children}) => {
     [engineRef]
   );
 
+  // ================================
+  // Effect Parameter Manipulation
+  // ================================
+
+  /**
+   * Updates a single effect parameter for the selected track
+   * Handles special case for pan effect separately
+   * @param {string} effectName - Name of the effect to update
+   * @param {number} value - New value for the effect parameter
+   */
   const updateEffect = useCallback(
     async (effectName, value) => {
       if (!selectedTrackId) {
@@ -269,7 +448,7 @@ const AppContextProvider = ({children}) => {
         // Also update the track's pan property (for AudioTrack model)
         track.pan = numValue / 100; // Convert from -100 to 100 range to -1 to 1
 
-        // Persist
+        // Persist to IndexedDB
         try {
           await dbManager.updateTrack(track);
         } catch (e) {
@@ -308,6 +487,11 @@ const AppContextProvider = ({children}) => {
     [selectedTrackId, engineRef]
   );
 
+  /**
+   * Resets a single effect parameter to its default value
+   * @param {string} effectName - Name of the effect to reset
+   * @param {number} defaultValue - Default value to reset to
+   */
   const resetEffect = useCallback(
     async (effectName, defaultValue) => {
       await updateEffect(effectName, defaultValue);
@@ -315,6 +499,10 @@ const AppContextProvider = ({children}) => {
     [updateEffect]
   );
 
+  /**
+   * Resets ALL effects for the selected track to their default values
+   * Does not remove effects from the track, only resets their parameters
+   */
   const resetAllEffects = useCallback(async () => {
     if (!selectedTrackId) return;
 
@@ -352,14 +540,34 @@ const AppContextProvider = ({children}) => {
     }
   }, [selectedTrackId, engineRef]);
 
+  // ================================
+  // Effects Menu Control
+  // ================================
+
+  /**
+   * Opens the effects editing menu/panel
+   */
   const openEffectsMenu = useCallback(() => {
     setIsEffectsMenuOpen(true);
   }, []);
 
+  /**
+   * Closes the effects editing menu/panel
+   * Used by DropdownPortal to close effects menu when other menus are opened
+   */
   const closeEffectsMenu = useCallback(() => {
     setIsEffectsMenuOpen(false);
   }, []);
 
+  // ================================
+  // Effect Addition/Removal
+  // ================================
+
+  /**
+   * Adds a new effect to the selected track
+   * Effect is added as enabled by default
+   * @param {string} effectId - ID of the effect to add
+   */
   const addEffect = useCallback(
     async (effectId) => {
       if (!selectedTrackId) return;
@@ -429,6 +637,11 @@ const AppContextProvider = ({children}) => {
     [selectedTrackId, engineRef]
   );
 
+  /**
+   * Removes an effect from the selected track
+   * Resets the effect value to default and removes from enabled effects
+   * @param {string} effectId - ID of the effect to remove
+   */
   const removeEffect = useCallback(
     async (effectId) => {
       if (!selectedTrackId) return;
@@ -487,7 +700,15 @@ const AppContextProvider = ({children}) => {
     [selectedTrackId, engineRef]
   );
 
-  // Toggle individual effect on/off - per-track enabled effects
+  // ================================
+  // Effect Enable/Disable Toggles
+  // ================================
+
+  /**
+   * Toggles a single effect on/off for the selected track
+   * Effect remains in the active list but is not applied when disabled
+   * @param {string} effectId - ID of the effect to toggle
+   */
   const toggleEffect = useCallback(
     async (effectId) => {
       if (!selectedTrackId) return;
@@ -531,7 +752,10 @@ const AppContextProvider = ({children}) => {
     [selectedTrackId, engineRef]
   );
 
-  // Toggle all effects on/off - per-track enabled effects
+  /**
+   * Toggles ALL effects on/off for the selected track
+   * Pan effect is excluded from toggling as it's always enabled in UI
+   */
   const toggleAllEffects = useCallback(async () => {
     if (!selectedTrackId) return;
 
@@ -589,7 +813,15 @@ const AppContextProvider = ({children}) => {
     }
   }, [selectedTrackId, engineRef]);
 
-  // Apply only enabled effects to engine
+  // ================================
+  // Engine Effect Application
+  // ================================
+
+  /**
+   * Applies only enabled effects to the audio engine
+   * Used for master/session-level effects application
+   * @param {Object} currentEffects - Effects to apply (filtered by enabled state)
+   */
   const applyEffectsToEngine = useCallback(
     (currentEffects) => {
       if (!engineRef?.current || !selectedTrackId) return;
@@ -606,7 +838,7 @@ const AppContextProvider = ({children}) => {
         }
       });
 
-      // Store master volume state
+      // Store master volume state before applying effects
       let masterGainBefore = null;
       try {
         if (engineRef.current.master?.gain?.gain) {
@@ -616,6 +848,7 @@ const AppContextProvider = ({children}) => {
         console.error(e);
       }
 
+      // Apply effects only if they differ from current engine state
       try {
         if (
           !shallowEqualEffects(enabledEffectsToApply, engineRef.current.effects)
@@ -626,7 +859,7 @@ const AppContextProvider = ({children}) => {
         console.error("Failed to apply master effects to engine:", e);
       }
 
-      // Restore master volume state
+      // Restore master volume state after effect application
       try {
         if (masterGainBefore !== null && engineRef.current.master?.gain?.gain) {
           engineRef.current.master.gain.gain.value = masterGainBefore;
@@ -638,6 +871,10 @@ const AppContextProvider = ({children}) => {
     [engineRef, selectedTrackId]
   );
 
+  /**
+   * Deletes ALL effects from the selected track
+   * Removes effects from active list and clears enabled states
+   */
   const deleteAllEffects = useCallback(async () => {
     if (!selectedTrackId) return;
 
@@ -668,6 +905,14 @@ const AppContextProvider = ({children}) => {
     }
   }, [selectedTrackId, engineRef]);
 
+  // ================================
+  // Session Management Effects
+  // ================================
+
+  /**
+   * Effect: Manages session changes and effect loading
+   * Persists active session to localStorage and loads session-specific effects
+   */
   useEffect(() => {
     if (activeSession === undefined) return;
 
@@ -688,7 +933,7 @@ const AppContextProvider = ({children}) => {
     if (lastSessionRef.current !== activeSession) {
       lastSessionRef.current = activeSession;
 
-      // Remove automatic track selection
+      // Clear track selection when session changes
       setSelectedTrackId(null);
       setSelectedTrackEffects(null);
       setSelectedTrackActiveEffects([]);
@@ -833,6 +1078,9 @@ const AppContextProvider = ({children}) => {
     }
   }, [activeSession, engineRef]);
 
+  /**
+   * Effect: Loads master effects from localStorage on initial mount
+   */
   useEffect(() => {
     try {
       const saved = localStorage.getItem("webamp.masterEffects");
@@ -845,13 +1093,21 @@ const AppContextProvider = ({children}) => {
     }
   }, []);
 
-  // Apply Master Effect Parameter Values to Engine
+  /**
+   * Effect: Applies master effects to audio engine when they change
+   */
   useEffect(() => {
     // Apply effect parameter values to the audio engine (only enabled ones)
     applyEffectsToEngine(effects);
   }, [effects, applyEffectsToEngine]);
 
-  // Persist and apply theme
+  // ================================
+  // Theme Management Effects
+  // ================================
+
+  /**
+   * Effect: Persists theme to localStorage and applies CSS classes
+   */
   useEffect(() => {
     try {
       window.localStorage?.setItem("webamp.theme", theme);
@@ -865,7 +1121,14 @@ const AppContextProvider = ({children}) => {
     }
   }, [theme]);
 
-  // Engine ref adoption
+  // ================================
+  // Engine Reference Management
+  // ================================
+
+  /**
+   * Effect: Adopts engine reference from window object if available
+   * Used for global engine access across components
+   */
   useEffect(() => {
     try {
       if (!engineRef && window.__WebAmpEngineRef) {
@@ -876,12 +1139,29 @@ const AppContextProvider = ({children}) => {
     }
   }, [engineRef]);
 
+  // ================================
+  // Database Refresh Utility
+  // ================================
+
+  /**
+   * Triggers a refresh of database-dependent components
+   * Increments dbRefreshTrigger to force re-fetching
+   */
   const refreshDB = useCallback(() => {
     setDbRefreshTrigger((prev) => prev + 1);
   }, []);
 
+  // ================================
+  // Context Value Assembly
+  // ================================
+
+  /**
+   * Memoized context value containing all state and functions
+   * Optimized with useMemo to prevent unnecessary re-renders
+   */
   const contextValue = useMemo(
     () => ({
+      // User & Session Management
       userData,
       loading,
       activeProject,
@@ -891,46 +1171,48 @@ const AppContextProvider = ({children}) => {
       theme,
       setTheme,
 
-      // Master Effects
+      // Master Effects (Global/Session-level)
       effects,
       setEffects,
 
-      // Track Effects
+      // Track Selection & State
       selectedTrackId,
       setSelectedTrackId,
       selectedTrackEffects,
       activeEffects, // Derived array of strings
 
-      // Effect Functions
+      // Effect Parameter Manipulation
       updateEffect,
       resetEffect,
       resetAllEffects,
       deleteAllEffects,
 
-      // Engine
+      // Audio Engine Reference
       engineRef,
       setEngineRef,
 
-      // Effects Menu State
+      // Effects Menu UI Control
       isEffectsMenuOpen,
       openEffectsMenu,
       closeEffectsMenu,
 
-      // Effect Management
+      // Effect Management (Add/Remove)
       addEffect,
       removeEffect,
 
-      // Toggle Functionality
+      // Effect Enable/Disable Toggles
       enabledEffects,
       toggleEffect,
       toggleAllEffects,
 
-      // Track Active Effects
+      // Track Active Effects Management
       selectedTrackActiveEffects,
       setSelectedTrackActiveEffects,
 
+      // Track Effect Application
       applyFilteredEffectsToTrack,
 
+      // Database Refresh
       refreshDB,
       dbRefreshTrigger,
     }),
@@ -969,6 +1251,10 @@ const AppContextProvider = ({children}) => {
       dbRefreshTrigger,
     ]
   );
+
+  // ================================
+  // Provider Render
+  // ================================
 
   return (
     <AppContext.Provider value={contextValue}>{children}</AppContext.Provider>

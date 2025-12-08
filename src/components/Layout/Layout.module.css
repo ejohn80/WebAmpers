@@ -1,11 +1,17 @@
-/* Assets tab */
+/* Layout.module.css - Styles for sidebar tab panels (Assets/Effects/Projects) */
+
+/* ================================
+   Loading & Container Styles
+   ================================ */
+
+/* Loading spinner for async operations */
 .spinner {
   display: flex;
   justify-content: center;
   color: white;
 }
 
-/* black container on each tab */
+/* Main container for each tab panel */
 .container {
   margin-top: 3.5px;
   background-color: var(--sidebar-panel-bg, #0f0f0f);
@@ -20,7 +26,7 @@
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.25);
 }
 
-/* container for asset elements */
+/* Inner wrapper for content */
 .wrapper {
   max-width: 600px;
   margin: 0 auto;
@@ -31,6 +37,11 @@
   min-height: 0;
 }
 
+/* ================================
+   Assets Tab Styles
+   ================================ */
+
+/* Search bar for filtering assets */
 .searchBar {
   background-color: var(--sidebar-panel-surface, #2a2a2a);
   border-radius: 6px;
@@ -54,6 +65,7 @@
   color: var(--sidebar-panel-muted, #888);
 }
 
+/* Table headers for asset list */
 .tableHeader {
   display: grid;
   grid-template-columns: 100px 180px 50px;
@@ -73,6 +85,7 @@
   text-align: right;
 }
 
+/* Individual asset row */
 .songRow {
   display: grid;
   grid-template-columns: 100px 100px 30px;
@@ -98,7 +111,7 @@
   color: var(--songname-color);
 }
 
-/* Show text cursor on hover for editable text */
+/* Show text cursor for editable names */
 .songName span:hover {
   cursor: text;
   background: rgba(222, 222, 222, 0.05);
@@ -111,12 +124,14 @@
   white-space: nowrap;
 }
 
+/* Asset duration display */
 .songDuration {
   font-size: 11px;
   color: var(--sidebar-panel-muted, rgb(209, 209, 209));
   text-align: right;
 }
 
+/* Input for editing asset names */
 .editInput {
   background: #2a2a2a;
   border: 1px solid #3a3a3a;
@@ -139,6 +154,7 @@
   box-shadow: 0 0 0 1px rgba(0, 229, 255, 0.3);
 }
 
+/* Scrollable asset list */
 .songList {
   flex: 1;
   overflow-y: auto;
@@ -152,7 +168,11 @@
   padding-top: 12px;
 }
 
-/* Effects */
+/* ================================
+   Effects Tab Styles
+   ================================ */
+
+/* Empty state for effects */
 .noEffectsMessage {
   text-align: center;
   color: #888;
@@ -167,6 +187,7 @@
   color: #00e5ff;
 }
 
+/* Individual effect card */
 .effectItem {
   margin-bottom: 20px;
   padding: 12px;
@@ -179,7 +200,7 @@
   color: var(--effect-card-text, #e5e5e5);
 }
 
-/* Close effect button styles */
+/* Close/remove effect button */
 .closeEffectButton {
   position: absolute;
   top: 8px;
@@ -205,6 +226,7 @@
   color: var(--close-effect-hover-icon, #ffffff);
 }
 
+/* Scrollable effects list */
 .effectsList {
   flex: 1;
   flex-grow: 1;
@@ -214,7 +236,7 @@
   min-height: 0;
 }
 
-/* New bottom row for value and reset button */
+/* Bottom row for value display and reset button */
 .bottomRow {
   display: flex;
   justify-content: space-between;
@@ -247,6 +269,7 @@
   color: var(--effect-card-text, #e5e5e5);
 }
 
+/* General button styles */
 .button {
   padding: 4px 10px;
   font-size: 11px;
@@ -262,7 +285,7 @@
   background: var(--effect-btn-hover, #1e3034);
 }
 
-/* Disabled state for reset buttons */
+/* Disabled button states */
 .buttonDisabled {
   background: #131313 !important;
   color: #4a4a4a !important;
@@ -275,6 +298,7 @@
   transform: none !important;
 }
 
+/* Reset All Effects button */
 .resetAllButton {
   padding: 10px 16px;
   background: var(--effect-btn-bg, #172528);
@@ -303,7 +327,6 @@
   background: var(--effect-btn-hover, #1e3034);
 }
 
-/* Disabled state for reset all button */
 .resetAllButtonDisabled {
   background: #2a2a2a !important;
   color: #666666 !important;
@@ -316,7 +339,7 @@
   transform: none !important;
 }
 
-/* Delete All Button */
+/* Delete All Effects button */
 .deleteAllButton {
   padding: 10px 20px;
   margin-top: 8px;
@@ -336,7 +359,6 @@
   background: rgba(220, 53, 69, 0.3);
 }
 
-/* Disabled state for delete all button */
 .deleteAllButtonDisabled {
   background: #2a2a2a !important;
   color: #666666 !important;
@@ -357,7 +379,228 @@
   line-height: 1;
 }
 
-/* Projects Tab */
+/* ================================
+   Slider Component Styles
+   ================================ */
+
+/* Universal slider styles - cross-browser compatible */
+.sliderContainer {
+  position: relative;
+  width: 100%;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  margin: 8px 0;
+  overflow: visible;
+}
+
+.sliderTrack {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 6px;
+  background: #1a1a1a;
+  border-radius: 1.5px;
+  transform: translateY(-50%);
+  outline: 1px solid #787879;
+  overflow: visible;
+}
+
+.sliderFill {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  height: 6px;
+  background: #11a1b7;
+  border-radius: 1.5px;
+  transform: translateY(-50%);
+  pointer-events: none;
+  transition: width 0.05s linear;
+  border: 1px solid black;
+}
+
+/* Remove transition during active dragging */
+.sliderContainer.dragging .sliderFill {
+  transition: none;
+}
+
+/* Slider state colors */
+.sliderFill.default {
+  background: #797f80; /* Gray at default value */
+}
+
+.sliderFill.changed {
+  background: #11a1b7; /* Blue when changed */
+}
+
+.sliderContainer.dragging .sliderFill.changed {
+  background: #17e1ff; /* Brighter blue when dragging */
+}
+
+/* Slider knob/draggable handle */
+.sliderKnobWrapper {
+  position: absolute;
+  top: 50%;
+  height: 20px;
+  width: 20px;
+  transform: translate(-50%, -50%);
+  transition: transform 120ms ease;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 3;
+}
+
+.sliderKnobWrapperDragging {
+  transform: translate(-50%, -50%) scale(1.1);
+}
+
+/* Hidden input for accessibility */
+.sliderInput {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 20px;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 4;
+}
+
+/* ================================
+   Toggle Switch Styles
+   ================================ */
+
+.toggleSwitch {
+  width: 31px;
+  height: 15px;
+  background: #333239;
+  border-radius: 5px;
+  position: relative;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.toggleSwitch.toggleOn {
+  background: #11a1b7;
+}
+
+.toggleSwitch.toggleOff {
+  background: #4e4e4e;
+}
+
+.toggleSlider {
+  position: absolute;
+  top: 2px;
+  left: 3.5px;
+  width: 10px;
+  height: 10px;
+  background: white;
+  border-radius: 2px;
+  transition: all 0.3s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.toggleOn .toggleSlider {
+  transform: translateX(14.5px);
+}
+
+.toggleOff .toggleSlider {
+  transform: translateX(0);
+}
+
+/* Individual effect toggle button */
+.effectToggleButton {
+  position: absolute;
+  top: 8.5px;
+  right: 33px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Master toggle button for all effects */
+.masterToggleButton {
+  background: var(--master-toggle-bg, #262529);
+  color: var(--master-toggle-text, #e5e5e5);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  width: 50%;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: 1;
+  min-height: 40px;
+}
+
+.masterToggleButton:hover {
+  background: var(--master-toggle-hover, #2a2a2a);
+}
+
+/* Effect header layout */
+.header {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  margin-bottom: 8px;
+  padding-right: 30px;
+}
+
+/* Disabled effect styling */
+.effectDisabled {
+  opacity: 0.7;
+  border-color: #555 !important;
+}
+
+.effectDisabled .label {
+  color: #888 !important;
+}
+
+.effectDisabled .description {
+  color: #666 !important;
+}
+
+/* Disabled slider styling */
+.sliderDisabled .sliderTrack {
+  background: #2a2a2a !important;
+  outline-color: #555 !important;
+}
+
+.sliderDisabled .sliderFill {
+  background: #666 !important;
+}
+
+.sliderDisabled .sliderFillDisabled {
+  background: #555 !important;
+}
+
+.valueDisabled {
+  color: #666 !important;
+}
+
+/* Master toggle content layout */
+.masterToggleContent {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14;
+  font-weight: bold;
+  color: var(--effect-btn-text, #17e1ff);
+  width: 100%;
+  gap: 8px;
+}
+
+/* ================================
+   Projects Tab Styles
+   ================================ */
 
 .loginPrompt {
   margin-top: 20px;
@@ -378,6 +621,7 @@
   color: #888;
 }
 
+/* Projects list container */
 .projectsList {
   max-height: 400px;
   overflow-y: auto;
@@ -385,6 +629,7 @@
   padding: 0;
 }
 
+/* Individual project item */
 .projectItem {
   margin-bottom: 8px;
   border: 1px solid var(--project-item-border, #3a3a3a);
@@ -404,11 +649,13 @@
   border-color: var(--project-item-hover-border, #4a4a4a);
 }
 
+/* Currently active project */
 .activeProject {
   border: 2px solid var(--project-active-border, #00e5ff) !important;
   background: var(--project-active-bg, #2f3f42);
 }
 
+/* Project delete button */
 .deleteButton {
   background: transparent;
   border: none;
@@ -430,6 +677,7 @@
   color: #fff;
 }
 
+/* Project creation form */
 .inputSection {
   margin-top: 10px;
   display: flex;
@@ -516,99 +764,10 @@
   cursor: not-allowed;
 }
 
-/* Universal Slider Styles - Works on all browsers */
-.sliderContainer {
-  position: relative;
-  width: 100%;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  margin: 8px 0;
-  overflow: visible;
-  /* border: 2px solid red; */
-}
+/* ================================
+   Add Effects Button & Dropdown
+   ================================ */
 
-.sliderTrack {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 50%;
-  height: 6px;
-  background: #1a1a1a;
-  border-radius: 1.5px;
-  transform: translateY(-50%);
-  outline: 1px solid #787879;
-  overflow: visible;
-  /* border: 1px solid red; */
-}
-
-.sliderFill {
-  position: absolute;
-  left: 0;
-  top: 50%;
-  height: 6px;
-  background: #11a1b7;
-  border-radius: 1.5px;
-  transform: translateY(-50%);
-  pointer-events: none;
-  transition: width 0.05s linear;
-  border: 1px solid black;
-}
-
-/* No transition when actively dragging */
-.sliderContainer.dragging .sliderFill {
-  transition: none;
-}
-
-/* Gray when at default value */
-.sliderFill.default {
-  background: #797f80;
-}
-
-/* Blue when changed from default */
-.sliderFill.changed {
-  background: #11a1b7;
-}
-
-/* Brighter blue when actively dragging */
-.sliderContainer.dragging .sliderFill.changed {
-  background: #17e1ff;
-}
-
-/* No transition when actively dragging */
-.sliderContainer.dragging .sliderFill {
-  transition: none;
-}
-
-.sliderKnobWrapper {
-  position: absolute;
-  top: 50%;
-  height: 20px;
-  width: 20px;
-  transform: translate(-50%, -50%);
-  transition: transform 120ms ease;
-  pointer-events: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 3;
-}
-
-.sliderKnobWrapperDragging {
-  transform: translate(-50%, -50%) scale(1.1);
-}
-
-.sliderInput {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 20px;
-  opacity: 0;
-  cursor: pointer;
-  z-index: 4;
-}
-
-/* Add effects button */
 .addEffectsButtonContent {
   display: flex;
   align-items: center;
@@ -637,226 +796,91 @@
   transform: translateY(-1px);
 }
 
-/* Toggle Switch Styles */
-.toggleSwitch {
-  width: 31px;
-  height: 15px;
-  background: #333239;
-  border-radius: 5px;
-  position: relative;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.toggleSwitch.toggleOn {
-  background: #11a1b7;
-}
-
-.toggleSwitch.toggleOff {
-  background: #4e4e4e;
-}
-
-.toggleSlider {
-  position: absolute;
-  top: 2px;
-  left: 3.5px; /* Add this */
-  width: 10px;
-  height: 10px;
-  background: white;
-  border-radius: 2px;
-  transition: all 0.3s ease;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
-}
-
-.toggleOn .toggleSlider {
-  transform: translateX(14.5px);
-}
-
-.toggleOff .toggleSlider {
-  transform: translateX(0);
-}
-
-/* Individual Effect Toggle Button */
-.effectToggleButton {
-  position: absolute;
-  top: 8.5px;
-  right: 33px;
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 0;
-  z-index: 2;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* Master Toggle Button */
-.masterToggleButton {
-  background: var(--master-toggle-bg, #262529);
-  color: var(--master-toggle-text, #e5e5e5);
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  width: 50%;
-  transition: all 0.2s ease;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex: 1;
-  min-height: 40px;
-}
-
-.masterToggleButton:hover {
-  background: var(--master-toggle-hover, #2a2a2a);
-  /* border-color: #17e1ff; */
-}
-
-.header {
+/* Effects dropdown menu */
+.toggleResetRow .effectsMenuDropdown {
+  background: #1e1d20;
+  border: 1px solid #333239;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  max-height: 400px;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  margin-bottom: 8px;
-  padding-right: 30px;
-  /* border: 1px solid red; */
 }
 
-/* Disabled Effect Styles */
-.effectDisabled {
-  opacity: 0.7;
-  border-color: #555 !important;
+.toggleResetRow .effectsDropdownHeader {
+  padding: 12px 16px;
+  border-bottom: 1px solid #333239;
+  color: #9c9c9c;
+  font-size: 13px;
+  font-weight: 500;
 }
 
-.effectDisabled .label {
-  color: #888 !important;
+.toggleResetRow .effectsDropdownList {
+  overflow-y: auto;
+  max-height: 350px;
 }
 
-.effectDisabled .description {
-  color: #666 !important;
-}
-
-/* Disabled Slider Styles */
-.sliderDisabled .sliderTrack {
-  background: #2a2a2a !important;
-  outline-color: #555 !important;
-}
-
-.sliderDisabled .sliderFill {
-  background: #666 !important;
-}
-
-.sliderDisabled .sliderFillDisabled {
-  background: #555 !important;
-}
-
-.valueDisabled {
-  color: #666 !important;
-}
-
-/* Master toggle button text */
-.masterToggleContent {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 14;
-  font-weight: bold;
-  color: var(--effect-btn-text, #17e1ff);
+.toggleResetRow .effectDropdownItem {
   width: 100%;
-  gap: 8px;
+  padding: 12px 16px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid #333239;
+  color: #e5e5e5;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
-/* Toggle and Reset Row - Side by Side Layout */
-.toggleResetRow {
-  display: flex;
-  gap: 8px;
-  width: 100%;
-  margin-bottom: 15px;
+.toggleResetRow .effectDropdownItem:last-child {
+  border-bottom: none;
+}
 
-  /* Dropdown Effects Menu */
-  .effectsMenuDropdown {
-    background: #1e1d20;
-    border: 1px solid #333239;
-    border-radius: 8px;
-    margin-bottom: 16px;
-    max-height: 400px;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-  }
+.toggleResetRow .effectDropdownItem:hover:not(:disabled) {
+  background: rgba(23, 225, 255, 0.08);
+}
 
-  .effectsDropdownHeader {
-    padding: 12px 16px;
-    border-bottom: 1px solid #333239;
-    color: #9c9c9c;
-    font-size: 13px;
-    font-weight: 500;
-  }
+.toggleResetRow .effectDropdownItemDisabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
 
-  .effectsDropdownList {
-    overflow-y: auto;
-    max-height: 350px;
-  }
+.toggleResetRow .effectDropdownName {
+  font-size: 13px;
+  font-weight: 600;
+  color: #e5e5e5;
+}
 
-  .effectDropdownItem {
-    width: 100%;
-    padding: 12px 16px;
-    background: transparent;
-    border: none;
-    border-bottom: 1px solid #333239;
-    color: #e5e5e5;
-    text-align: left;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
+.toggleResetRow .effectDropdownDescription {
+  font-size: 12px;
+  color: #888;
+}
 
-  .effectDropdownItem:last-child {
-    border-bottom: none;
-  }
+/* Dropdown scrollbar styling */
+.toggleResetRow .effectsDropdownList::-webkit-scrollbar {
+  width: 6px;
+}
 
-  .effectDropdownItem:hover:not(:disabled) {
-    background: rgba(23, 225, 255, 0.08);
-  }
+.toggleResetRow .effectsDropdownList::-webkit-scrollbar-track {
+  background: #1e1d20;
+}
 
-  .effectDropdownItemDisabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-  }
+.toggleResetRow .effectsDropdownList::-webkit-scrollbar-thumb {
+  background: #333239;
+  border-radius: 3px;
+}
 
-  .effectDropdownName {
-    font-size: 13px;
-    font-weight: 600;
-    color: #e5e5e5;
-  }
+.toggleResetRow .effectsDropdownList::-webkit-scrollbar-thumb:hover {
+  background: #5c5b62;
+}
 
-  .effectDropdownDescription {
-    font-size: 12px;
-    color: #888;
-  }
-
-  .effectsDropdownList::-webkit-scrollbar {
-    width: 6px;
-  }
-
-  .effectsDropdownList::-webkit-scrollbar-track {
-    background: #1e1d20;
-  }
-
-  .effectsDropdownList::-webkit-scrollbar-thumb {
-    background: #333239;
-    border-radius: 3px;
-  }
-
-  .effectsDropdownList::-webkit-scrollbar-thumb:hover {
-    background: #5c5b62;
-  }
-
-  .noEffectsMessage {
-    text-align: center;
-    padding: 40px 20px;
-    color: #888;
-    font-size: 14px;
-  }
+.toggleResetRow .noEffectsMessage {
+  text-align: center;
+  padding: 40px 20px;
+  color: #888;
+  font-size: 14px;
 }

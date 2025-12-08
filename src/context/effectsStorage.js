@@ -1,8 +1,18 @@
-const EFFECTS_STORAGE_KEY = "webamp.effectsBySession";
-const LEGACY_EFFECTS_KEY = "webamp.effects";
-const GLOBAL_SESSION_KEY = "__global";
-const ACTIVE_EFFECTS_STORAGE_KEY = "webamp.activeEffectsBySession";
+/**
+ * effectsStorage.js
+ *
+ * Storage utility for persisting audio effect settings across sessions.
+ * Manages both effect parameters and active effects dropdown state.
+ * Supports per-session storage with fallback to global defaults.
+ */
 
+// Storage keys
+const EFFECTS_STORAGE_KEY = "webamp.effectsBySession"; // Main effects parameters
+const LEGACY_EFFECTS_KEY = "webamp.effects"; // Legacy key for migration
+const GLOBAL_SESSION_KEY = "__global"; // Key for global/default settings
+const ACTIVE_EFFECTS_STORAGE_KEY = "webamp.activeEffectsBySession"; // Active effects dropdown
+
+// Default effect values
 const DEFAULT_EFFECTS = Object.freeze({
   pitch: 0,
   volume: 100,
@@ -18,6 +28,7 @@ const DEFAULT_EFFECTS = Object.freeze({
   chorus: 0,
 });
 
+// Check if localStorage is available
 const canUseStorage = () => {
   try {
     return (
@@ -30,6 +41,7 @@ const canUseStorage = () => {
   }
 };
 
+// Read JSON from localStorage
 const readJSON = (key) => {
   if (!canUseStorage()) return null;
   try {
@@ -41,6 +53,7 @@ const readJSON = (key) => {
   }
 };
 
+// Write JSON to localStorage
 const writeJSON = (key, value) => {
   if (!canUseStorage()) return;
   try {
@@ -50,6 +63,7 @@ const writeJSON = (key, value) => {
   }
 };
 
+// Remove key from localStorage
 const removeKey = (key) => {
   if (!canUseStorage()) return;
   try {
@@ -59,13 +73,16 @@ const removeKey = (key) => {
   }
 };
 
+// Normalize session ID (null/undefined becomes global)
 const normalizeSessionKey = (sessionId) =>
   sessionId === null || sessionId === undefined
     ? GLOBAL_SESSION_KEY
     : String(sessionId);
 
+// Create empty storage structure
 const createEmptyStore = () => ({sessions: {}});
 
+// Read and validate the main effects store
 const readStore = () => {
   const store = readJSON(EFFECTS_STORAGE_KEY);
   if (!store || typeof store !== "object" || Array.isArray(store)) {
@@ -77,16 +94,19 @@ const readStore = () => {
   return store;
 };
 
+// Merge partial effects with defaults
 export const mergeWithDefaults = (effects) => ({
   ...DEFAULT_EFFECTS,
   ...(effects || {}),
 });
 
+// Deep clone store
 const cloneStore = (store) => ({
   global: store.global ? {...store.global} : undefined,
   sessions: {...(store.sessions || {})},
 });
 
+// Internal: persist effects for session
 const persistEffectsForSessionWithStore = (
   sessionId,
   effects,
@@ -98,20 +118,23 @@ const persistEffectsForSessionWithStore = (
   const sessionKey = normalizeSessionKey(sessionId);
 
   if (sessionKey === GLOBAL_SESSION_KEY) {
-    store.global = payload;
+    store.global = payload; // Store as global default
   } else {
-    store.sessions[sessionKey] = payload;
+    store.sessions[sessionKey] = payload; // Store per-session
   }
 
   writeJSON(EFFECTS_STORAGE_KEY, store);
 };
 
+// Create default effects object
 export const createDefaultEffects = () => ({...DEFAULT_EFFECTS});
 
+// Public API: persist effects
 export const persistEffectsForSession = (sessionId, effects) => {
   persistEffectsForSessionWithStore(sessionId, effects);
 };
 
+// Load effects for session with fallback logic
 export const loadEffectsForSession = (sessionId) => {
   const store = readStore();
   const sessionKey = normalizeSessionKey(sessionId);
@@ -120,24 +143,28 @@ export const loadEffectsForSession = (sessionId) => {
       ? store.global
       : store.sessions && store.sessions[sessionKey];
 
+  // Found session-specific effects
   if (sessionEffects) {
     return mergeWithDefaults(sessionEffects);
   }
 
+  // Fallback to global effects
   if (sessionKey !== GLOBAL_SESSION_KEY && store.global) {
     const mergedGlobal = mergeWithDefaults(store.global);
     persistEffectsForSessionWithStore(sessionId, mergedGlobal, store);
     return mergedGlobal;
   }
 
+  // Migrate from legacy storage
   const legacy = readJSON(LEGACY_EFFECTS_KEY);
   if (legacy) {
     const mergedLegacy = mergeWithDefaults(legacy);
     persistEffectsForSessionWithStore(sessionId, mergedLegacy, store);
-    removeKey(LEGACY_EFFECTS_KEY);
+    removeKey(LEGACY_EFFECTS_KEY); // Clean up old key
     return mergedLegacy;
   }
 
+  // Return and persist defaults
   const defaults = createDefaultEffects();
   persistEffectsForSessionWithStore(sessionId, defaults, store);
   return defaults;
@@ -147,8 +174,10 @@ export const loadEffectsForSession = (sessionId) => {
 // ACTIVE EFFECTS LIST FUNCTIONS (FOR DROPDOWN PERSISTENCE)
 // ==========================================================
 
+// Default empty active effects list
 export const createDefaultActiveEffects = () => [];
 
+// Internal: persist active effects for session
 const persistActiveEffectsForSessionWithStore = (sessionId, payload, store) => {
   if (!canUseStorage()) return;
   const sessionKey = normalizeSessionKey(sessionId);
@@ -173,6 +202,7 @@ const persistActiveEffectsForSessionWithStore = (sessionId, payload, store) => {
   writeJSON(ACTIVE_EFFECTS_STORAGE_KEY, store);
 };
 
+// Public API: persist active effects dropdown
 export const persistActiveEffectsForSession = (
   sessionId,
   activeEffectsList
@@ -180,6 +210,7 @@ export const persistActiveEffectsForSession = (
   persistActiveEffectsForSessionWithStore(sessionId, activeEffectsList);
 };
 
+// Load active effects for session
 export const loadActiveEffectsForSession = (sessionId) => {
   if (!canUseStorage()) return createDefaultActiveEffects();
 
@@ -198,13 +229,13 @@ export const loadActiveEffectsForSession = (sessionId) => {
     return sessionActiveEffects;
   }
 
+  // Persist and return defaults
   const defaults = createDefaultActiveEffects();
-
   persistActiveEffectsForSessionWithStore(sessionId, defaults, store);
-
   return defaults;
 };
 
+// Export for testing
 export const __TESTING__ = {
   DEFAULT_EFFECTS,
   mergeWithDefaults,

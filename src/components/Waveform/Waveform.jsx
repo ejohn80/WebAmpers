@@ -1,18 +1,35 @@
+/**
+ * Waveform Visualization Component
+ *
+ * Renders audio waveforms from AudioBuffer data
+ *
+ * Key Features:
+ * - Efficient rendering
+ * - Interactive scrubbing with mouse/touch support
+ * - Progress tracking synchronized with global playback state
+ * - Horizontal scrolling for long audio tracks
+ * - Support for various AudioBuffer input formats
+ *
+ **/
 import React, {useRef, useEffect, useState} from "react";
 import "./Waveform.css";
 import {progressStore} from "../../playback/progressStore";
 
-const MIN_POINTS = 512;
-const MAX_POINTS = 20000;
-const DEFAULT_POINTS = 4000;
-const VIEWBOX_HEIGHT = 100;
+// Configuration constants
+const MIN_POINTS = 512; // Minimum waveform resolution
+const MAX_POINTS = 20000; // Maximum waveform resolution
+const DEFAULT_POINTS = 4000; // Default waveform resolution
+const VIEWBOX_HEIGHT = 100; // SVG viewbox height for consistent scaling
 
+// Helper: Clamp value between min and max
 const clamp = (value, min, max) =>
   Math.min(max, Math.max(min, Number.isFinite(value) ? value : min));
 
+// Helper: Check if value is an AudioBuffer
 const isAudioBuffer = (value) =>
   typeof AudioBuffer !== "undefined" && value instanceof AudioBuffer;
 
+// Helper: Extract AudioBuffer from various input formats
 const unwrapAudioBuffer = (candidate) => {
   if (!candidate) return null;
   if (isAudioBuffer(candidate)) return candidate;
@@ -25,6 +42,7 @@ const unwrapAudioBuffer = (candidate) => {
   return null;
 };
 
+// Compute min/max peaks from audio buffer samples
 const computePeaks = (
   audioBuffer,
   targetPoints,
@@ -35,6 +53,7 @@ const computePeaks = (
   const totalLength = audioBuffer.length ?? 0;
   if (!totalLength || !audioBuffer.numberOfChannels) return [];
 
+  // Validate sample range
   const safeStart = Math.max(0, Math.min(startSample || 0, totalLength));
   const safeEnd = Math.max(
     safeStart + 1,
@@ -43,12 +62,14 @@ const computePeaks = (
   const regionLength = safeEnd - safeStart;
   if (!regionLength) return [];
 
+  // Determine number of points to render
   const points = clamp(
     targetPoints,
     MIN_POINTS,
     Math.min(MAX_POINTS, regionLength)
   );
 
+  // Extract channel data
   const channelData = [];
   for (let ch = 0; ch < audioBuffer.numberOfChannels; ch++) {
     try {
@@ -60,6 +81,7 @@ const computePeaks = (
   }
   if (!channelData.length) return [];
 
+  // Process each point to find min/max amplitudes
   const peaks = new Array(points);
   for (let point = 0; point < points; point++) {
     const start = safeStart + Math.floor((point / points) * regionLength);
@@ -76,6 +98,7 @@ const computePeaks = (
       continue;
     }
 
+    // Find min/max in this segment across all channels
     const boundedEnd = Math.max(start + 1, Math.min(end, safeEnd));
     for (let sampleIdx = start; sampleIdx < boundedEnd; sampleIdx++) {
       for (let ch = 0; ch < channelData.length; ch++) {
@@ -93,6 +116,7 @@ const computePeaks = (
   return peaks;
 };
 
+// Convert peaks data to SVG path commands
 const buildWavePath = (peaks) => {
   if (!peaks.length) return {d: "", width: 0};
   const mid = VIEWBOX_HEIGHT / 2;
@@ -100,6 +124,7 @@ const buildWavePath = (peaks) => {
   const sanitize = (value) => (Number.isFinite(value) ? value : 0);
   const toY = (value) => mid - sanitize(value) * amp;
 
+  // Build top and bottom paths
   const topCommands = [];
   const bottomCommands = [];
   for (let i = 0; i < peaks.length; i++) {
@@ -114,6 +139,7 @@ const buildWavePath = (peaks) => {
     bottomCommands.push([x, lower]);
   }
 
+  // Construct SVG path string
   const firstPoint = topCommands[0] ?? [0, mid];
   const d = [
     `M ${firstPoint[0]} ${firstPoint[1]}`,
@@ -126,8 +152,9 @@ const buildWavePath = (peaks) => {
 };
 
 /**
- * Renders an audio buffer waveform using a scalable SVG path so very long tracks
- * don't exceed browser canvas limits.
+ * Waveform Component
+ * Renders an audio buffer waveform using scalable SVG.
+ * Supports interactive scrubbing and real-time progress display.
  */
 const Waveform = ({
   audioBuffer,
@@ -139,22 +166,25 @@ const Waveform = ({
   interactive = true,
 }) => {
   const containerRef = useRef(null);
-  const draggingRef = useRef(false);
-  const liveSeekFrameRef = useRef(null);
-  const liveSeekValueRef = useRef(null);
+  const draggingRef = useRef(false); // Track drag state for scrubbing
+  const liveSeekFrameRef = useRef(null); // RAF for seeking
+  const liveSeekValueRef = useRef(null); // Pending seek value
   const [resolutionHint, setResolutionHint] = useState(DEFAULT_POINTS);
   const [wavePath, setWavePath] = useState({d: "", width: 0});
   const [{ms, lengthMs}, setProgress] = useState(progressStore.getState());
 
+  // Check if scrubbing is currently locked
   const isScrubLocked = () =>
     typeof progressStore.isScrubLocked === "function"
       ? progressStore.isScrubLocked()
       : false;
 
+  // Subscribe to progress store updates
   useEffect(() => {
     return progressStore.subscribe(setProgress);
   }, []);
 
+  // Cancel pending live seek operation
   const cancelLiveSeek = () => {
     if (typeof window !== "undefined" && liveSeekFrameRef.current !== null) {
       window.cancelAnimationFrame(liveSeekFrameRef.current);
@@ -163,6 +193,7 @@ const Waveform = ({
     liveSeekValueRef.current = null;
   };
 
+  // Execute pending live seek operation
   const flushLiveSeek = () => {
     if (typeof window !== "undefined" && liveSeekFrameRef.current !== null) {
       window.cancelAnimationFrame(liveSeekFrameRef.current);
@@ -175,6 +206,7 @@ const Waveform = ({
     }
   };
 
+  // Schedule a seek operation for next animation frame
   const scheduleLiveSeek = (target) => {
     if (typeof target !== "number") return;
     liveSeekValueRef.current = target;
@@ -196,6 +228,7 @@ const Waveform = ({
     });
   };
 
+  // Update waveform resolution based on container width
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -210,18 +243,21 @@ const Waveform = ({
 
     updateResolution();
 
+    // Use ResizeObserver for responsive updates
     if (typeof ResizeObserver !== "undefined") {
       const observer = new ResizeObserver(updateResolution);
       observer.observe(container);
       return () => observer.disconnect();
     }
 
+    // Fallback to resize event
     if (typeof window !== "undefined") {
       window.addEventListener("resize", updateResolution);
       return () => window.removeEventListener("resize", updateResolution);
     }
   }, []);
 
+  // Generate waveform path from audio buffer
   useEffect(() => {
     let cancelled = false;
     const native = unwrapAudioBuffer(audioBuffer);
@@ -238,7 +274,7 @@ const Waveform = ({
       MAX_POINTS
     );
 
-    // Decide which part of the buffer to visualize
+    // Calculate sample range to visualize
     const sampleRate = native.sampleRate || 44100;
     let regionStartSample = 0;
     let regionEndSample = native.length ?? 0;
@@ -271,6 +307,7 @@ const Waveform = ({
       }
     };
 
+    // Use idle callback for non-blocking computation
     if (typeof window !== "undefined" && "requestIdleCallback" in window) {
       const handle = window.requestIdleCallback(compute, {timeout: 200});
       return () => {
@@ -285,18 +322,19 @@ const Waveform = ({
     };
   }, [audioBuffer, resolutionHint, durationMs, startInFileMs]);
 
-  // Compute playhead position within this segment if we have segment timing,
-  // otherwise fall back to global percentage (legacy behavior)
+  // Calculate playhead position percentage
   let pct = 0;
   if (durationMs && durationMs > 0) {
+    // Segment-based calculation
     const rel = (ms - (startOnTimelineMs || 0)) / durationMs;
     const clamped = Math.max(0, Math.min(1, rel));
     pct = clamped * 100;
   } else {
+    // Global timeline calculation
     pct = lengthMs > 0 ? Math.max(0, Math.min(100, (ms / lengthMs) * 100)) : 0;
   }
 
-  // Scrub helpers
+  // Convert client X coordinate to milliseconds position
   const msAtClientX = (clientX) => {
     const el = containerRef.current;
     if (!el) return;
@@ -310,7 +348,8 @@ const Waveform = ({
     const totalWidth = Math.max(scrollWidth, 1);
     const absolute = Math.max(0, Math.min(totalWidth, scrollLeft + rel));
     const p = absolute / totalWidth;
-    // If segment timing provided, map within this segment; else map across global length
+
+    // Map to appropriate timeline
     if (durationMs && durationMs > 0) {
       return (startOnTimelineMs || 0) + p * durationMs;
     }
@@ -318,7 +357,7 @@ const Waveform = ({
     return p * lengthMs;
   };
 
-  // Scrubbing handlers
+  // Mouse event handlers for scrubbing
   const onMouseDown = (e) => {
     if (e.button !== 0) return; // left button only
     if (!interactive || isScrubLocked()) return;
@@ -329,9 +368,8 @@ const Waveform = ({
     });
     const target = msAtClientX(e.clientX);
     if (typeof target === "number") {
-      // preview only: move the playhead visually without seeking audio
-      progressStore.setMs(target); // visual move
-      scheduleLiveSeek(target);
+      progressStore.setMs(target); // Visual update
+      scheduleLiveSeek(target); // Deferred audio seek
     }
     if (typeof window !== "undefined") {
       window.addEventListener("mousemove", onMouseMove);
@@ -356,7 +394,7 @@ const Waveform = ({
     const target = msAtClientX(e.clientX);
     if (!isScrubLocked()) {
       if (typeof target === "number") {
-        progressStore.requestSeek(target); // commit seek to engine
+        progressStore.requestSeek(target); // Commit final seek
       }
       progressStore.endScrub();
     }
@@ -366,6 +404,7 @@ const Waveform = ({
     }
   };
 
+  // Horizontal scroll handler for waveform navigation
   const onWheel = (e) => {
     const el = containerRef.current;
     if (!el) return;
@@ -373,7 +412,7 @@ const Waveform = ({
     const absX = Math.abs(e.deltaX);
     const absY = Math.abs(e.deltaY);
 
-    // Let vertical scrolls (without Shift) bubble to parent scroll areas
+    // Pass vertical scroll events (without Shift) to parent
     if (absY >= absX && !e.shiftKey) {
       return;
     }
@@ -385,6 +424,7 @@ const Waveform = ({
     el.scrollLeft += delta;
   };
 
+  // Cleanup on unmount
   useEffect(
     () => () => {
       if (typeof window !== "undefined") {
@@ -396,7 +436,7 @@ const Waveform = ({
     []
   );
 
-  // Touch support
+  // Touch event handlers for mobile scrubbing
   const onTouchStart = (e) => {
     if (!e.touches || e.touches.length === 0) return;
     if (!interactive || isScrubLocked()) return;
@@ -426,7 +466,7 @@ const Waveform = ({
     if (!draggingRef.current) return;
     draggingRef.current = false;
     cancelLiveSeek();
-    // finalize at current playhead; engine will have been paused
+    // Finalize seek at current position
     if (!isScrubLocked()) {
       const {ms: current} = progressStore.getState();
       progressStore.requestSeek(current);

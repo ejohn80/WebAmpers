@@ -1,3 +1,13 @@
+/**
+ * Header Component
+ *
+ * Main application header with logo and dropdown menus.
+ * Left side: Logo + File/Edit/Tools/Settings dropdowns
+ * Right side: User/Guest dropdown
+ *
+ * Props passed to DropdownPortal for track operations and import/export.
+ */
+
 import DropdownPortal from "./DropdownPortal";
 import "./Header.css";
 
@@ -18,7 +28,7 @@ function Header({
   return (
     <div className="header">
       <div className="container">
-        {/* container for logo + dropdown */}
+        {/* Left container: Logo and main menu dropdowns */}
         <div className="leftContainer">
           <span className="webampText">WebAmp</span>
           <DropdownPortal
@@ -38,6 +48,7 @@ function Header({
           />
         </div>
 
+        {/* Right container: User/Guest dropdown */}
         <div
           style={{
             display: "flex",

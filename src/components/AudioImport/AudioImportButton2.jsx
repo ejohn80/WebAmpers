@@ -14,14 +14,16 @@ import {LuImport} from "react-icons/lu";
  * @param {function} props.onImportError - Callback function for failed import. Receives error.
  */
 const AudioImportButton = ({onImportSuccess, onImportError}) => {
-  const fileInputRef = useRef(null);
-  const audioImporter = new AudioImporter();
+  const fileInputRef = useRef(null); // Reference to hidden file input element
+  const audioImporter = new AudioImporter(); // Audio import utility instance
 
+  // Trigger file input when button is clicked
   const handleButtonClick = () => {
     // Programmatically click the hidden file input element
     fileInputRef.current.click();
   };
 
+  // Handle file selection and import process
   const handleFileChange = async (event) => {
     const file = event.target.files[0];
     if (!file) {
@@ -31,15 +33,16 @@ const AudioImportButton = ({onImportSuccess, onImportError}) => {
     console.log(`Attempting to import: ${file.name}`);
 
     try {
+      // Process audio file through AudioImporter
       const importResult = await audioImporter.importFile(file);
       console.log("File imported successfully:", importResult.metadata);
       if (onImportSuccess) {
-        onImportSuccess(importResult);
+        onImportSuccess(importResult); // Notify parent of success
       }
     } catch (error) {
       console.error("Error importing file:", error.message);
       if (onImportError) {
-        onImportError(error);
+        onImportError(error); // Notify parent of error
       }
     }
 
@@ -49,13 +52,15 @@ const AudioImportButton = ({onImportSuccess, onImportError}) => {
 
   return (
     <>
+      {/* Hidden file input element */}
       <input
         type="file"
         ref={fileInputRef}
         onChange={handleFileChange}
-        accept=".wav, .mp3"
-        style={{display: "none"}}
+        accept=".wav, .mp3" // Accepted audio formats
+        style={{display: "none"}} // Hidden visually
       />
+      {/* Visible import button */}
       <button className="import-button" onClick={handleButtonClick}>
         <LuImport size={20} /> Import
       </button>

@@ -1,6 +1,5 @@
 import React, {useRef} from "react";
 import AudioImporter from "./AudioImporter";
-import {ImportIcon} from "../Layout/Svgs";
 import * as Tone from "tone";
 
 /**
@@ -60,7 +59,7 @@ const AudioImportButton = ({onImportSuccess, onImportError, children}) => {
     triggerElement = (
       <button className="import-button" onClick={handleButtonClick}>
         <span style={{display: "flex", alignItems: "center", gap: "10px"}}>
-          <ImportIcon />
+          {/* <ImportIcon /> */}
           Import Audio
         </span>
       </button>

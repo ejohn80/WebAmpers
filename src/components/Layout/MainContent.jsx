@@ -1,3 +1,24 @@
+/**
+ * MainContent Component
+ *
+ * Central workspace with timeline, tracks, and playback controls.
+ * Handles timeline zoom, scrolling, track management, and audio segment editing.
+ * Includes drag-and-drop for assets, cut/copy/paste operations, and effects menu.
+ *
+ * Features:
+ * - Horizontal-only timeline zoom with scroll compensation
+ * - Follow playhead mode for automatic scrolling during playback
+ * - Ctrl/Cmd + drag to create cut ranges on audio segments
+ * - Context menu for paste operations
+ * - Integration with effects menu and global playhead
+ *
+ * Key State:
+ * - zoom: Timeline zoom level (0.25x to 5x)
+ * - followPlayhead: Auto-scroll during playback
+ * - selectedSegment: Currently selected audio segment
+ * - cutBox: Visual selection for cutting segments
+ */
+
 import React, {
   useEffect,
   useMemo,
@@ -18,12 +39,19 @@ import EffectsMenu from "./Effects/EffectsMenu";
 import styles from "./MainContent.module.css";
 import "./MainContent.css";
 
+// Layout constants for track controls and spacing
 const TRACK_CONTROLS_WIDTH = 70;
 const TRACK_CONTROLS_GAP = 37;
-const TRACK_ROW_PADDING = 8; // Keep in sync with --track-row-padding in CSS
-const TRACK_HEIGHT_PX = 96; // Base track height (fixed for horizontal-only zoom)
+const TRACK_ROW_PADDING = 8;
+const TRACK_HEIGHT_PX = 96; // Fixed track height (horizontal-only zoom)
 const DEFAULT_TIMELINE_LEFT_OFFSET =
   TRACK_ROW_PADDING + TRACK_CONTROLS_WIDTH + TRACK_CONTROLS_GAP;
+
+// Zoom limits and defaults
+const BASE_PX_PER_SEC = 100;
+const DEFAULT_VISIBLE_MS = 60000; // 1 minute visible at 100% zoom
+const MIN_ZOOM = 0.25; // 25% min zoom
+const MAX_ZOOM = 5; // 500% max zoom
 
 function MainContent({
   tracks = [],
@@ -41,25 +69,17 @@ function MainContent({
   totalLengthMs = 0,
   onCutSegmentRange,
 }) {
+  // App context for selected track and effects menu
   const {selectedTrackId, setSelectedTrackId, isEffectsMenuOpen} =
     useContext(AppContext);
   const initialProgress = useMemo(() => progressStore.getState(), []);
 
-  // Default visible window length (in ms) before horizontal scrolling is needed
-  // Timeline scale is driven by pixels-per-second instead of a fixed window length
-  const BASE_PX_PER_SEC = 100; // fallback density: 100px per second when viewport not measured
-  const DEFAULT_VISIBLE_MS = 60000; // 1 minute of timeline should fit in the viewport at 100% zoom
-  const MIN_ZOOM = 0.25; // 25% (zoom out)
-  const MAX_ZOOM = 5; // 500% (zoom in)
+  // Core state for timeline interaction
   const [zoom, setZoom] = useState(1);
-
-  // Follow-mode toggle to auto-scroll the timeline during playback
   const [followPlayhead, setFollowPlayhead] = useState(false);
   const [timelineContentWidth, setTimelineContentWidth] = useState(0);
   const [measuredLeftOffsetPx, setMeasuredLeftOffsetPx] = useState(null);
   const [scrollAreaWidth, setScrollAreaWidth] = useState(0);
-  const scrollAreaRef = useRef(null);
-  const tracksRelativeRef = useRef(null);
   const [selectedSegment, setSelectedSegment] = useState(null);
   const [backgroundMenu, setBackgroundMenu] = useState({
     open: false,
@@ -67,16 +87,20 @@ function MainContent({
     y: 0,
   });
   const [playheadMs, setPlayheadMs] = useState(() => initialProgress?.ms || 0);
-  const playheadMsRef = useRef(playheadMs);
   const [cutBox, setCutBox] = useState(null);
+
+  // Refs for DOM access and performance
+  const scrollAreaRef = useRef(null);
+  const tracksRelativeRef = useRef(null);
+  const playheadMsRef = useRef(playheadMs);
   const suppressBackgroundClickRef = useRef(false);
 
-  // Keep playhead ref in sync with state
+  // Keep playhead ref synchronized
   useEffect(() => {
     playheadMsRef.current = playheadMs;
   }, [playheadMs]);
 
-  // Subscribe to progress store for playhead updates
+  // Subscribe to playback progress updates
   useEffect(() => {
     const unsubscribe = progressStore.subscribe(({ms}) => {
       setPlayheadMs(ms || 0);
@@ -84,11 +108,13 @@ function MainContent({
     return unsubscribe;
   }, []);
 
+  // Clear segment selection helper
   const clearSegmentSelection = useCallback(() => {
     setSelectedSegment(null);
     setCutBox(null);
   }, []);
 
+  // Handle segment selection
   const handleSegmentSelected = useCallback(
     (trackId, segmentId, segmentIndex) => {
       if (!trackId) {
@@ -105,8 +131,7 @@ function MainContent({
             ? segmentIndex
             : null,
       });
-      // selecting a segment should clear any existing cut selection
-      setCutBox(null);
+      setCutBox(null); // Clear any existing cut selection
     },
     []
   );
@@ -120,7 +145,7 @@ function MainContent({
     setCutBox(null);
   };
 
-  // Segment validation logic
+  // Validate selected segment exists in current tracks
   useEffect(() => {
     if (!selectedSegment) return;
 
@@ -143,20 +168,22 @@ function MainContent({
     }
   }, [tracks, selectedSegment, clearSegmentSelection]);
 
+  // Calculate left offset for timeline positioning
   const resolvedLeftOffsetPx = Number.isFinite(measuredLeftOffsetPx)
     ? measuredLeftOffsetPx
     : DEFAULT_TIMELINE_LEFT_OFFSET;
 
+  // Timeline CSS variables for consistent sizing
   const timelineStyle = useMemo(
     () => ({
       "--timeline-content-width": `${Math.max(1, timelineContentWidth)}px`,
-      // Track height is now fixed, adhering to horizontal-only zoom.
       "--track-height": `${TRACK_HEIGHT_PX}px`,
       "--timeline-left-offset": `${resolvedLeftOffsetPx}px`,
     }),
     [timelineContentWidth, resolvedLeftOffsetPx]
   );
 
+  // Pre-calculated timeline dimensions
   const timelineMetrics = useMemo(() => {
     const leftOffsetPx = resolvedLeftOffsetPx;
     const minimumTimelineWidth = Math.max(
@@ -172,6 +199,7 @@ function MainContent({
     return {widthPx, leftOffsetPx, rowWidthPx};
   }, [timelineContentWidth, scrollAreaWidth, resolvedLeftOffsetPx]);
 
+  // Measure actual timeline offset for precise positioning
   useLayoutEffect(() => {
     const container = tracksRelativeRef.current;
     if (!container) {
@@ -224,36 +252,34 @@ function MainContent({
     };
   }, [tracks.length, zoom, scrollAreaWidth]);
 
+  // Handle track selection
   const handleTrackSelected = useCallback(
     (trackId) => {
       if (typeof setSelectedTrackId === "function") {
         setSelectedTrackId(trackId);
       }
-      // whenever the user selects any track, clear the yellow box
-      setCutBox(null);
+      setCutBox(null); // Clear cut selection when track changes
     },
     [setSelectedTrackId]
   );
 
-  // Convert a mouse X coordinate → timeline milliseconds.
+  // Convert mouse X coordinate to timeline milliseconds
   const msFromClientX = useCallback(
     (clientX) => {
       const scrollArea = scrollAreaRef.current;
       if (!scrollArea || !totalLengthMs) return 0;
 
       const rect = scrollArea.getBoundingClientRect();
-
-      // Clamp mouse X inside the scroll area
       const clampedX = Math.max(rect.left, Math.min(rect.right, clientX));
       const xInViewport = clampedX - rect.left;
 
       const scrollLeft = scrollArea.scrollLeft || 0;
       const xOnRow = scrollLeft + xInViewport;
 
-      // Move into “timeline only” space (skip track controls)
+      // Adjust for track controls offset
       let xOnTimeline = xOnRow - timelineMetrics.leftOffsetPx;
 
-      // Clamp to timeline
+      // Clamp to timeline bounds
       xOnTimeline = Math.max(0, Math.min(timelineMetrics.widthPx, xOnTimeline));
 
       const ratio =
@@ -265,7 +291,7 @@ function MainContent({
     [totalLengthMs, timelineMetrics]
   );
 
-  // Helper: convert ms → x-position in pixels
+  // Convert milliseconds to X position on timeline
   const msToTimelineX = useCallback(
     (ms) => {
       if (!totalLengthMs || !timelineMetrics.widthPx) {
@@ -278,11 +304,13 @@ function MainContent({
     [timelineMetrics, totalLengthMs]
   );
 
+  // Clamp zoom value to valid range
   const clampZoom = useCallback((value) => {
     const sanitized = Number.isFinite(value) ? value : 1;
     return Number(Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, sanitized)).toFixed(2));
   }, []);
 
+  // Adjust scroll position when zoom changes (anchor around playhead)
   const adjustScrollForZoom = useCallback(
     (prevZoom, nextZoom) => {
       const node = scrollAreaRef.current;
@@ -295,38 +323,31 @@ function MainContent({
       const ratio = nextZoom / prevZoom;
       if (!Number.isFinite(ratio) || ratio === 1) return;
 
-      // We calculate the new timeline width without relying on the state update
-      // which hasn't happened yet.
       const newWidth = currentWidth * ratio;
-
-      // Anchor the scroll calculation around the current playhead position
       const anchorRatio = Math.max(
         0,
         Math.min(1, playheadMsRef.current / lengthMs)
       );
-      // Calculate how much the content *before* the playhead has expanded/shrunk
       const deltaPx = anchorRatio * (newWidth - currentWidth);
 
-      // Recalculate full row width to determine max scroll
       const newRowWidth =
         newWidth + timelineMetrics.leftOffsetPx + TRACK_ROW_PADDING;
       const viewportWidth = node.clientWidth || 0;
       const maxScroll = Math.max(0, newRowWidth - viewportWidth);
 
-      // Calculate desired scroll based on previous scroll + delta
       const desiredScroll = Math.min(
         Math.max(0, node.scrollLeft + deltaPx),
         maxScroll
       );
 
       if (Number.isFinite(desiredScroll)) {
-        // Direct DOM update (High Performance)
         node.scrollLeft = desiredScroll;
       }
     },
     [timelineMetrics.leftOffsetPx, timelineMetrics.widthPx, totalLengthMs]
   );
 
+  // Set zoom with scroll compensation
   const setZoomWithCompensation = useCallback(
     (computeNext) => {
       setZoom((prevZoom) => {
@@ -335,7 +356,6 @@ function MainContent({
         if (nextZoom === prevZoom) {
           return prevZoom;
         }
-        // This adjusts the scroll *before* React renders the new content width
         adjustScrollForZoom(prevZoom, nextZoom);
         return nextZoom;
       });
@@ -343,10 +363,9 @@ function MainContent({
     [adjustScrollForZoom, clampZoom]
   );
 
-  // === OPTIMIZED SCROLLING LOGIC ===
+  // Auto-scroll when follow mode is enabled during playback
   useEffect(() => {
     const unsubscribe = progressStore.subscribe(({ms}) => {
-      // If follow mode is off, do nothing
       if (!followPlayhead) return;
 
       const node = scrollAreaRef.current;
@@ -356,8 +375,6 @@ function MainContent({
       if (lengthMs === 0 || timelineMetrics.widthPx === 0) return;
 
       const pxPerMs = timelineMetrics.widthPx / lengthMs;
-
-      // Calculate where the playhead is in pixels
       const playheadX =
         timelineMetrics.leftOffsetPx +
         Math.max(0, Math.min(ms, lengthMs)) * pxPerMs;
@@ -365,13 +382,12 @@ function MainContent({
       const viewportWidth = node.clientWidth || 0;
       if (viewportWidth === 0) return;
 
-      // Center the playhead
+      // Center playhead in viewport
       const desiredScroll = playheadX - viewportWidth / 2;
       const maxScroll = Math.max(0, timelineMetrics.rowWidthPx - viewportWidth);
       const nextScroll = Math.min(Math.max(0, desiredScroll), maxScroll);
 
       if (Number.isFinite(nextScroll)) {
-        // Direct DOM update (High Performance)
         node.scrollLeft = nextScroll;
       }
     });
@@ -379,7 +395,7 @@ function MainContent({
     return unsubscribe;
   }, [followPlayhead, totalLengthMs, timelineMetrics]);
 
-  // Timeline width calculation
+  // Calculate timeline width based on zoom and available space
   useEffect(() => {
     const lengthMs = Math.max(1, totalLengthMs || 0);
     const visibleWindowMs = Math.max(1, Math.min(lengthMs, DEFAULT_VISIBLE_MS));
@@ -397,7 +413,7 @@ function MainContent({
     setTimelineContentWidth(desiredWidth);
   }, [totalLengthMs, zoom, scrollAreaWidth]);
 
-  // Scroll Area Width Observer
+  // Observe scroll area width for responsive layout
   useEffect(() => {
     const node = scrollAreaRef.current;
     if (!node) return;
@@ -422,14 +438,16 @@ function MainContent({
     return undefined;
   }, []);
 
+  // Check if any tracks exist
   const hasTracks = Array.isArray(tracks) && tracks.length > 0;
 
+  // Zoom control handlers
   const zoomIn = () => setZoomWithCompensation((z) => z + 0.25);
   const zoomOut = () => setZoomWithCompensation((z) => z - 0.25);
   const resetZoom = () => setZoomWithCompensation(() => 1);
   const toggleFollow = () => setFollowPlayhead((v) => !v);
 
-  // Handle asset drop
+  // Handle asset drop from library
   const handleDrop = (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -440,7 +458,6 @@ function MainContent({
 
       const dropData = JSON.parse(data);
       if (dropData.type === "asset" && onAssetDrop) {
-        // Get drop position to calculate timeline position
         const rect = e.currentTarget.getBoundingClientRect();
         const dropX = e.clientX - rect.left - timelineMetrics.leftOffsetPx;
         const pxPerMs =
@@ -448,22 +465,21 @@ function MainContent({
         const timelinePositionMs =
           pxPerMs > 0 ? Math.max(0, dropX / pxPerMs) : 0;
 
-        // Determine which track (if any) was targeted
+        // Determine which track was targeted based on Y position
         const dropY = e.clientY - rect.top;
-        const trackHeight = TRACK_HEIGHT_PX; // Fixed height
-        const rulerHeight = 40; // Approximate ruler height
+        const trackHeight = TRACK_HEIGHT_PX;
+        const rulerHeight = 40;
         const trackIndex = Math.floor((dropY - rulerHeight) / trackHeight);
         const targetTrackId =
           trackIndex >= 0 && trackIndex < tracks.length
             ? tracks[trackIndex]?.id
             : null;
 
-        // Pass the asset name along with the drop data
         onAssetDrop(
           dropData.assetId,
           targetTrackId,
           timelinePositionMs,
-          dropData.name // Add this to pass the asset name
+          dropData.name
         );
       }
     } catch (err) {
@@ -471,13 +487,11 @@ function MainContent({
     }
   };
 
-  // Handle Ctrl/Cmd + Click + Drag to create a cut range on the selected segment
+  // Handle Ctrl/Cmd + drag to create cut range on segment
   const handleTracksMouseDown = (e) => {
     const modifierPressed = e.ctrlKey || e.metaKey;
-    // Only modifier + left button
     if (!(modifierPressed && e.button === 0)) return;
 
-    // Eat this event so TrackLane's drag handler never sees it
     e.preventDefault();
     e.stopPropagation();
     if (
@@ -490,7 +504,7 @@ function MainContent({
     const container = e.currentTarget;
     const containerRect = container.getBoundingClientRect();
 
-    // Find which track-wrapper the mouse is over
+    // Find which track the mouse is over
     const wrappers = Array.from(
       container.getElementsByClassName("track-wrapper")
     );
@@ -513,7 +527,7 @@ function MainContent({
     if (!track || !Array.isArray(track.segments) || track.segments.length === 0)
       return;
 
-    // Prefer measuring the waveform area (timeline) instead of the full track wrapper
+    // Use waveform area for highlight positioning
     let highlightTopPx = trackTopPx;
     let highlightHeightPx = trackHeightPx;
     const timelineEl = wrappers[trackIndex].querySelector(
@@ -525,12 +539,11 @@ function MainContent({
       highlightHeightPx = timelineRect.height;
     }
 
-    // Time where mouse went down
+    // Find start time and containing segment
     const rawStartMs = msFromClientX(e.clientX);
-
-    // Find segment on this track that contains that time
     let segmentIndex = -1;
     let seg = null;
+
     for (let i = 0; i < track.segments.length; i++) {
       const s = track.segments[i];
       if (!s) continue;
@@ -545,22 +558,18 @@ function MainContent({
       }
     }
 
-    if (segmentIndex === -1 || !seg) {
-      // Ctrl-drag on empty part of track: do nothing
-      return;
-    }
+    if (segmentIndex === -1 || !seg) return;
 
-    // Prevent the "click" after drag from clearing our selection once
+    // Prevent background click after drag
     suppressBackgroundClickRef.current = true;
 
     const segStartMs =
       seg.startOnTimelineMs ?? Math.round((seg.startOnTimeline ?? 0) * 1000);
     const segDurMs = seg.durationMs ?? Math.round((seg.duration ?? 0) * 1000);
     const segEndMs = segStartMs + Math.max(0, segDurMs);
-
     const startMs = Math.max(segStartMs, Math.min(segEndMs, rawStartMs));
 
-    // Update selection so the rest of the UI knows which segment is active
+    // Update selection
     if (typeof setSelectedTrackId === "function") {
       setSelectedTrackId(track.id);
     }
@@ -570,7 +579,7 @@ function MainContent({
       segmentIndex,
     });
 
-    // Start the cut box, store the actual row top/height in pixels
+    // Create cut box
     setCutBox({
       trackId: track.id,
       segmentIndex,
@@ -581,6 +590,7 @@ function MainContent({
       heightPx: highlightHeightPx,
     });
 
+    // Drag handlers for cut box
     const handleMove = (moveEvt) => {
       const rawMs = msFromClientX(moveEvt.clientX);
       const clamped = Math.max(segStartMs, Math.min(segEndMs, rawMs));
@@ -611,17 +621,18 @@ function MainContent({
     document.addEventListener("mouseup", handleUp);
   };
 
+  // Handle background clicks (deselection)
   const handleScrollAreaClick = (e) => {
     if (suppressBackgroundClickRef.current) {
       suppressBackgroundClickRef.current = false;
       e.preventDefault();
       e.stopPropagation();
-      return; // don't clear selection after an Ctrl-drag
+      return;
     }
     handleBackgroundClick();
   };
 
-  // “Cut” button that actually calls your handler
+  // Apply cut operation to selected segment range
   const handleCutBoxApply = useCallback(() => {
     if (!cutBox || !onCutSegmentRange) return;
 
@@ -633,15 +644,18 @@ function MainContent({
     setCutBox(null);
   }, [cutBox, onCutSegmentRange]);
 
+  // Enable drag-and-drop for assets
   const handleDragOver = (e) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = "copy";
   };
 
+  // Close background context menu
   const closeBackgroundMenu = useCallback(() => {
     setBackgroundMenu((prev) => (prev.open ? {...prev, open: false} : prev));
   }, []);
 
+  // Close menu on outside click or Escape key
   useEffect(() => {
     if (!backgroundMenu.open) return undefined;
 
@@ -670,6 +684,7 @@ function MainContent({
     };
   }, [backgroundMenu.open, closeBackgroundMenu]);
 
+  // Show context menu on right-click background
   const handleBackgroundContextMenu = (e) => {
     const isOnTrack = e.target?.closest(".tracklane-root");
     if (isOnTrack) return;
@@ -685,6 +700,7 @@ function MainContent({
     setBackgroundMenu({open: true, x, y});
   };
 
+  // Create portal for context menu (outside React tree)
   const backgroundMenuPortal =
     backgroundMenu.open && typeof document !== "undefined"
       ? createPortal(
@@ -715,6 +731,7 @@ function MainContent({
         )
       : null;
 
+  // Combined clear selection handler
   const handleClearSegmentSelection = useCallback(() => {
     clearSegmentSelection();
     setCutBox(null);
@@ -726,13 +743,14 @@ function MainContent({
       style={timelineStyle}
       disableSectionPadding
     >
-      {/* Effects Menu */}
+      {/* Effects Menu Overlay */}
       {isEffectsMenuOpen && (
         <div className={styles.effectsMenuContainer}>
           <EffectsMenu />
         </div>
       )}
 
+      {/* Main Timeline Scroll Area */}
       <div
         className="timeline-scroll-area"
         ref={scrollAreaRef}
@@ -743,11 +761,14 @@ function MainContent({
       >
         {hasTracks ? (
           <div className="timeline-stack">
+            {/* Timeline Ruler with time markers */}
             <TimelineRuler
               totalLengthMs={totalLengthMs}
               timelineWidth={timelineMetrics.widthPx}
               timelineLeftOffsetPx={timelineMetrics.leftOffsetPx}
             />
+
+            {/* Scrollable Content Container */}
             <div
               className="timeline-scroll-content"
               style={{
@@ -763,7 +784,7 @@ function MainContent({
                   position: "relative",
                 }}
               >
-                {/* CUT BOX OVERLAY */}
+                {/* Cut Box Overlay (yellow selection) */}
                 {cutBox &&
                   (() => {
                     const startX = msToTimelineX(cutBox.startMs);
@@ -771,7 +792,7 @@ function MainContent({
                     const left = Math.min(startX, endX);
                     const width = Math.max(2, Math.abs(endX - startX));
                     const top = cutBox.topPx ?? 0;
-                    const height = cutBox.heightPx ?? TRACK_HEIGHT_PX; // Fixed height
+                    const height = cutBox.heightPx ?? TRACK_HEIGHT_PX;
 
                     return (
                       <div
@@ -785,10 +806,11 @@ function MainContent({
                           width: `${width}px`,
                           height: `${height}px`,
                           border: "1px solid #e6c200",
-                          backgroundColor: "rgba(255, 255, 153, 0.6)", // light yellow
+                          backgroundColor: "rgba(255, 255, 153, 0.6)",
                           boxSizing: "border-box",
                         }}
                       >
+                        {/* Cut button when dragging finished */}
                         {!cutBox.isDragging && (
                           <button
                             type="button"
@@ -813,6 +835,7 @@ function MainContent({
                     );
                   })()}
 
+                {/* Tracks Container */}
                 <div
                   className="tracks-container"
                   style={{width: `${timelineMetrics.rowWidthPx}px`}}
@@ -850,6 +873,8 @@ function MainContent({
                 </div>
               </div>
             </div>
+
+            {/* Global Playhead Overlay */}
             <div
               className="global-playhead-overlay"
               style={{
@@ -864,12 +889,17 @@ function MainContent({
             </div>
           </div>
         ) : (
+          // Empty state when no tracks
           <div className="empty-state" role="status" aria-live="polite">
             Import an audio file
           </div>
         )}
       </div>
+
+      {/* Context Menu Portal */}
       {backgroundMenuPortal}
+
+      {/* Zoom Controls Bar */}
       <div className="zoom-controls-bar">
         <div
           className="zoom-controls"

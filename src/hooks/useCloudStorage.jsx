@@ -7,15 +7,16 @@ import {cloudStorageManager} from "../managers/CloudStorageManager";
  * @returns {Object} Save/load functions and state
  */
 export function useCloudStorage() {
-  const {userData} = useContext(AppContext);
+  const {userData} = useContext(AppContext); // Get user auth data from context
 
+  // State
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [saves, setSaves] = useState([]);
+  const [saves, setSaves] = useState([]); // List of saved sessions
   const [error, setError] = useState(null);
 
   /**
-   * Save current session to Firebase
+   * Save current session to Firebase with custom project name
    */
   const saveSession = useCallback(
     async (projectName) => {
@@ -32,7 +33,7 @@ export function useCloudStorage() {
           userData.uid,
           projectName || "Untitled Project"
         );
-        return url;
+        return url; // Returns Firebase storage URL
       } catch (err) {
         setError(err.message);
         return null;
@@ -44,7 +45,7 @@ export function useCloudStorage() {
   );
 
   /**
-   * Quick save to a standard slot
+   * Quick save to a standard slot (auto-named)
    */
   const quickSave = useCallback(async () => {
     if (!userData?.uid) {
@@ -67,7 +68,8 @@ export function useCloudStorage() {
   }, [userData]);
 
   /**
-   * Load session from Firebase
+   * Load specific session from Firebase by filename
+   * @param {boolean} clearExisting - Whether to clear current session first
    */
   const loadSession = useCallback(
     async (fileName, clearExisting = true) => {
@@ -85,7 +87,7 @@ export function useCloudStorage() {
           fileName,
           clearExisting
         );
-        return stats;
+        return stats; // Returns load statistics/metadata
       } catch (err) {
         setError(err.message);
         return null;
@@ -126,7 +128,7 @@ export function useCloudStorage() {
   );
 
   /**
-   * List all saved sessions
+   * List all saved sessions for current user
    */
   const listSaves = useCallback(async () => {
     if (!userData?.uid) {
@@ -139,7 +141,7 @@ export function useCloudStorage() {
 
     try {
       const savesList = await cloudStorageManager.listSaves(userData.uid);
-      setSaves(savesList);
+      setSaves(savesList); // Update state with list
       return savesList;
     } catch (err) {
       setError(err.message);
@@ -150,7 +152,7 @@ export function useCloudStorage() {
   }, [userData]);
 
   /**
-   * Delete a saved session
+   * Delete a saved session by filename
    */
   const deleteSave = useCallback(
     async (fileName) => {
@@ -163,7 +165,7 @@ export function useCloudStorage() {
 
       try {
         await cloudStorageManager.deleteSave(userData.uid, fileName);
-        // Refresh the list
+        // Refresh the list after deletion
         await listSaves();
         return true;
       } catch (err) {
@@ -187,7 +189,7 @@ export function useCloudStorage() {
     isLoading,
     saves,
     error,
-    isAuthenticated: !!userData?.uid,
+    isAuthenticated: !!userData?.uid, // Convenience flag
 
     // Actions
     saveSession,

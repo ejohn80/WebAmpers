@@ -1,26 +1,29 @@
+/* Sidebar.css - Styles for the draggable sidebar component */
+
+/* Main sidebar container */
 .sidebar-container {
   overflow-y: auto;
   height: 100%;
-  scrollbar-width: thin;
-  scrollbar-color: #333239 #1e1d20;
+  scrollbar-width: thin; /* Firefox scrollbar styling */
+  scrollbar-color: #333239 #1e1d20; /* Firefox: thumb and track colors */
   background: var(--panel-bg);
 }
 
-/* Webkit browsers (Chrome, Safari, Edge) */
+/* Custom scrollbar styling for Webkit browsers (Chrome, Safari, Edge) */
 .sidebar-container::-webkit-scrollbar {
-  width: 5px;
+  width: 5px; /* Narrow scrollbar width */
 }
 
 .sidebar-container::-webkit-scrollbar-track {
-  background: #1e1d20;
+  background: #1e1d20; /* Track color */
   border-radius: 3px;
 }
 
 .sidebar-container::-webkit-scrollbar-thumb {
-  background: #333239;
+  background: #333239; /* Thumb color */
   border-radius: 3px;
 }
 
 .sidebar-container::-webkit-scrollbar-thumb:hover {
-  background: #5c5b62;
+  background: #5c5b62; /* Thumb hover color */
 }

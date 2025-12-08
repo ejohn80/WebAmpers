@@ -1,3 +1,6 @@
+/* Equalizer.module.css - Styling for the equalizer modal */
+
+/* Main equalizer panel container */
 .equalizerPanel {
   position: fixed;
   z-index: 10000;
@@ -12,6 +15,7 @@
   overflow: hidden;
 }
 
+/* Dragging state */
 .equalizerPanel.dragging {
   cursor: grabbing;
   box-shadow:
@@ -19,6 +23,7 @@
     0 0 0 1px rgba(23, 225, 255, 0.2);
 }
 
+/* Header with title and close button */
 .header {
   display: flex;
   justify-content: space-between;
@@ -36,6 +41,7 @@
   cursor: grabbing;
 }
 
+/* Drag handle indicator */
 .dragHandle {
   color: #555;
   font-size: 14px;
@@ -47,6 +53,7 @@
   cursor: grabbing;
 }
 
+/* Main title */
 .title {
   margin: 0;
   font-size: 14px;
@@ -56,6 +63,7 @@
   flex-shrink: 0;
 }
 
+/* Close button */
 .closeButton {
   width: 24px;
   height: 24px;
@@ -76,6 +84,7 @@
   color: #fff;
 }
 
+/* Frequency response curve container */
 .curveContainer {
   position: relative;
   padding: 8px 12px;
@@ -83,12 +92,14 @@
   border-bottom: 1px solid var(--eq-divider, #333239);
 }
 
+/* SVG frequency curve */
 .frequencyResponseSvg {
   width: 100%;
   height: 70px;
   display: block;
 }
 
+/* dB scale labels (right side) */
 .dbLabels {
   position: absolute;
   right: 16px;
@@ -102,18 +113,21 @@
   pointer-events: none;
 }
 
+/* EQ controls section */
 .eqControls {
   padding: 16px 12px;
   cursor: default;
   color: var(--eq-text, #e5e5e5);
 }
 
+/* 10-band container */
 .bandsContainer {
   display: flex;
   justify-content: space-between;
   gap: 4px;
 }
 
+/* Individual band column */
 .bandColumn {
   display: flex;
   flex-direction: column;
@@ -122,6 +136,7 @@
   flex: 1;
 }
 
+/* Current dB value display */
 .bandValue {
   font-size: 10px;
   font-family: monospace;
@@ -131,12 +146,14 @@
   height: 14px;
 }
 
+/* Frequency label (32, 64, 125, etc.) */
 .bandLabel {
   font-size: 10px;
   color: var(--eq-muted, #666);
   font-weight: 500;
 }
 
+/* Vertical slider container */
 .verticalSliderContainer {
   width: 24px;
   height: 100px;
@@ -145,6 +162,7 @@
   cursor: pointer;
 }
 
+/* Slider track background */
 .verticalSliderTrack {
   position: relative;
   width: 6px;
@@ -154,6 +172,7 @@
   outline: 1px solid var(--eq-divider, #444);
 }
 
+/* Center zero line */
 .centerLine {
   position: absolute;
   left: 0;
@@ -164,6 +183,7 @@
   transform: translateY(-50%);
 }
 
+/* Filled portion of slider */
 .verticalSliderFill {
   position: absolute;
   left: 0;
@@ -172,14 +192,17 @@
   border-radius: 3px;
 }
 
+/* Color for modified (non-zero) values */
 .verticalSliderFill.changed {
   background: var(--eq-strong, #11a1b7);
 }
 
+/* Brighter color when actively dragging */
 .verticalSliderContainer.dragging .verticalSliderFill.changed {
   background: var(--eq-strong, #17e1ff);
 }
 
+/* Draggable knob */
 .verticalSliderKnob {
   position: absolute;
   left: 50%;
@@ -192,12 +215,14 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
 }
 
+/* Knob dragging state */
 .verticalSliderKnob.knobDragging {
   transform: translateX(-50%) scale(1.1);
   box-shadow: 0 2px 8px rgba(23, 225, 255, 0.4);
   border-color: #17e1ff;
 }
 
+/* Footer with preset selector and reset */
 .footer {
   display: flex;
   justify-content: space-between;
@@ -207,6 +232,7 @@
   border-top: 1px solid var(--eq-divider, #333239);
 }
 
+/* Preset dropdown section */
 .presetSection {
   display: flex;
   align-items: center;
@@ -218,6 +244,7 @@
   color: var(--eq-muted, #888);
 }
 
+/* Preset dropdown menu */
 .presetSelect {
   background: var(--eq-select-bg, #2a2a2a);
   border: 1px solid var(--eq-select-border, #3a3a3a);
@@ -243,6 +270,7 @@
   color: var(--eq-select-option-text, #e5e5e5);
 }
 
+/* Reset button */
 .resetButton {
   padding: 6px 14px;
   font-size: 12px;
@@ -259,6 +287,7 @@
   background: var(--eq-reset-hover, #1e3034);
 }
 
+/* Disabled reset button (when already flat) */
 .resetButtonDisabled {
   background: #1a1a1a !important;
   color: #4a4a4a !important;
@@ -266,6 +295,7 @@
   opacity: 0.5;
 }
 
+/* Custom scrollbar styling */
 .equalizerPanel ::-webkit-scrollbar {
   width: 6px;
 }
@@ -283,12 +313,14 @@
   background: var(--eq-scroll-thumb-hover, #5c5b62);
 }
 
+/* Title section with track name */
 .titleSection {
   display: flex;
   align-items: center;
   gap: 10px;
 }
 
+/* Current track name display */
 .trackName {
   font-size: 11px;
   color: #888;

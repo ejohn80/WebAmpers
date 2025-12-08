@@ -1,6 +1,9 @@
 import React from "react";
 import "../../pages/AudioPage.css";
 
+/**
+ * DraggableDiv - Used as a consistent wrapper for draggable UI sections.
+ */
 const DraggableDiv = ({
   color = "",
   children,
@@ -8,9 +11,10 @@ const DraggableDiv = ({
   disableSectionPadding = false,
   ...props
 }) => {
+  // Build class list: conditionally include "section" class, add color, and custom classes
   const classes = [disableSectionPadding ? null : "section", color, className]
-    .filter(Boolean)
-    .join(" ");
+    .filter(Boolean) // Remove null/undefined values
+    .join(" "); // Join into a single className string
 
   return (
     <div className={classes} {...props}>

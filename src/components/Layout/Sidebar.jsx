@@ -1,3 +1,10 @@
+/**
+ * Sidebar Component
+ *
+ * Main application sidebar with tabbed navigation for Assets, Effects, and Sessions.
+ * Provides draggable interface and integrates with AppContext for effects menu management.
+ */
+
 import {useState, useEffect, useContext} from "react";
 import DraggableDiv from "../Generic/DraggableDiv";
 import AssetsTab from "./Sidebar/AssetsTab";
@@ -6,16 +13,13 @@ import SessionsTab from "./Sidebar/SessionsTab";
 import {AppContext} from "../../context/AppContext";
 import "./Sidebar.css";
 
-/**
- * Sidebar component for the application layout.
- * @param {function} props.onImportSuccess - Callback for successful audio import.
- * @param {function} props.onImportError - Callback for failed audio import.
- * @param {function} props.onAssetDelete - Callback for asset deletion.
- * @param {number} props.assetsRefreshTrigger - Counter to trigger assets reload.
- * @param {Map} props.assetBufferCache - Cache for shared audio buffers.
- */
+// Key for storing sidebar tab preference in localStorage
 const SIDEBAR_TAB_KEY = "webamp.sidebarTab";
 
+/**
+ * Retrieves the initial active tab from localStorage
+ * Defaults to "assets" if no preference is stored
+ */
 const getInitialTab = () => {
   if (
     typeof window === "undefined" ||
@@ -39,9 +43,13 @@ function Sidebar({
   assetsRefreshTrigger,
   assetBufferCache,
 }) {
+  // State for currently active tab
   const [currentTab, setCurrentTab] = useState(getInitialTab);
-  const {closeEffectsMenu} = useContext(AppContext); // Get closeEffectsMenu from context
 
+  // Access AppContext to close effects menu when needed
+  const {closeEffectsMenu} = useContext(AppContext);
+
+  // Tab definitions - each maps to a component
   const tabs = [
     {
       key: "assets",
@@ -68,6 +76,10 @@ function Sidebar({
     },
   ];
 
+  /**
+   * Handles tab selection with side effect of closing effects menu
+   * @param {string} key - The tab key to switch to
+   */
   const handleTabClick = (key) => {
     // Close effects menu when switching to any tab except effects
     if (key !== "effects") {
@@ -76,6 +88,7 @@ function Sidebar({
     setCurrentTab(key);
   };
 
+  // Persist tab selection to localStorage when it changes
   useEffect(() => {
     try {
       if (typeof window !== "undefined" && window.localStorage) {
@@ -88,6 +101,7 @@ function Sidebar({
 
   return (
     <DraggableDiv color="1E1D20" className="sidebar-container">
+      {/* Tab Navigation Buttons */}
       <div style={{display: "flex", marginBottom: "10px", borderRadius: "8px"}}>
         {tabs.map(({key, label}) => (
           <button
@@ -115,6 +129,7 @@ function Sidebar({
         ))}
       </div>
 
+      {/* Tab Content Area */}
       <div>
         {tabs.map(({key, component}) => (
           <div

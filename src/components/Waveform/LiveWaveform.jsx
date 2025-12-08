@@ -1,21 +1,31 @@
+/**
+ * LiveWaveform Component
+ *
+ * Displays a real-time audio waveform that fills left-to-right while recording.
+ * Features:
+ * - Shows amplitude waveform without looping during recording
+ * - Red progress bar indicates current playback position
+ * - Time-based scrolling (pixelsPerSecond controls horizontal scaling)
+ * - Cleans up audio resources properly on unmount
+ */
 import React, {useEffect, useRef} from "react";
 
-// Live waveform that fills left-to-right without looping while recording.
 export default function LiveWaveform({stream, startTs, pixelsPerSecond = 120}) {
   const canvasRef = useRef(null);
   const rafRef = useRef(null);
   const nodesRef = useRef({audioCtx: null, source: null, analyser: null});
-  const accRef = useRef({cols: [], lastX: -1});
+  const accRef = useRef({cols: [], lastX: -1}); // Accumulated waveform data
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || !stream) return;
-    // fit to CSS size
+
+    // Size canvas to match CSS dimensions
     canvas.width = canvas.clientWidth;
     canvas.height = canvas.clientHeight;
     const ctx = canvas.getContext("2d");
 
-    // setup analyser
+    // Set up audio processing pipeline
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     const source = audioCtx.createMediaStreamSource(stream);
     const analyser = audioCtx.createAnalyser();
@@ -24,14 +34,14 @@ export default function LiveWaveform({stream, startTs, pixelsPerSecond = 120}) {
     nodesRef.current = {audioCtx, source, analyser};
     const data = new Uint8Array(analyser.frequencyBinCount);
 
-    // accumulated columns
+    // Initialize column storage for waveform
     accRef.current = {cols: new Array(canvas.width).fill(null), lastX: -1};
 
     const draw = () => {
       rafRef.current = requestAnimationFrame(draw);
       analyser.getByteTimeDomainData(data);
 
-      // compute current x based on elapsed time
+      // Calculate current x position based on elapsed time
       const elapsedSec = Math.max(
         0,
         (Date.now() - (startTs || Date.now())) / 1000
@@ -41,18 +51,20 @@ export default function LiveWaveform({stream, startTs, pixelsPerSecond = 120}) {
         Math.floor(elapsedSec * pixelsPerSecond)
       );
 
-      // derive min/max from current snapshot (single column measure)
+      // Find min/max amplitude in current audio frame
       let min = 255,
         max = 0;
-      const step = Math.ceil(data.length / 32); // coarse sampling for performance
+      const step = Math.ceil(data.length / 32); // Performance optimization
       for (let i = 0; i < data.length; i += step) {
         const v = data[i];
         if (v < min) min = v;
         if (v > max) max = v;
       }
+
+      // Store waveform column data
       const c = accRef.current;
       if (x !== c.lastX) {
-        // fill any skipped columns up to x with current min/max
+        // Fill any skipped columns with current measurement
         for (let i = c.lastX + 1; i <= x; i++) {
           c.cols[i] = {min, max};
         }
@@ -61,7 +73,7 @@ export default function LiveWaveform({stream, startTs, pixelsPerSecond = 120}) {
         c.cols[x] = {min, max};
       }
 
-      // redraw accumulated waveform up to x
+      // Draw accumulated waveform up to current position
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       const mid = canvas.height / 2;
       ctx.strokeStyle = "#7fd3ff";
@@ -77,29 +89,27 @@ export default function LiveWaveform({stream, startTs, pixelsPerSecond = 120}) {
       }
       ctx.stroke();
 
-      // red bar – clamp at right edge once filled
+      // Draw red progress bar
       ctx.fillStyle = "red";
       ctx.fillRect(x, 0, 2, canvas.height);
     };
     draw();
 
+    // Cleanup function
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
+
+      // Disconnect audio nodes safely
       try {
         nodesRef.current.source?.disconnect?.();
-      } catch {
-        // Intentionally empty
-      }
+      } catch {}
       try {
         nodesRef.current.analyser?.disconnect?.();
-      } catch {
-        // Intentionally empty
-      }
+      } catch {}
       try {
         nodesRef.current.audioCtx?.close?.();
-      } catch {
-        // Intentionally empty
-      }
+      } catch {}
+
       nodesRef.current = {audioCtx: null, source: null, analyser: null};
     };
   }, [stream, startTs, pixelsPerSecond]);

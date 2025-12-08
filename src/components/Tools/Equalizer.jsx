@@ -1,9 +1,18 @@
+/**
+ * Equalizer Component
+ *
+ * Interactive audio equalizer with 10-band frequency controls and presets.
+ * Supports both master EQ (global) and per-track EQ with real-time visual feedback.
+ * Features draggable window, frequency response curve visualization, and preset management.
+ */
+
 import {useState, useRef, useEffect, useCallback, useContext} from "react";
 import styles from "./Equalizer.module.css";
 import {AppContext} from "../../context/AppContext";
 import {audioManager} from "../../managers/AudioManager";
 import {dbManager} from "../../managers/DBManager";
 
+// 10-band EQ frequency definitions
 const EQ_BANDS = [
   {freq: 32, label: "32"},
   {freq: 64, label: "64"},
@@ -17,6 +26,7 @@ const EQ_BANDS = [
   {freq: 16000, label: "16k"},
 ];
 
+// Predefined EQ presets for common audio profiles
 const EQ_PRESETS = {
   flat: {name: "Flat", values: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]},
   bass_boost: {name: "Bass Boost", values: [6, 5, 4, 2, 0, 0, 0, 0, 0, 0]},
@@ -30,17 +40,25 @@ const EQ_PRESETS = {
   acoustic: {name: "Acoustic", values: [3, 2, 1, 1, 2, 2, 2, 3, 2, 1]},
 };
 
+/**
+ * Vertical slider component for EQ band control
+ * Supports mouse drag and visual feedback
+ */
 const VerticalSlider = ({value, onChange, onChangeComplete, min, max}) => {
   const trackRef = useRef(null);
   const [isDragging, setIsDragging] = useState(false);
   const [tempValue, setTempValue] = useState(value);
 
+  // Sync temp value when not dragging
   useEffect(() => {
     if (!isDragging) {
       setTempValue(value);
     }
   }, [value, isDragging]);
 
+  /**
+   * Convert mouse Y position to dB value
+   */
   const calculateValue = useCallback(
     (clientY) => {
       if (!trackRef.current) return tempValue;
@@ -56,9 +74,9 @@ const VerticalSlider = ({value, onChange, onChangeComplete, min, max}) => {
     e.preventDefault();
     setIsDragging(true);
     const newValue = calculateValue(e.clientY);
-    const rounded = Math.round(newValue * 2) / 2;
+    const rounded = Math.round(newValue * 2) / 2; // Snap to 0.5dB increments
     setTempValue(rounded);
-    onChange(rounded, true); // true = preview mode
+    onChange(rounded, true); // Preview mode (visual only)
   };
 
   const handleMouseMove = useCallback(
@@ -67,8 +85,7 @@ const VerticalSlider = ({value, onChange, onChangeComplete, min, max}) => {
       const newValue = calculateValue(e.clientY);
       const rounded = Math.round(newValue * 2) / 2;
       setTempValue(rounded);
-      // Only update visual, not audio engine
-      onChange(rounded, true); // true = preview mode
+      onChange(rounded, true); // Preview mode
     },
     [isDragging, calculateValue, onChange]
   );
@@ -80,6 +97,7 @@ const VerticalSlider = ({value, onChange, onChangeComplete, min, max}) => {
     }
   }, [tempValue, onChangeComplete]);
 
+  // Add global mouse event listeners during drag
   useEffect(() => {
     if (!isDragging) return;
     window.addEventListener("mousemove", handleMouseMove);
@@ -90,6 +108,7 @@ const VerticalSlider = ({value, onChange, onChangeComplete, min, max}) => {
     };
   }, [isDragging, handleMouseMove, handleMouseUp]);
 
+  // Calculate display values and percentages
   const displayValue = isDragging ? tempValue : value;
   const percentage = ((displayValue - min) / (max - min)) * 100;
   const isChanged = displayValue !== 0;
@@ -117,6 +136,10 @@ const VerticalSlider = ({value, onChange, onChangeComplete, min, max}) => {
   );
 };
 
+/**
+ * Visual frequency response curve component
+ * Shows EQ curve based on current band values
+ */
 const FrequencyResponseCurve = ({bandValues}) => {
   const width = 320,
     height = 80;
@@ -124,6 +147,9 @@ const FrequencyResponseCurve = ({bandValues}) => {
   const graphWidth = width - padding.left - padding.right;
   const graphHeight = height - padding.top - padding.bottom;
 
+  /**
+   * Generate SVG path for EQ curve
+   */
   const generateCurvePoints = () => {
     const points = bandValues.map((val, i) => ({
       x: padding.left + (i / (bandValues.length - 1)) * graphWidth,
@@ -167,6 +193,7 @@ const FrequencyResponseCurve = ({bandValues}) => {
         </linearGradient>
       </defs>
 
+      {/* dB grid lines */}
       {[-12, -6, 0, 6, 12].map((db) => {
         const y = padding.top + graphHeight / 2 - (db / 12) * (graphHeight / 2);
         return (
@@ -182,7 +209,10 @@ const FrequencyResponseCurve = ({bandValues}) => {
         );
       })}
 
+      {/* Filled curve area */}
       <path d={generateFillPath()} fill="url(#curveGradient)" />
+
+      {/* Curve line */}
       <path
         d={generateCurvePoints()}
         fill="none"
@@ -192,6 +222,7 @@ const FrequencyResponseCurve = ({bandValues}) => {
         strokeLinejoin="round"
       />
 
+      {/* Control points */}
       {bandValues.map((val, i) => {
         const x = padding.left + (i / (bandValues.length - 1)) * graphWidth;
         const y =
@@ -212,6 +243,10 @@ const FrequencyResponseCurve = ({bandValues}) => {
   );
 };
 
+/**
+ * Main Equalizer component
+ * Supports both master (global) and per-track equalization
+ */
 const Equalizer = ({isOpen, onClose, initialPosition = {x: 100, y: 100}}) => {
   const {
     engineRef,
@@ -221,6 +256,7 @@ const Equalizer = ({isOpen, onClose, initialPosition = {x: 100, y: 100}}) => {
     setSelectedTrackId,
   } = useContext(AppContext);
 
+  // Component state
   const [selectedPreset, setSelectedPreset] = useState("flat");
   const [position, setPosition] = useState(initialPosition);
   const [bandValues, setBandValues] = useState(EQ_BANDS.map((_) => 0));
@@ -228,9 +264,12 @@ const Equalizer = ({isOpen, onClose, initialPosition = {x: 100, y: 100}}) => {
   const [dragOffset, setDragOffset] = useState({x: 0, y: 0});
   const [trackName, setTrackName] = useState("Master");
 
+  // Ref for batching EQ changes
   const pendingChangesRef = useRef(new Map());
 
-  // Update track name display
+  /**
+   * Update displayed track name based on selection
+   */
   useEffect(() => {
     if (selectedTrackId) {
       const track = audioManager?.getTrack(selectedTrackId);
@@ -240,7 +279,9 @@ const Equalizer = ({isOpen, onClose, initialPosition = {x: 100, y: 100}}) => {
     }
   }, [selectedTrackId]);
 
-  // Detect preset from current values
+  /**
+   * Detect which preset matches current EQ settings
+   */
   useEffect(() => {
     const matchingPreset = Object.entries(EQ_PRESETS).find(([_, preset]) =>
       preset.values.every((val, i) => val === bandValues[i])
@@ -253,10 +294,12 @@ const Equalizer = ({isOpen, onClose, initialPosition = {x: 100, y: 100}}) => {
     }
   }, [bandValues]);
 
-  // Sync sliders with selected track or master
+  /**
+   * Sync slider values with current track or master EQ
+   */
   useEffect(() => {
     if (selectedTrackId) {
-      // Load track-specific EQ values
+      // Load track-specific EQ
       const track = audioManager?.getTrack(selectedTrackId);
       if (track && track.effects) {
         const values = EQ_BANDS.map((b) => track.effects[b.freq] ?? 0);
@@ -265,23 +308,22 @@ const Equalizer = ({isOpen, onClose, initialPosition = {x: 100, y: 100}}) => {
         setBandValues(EQ_BANDS.map((_) => 0));
       }
     } else {
-      // Load master EQ values
+      // Load master EQ
       const values = EQ_BANDS.map((b) => masterEffects[b.freq] ?? 0);
       setBandValues(values);
     }
   }, [selectedTrackId, masterEffects]);
 
-  // Apply all pending EQ changes at once
+  /**
+   * Apply batched EQ changes to audio engine and storage
+   */
   const applyPendingChanges = useCallback(async () => {
     if (pendingChangesRef.current.size === 0) return;
 
-    console.log("[EQ] Applying batched changes:", pendingChangesRef.current);
-
     if (selectedTrackId) {
-      // Update track-specific EQ
+      // Apply to selected track
       const track = audioManager?.getTrack(selectedTrackId);
       if (track) {
-        // Build new effects object with all pending changes
         const newEffects = {...track.effects};
         pendingChangesRef.current.forEach((value, freq) => {
           newEffects[freq] = value;
@@ -289,7 +331,7 @@ const Equalizer = ({isOpen, onClose, initialPosition = {x: 100, y: 100}}) => {
 
         track.effects = newEffects;
 
-        // Update engine ONCE with all changes
+        // Update audio engine
         if (engineRef?.current?.setTrackEffects) {
           try {
             engineRef.current.setTrackEffects(
@@ -303,7 +345,7 @@ const Equalizer = ({isOpen, onClose, initialPosition = {x: 100, y: 100}}) => {
           }
         }
 
-        // Persist to DB
+        // Persist to IndexedDB
         try {
           await dbManager.updateTrack(track);
         } catch (e) {
@@ -311,7 +353,7 @@ const Equalizer = ({isOpen, onClose, initialPosition = {x: 100, y: 100}}) => {
         }
       }
     } else {
-      // Update master EQ
+      // Apply to master EQ
       const newMasterEffects = {...masterEffects};
       pendingChangesRef.current.forEach((value, freq) => {
         newMasterEffects[freq] = value;
@@ -319,7 +361,7 @@ const Equalizer = ({isOpen, onClose, initialPosition = {x: 100, y: 100}}) => {
 
       setMasterEffects(newMasterEffects);
 
-      // Apply to engine ONCE with all changes
+      // Update audio engine
       if (engineRef?.current?.applyEffects) {
         try {
           engineRef.current.applyEffects(newMasterEffects);
@@ -328,7 +370,7 @@ const Equalizer = ({isOpen, onClose, initialPosition = {x: 100, y: 100}}) => {
         }
       }
 
-      // Persist master effects
+      // Persist to localStorage
       try {
         localStorage.setItem(
           "webamp.masterEffects",
@@ -342,10 +384,13 @@ const Equalizer = ({isOpen, onClose, initialPosition = {x: 100, y: 100}}) => {
     pendingChangesRef.current.clear();
   }, [selectedTrackId, masterEffects, engineRef, setMasterEffects]);
 
+  /**
+   * Handle individual band change (with preview support)
+   */
   const handleBandChange = useCallback((index, value, isPreview = false) => {
     const freq = EQ_BANDS[index].freq;
 
-    // Always update UI immediately
+    // Update UI immediately
     setBandValues((prev) => {
       const next = [...prev];
       next[index] = value;
@@ -353,24 +398,25 @@ const Equalizer = ({isOpen, onClose, initialPosition = {x: 100, y: 100}}) => {
     });
 
     if (isPreview) {
-      // don't apply to engine
       pendingChangesRef.current.set(freq, value);
     }
   }, []);
 
+  /**
+   * Handle band change completion (apply to engine)
+   */
   const handleBandChangeComplete = useCallback(
     async (index, value) => {
       const freq = EQ_BANDS[index].freq;
-
-      // Store this final value
       pendingChangesRef.current.set(freq, value);
-
-      // Apply all pending changes to the audio engine
       await applyPendingChanges();
     },
     [applyPendingChanges]
   );
 
+  /**
+   * Apply EQ preset to current target
+   */
   const handlePresetChange = useCallback(
     async (presetKey) => {
       setSelectedPreset(presetKey);
@@ -378,11 +424,10 @@ const Equalizer = ({isOpen, onClose, initialPosition = {x: 100, y: 100}}) => {
       if (presetKey !== "custom" && EQ_PRESETS[presetKey]) {
         const preset = EQ_PRESETS[presetKey];
 
-        // Apply all values at once
         if (selectedTrackId) {
+          // Apply preset to track
           const track = audioManager?.getTrack(selectedTrackId);
           if (track) {
-            // Build the new effects object with all EQ bands
             const newEffects = {...track.effects};
             EQ_BANDS.forEach((band, i) => {
               newEffects[band.freq] = preset.values[i];
@@ -391,7 +436,7 @@ const Equalizer = ({isOpen, onClose, initialPosition = {x: 100, y: 100}}) => {
             track.effects = newEffects;
             setBandValues(preset.values);
 
-            // Update engine ONCE
+            // Update engine
             if (engineRef?.current?.setTrackEffects) {
               try {
                 engineRef.current.setTrackEffects(
@@ -413,7 +458,7 @@ const Equalizer = ({isOpen, onClose, initialPosition = {x: 100, y: 100}}) => {
             }
           }
         } else {
-          // Master preset
+          // Apply preset to master
           const newMasterEffects = {...masterEffects};
           EQ_BANDS.forEach((band, i) => {
             newMasterEffects[band.freq] = preset.values[i];
@@ -422,7 +467,7 @@ const Equalizer = ({isOpen, onClose, initialPosition = {x: 100, y: 100}}) => {
           setMasterEffects(newMasterEffects);
           setBandValues(preset.values);
 
-          // Update engine ONCE
+          // Update engine
           if (engineRef?.current?.applyEffects) {
             try {
               engineRef.current.applyEffects(newMasterEffects);
@@ -446,10 +491,16 @@ const Equalizer = ({isOpen, onClose, initialPosition = {x: 100, y: 100}}) => {
     [selectedTrackId, masterEffects, engineRef, setMasterEffects]
   );
 
+  /**
+   * Reset EQ to flat response
+   */
   const handleReset = useCallback(() => {
     handlePresetChange("flat");
   }, [handlePresetChange]);
 
+  /**
+   * Window dragging handlers
+   */
   const handleMouseDown = (e) => {
     if (
       e.target.closest(`.${styles.eqControls}`) ||
@@ -479,6 +530,7 @@ const Equalizer = ({isOpen, onClose, initialPosition = {x: 100, y: 100}}) => {
 
   const handleMouseUp = useCallback(() => setIsDragging(false), []);
 
+  // Add global mouse listeners for dragging
   useEffect(() => {
     if (isDragging) {
       window.addEventListener("mousemove", handleMouseMove);
@@ -502,6 +554,7 @@ const Equalizer = ({isOpen, onClose, initialPosition = {x: 100, y: 100}}) => {
       style={{left: position.x, top: position.y}}
       onMouseDown={handleMouseDown}
     >
+      {/* Header with title and close button */}
       <div className={styles.header}>
         <div className={styles.titleSection}>
           <h3 className={styles.title}>Equalizer</h3>
@@ -514,6 +567,7 @@ const Equalizer = ({isOpen, onClose, initialPosition = {x: 100, y: 100}}) => {
         </button>
       </div>
 
+      {/* Frequency response visualization */}
       <div className={styles.curveContainer}>
         <FrequencyResponseCurve bandValues={bandValues} />
         <div className={styles.dbLabels}>
@@ -523,6 +577,7 @@ const Equalizer = ({isOpen, onClose, initialPosition = {x: 100, y: 100}}) => {
         </div>
       </div>
 
+      {/* 10-band EQ controls */}
       <div className={styles.eqControls}>
         <div className={styles.bandsContainer}>
           {EQ_BANDS.map((band, index) => (
@@ -546,6 +601,7 @@ const Equalizer = ({isOpen, onClose, initialPosition = {x: 100, y: 100}}) => {
         </div>
       </div>
 
+      {/* Footer with preset selector and controls */}
       <div className={styles.footer}>
         <div className={styles.presetSection}>
           <label className={styles.presetLabel}>Preset:</label>
@@ -562,6 +618,8 @@ const Equalizer = ({isOpen, onClose, initialPosition = {x: 100, y: 100}}) => {
             ))}
           </select>
         </div>
+
+        {/* Switch between track and master EQ */}
         {selectedTrackId && (
           <div>
             <button
@@ -572,6 +630,8 @@ const Equalizer = ({isOpen, onClose, initialPosition = {x: 100, y: 100}}) => {
             </button>
           </div>
         )}
+
+        {/* Reset button */}
         <button
           className={`${styles.resetButton} ${!isModified ? styles.resetButtonDisabled : ""}`}
           onClick={handleReset}

@@ -1,3 +1,11 @@
+/**
+ * AssetsTab Component
+ *
+ * Displays and manages audio assets in a searchable list.
+ * Supports import, rename, delete, and drag-and-drop operations.
+ * Integrates with IndexedDB for persistent storage and asset buffer caching.
+ */
+
 import {useState, useEffect, useContext} from "react";
 import {IoSearch} from "react-icons/io5";
 import {MoonLoader} from "react-spinners";
@@ -15,6 +23,7 @@ const AssetsTab = ({
   refreshTrigger,
   assetBufferCache,
 }) => {
+  // Component state
   const [searchTerm, setSearchTerm] = useState("");
   const [assets, setAssets] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -22,9 +31,12 @@ const AssetsTab = ({
   const [editingAssetId, setEditingAssetId] = useState(null);
   const [editingName, setEditingName] = useState("");
 
+  // Access database refresh trigger from app context
   const {dbRefreshTrigger} = useContext(AppContext);
 
-  // Load assets from IndexedDB
+  /**
+   * Load assets from IndexedDB
+   */
   const loadAssets = async () => {
     try {
       setIsLoading(true);
@@ -38,27 +50,32 @@ const AssetsTab = ({
     }
   };
 
+  // Load assets on mount and when refresh trigger changes
   useEffect(() => {
     loadAssets();
   }, [dbRefreshTrigger]);
 
-  // Reload when refreshTrigger changes (triggered by external imports)
+  // Reload when external import triggers a refresh
   useEffect(() => {
     if (refreshTrigger) {
       loadAssets();
     }
   }, [refreshTrigger]);
 
+  /**
+   * Handle successful audio import
+   * @param {Object} importResult - Imported audio data with buffer
+   */
   const handleImportSuccess = async (importResult) => {
     console.log("[AssetsTab] Import result:", importResult);
 
     try {
       const {buffer} = importResult;
 
-      // Use shared utility to save asset
+      // Save asset to IndexedDB using shared utility
       const assetId = await saveAsset(importResult, dbManager);
 
-      // Get the saved asset to retrieve the potentially renamed name
+      // Retrieve saved asset to get final name (may have been auto-renamed)
       const savedAsset = await dbManager.getAsset(assetId);
       if (!savedAsset) {
         console.error("[AssetsTab] Failed to retrieve saved asset");
@@ -66,25 +83,24 @@ const AssetsTab = ({
         return;
       }
 
-      // Update importResult with the actual saved name (may have been renamed for duplicates)
+      // Update result with DB-stored name
       const updatedImportResult = {
         ...importResult,
-        name: savedAsset.name, // Use the name from DB which may include (2), (3), etc.
+        name: savedAsset.name,
       };
 
-      // Cache the buffer with the asset ID for buffer sharing
+      // Cache audio buffer for shared access across tracks
       if (assetBufferCache && buffer) {
-        // Import provides native AudioBuffer, convert to Tone.ToneAudioBuffer
         const Tone = await import("tone");
         const toneBuffer = new Tone.ToneAudioBuffer(buffer);
         assetBufferCache.set(assetId, toneBuffer);
         console.log(`[AssetsTab] Cached buffer for asset ${assetId}`);
       }
 
-      // Reload assets
+      // Reload asset list
       await loadAssets();
 
-      // Call parent's onImportSuccess to create a track with the updated name
+      // Notify parent component to create track
       if (onImportSuccess) {
         onImportSuccess(updatedImportResult, assetId);
       }
@@ -97,11 +113,16 @@ const AssetsTab = ({
     }
   };
 
+  /**
+   * Delete an asset with confirmation and dependency check
+   * @param {string} assetId - ID of asset to delete
+   * @param {Event} event - Click event to stop propagation
+   */
   const handleDeleteAsset = async (assetId, event) => {
     event.stopPropagation();
 
     try {
-      // Check if asset is being used by any tracks
+      // Check if asset is in use by any tracks
       const isInUse = await dbManager.isAssetInUse(assetId);
 
       if (isInUse) {
@@ -118,7 +139,7 @@ const AssetsTab = ({
       await dbManager.deleteAsset(assetId);
       await loadAssets();
 
-      // Notify parent to clear buffer cache
+      // Notify parent to clear cached buffer
       if (onAssetDelete) {
         onAssetDelete(assetId);
       }
@@ -128,6 +149,10 @@ const AssetsTab = ({
     }
   };
 
+  /**
+   * Set global drag data for cross-component drag operations
+   * @param {Object} asset - Asset object being dragged
+   */
   const setGlobalDragAsset = (asset) => {
     if (typeof window === "undefined") return;
     window.__WEBAMP_DRAG_ASSET__ = {
@@ -142,8 +167,12 @@ const AssetsTab = ({
     delete window.__WEBAMP_DRAG_ASSET__;
   };
 
+  /**
+   * Handle drag start event for asset dragging
+   * @param {DragEvent} event - Native drag event
+   * @param {Object} asset - Asset being dragged
+   */
   const handleDragStart = (event, asset) => {
-    // Store asset data in drag event
     event.dataTransfer.setData(
       "application/json",
       JSON.stringify({
@@ -160,13 +189,22 @@ const AssetsTab = ({
     clearGlobalDragAsset();
   };
 
+  // Clean up global drag data on unmount
   useEffect(() => () => clearGlobalDragAsset(), []);
 
+  /**
+   * Start editing asset name on double-click
+   * @param {Object} asset - Asset to rename
+   */
   const handleDoubleClick = (asset) => {
     setEditingAssetId(asset.id);
     setEditingName(asset.name);
   };
 
+  /**
+   * Submit renamed asset name to database
+   * @param {string} assetId - ID of asset being renamed
+   */
   const handleRenameSubmit = async (assetId) => {
     if (!editingName.trim()) {
       alert("Asset name cannot be empty");
@@ -186,6 +224,11 @@ const AssetsTab = ({
     }
   };
 
+  /**
+   * Handle key events during rename editing
+   * @param {KeyboardEvent} e - Keyboard event
+   * @param {string} assetId - ID of asset being renamed
+   */
   const handleRenameKeyDown = (e, assetId) => {
     if (e.key === "Enter") {
       handleRenameSubmit(assetId);
@@ -195,6 +238,7 @@ const AssetsTab = ({
     }
   };
 
+  // Filter assets based on search term
   const filteredAssets = assets.filter((asset) =>
     asset.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -202,6 +246,7 @@ const AssetsTab = ({
   return (
     <div className={styles.container}>
       <div className={styles.wrapper}>
+        {/* Search Bar */}
         <div className={styles.searchBar}>
           <IoSearch size={18} color="#888" />
           <input
@@ -213,18 +258,21 @@ const AssetsTab = ({
           />
         </div>
 
+        {/* Table Headers */}
         <div className={styles.tableHeader}>
           <div>Name</div>
           <div>Duration</div>
-          <div></div> {/* Empty header for trash can column */}
+          <div></div> {/* Empty column for delete button */}
         </div>
 
+        {/* Loading State */}
         {isLoading ? (
           <div className={styles.spinner}>
             <MoonLoader color="white" size={30} />
           </div>
         ) : (
           <div className={styles.songList}>
+            {/* Empty State */}
             {filteredAssets.length === 0 ? (
               <div className={styles.emptyMessage}>
                 {searchTerm
@@ -232,6 +280,7 @@ const AssetsTab = ({
                   : "No assets yet. Import some audio files!"}
               </div>
             ) : (
+              /* Asset List */
               filteredAssets.map((asset) => (
                 <div
                   key={asset.id}
@@ -244,6 +293,7 @@ const AssetsTab = ({
                     cursor: editingAssetId === asset.id ? "text" : "grab",
                   }}
                 >
+                  {/* Asset Name (editable on double-click) */}
                   <div className={styles.songName}>
                     {editingAssetId === asset.id ? (
                       <input
@@ -260,8 +310,11 @@ const AssetsTab = ({
                       <span>{asset.name}</span>
                     )}
                   </div>
+
+                  {/* Asset Duration */}
                   <div className={styles.songDuration}>{asset.duration}</div>
 
+                  {/* Delete Button */}
                   <button
                     onClick={(e) => handleDeleteAsset(asset.id, e)}
                     className={styles.deleteButton}
@@ -275,8 +328,10 @@ const AssetsTab = ({
           </div>
         )}
 
+        {/* Error Display */}
         {error && <p className={styles.error}>{error}</p>}
 
+        {/* Import Button */}
         <div className={styles.importButtonWrapper}>
           <AudioImportButton
             onImportSuccess={handleImportSuccess}

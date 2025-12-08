@@ -1,3 +1,6 @@
+/* Track lane layout styling */
+
+/* Left side controls panel */
 .tracklane-side {
   width: var(--track-controls-width);
   min-width: var(--track-controls-width);
@@ -13,6 +16,7 @@
   /* border: 0.1px solid lime; */
 }
 
+/* Main track row container */
 .tracklane-root {
   display: flex;
   gap: var(--track-controls-gap);
@@ -29,6 +33,7 @@
   /* border: 0.1px solid lime; */
 }
 
+/* Right side content area */
 .tracklane-main {
   min-height: var(--track-height, 96px);
   width: var(--timeline-content-width, 100%);
@@ -52,6 +57,7 @@
   font-weight: 600;
 }
 
+/* Controls container */
 .tracklane-controls-box {
   background: var(--tracklane-button-box);
   padding: 8px;
@@ -80,6 +86,7 @@
   /* border: 0.1px solid yellow; */
 }
 
+/* Base track button */
 .tl-btn {
   background: var(--mute-btn-bg);
   color: var(--app-text);
@@ -93,6 +100,7 @@
   border: none;
 }
 
+/* Audio-specific buttons (mute/solo) */
 .tl-btn-audio {
   background: var(--mute-btn-bg, var(--surface-subtle));
   color: var(--mute-btn-color, var(--app-text));
@@ -103,6 +111,7 @@
   color: var(--mute-btn-color, var(--app-text));
 }
 
+/* Active state for mute/solo */
 .tl-btn-audio.tl-btn--active {
   background: var(--mute-btn-active-bg);
   color: var(--mute-btn-active-color);
@@ -120,6 +129,7 @@
   border-color: var(--surface-active);
 }
 
+/* Delete button */
 .tl-btn-delete {
   background: var(--mute-btn-bg, var(--surface-subtle));
   color: var(--mute-btn-color, var(--app-text));
@@ -141,15 +151,17 @@
   border-radius: 4px;
   display: flex;
   flex-direction: column;
-  contain: strict;
+  contain: strict; /* Performance optimization */
   will-change: transform;
 }
 
+/* Visual indicator during drag & drop */
 .tracklane-timeline--drop {
   outline: 2px dashed var(--drop-outline);
   outline-offset: -4px;
 }
 
+/* Drag & drop preview overlay */
 .tracklane-drop-preview {
   position: absolute;
   top: 6px;
@@ -183,8 +195,8 @@
   opacity: 0.8;
 }
 
+/* Absolutely positioned segment container */
 .tracklane-segment-positioned {
-  /* Positioned absolutely within timeline */
   position: absolute;
   top: 0;
   bottom: 0;
@@ -223,6 +235,7 @@
   font-size: 12px;
 }
 
+/* Empty track state */
 .tracklane-empty {
   color: var(--muted-text);
   padding: 12px;
@@ -234,6 +247,7 @@
   transform: translate(-50%, -50%);
 }
 
+/* Context menu (portal) */
 .tracklane-context-menu {
   position: fixed;
   z-index: 50;
@@ -288,11 +302,12 @@
   background: var(--context-divider);
 }
 
-/* Hide track name overlay when timeline is very narrow */
+/* Responsive: hide title overlay on narrow timelines */
 .tracklane-timeline[data-narrow="true"] .tracklane-title-overlay {
   display: none;
 }
-*/ .tracklane-timeline[data-medium="true"] .tracklane-title-overlay {
+
+.tracklane-timeline[data-medium="true"] .tracklane-title-overlay {
   padding: 4px 6px;
 }
 
@@ -302,6 +317,7 @@
   font-size: 11px;
 }
 
+/* Context menu section headers */
 .context-menu-section-title {
   font-size: 11px;
   text-transform: uppercase;

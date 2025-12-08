@@ -12,7 +12,9 @@ function App() {
     <AppContextProvider>
       <Router>
         <Routes>
+          {/* Main audio editor page */}
           <Route path="/" element={<AudioPage />} />
+          {/* Authentication pages */}
           <Route path="/register" element={<Register />} />
           <Route path="/login" element={<Login />} />
           <Route path="/reset-password" element={<ResetPassoword />} />
