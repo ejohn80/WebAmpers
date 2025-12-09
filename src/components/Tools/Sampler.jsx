@@ -21,19 +21,62 @@ import styles from "./Sampler.module.css";
 const PIANO_SOUNDS = {
   A0: "A0.mp3",
   A1: "A1.mp3",
-  // ... (rest of piano sound mappings)
+  A2: "A2.mp3",
+  A3: "A3.mp3",
+  A4: "A4.mp3",
+  A5: "A5.mp3",
+  A6: "A6.mp3",
+  A7: "A7.mp3",
+  C1: "C1.mp3",
+  C2: "C2.mp3",
+  C3: "C3.mp3",
+  C4: "C4.mp3",
+  C5: "C5.mp3",
+  C6: "C6.mp3",
+  C7: "C7.mp3",
+  C8: "C8.mp3",
+  "D#1": "Ds1.mp3",
+  "D#2": "Ds2.mp3",
+  "D#3": "Ds3.mp3",
+  "D#4": "Ds4.mp3",
+  "D#5": "Ds5.mp3",
+  "D#6": "Ds6.mp3",
+  "D#7": "Ds7.mp3",
+  "F#1": "Fs1.mp3",
+  "F#2": "Fs2.mp3",
+  "F#3": "Fs3.mp3",
+  "F#4": "Fs4.mp3",
+  "F#5": "Fs5.mp3",
+  "F#6": "Fs6.mp3",
+  "F#7": "Fs7.mp3",
 };
 
 // Piano UI key layout (1 octave)
 const PIANO_KEYS = [
   {note: "C4", label: "C", key: "a", isBlack: false},
-  // ... (rest of piano keys)
+  {note: "C#4", label: "C#", key: "w", isBlack: true, offset: 1},
+  {note: "D4", label: "D", key: "s", isBlack: false},
+  {note: "D#4", label: "D#", key: "e", isBlack: true, offset: 2},
+  {note: "E4", label: "E", key: "d", isBlack: false},
+  {note: "F4", label: "F", key: "f", isBlack: false},
+  {note: "F#4", label: "F#", key: "t", isBlack: true, offset: 4},
+  {note: "G4", label: "G", key: "g", isBlack: false},
+  {note: "G#4", label: "G#", key: "y", isBlack: true, offset: 5},
+  {note: "A4", label: "A", key: "h", isBlack: false},
+  {note: "A#4", label: "A#", key: "u", isBlack: true, offset: 6},
+  {note: "B4", label: "B", key: "j", isBlack: false},
 ];
 
 // Drum pad configuration
 const DRUM_PADS = [
   {note: "C1", label: "Kick", key: "a", file: "kick-plain"},
-  // ... (rest of drum pads)
+  {note: "D1", label: "Snare", key: "s", file: "snare-acoustic01"},
+  {note: "E1", label: "Hi-Hat", key: "d", file: "hihat-plain"},
+  {note: "F1", label: "Open HH", key: "f", file: "openhat-tight"},
+  {note: "G1", label: "Tom", key: "g", file: "tom-acoustic01"},
+  {note: "A1", label: "Clap", key: "h", file: "clap-analog"},
+  {note: "B1", label: "Kick 2", key: "j", file: "kick-thump"},
+  {note: "C2", label: "Snare 2", key: "k", file: "snare-808"},
 ];
 
 // Map drum notes to file names
