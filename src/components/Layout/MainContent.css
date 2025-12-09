@@ -18,6 +18,7 @@
     var(--track-row-padding, 0px) + var(--track-controls-width) +
       var(--track-controls-gap)
   );
+  background-color: var(--main-content-background);
 }
 
 /* Scrollable timeline area */
@@ -206,6 +207,8 @@
   width: 2px;
   height: 18px;
   background: var(--timeline-pre-line);
+  border-bottom-left-radius: 5px;
+  border-bottom-right-radius: 5px;
 }
 
 .timeline-tick-label {
@@ -219,6 +222,8 @@
 .timeline-tick.pre .timeline-tick-line {
   height: 14px;
   opacity: 0.3;
+  border-bottom-left-radius: 2px;
+  border-bottom-right-radius: 2px;
 }
 
 .timeline-tick.pre .timeline-tick-label {

@@ -17,6 +17,7 @@ import {
   XIcon,
   DeleteEffectsIcon,
 } from "../Svgs.jsx";
+import {FaItalic} from "react-icons/fa";
 
 function EffectsTab() {
   // Access effect management functions and state from AppContext
@@ -362,9 +363,10 @@ function EffectsTab() {
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
+            fontStyle: "italic",
           }}
         >
-          Please select an audio track to manage effects.
+          Select an audio track to manage its effects
         </div>
       </div>
     );

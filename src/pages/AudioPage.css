@@ -15,6 +15,7 @@ html,
   z-index: 9999;
   overflow: visible; /* Allow dropdowns to extend beyond header bounds */
   border-bottom: 2px solid var(--header-border);
+  background-color: var(--header-background);
 }
 
 /* Main application container - uses CSS Grid for three-row layout */
@@ -34,7 +35,7 @@ html,
 .section {
   padding: 10px;
   box-sizing: border-box;
-  color: var(--section-text); /* match header text color */
+  color: var(--section-text);
 }
 
 /* Footer-specific overrides to vertically center content inside the small footer row */
