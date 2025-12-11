@@ -269,12 +269,16 @@
   --slider-background: #1a1a1a;
   --slider-default: #797f80;
   --disabled-button: #131313;
+  --effects-scrollbar: #1e1d20;
+  --effects-scrollbar-2: #333239;
 }
 
 /* ======================================================================
    Light mode theme override
    ====================================================================== */
 .theme-light {
+  --effects-scrollbar: #e4e3e7;
+  --effects-scrollbar-2: #d0d0d1;
   --disabled-button: #a5a2a2;
   --slider-default: #b9baba;
   --slider-background: #efefef;

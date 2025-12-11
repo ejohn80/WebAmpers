@@ -5,7 +5,7 @@
   overflow-y: auto;
   height: 100%;
   scrollbar-width: thin; /* Firefox scrollbar styling */
-  scrollbar-color: #333239 #1e1d20; /* Firefox: thumb and track colors */
+  scrollbar-color: var(--effects-scrollbar) var(--effects-scrollbar-2); /* Firefox: thumb and track colors */
   background: var(--sidebar-background);
   transition:
     width 0.25s ease,
