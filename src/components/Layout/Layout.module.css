@@ -175,7 +175,7 @@
 /* Empty state for effects */
 .noEffectsMessage {
   text-align: center;
-  color: #888;
+  color: var(--no-effects-text, #888);
   font-size: 15px;
   padding: 40px 20px;
   font-style: italic;
@@ -273,12 +273,13 @@
 .button {
   padding: 4px 10px;
   font-size: 11px;
-  background: var(--effect-btn-bg, #172528);
+  background: var(--individual-reset-button-bg, #172528);
   color: var(--effect-btn-text, #17e1ff);
   border: none;
   border-radius: 4px;
   cursor: pointer;
   transition: all 0.2s;
+  border: none;
 }
 
 .button:hover {
@@ -287,7 +288,7 @@
 
 /* Disabled button states */
 .buttonDisabled {
-  background: #131313 !important;
+  background: var(--disabled-button) !important;
   color: #4a4a4a !important;
   cursor: not-allowed !important;
   opacity: 0.5;
@@ -303,7 +304,7 @@
   padding: 10px 16px;
   background: var(--effect-btn-bg, #172528);
   color: var(--effect-btn-text, #17e1ff);
-  border: none;
+  border: 2px solid var(--reset-all-button-border, #172528);
   border-radius: 6px;
   font-weight: bold;
   cursor: pointer;
@@ -328,14 +329,14 @@
 }
 
 .resetAllButtonDisabled {
-  background: #2a2a2a !important;
-  color: #666666 !important;
+  background: var(--disabled-reset-bg) !important;
+  color: var(--disabled-reset-text) !important;
   cursor: not-allowed !important;
   opacity: 0.5;
 }
 
 .resetAllButtonDisabled:hover {
-  background: #313131 !important;
+  background: var(--reset-all-disabled-hover) !important;
   transform: none !important;
 }
 
@@ -343,7 +344,7 @@
 .deleteAllButton {
   padding: 10px 20px;
   margin-top: 8px;
-  background: rgba(238, 32, 53, 0.15);
+  background: var(--delete-all-bg);
   color: #fe5656;
   border: none;
   border-radius: 6px;
@@ -356,7 +357,7 @@
 }
 
 .deleteAllButton:hover {
-  background: rgba(220, 53, 69, 0.3);
+  background: var(--delete-all-bg-hover);
 }
 
 .deleteAllButtonDisabled {
@@ -400,10 +401,10 @@
   right: 0;
   top: 50%;
   height: 6px;
-  background: #1a1a1a;
+  background: var(--slider-background);
   border-radius: 1.5px;
   transform: translateY(-50%);
-  outline: 1px solid #787879;
+  outline: 1px solid var(--slider-outline);
   overflow: visible;
 }
 
@@ -427,7 +428,7 @@
 
 /* Slider state colors */
 .sliderFill.default {
-  background: #797f80; /* Gray at default value */
+  background: var(--slider-default); /* Gray at default value */
 }
 
 .sliderFill.changed {
@@ -529,7 +530,7 @@
 .masterToggleButton {
   background: var(--master-toggle-bg, #262529);
   color: var(--master-toggle-text, #e5e5e5);
-  border: none;
+  border: 2px solid var(--reset-all-button-border, #262529);
   border-radius: 6px;
   cursor: pointer;
   width: 50%;
@@ -632,10 +633,10 @@
 /* Individual project item */
 .projectItem {
   margin-bottom: 8px;
-  border: 1px solid var(--project-item-border, #3a3a3a);
+  border: 2px solid var(--project-item-border);
   padding: 12px;
   border-radius: 6px;
-  background: var(--project-item-bg, #2b2b2b);
+  background: var(--project-item-bg);
   cursor: pointer;
   transition: all 0.2s;
   color: var(--project-item-text, #fff);
@@ -777,7 +778,7 @@
 
 .addEffectsButton {
   padding: 10px 20px;
-  margin-bottom: 16px;
+  margin-bottom: 8px;
   background: var(--sidebar-cta-bg, #172528);
   color: var(--sidebar-cta-text, #17e1ff);
   border: 2px solid var(--sidebar-cta-border, #23393d);
@@ -883,4 +884,12 @@
   padding: 40px 20px;
   color: #888;
   font-size: 14px;
+}
+
+/* Toggle and Reset Row - Side by Side Layout */
+.toggleResetRow {
+  display: flex;
+  gap: 5px;
+  width: 100%;
+  margin-bottom: 8px;
 }

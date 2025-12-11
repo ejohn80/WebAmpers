@@ -168,6 +168,7 @@
   z-index: 11;
   margin-bottom: var(--timeline-ruler-gap, 12px);
   overflow: visible;
+  outline: 0.5px solid grey;
 }
 
 /* Triangle indicator for timeline scrubbing */

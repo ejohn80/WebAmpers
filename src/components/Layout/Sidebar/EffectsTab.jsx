@@ -357,7 +357,7 @@ function EffectsTab() {
         <div
           style={{
             padding: "16px",
-            color: "#ccc",
+            color: "var(--select-audio-track)",
             textAlign: "center",
             minHeight: "100px",
             display: "flex",

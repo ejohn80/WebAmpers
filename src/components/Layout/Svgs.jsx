@@ -763,7 +763,7 @@ export function ResetAllButtonEnabled() {
     >
       <path
         d="M3.63889 7.60714L0.75 4.17857M0.75 4.17857L3.63889 0.75M0.75 4.17857H10.1389C12.1332 4.17857 13.75 5.24021 13.75 7.60714C13.75 9.97408 12.1333 11.25 10.1389 11.25H2.25"
-        stroke="#17E1FF"
+        stroke="var(--reset-all-button-enabled)"
         strokeWidth="2"
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -783,7 +783,7 @@ export function ResetAllButtonDisabled() {
     >
       <path
         d="M3.63889 7.60714L0.75 4.17857M0.75 4.17857L3.63889 0.75M0.75 4.17857H10.1389C12.1332 4.17857 13.75 5.24021 13.75 7.60714C13.75 9.97408 12.1333 11.25 10.1389 11.25H2.25"
-        stroke="#666666"
+        stroke="var(--disabled-reset-text)"
         strokeWidth="2"
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -803,7 +803,7 @@ export function PlusSignIcon() {
     >
       <path
         d="M1 6H6.5M6.5 6H12M6.5 6V11M6.5 6V1"
-        stroke="#17E1FF"
+        stroke="var(--plus-sign)"
         strokeWidth="2.5"
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -823,7 +823,7 @@ export function XIcon() {
     >
       <path
         d="M1 9L4.50003 5.00003M4.50003 5.00003L8 1M4.50003 5.00003L1 1M4.50003 5.00003L8 9"
-        stroke="white"
+        stroke="var(--x-icon)"
         strokeWidth="2"
         strokeLinecap="round"
         strokeLinejoin="round"
