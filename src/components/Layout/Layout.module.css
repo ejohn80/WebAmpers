@@ -797,8 +797,16 @@
   transform: translateY(-1px);
 }
 
+/* Toggle and Reset Row - Side by Side Layout */
+.toggleResetRow {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  margin-bottom: 15px;
+}
+
 /* Effects dropdown menu */
-.toggleResetRow .effectsMenuDropdown {
+.effectsMenuDropdown {
   background: #1e1d20;
   border: 1px solid #333239;
   border-radius: 8px;
