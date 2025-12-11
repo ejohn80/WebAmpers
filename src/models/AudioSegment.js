@@ -49,10 +49,17 @@ export class AudioSegment {
   effects;
 
   /**
+   * The color for this segment's waveform display.
+   * @type {string|null}
+   */
+  color;
+
+  /**
    * @param {object} options - The initial properties of the segment.
    * @param {Tone.ToneAudioBuffer} options.buffer - The full audio buffer. This is required.
    * @param {string} [options.name] - The display name for the segment.
    * @param {string} [options.fileName] - The original filename of the audio asset.
+   * @param {string} [options.color] - The color for the segment's waveform.
    * @param {number} [options.offset=0] - The start offset in seconds.
    * @param {number} [options.duration] - The duration in seconds. Defaults to the buffer's duration minus the offset.
    * @param {Array<any>} [options.effects=[]] - An initial list of effects for this segment.
@@ -68,6 +75,7 @@ export class AudioSegment {
     // Store name and fileName
     this.name = options.name || options.fileName || null;
     this.fileName = options.fileName || options.name || null;
+    this.color = options.color || null;
 
     this.buffer = options.buffer;
     this.offset = options.offset || 0;
@@ -124,6 +132,7 @@ export class AudioSegment {
       id: this.id,
       name: this.name,
       fileName: this.fileName,
+      color: this.color,
       offset: this.offset,
       duration: this.duration,
       // Note: buffer is not serialized, it should be stored separately

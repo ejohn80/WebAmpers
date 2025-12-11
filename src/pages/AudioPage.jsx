@@ -528,6 +528,7 @@ function AudioPage() {
                 buffer: segmentToneBuffer,
                 name: segment.name || segment.fileName || null,
                 fileName: segment.fileName || segment.name || null,
+                color: segment.color || null,
               });
             }
           }
@@ -802,6 +803,7 @@ function AudioPage() {
           durationMs,
           startOnTimelineMs: Math.round(timelinePositionMs),
           startInFileMs: 0,
+          color: `hsl(${Math.random() * 360}, 70%, 50%)`,
         };
 
         // Add segment with automatic spacing
@@ -849,6 +851,7 @@ function AudioPage() {
             durationMs,
             startOnTimelineMs: 0,
             startInFileMs: 0,
+            color: `hsl(${Math.random() * 360}, 70%, 50%)`,
           },
         ],
         volume: 0,
@@ -883,6 +886,7 @@ function AudioPage() {
             durationMs,
             startOnTimelineMs: 0,
             startInFileMs: 0,
+            color: `hsl(${Math.random() * 360}, 70%, 50%)`,
           },
         ],
         volume: 0,
@@ -1682,6 +1686,7 @@ function AudioPage() {
           assetId: seg.assetId || trackData.assetId,
           name: segmentCopyName,
           fileName: segmentCopyName,
+          color: seg.color || null,
         };
       });
 
@@ -1710,6 +1715,7 @@ function AudioPage() {
           name: seg.name,
           fileName: seg.fileName,
           assetId: seg.assetId,
+          color: seg.color || null,
         })),
       };
 

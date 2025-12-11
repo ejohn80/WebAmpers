@@ -5,8 +5,8 @@
   overflow-y: auto;
   height: 100%;
   scrollbar-width: thin; /* Firefox scrollbar styling */
-  scrollbar-color: #333239 #1e1d20; /* Firefox: thumb and track colors */
-  background: var(--panel-bg);
+  scrollbar-color: var(--effects-scrollbar) var(--effects-scrollbar-2); /* Firefox: thumb and track colors */
+  background: var(--sidebar-background);
   transition:
     width 0.25s ease,
     min-width 0.25s ease,
@@ -57,9 +57,8 @@
   border: none;
   background: var(--sidebar-tab-bg, #193338);
   color: var(--sidebar-tab-text, #17e1ff);
-  font-weight: 600;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
   cursor: pointer;
   transition:
     background 0.2s ease,
@@ -67,10 +66,6 @@
   position: relative;
   letter-spacing: -0.4px;
   font-size: 14px;
-}
-
-.sidebar-tab-button + .sidebar-tab-button {
-  border-left: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .sidebar-tab-button.is-first {
@@ -95,5 +90,4 @@
 .sidebar-tab-button.is-active {
   background: var(--sidebar-tab-active-bg, #17e1ff);
   color: var(--sidebar-tab-active-text, #193338);
-  box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.2);
 }

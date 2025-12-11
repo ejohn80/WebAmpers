@@ -9,11 +9,11 @@
   flex-direction: column;
   gap: 6px;
   align-self: stretch;
-  background: var(--tracklane-button-box);
+  background-color: var(--tracklane-button-box);
   left: 0;
   z-index: 5;
   border-radius: 6px;
-  /* border: 0.1px solid lime; */
+  /* border: 1px solid lime; */
 }
 
 /* Main track row container */
@@ -21,7 +21,7 @@
   display: flex;
   gap: var(--track-controls-gap);
   align-items: stretch;
-  background: var(--waveform-background);
+  background-color: var(--waveform-background);
   color: var(--app-text);
   padding: var(--track-row-padding, 8px);
   border-radius: 6px;
@@ -40,7 +40,7 @@
   flex: 1 1 auto;
   display: flex;
   flex-direction: column;
-  background: var(--tracklane-button-box);
+  background: var(--tracklane-waveform-background);
   padding: 8px 0px;
   /* border: 1px solid red; */
 }
@@ -59,13 +59,15 @@
 
 /* Controls container */
 .tracklane-controls-box {
-  background: var(--tracklane-button-box);
+  /* background-color: var(--tracklane-button-box); */
   padding: 8px;
   border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex: 1 1 auto;
+  z-index: 6;
+  /* border: 1px solid hotpink; */
 }
 
 .tracklane-controls-box .tracklane-controls {
@@ -81,14 +83,14 @@
 .tracklane-controls {
   display: flex;
   gap: 8px;
-  padding: 2px 6px;
+  padding: 4px 6px;
   align-items: center;
   /* border: 0.1px solid yellow; */
 }
 
 /* Base track button */
 .tl-btn {
-  background: var(--mute-btn-bg);
+  background-color: var(--mute-btn-bg);
   color: var(--app-text);
   padding: 6px;
   border-radius: 3px;
@@ -102,13 +104,13 @@
 
 /* Audio-specific buttons (mute/solo) */
 .tl-btn-audio {
-  background: var(--mute-btn-bg, var(--surface-subtle));
-  color: var(--mute-btn-color, var(--app-text));
+  background: var(--mute-btn-bg);
+  color: var(--mute-btn-color);
 }
 
 .tl-btn:hover {
   background: var(--mute-btn-hover);
-  color: var(--mute-btn-color, var(--app-text));
+  color: var(--mute-btn-color);
 }
 
 /* Active state for mute/solo */

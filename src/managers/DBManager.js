@@ -159,6 +159,7 @@ class DBManager {
       startInFileMs: segment.startInFileMs,
       name: segment.name || null,
       fileName: segment.fileName || null,
+      color: segment.color || null,
     };
 
     // Generate ID if missing
