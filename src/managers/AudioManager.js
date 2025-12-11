@@ -169,6 +169,7 @@ class AudioManager {
             duration: durationSec,
             name: s.name || s.fileName || null,
             fileName: s.fileName || s.name || null,
+            color: s.color || `hsl(${Math.random() * 360}, 70%, 50%)`,
           });
 
           // Preserve metadata from serialized segment
